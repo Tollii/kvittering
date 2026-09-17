@@ -42,6 +42,7 @@
 	let excluded = $state(initial.excluded);
 	let remember = $state<string[]>([]);
 	let productChanges = $state<Record<string, string>>({});
+	let productEditorOpen = $state<Record<string, boolean>>({});
 	let error = $state('');
 	let busy = $state(false);
 	let message = $state('');
@@ -286,15 +287,6 @@
 							>
 						</div>
 						{#if line.kind === 'product'}
-							<ProductSelector
-								receiptId={initial._id}
-								retailer={data.store ?? ''}
-								{line}
-								value={productChanges[line.id] ?? ''}
-								onchange={(value) => {
-									productChanges[line.id] = value;
-								}}
-							/>
 							<label
 								>Kategori<NativeSelect.Root bind:value={line.categoryId}
 									>{#each categoryGroups as [group, name] (group)}<optgroup label={name}
@@ -313,6 +305,28 @@
 											: remember.filter((id) => id !== line.id))}
 								/>Husk kategori for samme vare i denne butikken</label
 							>
+							<details bind:open={productEditorOpen[line.id]}>
+								<summary class="min-h-11 content-center"
+									>Endre produktkobling{productChanges[line.id]
+										? ' · Endring ikke lagret'
+										: ''}</summary
+								>
+								{#if productEditorOpen[line.id]}
+									<p class="footnote">
+										Produkter kobles automatisk i bakgrunnen. Du trenger bare å endre dette hvis en
+										kobling er feil.
+									</p>
+									<ProductSelector
+										receiptId={initial._id}
+										retailer={data.store ?? ''}
+										{line}
+										value={productChanges[line.id] ?? ''}
+										onchange={(value) => {
+											productChanges[line.id] = value;
+										}}
+									/>
+								{/if}
+							</details>
 							<details open={line.issues.length > 0}>
 								<summary>Andre detaljer</summary>
 								<div class="grid gap-4">
