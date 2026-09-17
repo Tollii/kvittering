@@ -8,3 +8,12 @@ bun.lockb
 # Miscellaneous
 /static/
 /drizzle/
+
+/convex/_generated/
+
+# Installed skills and Convex CLI templates
+/.agents/
+/.claude/
+/skills-lock.json
+/convex/README.md
+/convex/tsconfig.json

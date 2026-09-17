@@ -1,69 +1,121 @@
-# sv
+# Kvittering
 
-Everything you need to build a Svelte project, powered by [`sv`](https://github.com/sveltejs/cli).
+A mobile-first grocery receipt app for a private household with two members. The interface uses Norwegian, NOK, integer øre, and Europe/Oslo dates.
 
-## Creating a project
+## Local setup
 
-If you're seeing this, you've probably already done this step. Congrats!
-
-```sh
-# create a new project
-npx sv create my-app
-```
-
-To recreate this project with the same configuration:
+Use Bun and Node.js 22 or later.
 
 ```sh
-# recreate this project
-bun x sv@0.17.0 create --template minimal --types ts --add prettier eslint playwright better-auth="demo:password" ai-tools="ide:other" experimental="versions:kit+features:async,remoteFunctions,explicitEnvironmentVariables,handleRenderingErrors" drizzle="database:sqlite+sqlite:libsql" --install bun sveltemo
+bun install
+bunx convex dev --once
 ```
 
-## Developing
-
-Install dependencies with `bun install`. The home page subscribes to the public
-`samples:list` query through `convex-svelte`. It displays loading, error, empty,
-and data states. Sample data is stored in Convex, not in the page.
-
-Run the Convex development server in one terminal:
+Keep the development deployment values in `.env.local`. Set the provider keys and authentication secret in `.env`; see `.env.example`.
 
 ```sh
-bunx convex dev
+bun scripts/configure_development.ts
+bunx convex dev --once
+bun run dev
 ```
 
-Use the development deployment configured in `.env.local`. Set
-`PUBLIC_CONVEX_URL` to that deployment's URL. This variable is declared in
-`src/env.ts` and included in the client at build time.
+Open [the local app](http://localhost:5180). Create an account with a password of at least 12 characters. Create a household. The second person creates a separate account and enters the invitation code shown under **Husstanden**. The membership limit is enforced in a database transaction. Email ownership verification and password recovery are not configured in this first version.
 
-Add the three sample records, then start Svelte in another terminal:
+The configuration script only accepts a `dev:` deployment. It passes values to the Convex CLI through standard input and does not print keys. `RECEIPT_SITE_URL` can override its default app origin, `http://localhost:5180`.
+
+## Environment variables
+
+| Variable                 | Location           | Purpose                                                                        |
+| ------------------------ | ------------------ | ------------------------------------------------------------------------------ |
+| `CONVEX_DEPLOYMENT`      | Local `.env.local` | Personal development deployment selected by the Convex CLI                     |
+| `PUBLIC_CONVEX_URL`      | SvelteKit / Vercel | Convex query, mutation, and realtime URL                                       |
+| `PUBLIC_CONVEX_SITE_URL` | SvelteKit / Vercel | Convex HTTP action URL; copy the exact value from Convex, including its region |
+| `SITE_URL`               | Convex             | Exact browser origin, without a trailing slash; controls auth and image CORS   |
+| `BETTER_AUTH_SECRET`     | Convex             | Random secret of at least 32 characters                                        |
+| `OPENAI_API_KEY`         | Convex             | Receipt image extraction key                                                   |
+| `OPENAI_RECEIPT_MODEL`   | Convex             | Default `gpt-5.6-luna`                                                         |
+| `TYPESAFE_API_KEY`       | Convex             | Product classification key                                                     |
+| `TYPESAFE_MODEL`         | Convex             | Default `jev-latest`                                                           |
+| `RECEIPT_PROVIDER`       | Convex, optional   | Set to `mock` for a labelled demonstration; leave unset for live providers     |
+
+Provider keys never enter the browser bundle. The browser talks directly to authenticated Convex image endpoints. The SvelteKit server only proxies authentication requests.
+
+If the OpenAI key is missing, extraction returns the Battery fixture and marks the result as mock output. If the TypeSafe key is missing, products stay unclassified and carry a mock classification label. A live provider error is a processing failure; the app does not silently replace it with mock data. The provider label remains available in each receipt's processing information.
+
+## Receipt workflow
+
+1. Take a photo or select up to eight images. JPEG, PNG, WebP, and HEIC are supported. The browser converts images to JPEG with a maximum dimension of 2400 pixels. The server stores these capture images; it does not retain the source HEIC file.
+2. Press **Lagre kvittering**. The app first writes the images to IndexedDB. Only after that write completes does it show **Lagret på denne enheten**.
+3. The upload queue reserves a receipt using a stable request ID. It records every completed image upload. A repeated request or lost acknowledgement does not create another receipt or another image slot.
+4. After all images arrive, a Convex Workflow runs extraction, applies confirmed product aliases, calls Jev for unfamiliar products, and stores the result. Failed provider calls have bounded retries.
+5. Review the photos, names, dates, quantities, categories, amounts, discounts, and pant. Add or remove lines as needed. Resolve unclear fields and financial discrepancies before marking the receipt reviewed.
+
+The application shell works offline after a successful online visit to the production build. Capture and the local queue remain available offline for the last signed-in household. History and original server photos require a connection. Uploads resume while the app is open after connectivity returns. The app does not depend on background upload support when a mobile browser is closed. Clearing browser storage deletes photos that have not yet uploaded. The app requests persistent browser storage after saving, but a browser can refuse it.
+
+To test the service worker locally, use the production build on the same configured origin:
 
 ```sh
-bunx convex run samples:seed
-bun run dev -- --open
+bun run build
+bun run preview --host localhost --port 5180 --strictPort
 ```
 
-The seed function is internal. Repeated calls do not duplicate or overwrite
-records. The public query returns at most 20 records in name order. To check
-live updates, edit a sample description in the Convex development dashboard;
-the open page updates without a reload.
+Stop the development server first. Install the app from the browser menu or use **Add to Home Screen** on iPhone. Camera access on a phone requires HTTPS; plain HTTP on a computer's LAN address is not a supported camera deployment.
 
-For a single backend update and seed operation, use
-`bunx convex dev --once --run samples:seed`.
+## Accounting and product matching
 
-Validate the app with `bun run check`, `bunx tsc --noEmit -p convex/tsconfig.json`,
-and `bun run build`.
+- Product lines, item discounts, receipt discounts, deposits, deposit returns, other adjustments, VAT, and savings summaries have separate types.
+- All stored money values are integer øre. VAT and repeated savings summaries do not contribute to totals.
+- A product amount is its printed line amount. A separate linked discount is applied once. Receipt-wide discounts are allocated proportionally in whole øre. Unlinked discounts and other adjustments remain visible under unallocated spending.
+- Unknown and non-NOK currencies remain visible for review and are excluded from NOK totals and product price comparisons. There is no currency conversion.
+- Amounts are never changed to force a receipt to balance. Unknown values remain null. Repeated equivalent discount lines, invalid signs, quantity/price discrepancies, and total differences need review.
+- Pant is included in cash paid and excluded from product spending. Reviewed and provisional data are labelled separately. Suspected duplicates remain present until a member explicitly excludes one from spending.
+- Alias matches require the same store, exact normalized product name, brand, package size, package unit, and sale unit. There is no fuzzy name matching. Choosing **Husk kategori** confirms that identity and category for matching products. Existing matches update in small batches. Item-only category corrections keep their category.
+- Unconfirmed products remain separate in product history. Unit-price comparison requires an explicit quantity and comparable mass or volume. It does not infer package size from a name.
+- Every extraction is stored separately. Reprocessing after manual edits keeps the edited receipt intact and stores the new extraction for comparison. Revision checks prevent one member from silently replacing another member's changes.
+- Search and reports load the household history through paginated, indexed queries. The interface labels totals as incomplete while pages are still loading. This first version is intended for one small household, not a large reporting workload.
 
-The separate Better Auth demo uses Drizzle. Its schema is generated with
-`bun run auth:schema`; apply it to the configured database with `bun run db:push`
-before using the authentication demo.
+Jev receives product descriptions, supported attributes, category definitions, and linked discount product descriptions. It does not receive images, receipt totals, payment details, or household member data. Related descriptions matter: the supplied receipt's `BATTERY REMIX` line is identified more reliably with its linked `Battery energidrikk` offer text.
 
-## Building
-
-To create a production version of your app:
+## Tests and verification
 
 ```sh
-npm run build
+bun run test
+bun run check
+bunx tsc --noEmit -p convex/tsconfig.json
+bunx tsc --noEmit -p src/service-worker/tsconfig.json
+bun run lint
+bun run build
+bun run test:e2e
 ```
 
-You can preview the production build with `npm run preview`.
+The unit and Convex tests cover the Battery example, repeated savings summaries, weighted products, unknown totals, integer money validation, interrupted upload recovery, duplicate processing, household access checks, stale edits, preservation of manual corrections, and exact alias propagation.
 
-> To deploy your app, you may need to install an [adapter](https://svelte.dev/docs/kit/adapters) for your target environment.
+Run `bun scripts/verify_providers.ts` to check model access and a small live Jev classification. This sends one classification request to TypeSafe.
+
+The browser suite checks offline shell loading. Set `E2E_STORAGE_STATE` to a Playwright storage-state file for a signed-in test household to also test persistent offline photo capture. This optional test stays offline and does not upload its image. Run against the production preview, not the development server.
+
+The local implementation was also tested in Chromium at desktop and phone sizes with the supplied receipt photo. Live tests used a separate test household with two accounts. Both accounts could read the receipt and its protected photo. Offline capture survived a full reload, resumed upload on reconnection, and flagged the repeated photo as a duplicate. The repeated test receipt was explicitly excluded from spending. Real iOS camera behavior and installation still need an on-device check.
+
+## Vercel deployment
+
+This repository uses SvelteKit 3 preview. Use the pinned matching preview Vercel adapter from the lockfile; the stable version 6 adapter is incompatible with its build API. Better Auth is pinned to the 1.6 release line required by the Convex component.
+
+1. Create a Convex production deployment. Set its `SITE_URL`, `BETTER_AUTH_SECRET`, and provider variables. Use different secrets for production.
+2. Deploy the Convex functions with `bunx convex deploy` after confirming the production target.
+3. Import the repository into Vercel. Use `bun install --frozen-lockfile` as the install command and `bun run build` as the build command. Select Node.js 22. The adapter creates the Build Output API files in `.vercel/output` and uses Stockholm (`arn1`) for server functions.
+4. Set `PUBLIC_CONVEX_URL` and `PUBLIC_CONVEX_SITE_URL` on Vercel to the production deployment URLs. Provider keys belong in Convex, not in public Vercel variables.
+5. Set the Convex `SITE_URL` to the exact HTTPS Vercel or custom-domain origin. Redeploy when public URLs change. Use a separate Convex preview deployment and matching origin for preview URLs.
+6. Open the HTTPS site, create the two accounts and household, test capture, close/reopen recovery, review, and install on each phone.
+
+No Vercel site or production deployment was published as part of the local build task. Authentication data, receipt images, model processing, and the receipt database all remain in Convex. The unused SQLite starter backend has been removed.
+
+## Verified provider references
+
+- [OpenAI GPT-5.6 Luna](https://developers.openai.com/api/docs/models/gpt-5.6-luna): image input, Responses API, and structured output support.
+- [OpenAI structured output](https://developers.openai.com/api/docs/guides/structured-outputs): `responses.parse` with a Zod schema.
+- [TypeSafe HTTP API](https://docs.typesafe.ai/api): `jev-latest`, typed Choice questions, and confidence values.
+- [TypeSafe JavaScript SDK](https://docs.typesafe.ai/sdk/javascript): `TypeSafeClient.systemOne` and `choice`.
+- [Convex Better Auth integration](https://convex-better-auth.netlify.app/framework-guides/sveltekit).
+- [SvelteKit Vercel adapter](https://svelte.dev/docs/kit/adapter-vercel).
+
+Model identifiers and account access were checked on 17 September 2026. Model classifications remain provisional until reviewed. A single receipt test does not establish general extraction accuracy.

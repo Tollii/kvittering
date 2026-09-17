@@ -4,7 +4,7 @@
 	"version": "0.0.1",
 	"type": "module",
 	"scripts": {
-		"dev": "vite dev",
+		"dev": "vite dev --host localhost --port 5180 --strictPort",
 		"build": "vite build",
 		"preview": "vite preview",
 		"prepare": "svelte-kit sync || echo ''",
@@ -12,26 +12,20 @@
 		"check:watch": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json --watch",
 		"lint": "prettier --check . && eslint .",
 		"format": "prettier --write .",
-		"test:e2e": "playwright install && playwright test",
-		"test": "npm run test:e2e",
-		"db:push": "drizzle-kit push",
-		"db:generate": "drizzle-kit generate",
-		"db:migrate": "drizzle-kit migrate",
-		"db:studio": "drizzle-kit studio",
-		"auth:schema": "auth generate --config src/lib/server/auth.ts --output src/lib/server/db/auth.schema.ts --yes"
+		"test:e2e": "playwright test",
+		"test": "vitest run"
 	},
 	"devDependencies": {
+		"@edge-runtime/vm": "^5.0.0",
 		"@eslint/js": "^10.0.1",
-		"@libsql/client": "^0.17.3",
 		"@playwright/test": "^1.60.0",
 		"@sveltejs/adapter-auto": "next",
+		"@sveltejs/adapter-vercel": "^7.0.0-next.9",
 		"@sveltejs/kit": "next",
 		"@sveltejs/vite-plugin-svelte": "^7.1.2",
 		"@types/node": "^24",
-		"auth": "^1.6.23",
-		"better-auth": "^1.6.23",
-		"drizzle-kit": "^0.31.10",
-		"drizzle-orm": "^0.45.2",
+		"better-auth": "1.6.33",
+		"convex-test": "^0.0.58",
 		"eslint": "^10.4.1",
 		"eslint-config-prettier": "^10.1.8",
 		"eslint-plugin-svelte": "^3.19.0",
@@ -42,14 +36,23 @@
 		"svelte-check": "^4.6.0",
 		"typescript": "^6.0.3",
 		"typescript-eslint": "^8.60.1",
-		"vite": "^8.0.16"
+		"vite": "^8.0.16",
+		"vitest": "^5.0.1"
 	},
 	"imports": {
 		"#lib": "./src/lib/index.js",
 		"#lib/*": "./src/lib/*"
 	},
 	"dependencies": {
+		"@convex-dev/better-auth": "^0.12.5",
+		"@convex-dev/workflow": "^0.4.8",
+		"@lucide/svelte": "^1.46.0",
+		"@typesafe-ai/sdk": "^0.6.0",
 		"convex": "^1.46.0",
-		"convex-svelte": "^0.14.0"
+		"convex-svelte": "^0.14.0",
+		"heic-to": "^1.5.2",
+		"idb": "^8.0.3",
+		"openai": "^7.17.0",
+		"zod": "^4.6.5"
 	}
 }
