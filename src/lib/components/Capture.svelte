@@ -118,9 +118,8 @@
 		{#if photos.length > 1}
 			<label class="flex min-h-12 items-center gap-3 py-3">
 				<input type="checkbox" bind:checked={combined} disabled={working} />
-				<span>Bildene er deler av én lang kvittering</span>
+				<span>Bildene er deler av samme kvittering</span>
 			</label>
-			{#if combined}<p class="muted small">Bildene behandles sammen, i valgt rekkefølge.</p>{/if}
 		{/if}
 		<Button variant="default" class="primary wide" onclick={save} disabled={working}
 			>{#if working}Lagrer …{:else}<Check size={20} />Lagre {photos.length === 1 || combined

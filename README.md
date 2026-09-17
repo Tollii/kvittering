@@ -44,7 +44,7 @@ If the OpenAI key is missing, extraction returns the Battery fixture and marks t
 
 ## Receipt workflow
 
-1. Take a photo or select up to eight images. JPEG, PNG, WebP, and HEIC are supported. The browser converts images to JPEG with a maximum dimension of 2400 pixels. The server stores these capture images; it does not retain the source HEIC file.
+1. Take a photo or select up to eight images. Each image becomes a separate receipt by default. For sections of one receipt, select **Bildene er deler av samme kvittering**. JPEG, PNG, WebP, and HEIC are supported. The browser converts images to JPEG with a maximum dimension of 2400 pixels. The server stores these capture images; it does not retain the source HEIC file.
 2. Press **Lagre kvittering**. The app first writes the images to IndexedDB. Only after that write completes does it show **Lagret på denne enheten**.
 3. The upload queue reserves a receipt using a stable request ID. It records every completed image upload. A repeated request or lost acknowledgement does not create another receipt or another image slot.
 4. After all images arrive, a Convex Workflow runs extraction, applies confirmed product aliases, calls Jev for unfamiliar products, and stores the result. Failed provider calls have bounded retries.
@@ -75,6 +75,10 @@ Stop the development server first. Install the app from the browser menu or use 
 - Search and reports load the household history through paginated, indexed queries. The interface labels totals as incomplete while pages are still loading. This first version is intended for one small household, not a large reporting workload.
 
 Jev receives product descriptions, supported attributes, category definitions, and linked discount product descriptions. It does not receive images, receipt totals, payment details, or household member data. Related descriptions matter: the supplied receipt's `BATTERY REMIX` line is identified more reliably with its linked `Battery energidrikk` offer text.
+
+### Overlapping receipt images
+
+Combined images are read together. Extraction uses neighbouring rows and partial rows to reconstruct receipt order, even when upload order differs. A clearly repeated receipt row appears once, with its source image numbers retained. Equal product names or prices alone do not cause a merge. Uncertain overlap remains as separate rows with a review warning. Original image text is retained, and the existing total check remains active. Model extraction can still make errors; reviewed edits remain protected during reprocessing.
 
 ## Product matching
 

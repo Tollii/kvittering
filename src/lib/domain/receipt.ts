@@ -16,6 +16,7 @@ export const lineValidator = v.object({
 	id: v.string(),
 	kind: v.union(...lineKinds.map((kind) => v.literal(kind))),
 	originalText: v.string(),
+	sourceImages: v.optional(v.array(v.number())),
 	name: v.string(),
 	amountOre: nullableNumber,
 	quantity: nullableNumber,
