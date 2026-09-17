@@ -49,6 +49,15 @@
 		data?.lines.filter((line) => lineReviewIssues(line).length > 0) ?? []
 	);
 	const reviewIssues = $derived(data ? receiptReviewIssues(data) : []);
+	const visibleLines = $derived(
+		data?.lines.filter((line) =>
+			showAllLines
+				? showSummaryLines ||
+					!['summary', 'vat'].includes(line.kind) ||
+					lineReviewIssues(line).length > 0
+				: lineReviewIssues(line).length > 0
+		) ?? []
+	);
 	let revision = $state(initial.revision);
 	let duplicateResolved = $state(initial.duplicateResolved);
 	let excluded = $state(initial.excluded);
@@ -308,9 +317,7 @@
 				</div>{/if}
 			<div class="section-header">
 				<h2>{showAllLines ? 'Varer og beløp' : 'Til kontroll'}</h2>
-				<span class="muted small"
-					>{showAllLines ? data.lines.length : unresolvedLines.length} linjer</span
-				>
+				<span class="muted small">{visibleLines.length} linjer</span>
 			</div>
 			<Button
 				variant="ghost"
@@ -324,7 +331,7 @@
 			{#if showAllLines}<label class="check-label"
 					><input type="checkbox" bind:checked={showSummaryLines} /> Vis også betalings- og avgiftssammendrag</label
 				>{/if}
-			{#each data.lines.filter( (line) => (showAllLines ? showSummaryLines || !['summary', 'vat'].includes(line.kind) || lineReviewIssues(line).length > 0 : lineReviewIssues(line).length > 0) ) as line (line.id)}<details
+			{#each visibleLines as line (line.id)}<details
 					class="line-editor"
 					bind:open={expanded[line.id]}
 				>
