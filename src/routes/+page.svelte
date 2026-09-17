@@ -37,10 +37,8 @@
 	} from '#lib/upload-queue.js';
 	import type { Id } from '../../convex/_generated/dataModel';
 	import type { Receipt } from '#lib/domain/insights.js';
-	import { formatMoney, osloDate } from '#lib/domain/receipt.js';
-	import { monthlyInsights } from '#lib/domain/insights.js';
 	import { onMount, tick } from 'svelte';
-	let area = $state<'capture' | 'inbox' | 'spending' | 'history'>('capture');
+	let area = $state<'inbox' | 'spending' | 'history'>('inbox');
 	let selected = $state<Receipt | null>(null);
 	let capture = $state<ReturnType<typeof Capture>>();
 	let returnScroll = 0;
@@ -82,7 +80,6 @@
 	const pending = $derived(
 		receipts.results.filter((receipt) => receipt.status !== 'reviewed' && !receipt.excluded)
 	);
-	const totals = $derived(monthlyInsights(receipts.results, osloDate().slice(0, 7)));
 	const transport: UploadTransport = {
 		reserve: (clientId, imageCount, householdId) =>
 			client.mutation(api.receipts.reserve, {
@@ -219,10 +216,8 @@
 		settings = false;
 		window.scrollTo({ top: 0 });
 	}
-	function openCamera() {
-		navigate('capture');
-		// Keep the native camera request inside the user's tap.
-		capture?.openCamera();
+	function openCapture() {
+		capture?.openPicker();
 	}
 	function openProfile() {
 		settings = true;
@@ -337,7 +332,10 @@
 				<div><strong>{householdTitle}</strong><span>Deres dagligvarer</span></div>
 			</div>
 			<nav aria-label="Hovedmeny">
-				{#each [{ id: 'capture' as const, label: 'Ny kvittering', icon: Camera }, { id: 'inbox' as const, label: 'Innboks', icon: Inbox }, { id: 'spending' as const, label: 'Forbruk', icon: ChartNoAxesCombined }, { id: 'history' as const, label: 'Historikk', icon: Search }] as item (item.id)}<Button
+				<Button variant="default" class="primary" onclick={openCapture}
+					><Camera size={20} />Legg til kvittering</Button
+				>
+				{#each [{ id: 'inbox' as const, label: 'Innboks', icon: Inbox }, { id: 'spending' as const, label: 'Forbruk', icon: ChartNoAxesCombined }, { id: 'history' as const, label: 'Historikk', icon: Search }] as item (item.id)}<Button
 						variant="ghost"
 						class={area === item.id && !settings ? 'active' : ''}
 						onclick={() => navigate(item.id)}
@@ -369,7 +367,6 @@
 						: settings
 							? 'Husstanden'
 							: {
-									capture: 'Ny kvittering',
 									inbox: 'Innboks',
 									spending: 'Forbruk',
 									history: 'Historikk'
@@ -483,57 +480,21 @@
 								<Inbox size={35} />
 								<h2>Innboksen er tom.</h2>
 								<p>Ta et bilde neste gang dere handler.</p>
-								<Button variant="default" class="primary" onclick={() => navigate('capture')}
+								<Button variant="default" class="primary" onclick={openCapture}
 									><Camera size={18} />Ny kvittering</Button
 								>
 							</div>{/each}
 					</div>
 				{/if}
-				<div hidden={area !== 'capture' || !!selected || settings}>
-					<div class="capture-layout">
-						<Capture
-							bind:this={capture}
-							householdId={householdId!}
-							offline={!online}
-							onsaved={() => void synchronize()}
-						/>
-						<aside class="capture-sidebar">
-							<section class="month-summary">
-								<div class="section-eyebrow">DENNE MÅNEDEN</div>
-								<h2>{formatMoney(totals.products)}</h2>
-								<p>Vareforbruk uten pant</p>
-								<div>
-									<span>{totals.selected.length} kvitteringer</span><span
-										>{totals.provisional ? 'Foreløpig' : 'Kontrollert'}</span
-									>
-								</div>
-								<Button variant="ghost" class="text-button" onclick={() => navigate('spending')}
-									>Se forbruket<ChevronRight size={16} /></Button
-								>
-							</section>
-							<section class="recent-section">
-								<div class="section-header">
-									<h2>Siste kvitteringer</h2>
-									<Button variant="ghost" class="text-button" onclick={() => navigate('inbox')}
-										>Se alle<ChevronRight size={14} /></Button
-									>
-								</div>
-								{#each receipts.results.slice(0, 3) as receipt (receipt._id)}<ReceiptCard
-										{receipt}
-										onopen={openReceipt}
-									/>{:else}<div class="empty-recent">
-										<ReceiptText size={26} />
-										<p>Ingen kvitteringer ennå.</p>
-									</div>{/each}{#if queue.length}<Button
-										variant="ghost"
-										class="notice queue-notice"
-										onclick={() => navigate('inbox')}
-										><CloudUpload size={19} />{queue.length} lagret på enheten</Button
-									>{/if}
-							</section>
-						</aside>
-					</div>
-				</div>
+				<Capture
+					bind:this={capture}
+					householdId={householdId!}
+					offline={!online}
+					onsaved={() => {
+						navigate('inbox');
+						void synchronize();
+					}}
+				/>
 				{#if area === 'spending'}<div hidden={!!selected || settings}>
 						<Spending receipts={receipts.results} onopen={openReceipt} />
 					</div>{/if}
@@ -576,10 +537,10 @@
 			<Button
 				variant="ghost"
 				class="mobile-camera"
-				aria-label="Ta bilde av kvittering"
-				onclick={openCamera}
+				aria-label="Legg til kvittering"
+				onclick={openCapture}
 			>
-				<span class="mobile-camera-icon"><Camera size={26} /></span><span>Ta bilde</span>
+				<span class="mobile-camera-icon"><Camera size={26} /></span><span>Legg til</span>
 			</Button>
 			<Button
 				variant="ghost"

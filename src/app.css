@@ -355,59 +355,8 @@
 .mobile-nav {
 	display: none;
 }
-.capture-layout {
-	display: grid;
-	grid-template-columns: minmax(0, 1.2fr) minmax(260px, 0.85fr);
-	gap: 66px;
-}
-.capture-panel {
-	max-width: 490px;
-	padding-top: 10px;
-}
-.capture-panel h1 {
-	font-size: 46px;
-	line-height: 1.25;
-	margin-bottom: 20px;
-}
 .muted-heading {
 	color: #879081;
-}
-.capture-panel .intro {
-	margin-bottom: 34px;
-}
-.camera-button {
-	width: 100%;
-	min-height: 214px;
-	border: 1px dashed #cad4bf;
-	border-radius: 15px;
-	background: #e9ede1;
-	color: var(--green);
-	display: flex;
-	flex-direction: column;
-	align-items: center;
-	justify-content: center;
-	gap: 11px;
-	position: relative;
-}
-.camera-button:hover {
-	background: #e0e8d7;
-}
-.camera-symbol {
-	display: grid;
-	place-items: center;
-	width: 68px;
-	height: 65px;
-	background: #d7e0ca;
-	border-radius: 20px;
-	margin-bottom: 4px;
-}
-.camera-button strong {
-	font-size: 16px;
-	font-weight: 650;
-}
-.camera-button > span:last-child {
-	color: #7b8a70;
-	font-size: 12px;
 }
 .primary,
 .secondary {
@@ -441,16 +390,6 @@
 .wide {
 	width: 100%;
 }
-.capture-panel > .secondary {
-	margin-top: 12px;
-}
-.capture-note {
-	display: flex;
-	gap: 14px;
-	border-top: 1px solid var(--line);
-	padding-top: 27px;
-	margin-top: 31px;
-}
 .note-icon {
 	display: grid;
 	place-items: center;
@@ -460,55 +399,6 @@
 	height: 36px;
 	flex-shrink: 0;
 	color: #9d8051;
-}
-.capture-note p {
-	font-size: 11px;
-	color: #8c9084;
-	line-height: 1.8;
-	margin: 0;
-}
-.capture-note strong {
-	font-weight: 550;
-	color: #697965;
-}
-.capture-sidebar {
-	padding-top: 11px;
-}
-.month-summary {
-	background: #ede9dd;
-	border: 1px solid #e5e0d2;
-	border-radius: 12px;
-	padding: 25px 25px 20px;
-}
-.month-summary .section-eyebrow {
-	font-size: 9px;
-	color: #8b8978;
-	margin-bottom: 12px;
-}
-.month-summary h2 {
-	font-size: 31px;
-	letter-spacing: -1px;
-	margin-bottom: 5px;
-}
-.month-summary p {
-	font-size: 11px;
-	color: #818574;
-}
-.month-summary > div:last-of-type {
-	display: flex;
-	justify-content: space-between;
-	font-size: 10px;
-	color: #888b7b;
-	border-top: 1px solid #dedccd;
-	padding-top: 17px;
-	margin-top: 20px;
-}
-.month-summary .text-button {
-	font-size: 11px;
-	margin-top: 5px;
-}
-.recent-section {
-	margin-top: 31px;
 }
 .section-header {
 	display: flex;
@@ -595,27 +485,6 @@
 }
 .receipt-price > svg {
 	color: #a5ae9e;
-}
-.capture-sidebar .receipt-card {
-	padding: 13px 10px;
-	gap: 9px;
-}
-.capture-sidebar .store-icon {
-	width: 35px;
-	height: 39px;
-}
-.capture-sidebar .receipt-price {
-	font-size: 11px;
-}
-.capture-sidebar .receipt-price svg {
-	display: none;
-}
-.capture-aside-note {
-	font-family: var(--font-sans);
-	font-size: 14px;
-	color: #a1a795;
-	line-height: 1.7;
-	margin: 27px 10px;
 }
 .empty-recent {
 	text-align: center;
@@ -1248,18 +1117,6 @@
 	main {
 		padding-top: 78px;
 	}
-	.capture-layout {
-		gap: 86px;
-	}
-	.capture-panel h1 {
-		font-size: 51px;
-	}
-	.capture-panel {
-		max-width: 520px;
-	}
-	.camera-button {
-		min-height: 240px;
-	}
 }
 @media (max-width: 1100px) {
 	.sidebar {
@@ -1274,20 +1131,6 @@
 	}
 	main {
 		padding: 43px 30px;
-	}
-	.capture-layout {
-		gap: 28px;
-	}
-	.capture-panel h1 {
-		font-size: 38px;
-	}
-	.capture-sidebar .receipt-card {
-		gap: 8px;
-		flex-wrap: wrap;
-	}
-	.capture-sidebar .receipt-price {
-		margin-left: 43px;
-		margin-top: -7px;
 	}
 	.metric-grid {
 		grid-template-columns: repeat(2, 1fr);
@@ -1329,65 +1172,6 @@
 	main {
 		padding: 29px 22px 110px;
 		min-height: calc(100vh - 70px);
-	}
-	.capture-layout {
-		display: block;
-	}
-	.capture-panel {
-		max-width: none;
-		padding-top: 10px;
-	}
-	.capture-panel h1 {
-		font-size: 40px;
-		letter-spacing: -1.8px;
-	}
-	.capture-panel .section-eyebrow {
-		font-size: 9px;
-		margin-bottom: 19px;
-	}
-	.capture-panel .intro {
-		font-size: 14px;
-		line-height: 1.75;
-		margin-bottom: 27px;
-	}
-	.camera-button {
-		min-height: 202px;
-	}
-	.capture-panel > .secondary {
-		min-height: 48px;
-	}
-	.capture-note {
-		margin-top: 24px;
-		padding-top: 23px;
-	}
-	.capture-note p {
-		font-size: 11px;
-	}
-	.capture-sidebar {
-		padding-top: 34px;
-	}
-	.month-summary {
-		padding: 22px;
-	}
-	.month-summary h2 {
-		font-size: 30px;
-	}
-	.capture-aside-note {
-		display: none;
-	}
-	.recent-section {
-		margin-top: 25px;
-	}
-	.capture-sidebar .receipt-card {
-		flex-wrap: nowrap;
-		padding: 16px 13px;
-	}
-	.capture-sidebar .receipt-price {
-		margin: 0 0 0 auto;
-		font-size: 12px;
-	}
-	.capture-sidebar .receipt-price svg {
-		display: block;
 	}
 	.app-footer {
 		display: none;
@@ -1623,4 +1407,26 @@
 summary {
 	cursor: pointer;
 	min-height: 44px;
+}
+
+.capture-sheet {
+	max-width: 540px;
+	max-height: 85dvh;
+	margin-inline: auto;
+	border-radius: 22px 22px 0 0;
+	padding-bottom: max(20px, env(safe-area-inset-bottom));
+}
+.capture-sheet-body {
+	overflow-y: auto;
+	padding: 0 20px;
+	display: grid;
+	gap: 16px;
+}
+.capture-option {
+	min-height: 80px;
+	flex-direction: column;
+	gap: 8px;
+}
+.capture-sheet .photo-previews {
+	margin: 0;
 }
