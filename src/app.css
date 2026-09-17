@@ -1422,6 +1422,14 @@
 		border-radius: 9px;
 		font-size: 10px;
 	}
+	.mobile-nav button svg {
+		width: 22px;
+		height: 22px;
+	}
+	.mobile-nav .mobile-camera svg {
+		width: 26px;
+		height: 26px;
+	}
 	.mobile-nav .nav-icon {
 		position: relative;
 	}
