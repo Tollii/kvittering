@@ -80,6 +80,7 @@ export const extract = internalAction({
 			lines: response.output_parsed.lines.map((line) => ({
 				...emptyLine(line.id),
 				...line,
+				receiptName: line.name,
 				manual: false,
 				categoryId: line.kind === 'product' ? 'fallback.unclear' : null
 			}))

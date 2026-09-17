@@ -26,6 +26,24 @@ export const receiptFields = {
 	excluded: v.boolean()
 };
 export default defineSchema({
+	products: defineTable({
+		householdId: v.id('households'),
+		retailer: v.string(),
+		name: v.string(),
+		brand: v.union(v.string(), v.null()),
+		packageSize: v.union(v.number(), v.null()),
+		packageUnit: v.union(v.string(), v.null()),
+		attributes: v.array(v.string())
+	})
+		.index('by_householdId_and_retailer', ['householdId', 'retailer'])
+		.searchIndex('search_name', { searchField: 'name', filterFields: ['householdId', 'retailer'] }),
+	productMappings: defineTable({
+		householdId: v.id('households'),
+		retailer: v.string(),
+		key: v.string(),
+		productId: v.union(v.id('products'), v.null()),
+		confirmedBy: v.union(v.string(), v.null())
+	}).index('by_householdId_and_retailer_and_key', ['householdId', 'retailer', 'key']),
 	samples: defineTable({ name: v.string(), description: v.string() }).index('by_name', ['name']),
 	households: defineTable({ name: v.string(), invitation: v.string() }).index('by_invitation', [
 		'invitation'

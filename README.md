@@ -69,12 +69,24 @@ Stop the development server first. Install the app from the browser menu or use 
 - Unknown and non-NOK currencies remain visible for review and are excluded from NOK totals and product price comparisons. There is no currency conversion.
 - Amounts are never changed to force a receipt to balance. Unknown values remain null. Repeated equivalent discount lines, invalid signs, quantity/price discrepancies, and total differences need review.
 - Pant is included in cash paid and excluded from product spending. Reviewed and provisional data are labelled separately. Suspected duplicates remain present until a member explicitly excludes one from spending.
-- Alias matches require the same store, exact normalized product name, brand, package size, package unit, and sale unit. There is no fuzzy name matching. Choosing **Husk kategori** confirms that identity and category for matching products. Existing matches update in small batches. Item-only category corrections keep their category.
-- Unconfirmed products remain separate in product history. Unit-price comparison requires an explicit quantity and comparable mass or volume. It does not infer package size from a name.
+- Alias matches require the same store, exact normalized product name, brand, package size, package unit, and sale unit. There is no fuzzy name matching. Choosing **Husk kategori** saves only the classification for matching descriptions. Product identity is stored separately. Existing matches update in small batches. Item-only category corrections keep their category.
+- Products without a product record remain separate in product history. Unit-price comparison requires an explicit quantity and comparable mass or volume. It does not infer package size from a name.
 - Every extraction is stored separately. Reprocessing after manual edits keeps the edited receipt intact and stores the new extraction for comparison. Revision checks prevent one member from silently replacing another member's changes.
 - Search and reports load the household history through paginated, indexed queries. The interface labels totals as incomplete while pages are still loading. This first version is intended for one small household, not a large reporting workload.
 
 Jev receives product descriptions, supported attributes, category definitions, and linked discount product descriptions. It does not receive images, receipt totals, payment details, or household member data. Related descriptions matter: the supplied receipt's `BATTERY REMIX` line is identified more reliably with its linked `Battery energidrikk` offer text.
+
+## Product matching
+
+Each receipt line keeps its original text and its first extracted receipt name. The matching key changes only case and repeated whitespace. Flavour, size, punctuation, and words such as “zero” stay in the key. Mappings belong to one household and one normalized retailer name; branches of the same retailer can share a mapping.
+
+Processing first checks saved receipt-name mappings. For unfamiliar names, indexed name searches retrieve a small candidate set. Code removes conflicting brands, package sizes, and zero variants, then ranks at most five candidates. Jev selects an existing product, a distinct new product, or uncertain. A match or new product requires confidence of at least 0.85. This is a conservative starting policy, not a measured accuracy guarantee. Missing size does not establish a match to a sized candidate. The app never fills a receipt's missing size from a product record.
+
+Jev receives only product names, brands, explicit package details, and attributes. It receives no prices, payment details, household IDs, or images for matching. Requests contain up to 12 items. Model calls stop after a service failure or a bounded processing period; unresolved items stay separate and receipt processing continues. Final product and mapping writes are transactional and recheck saved mappings, so a concurrent correction takes priority over an earlier model result.
+
+In receipt review, expand a product line and use **Koblet produkt**. Search existing products, create a separate product from the line, or choose **Hold varen separat**. Press **Lagre endringer** to save. The choice applies to that line and future matching receipt names from the same retailer. It does not rewrite other historical receipts. Explicit separation is also remembered. Reprocessing keeps manual corrections. Existing receipts can receive product links through the same review control; there is no automatic historical migration.
+
+Product purchase counts, cumulative spending, and price history group by product record. Category aliases no longer establish product identity. Unit-price comparisons still require explicit quantity and comparable package size or weight. Product matching does not change receipt amounts or category assignments.
 
 ## Tests and verification
 

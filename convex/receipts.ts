@@ -1,3 +1,4 @@
+import { productChange, correctProducts } from './products';
 import { v } from 'convex/values';
 import { paginationOptsValidator, paginationResultValidator } from 'convex/server';
 import { query, mutation, internalQuery, internalMutation } from './_generated/server';
@@ -121,6 +122,7 @@ export const save = mutation({
 		data: receiptDataValidator,
 		reviewed: v.boolean(),
 		rememberLineIds: v.array(v.string()),
+		productChanges: v.optional(v.array(productChange)),
 		duplicateResolved: v.boolean(),
 		excluded: v.boolean()
 	},
@@ -145,6 +147,26 @@ export const save = mutation({
 				(receipt.duplicateOf && !args.duplicateResolved))
 		)
 			throw new Error('Kontroller avvik og uklare felt før godkjenning.');
+		for (const line of args.data.lines) {
+			const previous = receipt.data?.lines.find((old) => old.id === line.id);
+			if (previous) line.originalText = previous.originalText;
+			line.receiptName = previous?.receiptName ?? previous?.name ?? line.name;
+			line.productId = previous?.productId ?? null;
+			line.productName = previous?.productName ?? '';
+			line.productMatchManual = previous?.productMatchManual ?? false;
+			if (line.kind !== 'product' || args.data.store !== receipt.data?.store) {
+				line.productId = null;
+				line.productName = '';
+				line.productMatchManual = false;
+			}
+		}
+		await correctProducts(
+			ctx,
+			member.householdId,
+			member.identity,
+			args.data,
+			args.productChanges ?? []
+		);
 		for (const line of args.data.lines) {
 			const previous = receipt.data?.lines.find((old) => old.id === line.id);
 			if (!previous || JSON.stringify(previous) !== JSON.stringify(line)) line.manual = true;

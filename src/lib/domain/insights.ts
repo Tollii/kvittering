@@ -153,11 +153,11 @@ export function productHistory(receipts: Receipt[]) {
 		if (!receipt.data || receipt.excluded || receipt.data.currency !== 'NOK') continue;
 		for (const line of spendingLines(receipt.data).products) {
 			// Unconfirmed items remain separate; similar names do not establish identity.
-			const key = line.productKey ?? `${receipt._id}:${line.id}`;
+			const key = line.productId ?? `${receipt._id}:${line.id}`;
 			const product = products.get(key) ?? {
 				key,
-				name: line.name,
-				confirmed: !!line.productKey,
+				name: line.productName || line.name,
+				confirmed: !!line.productId,
 				quantity: 0,
 				purchases: new Set<string>(),
 				amountOre: 0,

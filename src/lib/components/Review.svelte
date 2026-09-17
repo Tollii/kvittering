@@ -9,6 +9,8 @@
 		ChevronDown
 	} from '@lucide/svelte';
 	import { useQuery, useConvexClient } from 'convex-svelte';
+	import ProductSelector from './ProductSelector.svelte';
+	import type { Id } from '../../../convex/_generated/dataModel';
 	import { api } from '../../../convex/_generated/api';
 	import type { Receipt } from '#lib/domain/insights.js';
 	import {
@@ -35,6 +37,7 @@
 	let duplicateResolved = $state(initial.duplicateResolved);
 	let excluded = $state(initial.excluded);
 	let remember = $state<string[]>([]);
+	let productChanges = $state<Record<string, string>>({});
 	let error = $state('');
 	let busy = $state(false);
 	let message = $state('');
@@ -114,10 +117,21 @@
 				data: $state.snapshot(data),
 				reviewed,
 				rememberLineIds: remember,
+				productChanges: Object.entries(productChanges)
+					.filter(([, value]) => value)
+					.map(([lineId, value]) => ({
+						lineId,
+						productId: value === 'new' || value === 'separate' ? null : (value as Id<'products'>),
+						createNew: value === 'new'
+					})),
 				duplicateResolved,
 				excluded
 			});
-			revision++;
+			const saved = await client.query(api.receipts.detail, { id: initial._id });
+			data = saved.receipt.data;
+			revision = saved.receipt.revision;
+			productChanges = {};
+			remember = [];
 			message = reviewed ? 'Kvitteringen er kontrollert.' : 'Endringene er lagret.';
 			if (reviewed) onclose();
 		} catch (cause) {
@@ -143,6 +157,7 @@
 		if (current?.data) {
 			data = $state.snapshot(current.data);
 			revision = current.revision;
+			productChanges = {};
 		}
 	}
 </script>
@@ -254,7 +269,17 @@
 								/></label
 							>
 						</div>
-						{#if line.kind === 'product'}<label
+						{#if line.kind === 'product'}
+							<ProductSelector
+								receiptId={initial._id}
+								retailer={data.store ?? ''}
+								{line}
+								value={productChanges[line.id] ?? ''}
+								onchange={(value) => {
+									productChanges[line.id] = value;
+								}}
+							/>
+							<label
 								>Kategori<select bind:value={line.categoryId}
 									>{#each categoryGroups as [group, name] (group)}<optgroup label={name}
 											>{#each categories.filter((c) => c.group === group) as category (category.id)}<option
@@ -322,6 +347,7 @@
 									></label
 								>
 							</div>
+
 							<label>Merke<input bind:value={line.brand} /></label><label
 								>Etiketter (kommadelt)<input
 									value={line.tags.join(', ')}

@@ -61,7 +61,7 @@
 		<p>{selected.purchases.size} kjøp · {formatMoney(selected.amountOre)} til sammen</p>
 		<p class="footnote">
 			{selected.confirmed
-				? 'Prisene gjelder en bekreftet vare fra samme butikk.'
+				? 'Prisene gjelder samme koblede produkt fra denne butikken.'
 				: 'Varen er ikke bekreftet som en match. Den vises separat.'} Enhetspriser vises bare når mengde
 			og størrelse er oppgitt.
 		</p>

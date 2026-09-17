@@ -31,7 +31,11 @@ export const lineValidator = v.object({
 	tags: v.array(v.string()),
 	issues: v.array(v.string()),
 	manual: v.boolean(),
-	productKey: nullableString
+	productKey: nullableString,
+	receiptName: v.optional(v.string()),
+	productId: v.optional(v.union(v.id('products'), v.null())),
+	productName: v.optional(v.string()),
+	productMatchManual: v.optional(v.boolean())
 });
 export const receiptDataValidator = v.object({
 	store: nullableString,

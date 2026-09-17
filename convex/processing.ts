@@ -9,6 +9,8 @@ import {
 	classificationInputs,
 	type ReceiptData
 } from '../src/lib/domain/receipt';
+import { productDecision, findMapping, createProduct, linkProduct, saveMapping } from './products';
+import { matchingKey, compatibleProduct } from '../src/lib/domain/product-matching';
 const workflow = new WorkflowManager(components.workflow);
 export const processReceipt = workflow
 	.define({ args: { id: v.id('receipts'), generation: v.number() }, returns: v.null() })
@@ -38,7 +40,12 @@ export const processReceipt = workflow
 					if (result.confidence < 0.65) line.issues.push('Kategorien er usikker.');
 				}
 			}
+			const matches = await step.runAction(internal.productMatching.match, {
+				id: args.id,
+				data: prepared
+			});
 			await step.runMutation(internal.processing.finish, {
+				matches,
 				...args,
 				data: prepared,
 				original: extraction.data,
@@ -98,6 +105,7 @@ export const finish = internalMutation({
 		generation: v.number(),
 		data: receiptDataValidator,
 		original: receiptDataValidator,
+		matches: v.optional(v.array(productDecision)),
 		provider: v.string()
 	},
 	returns: v.null(),
@@ -139,6 +147,42 @@ export const finish = internalMutation({
 		}
 		// A new extraction is kept for comparison. It never replaces a user's edits.
 		const data = receipt.revision > 0 && receipt.data ? receipt.data : args.data;
+		if (data === args.data) {
+			const retailer = matchingKey(data.store ?? '');
+			for (const line of data.lines) {
+				if (line.kind !== 'product' || !retailer) continue;
+				line.receiptName ??= line.name;
+				const mapping = await findMapping(ctx, receipt.householdId, retailer, line);
+				let productId = null;
+				if (mapping) {
+					const product = mapping.productId
+						? await ctx.db.get('products', mapping.productId)
+						: null;
+					if (
+						!mapping.productId ||
+						(product && compatibleProduct(line, product, mapping.confirmedBy !== null))
+					) {
+						await linkProduct(ctx, receipt.householdId, retailer, line, mapping.productId);
+						continue;
+					}
+				}
+				const decision = args.matches?.find((match) => match.lineId === line.id);
+				if (decision?.kind === 'new')
+					productId = await createProduct(ctx, receipt.householdId, retailer, line);
+				if (decision?.kind === 'match' && decision.productId) {
+					const product = await ctx.db.get('products', decision.productId);
+					if (
+						product &&
+						product.householdId === receipt.householdId &&
+						product.retailer === retailer &&
+						compatibleProduct(line, product)
+					)
+						productId = product._id;
+				}
+				await linkProduct(ctx, receipt.householdId, retailer, line, productId);
+				if (productId) await saveMapping(ctx, receipt.householdId, retailer, line, productId, null);
+			}
+		}
 		await ctx.db.patch('receipts', args.id, {
 			data,
 			provider: args.provider,
