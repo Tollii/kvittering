@@ -3,6 +3,7 @@ import { convexTest } from 'convex-test';
 import { expect, it } from 'vitest';
 import { api, internal } from './_generated/api';
 import schema from './schema';
+import type { Id } from './_generated/dataModel';
 import { batteryFixture } from '../src/lib/domain/receipt';
 const modules = import.meta.glob('./**/*.ts');
 it('keeps unresolved extraction issues, mismatches, duplicates and mock results in review', async () => {
@@ -12,7 +13,7 @@ it('keeps unresolved extraction issues, mismatches, duplicates and mock results 
 		name: 'Home',
 		invitation: '0123456789abcdef0123456789abcdef'
 	});
-	let previousId;
+	let previousId: Id<'receipts'> | null = null;
 	for (const scenario of ['issue', 'mismatch', 'duplicate', 'mock', 'clean']) {
 		const id = await user.mutation(api.receipts.reserve, {
 			clientId: `review-policy-${scenario}`,
@@ -39,6 +40,19 @@ it('keeps unresolved extraction issues, mismatches, duplicates and mock results 
 		const receipt = (await user.query(api.receipts.detail, { id })).receipt;
 		expect(receipt.status).toBe(scenario === 'clean' ? 'reviewed' : 'needs_review');
 		expect(receipt.autoAccepted).toBe(scenario === 'clean');
+		if (scenario === 'issue') {
+			data.lines[0].issues = [];
+			await user.mutation(api.receipts.save, {
+				id,
+				revision: 0,
+				data,
+				reviewed: false,
+				rememberLineIds: [],
+				duplicateResolved: false,
+				excluded: false
+			});
+			expect((await user.query(api.receipts.detail, { id })).receipt.status).toBe('reviewed');
+		}
 		previousId = id;
 	}
 });
