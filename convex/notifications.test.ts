@@ -63,6 +63,7 @@ it('schedules only the uploader once, and skips delivery after review, unsubscri
 	const data = batteryFixture();
 	const args = { id, generation: 1, data, original: data, provider: 'fixture' };
 	await t.mutation(internal.processing.finish, args);
+	expect((await uploader.query(api.receipts.detail, { id })).receipt.autoAccepted).toBe(true);
 	await t.mutation(internal.processing.finish, args);
 	const deliveries = await t.run((ctx) => ctx.db.system.query('_scheduled_functions').take(10));
 	expect(deliveries).toHaveLength(1);
@@ -78,7 +79,15 @@ it('schedules only the uploader once, and skips delivery after review, unsubscri
 	expect(await t.run((ctx) => ctx.db.system.query('_scheduled_functions').take(10))).toHaveLength(
 		1
 	);
-	await t.run((ctx) => ctx.db.patch('receipts', id, { status: 'reviewed' }));
+	await uploader.mutation(api.receipts.save, {
+		id,
+		revision: 0,
+		data,
+		reviewed: true,
+		rememberLineIds: [],
+		duplicateResolved: false,
+		excluded: false
+	});
 	expect(
 		await t.query(internal.notifications.delivery, {
 			receiptId: id,
@@ -93,7 +102,7 @@ it('schedules only the uploader once, and skips delivery after review, unsubscri
 			subscriptionId: sendArgs.subscriptionId
 		})
 	).toBeNull();
-	await uploader.mutation(api.receipts.remove, { id, revision: 0 });
+	await uploader.mutation(api.receipts.remove, { id, revision: 1 });
 	expect(
 		await t.query(internal.notifications.delivery, {
 			receiptId: id,

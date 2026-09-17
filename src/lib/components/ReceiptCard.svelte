@@ -41,7 +41,9 @@
 				? 'Utelatt fra forbruk'
 				: receipt.duplicateOf && !receipt.duplicateResolved
 					? 'Mulig duplikat'
-					: labels[receipt.status]}</span
+					: receipt.autoAccepted
+						? 'Automatisk godkjent'
+						: labels[receipt.status]}</span
 		></span
 	>
 	<span class="receipt-price"

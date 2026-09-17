@@ -22,9 +22,11 @@ export const send = internalAction({
 				{ endpoint: target.subscription.endpoint, keys: target.subscription.keys },
 				JSON.stringify({
 					title: 'Kvitteringen er klar',
-					body: target.store
-						? `Kvitteringen fra ${target.store.slice(0, 80)} er klar til kontroll.`
-						: 'Kvitteringen er klar til kontroll.',
+					body: target.autoAccepted
+						? 'Kvitteringen er behandlet og automatisk godkjent.'
+						: target.store
+							? `Kvitteringen fra ${target.store.slice(0, 80)} er klar til kontroll.`
+							: 'Kvitteringen er klar til kontroll.',
 					receiptId: args.receiptId
 				}),
 				{

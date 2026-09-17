@@ -102,7 +102,8 @@ export const delivery = internalQuery({
 	returns: v.union(
 		v.object({
 			subscription: schema.doc('pushSubscriptions'),
-			store: v.union(v.string(), v.null())
+			store: v.union(v.string(), v.null()),
+			autoAccepted: v.boolean()
 		}),
 		v.null()
 	),
@@ -112,7 +113,8 @@ export const delivery = internalQuery({
 		if (
 			!receipt ||
 			!subscription ||
-			receipt.status !== 'needs_review' ||
+			(receipt.status !== 'needs_review' &&
+				!(receipt.status === 'reviewed' && receipt.autoAccepted)) ||
 			receipt.excluded ||
 			receipt.uploadedBy !== subscription.identity ||
 			receipt.householdId !== subscription.householdId
@@ -123,7 +125,11 @@ export const delivery = internalQuery({
 			.withIndex('by_identity', (q) => q.eq('identity', subscription.identity))
 			.unique();
 		if (member?.householdId !== receipt.householdId) return null;
-		return { subscription, store: receipt.data?.store ?? null };
+		return {
+			subscription,
+			store: receipt.data?.store ?? null,
+			autoAccepted: receipt.autoAccepted ?? false
+		};
 	}
 });
 export const removeExpired = internalMutation({

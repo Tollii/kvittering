@@ -159,3 +159,9 @@ The existing service worker displays Web Push messages and opens the receipt whe
 Convex requires `VAPID_PUBLIC_KEY` and `VAPID_PRIVATE_KEY`. Generate one pair with `web-push.generateVAPIDKeys()` and keep the private key only in Convex environment variables. Keep the same pair across deploys; rotation requires devices to subscribe again. `SITE_URL` is the VAPID contact URL. No Vercel secret or additional push service account is needed. Apple, Google, Mozilla and Windows browser push endpoints are accepted.
 
 Push delivery depends on the device's notification permission, connectivity and operating-system settings. The inbox remains the authoritative receipt status.
+
+### Automatic receipt acceptance
+
+Newly processed receipts are accepted automatically when the store, date, currency, product names and amounts are present, the total reconciles exactly, and no extraction, overlap or duplicate issues remain. Optional package information and unresolved product links do not block acceptance. Category warnings start below 50% confidence; an unclassified product still needs review. Extraction asks only for issues that affect receipt correctness, rather than missing optional details.
+
+Review shows unresolved lines by default. **Vis alle linjer** opens the full list. Each line approval is saved; resolving the last issue completes the receipt. Saving other corrections also accepts the receipt if all checks pass. Existing user edits are preserved during reprocessing. Automatically accepted receipts appear in History and still receive a completion notification.

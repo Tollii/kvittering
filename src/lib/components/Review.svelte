@@ -14,6 +14,11 @@
 	} from '@lucide/svelte';
 	import { useQuery, useConvexClient } from 'convex-svelte';
 	import ProductSelector from './ProductSelector.svelte';
+	import {
+		canAcceptReceipt,
+		lineReviewIssues,
+		receiptReviewIssues
+	} from '#lib/domain/receipt-review.js';
 	import type { Id } from '../../../convex/_generated/dataModel';
 	import { api } from '../../../convex/_generated/api';
 	import type { Receipt } from '#lib/domain/insights.js';
@@ -34,9 +39,16 @@
 	let { receipt, onclose }: { receipt: Receipt; onclose: () => void } = $props();
 	const initial = untrack(() => receipt);
 	let expanded = $state<Record<string, boolean>>(
-		Object.fromEntries(initial.data?.lines.map((line) => [line.id, line.issues.length > 0]) ?? [])
+		Object.fromEntries(
+			initial.data?.lines.map((line) => [line.id, lineReviewIssues(line).length > 0]) ?? []
+		)
 	);
 	let data = $state<ReceiptData | null>(initial.data ? $state.snapshot(initial.data) : null);
+	let showAllLines = $state(initial.status === 'reviewed');
+	const unresolvedLines = $derived(
+		data?.lines.filter((line) => lineReviewIssues(line).length > 0) ?? []
+	);
+	const reviewIssues = $derived(data ? receiptReviewIssues(data) : []);
 	let revision = $state(initial.revision);
 	let duplicateResolved = $state(initial.duplicateResolved);
 	let excluded = $state(initial.excluded);
@@ -146,12 +158,24 @@
 			productChanges = {};
 			remember = [];
 			message = reviewed ? 'Kvitteringen er kontrollert.' : 'Endringene er lagret.';
-			if (reviewed) onclose();
+			if (saved.receipt.status === 'reviewed') onclose();
 		} catch (cause) {
 			error = cause instanceof Error ? cause.message : 'Lagring mislyktes.';
 		} finally {
 			busy = false;
 		}
+	}
+	async function approveLine(line: ReceiptLine) {
+		line.issues = [];
+		expanded[line.id] = false;
+		if (data && !invalidMoney.length)
+			await save(canAcceptReceipt(data, !!initial.duplicateOf && !duplicateResolved));
+	}
+	async function approveFields() {
+		if (!data) return;
+		data.issues = [];
+		if (!invalidMoney.length)
+			await save(canAcceptReceipt(data, !!initial.duplicateOf && !duplicateResolved));
 	}
 	async function retry() {
 		busy = true;
@@ -241,7 +265,13 @@
 				</div>
 			</div>{/if}
 		{#if data && totals}
-			<details class="panel">
+			<details
+				class="panel"
+				open={!data.store ||
+					!data.purchaseDate ||
+					data.currency !== 'NOK' ||
+					data.totalOre === null}
+			>
 				<summary>Butikk, dato og betalingsdetaljer</summary>
 				<div class="receipt-fields">
 					<label>Butikk<Input bind:value={data.store} /></label><label
@@ -264,27 +294,37 @@
 					<label>Kvitteringsnummer<Input bind:value={data.receiptNumber} /></label>
 				</div>
 			</details>
-			{#if data.issues.length}<div class="notice warning">
+			{#if reviewIssues.length}<div class="notice warning">
 					<div>
-						<strong>Uklare felt</strong>{#each data.issues as issue, index (index)}<p>
+						<strong>Må kontrolleres</strong>{#each reviewIssues as issue, index (index)}<p>
 								{issue}
-							</p>{/each}<Button
-							variant="ghost"
-							class="text-button"
-							onclick={() => (data!.issues = [])}>Feltene er kontrollert</Button
-						>
+							</p>{/each}{#if data.issues.length}<Button
+								variant="ghost"
+								class="text-button"
+								onclick={approveFields}
+								disabled={busy}>Feltene er kontrollert</Button
+							>{/if}
 					</div>
 				</div>{/if}
 			<div class="section-header">
-				<h2>Varer og beløp</h2>
+				<h2>{showAllLines ? 'Varer og beløp' : 'Til kontroll'}</h2>
 				<span class="muted small"
-					>{data.lines.filter((line) => !['summary', 'vat'].includes(line.kind)).length} vare- og beløpslinjer</span
+					>{showAllLines ? data.lines.length : unresolvedLines.length} linjer</span
 				>
 			</div>
-			<label class="check-label"
-				><input type="checkbox" bind:checked={showSummaryLines} /> Vis også betalings- og avgiftssammendrag</label
+			<Button
+				variant="ghost"
+				class="text-button mb-4"
+				onclick={() => (showAllLines = !showAllLines)}
+				>{showAllLines ? 'Vis bare det som må kontrolleres' : 'Vis alle linjer'}</Button
 			>
-			{#each data.lines.filter((line) => showSummaryLines || !['summary', 'vat'].includes(line.kind) || line.issues.length > 0) as line (line.id)}<details
+			{#if !showAllLines && !unresolvedLines.length}<p class="muted">
+					Ingen varelinjer trenger kontroll.
+				</p>{/if}
+			{#if showAllLines}<label class="check-label"
+					><input type="checkbox" bind:checked={showSummaryLines} /> Vis også betalings- og avgiftssammendrag</label
+				>{/if}
+			{#each data.lines.filter( (line) => (showAllLines ? showSummaryLines || !['summary', 'vat'].includes(line.kind) || lineReviewIssues(line).length > 0 : lineReviewIssues(line).length > 0) ) as line (line.id)}<details
 					class="line-editor"
 					bind:open={expanded[line.id]}
 				>
@@ -293,7 +333,7 @@
 							><strong>{line.name || 'Ny vare'}</strong><small
 								>{labels[line.kind]}{line.kind === 'product'
 									? ` · ${categoryById.get(line.categoryId ?? '')?.name ?? 'Ukjent kategori'}`
-									: ''}{line.issues.length ? ' · Må kontrolleres' : ''}</small
+									: ''}{lineReviewIssues(line).length ? ' · Må kontrolleres' : ''}</small
 							></span
 						><strong>{formatMoney(line.amountOre)}</strong><ChevronDown size={16} /></summary
 					>
@@ -378,15 +418,13 @@
 										>{/each}</NativeSelect.Root
 								></label
 							>{/if}
-						{#if line.issues.length}<div class="notice warning">
+						{#if lineReviewIssues(line).length}<div class="notice warning">
 								<div>
-									{#each line.issues as issue, i (i)}<p>{issue}</p>{/each}<Button
+									{#each lineReviewIssues(line) as issue, i (i)}<p>{issue}</p>{/each}<Button
 										variant="ghost"
 										class="text-button"
-										onclick={() => {
-											line.issues = [];
-											expanded[line.id] = false;
-										}}>Linjen er kontrollert</Button
+										disabled={busy}
+										onclick={() => approveLine(line)}>Linjen er kontrollert</Button
 									>
 								</div>
 							</div>{/if}
@@ -401,43 +439,47 @@
 						>
 					</div>
 				</details>{/each}
-			<Button variant="outline" class="secondary wide" onclick={() => data!.lines.push(emptyLine())}
-				><Plus size={18} />Legg til manglende linje</Button
-			>
-			<div class="panel reconciliation">
-				<h2>Stemmer beløpene?</h2>
-				<dl>
-					<div>
-						<dt>Varer før rabatt</dt>
-						<dd>{formatMoney(totals.products)}</dd>
-					</div>
-					<div>
-						<dt>Rabatter</dt>
-						<dd>{formatMoney(totals.discounts)}</dd>
-					</div>
-					<div>
-						<dt>Pant og pantretur</dt>
-						<dd>{formatMoney(totals.deposits + totals.returns)}</dd>
-					</div>
-					<div>
-						<dt>Andre justeringer</dt>
-						<dd>{formatMoney(totals.adjustments)}</dd>
-					</div>
-					<div class="total-row">
-						<dt>Beregnet</dt>
-						<dd>{formatMoney(totals.calculated)}</dd>
-					</div>
-					<div>
-						<dt>Betalt</dt>
-						<dd>{formatMoney(data.totalOre)}</dd>
-					</div>
-				</dl>
-				{#if totals.issues.length}<div class="notice warning">
+			{#if showAllLines}<Button
+					variant="outline"
+					class="secondary wide"
+					onclick={() => data!.lines.push(emptyLine())}
+					><Plus size={18} />Legg til manglende linje</Button
+				>
+				<div class="panel reconciliation">
+					<h2>Stemmer beløpene?</h2>
+					<dl>
 						<div>
-							{#each totals.issues as issue, index (index)}<p>{issue}</p>{/each}
+							<dt>Varer før rabatt</dt>
+							<dd>{formatMoney(totals.products)}</dd>
 						</div>
-					</div>{:else}<p class="success-text"><Check size={17} />Beløpene stemmer</p>{/if}
-			</div>
+						<div>
+							<dt>Rabatter</dt>
+							<dd>{formatMoney(totals.discounts)}</dd>
+						</div>
+						<div>
+							<dt>Pant og pantretur</dt>
+							<dd>{formatMoney(totals.deposits + totals.returns)}</dd>
+						</div>
+						<div>
+							<dt>Andre justeringer</dt>
+							<dd>{formatMoney(totals.adjustments)}</dd>
+						</div>
+						<div class="total-row">
+							<dt>Beregnet</dt>
+							<dd>{formatMoney(totals.calculated)}</dd>
+						</div>
+						<div>
+							<dt>Betalt</dt>
+							<dd>{formatMoney(data.totalOre)}</dd>
+						</div>
+					</dl>
+					{#if totals.issues.length}<div class="notice warning">
+							<div>
+								{#each totals.issues as issue, index (index)}<p>{issue}</p>{/each}
+							</div>
+						</div>{:else}<p class="success-text"><Check size={17} />Beløpene stemmer</p>{/if}
+				</div>
+			{/if}
 			{#if message}<p class="success-text" role="status">
 					{message}
 				</p>{/if}
@@ -451,7 +493,9 @@
 					variant="default"
 					class="primary"
 					onclick={() => save(true)}
-					disabled={busy || invalidMoney.length > 0 || totals.issues.length > 0}
+					disabled={busy ||
+						invalidMoney.length > 0 ||
+						!canAcceptReceipt(data, !!initial.duplicateOf && !duplicateResolved)}
 					><Check size={18} />Marker kontrollert</Button
 				>
 			</div>

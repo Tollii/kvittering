@@ -24,6 +24,7 @@ export const receiptFields = {
 	duplicateOf: v.union(v.id('receipts'), v.null()),
 	duplicateResolved: v.boolean(),
 	excluded: v.boolean(),
+	autoAccepted: v.optional(v.boolean()),
 	receiptReadyNotified: v.optional(v.boolean())
 };
 export default defineSchema({

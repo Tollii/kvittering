@@ -11,6 +11,7 @@ import {
 } from '../src/lib/domain/receipt';
 import { productDecision, findMapping, createProduct, linkProduct, saveMapping } from './products';
 import { matchingKey, compatibleProduct } from '../src/lib/domain/product-matching';
+import { canAcceptReceipt, categoryReviewThreshold } from '../src/lib/domain/receipt-review';
 const workflow = new WorkflowManager(components.workflow);
 export const processReceipt = workflow
 	.define({ args: { id: v.id('receipts'), generation: v.number() }, returns: v.null() })
@@ -37,7 +38,11 @@ export const processReceipt = workflow
 				if (line) {
 					line.categoryId = result.categoryId;
 					line.confidence = result.confidence;
-					if (result.confidence < 0.65) line.issues.push('Kategorien er usikker.');
+					if (
+						result.confidence < categoryReviewThreshold ||
+						result.categoryId === 'fallback.unclear'
+					)
+						line.issues.push('Kategorien er usikker.');
 				}
 			}
 			const matches = await step.runAction(internal.productMatching.match, {
@@ -183,10 +188,15 @@ export const finish = internalMutation({
 				if (productId) await saveMapping(ctx, receipt.householdId, retailer, line, productId, null);
 			}
 		}
+		const autoAccepted =
+			canAcceptReceipt(data, !!duplicateOf && !receipt.duplicateResolved) &&
+			!args.provider.includes('mock') &&
+			receipt.revision === 0;
 		await ctx.db.patch('receipts', args.id, {
 			data,
+			autoAccepted,
 			provider: args.provider,
-			status: 'needs_review',
+			status: autoAccepted ? 'reviewed' : 'needs_review',
 			error: null,
 			duplicateOf
 		});

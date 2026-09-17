@@ -5,12 +5,8 @@ import { query, mutation, internalQuery, internalMutation } from './_generated/s
 import { internal } from './_generated/api';
 import schema from './schema';
 import { requireMember, requireReceipt } from './access';
-import {
-	receiptDataValidator,
-	validateReceipt,
-	reconcile,
-	aliasKey
-} from '../src/lib/domain/receipt';
+import { receiptDataValidator, validateReceipt, aliasKey } from '../src/lib/domain/receipt';
+import { canAcceptReceipt } from '../src/lib/domain/receipt-review';
 import { start } from '@convex-dev/workflow';
 export const list = query({
 	args: { paginationOpts: paginationOptsValidator },
@@ -138,14 +134,12 @@ export const save = mutation({
 		)
 			throw new Error('Vent til behandlingen er ferdig.');
 		validateReceipt(args.data);
-		const result = reconcile(args.data);
-		if (
-			args.reviewed &&
-			(result.issues.length ||
-				args.data.issues.length ||
-				args.data.lines.some((l) => l.issues.length) ||
-				(receipt.duplicateOf && !args.duplicateResolved))
-		)
+		const acceptable = canAcceptReceipt(
+			args.data,
+			!!receipt.duplicateOf && !args.duplicateResolved
+		);
+		const reviewed = args.reviewed || (acceptable && !receipt.provider.includes('mock'));
+		if (args.reviewed && !acceptable)
 			throw new Error('Kontroller avvik og uklare felt før godkjenning.');
 		for (const line of args.data.lines) {
 			const previous = receipt.data?.lines.find((old) => old.id === line.id);
@@ -208,9 +202,10 @@ export const save = mutation({
 				revision: receipt.revision
 			});
 		await ctx.db.patch('receipts', args.id, {
+			autoAccepted: false,
 			data: args.data,
 			revision: receipt.revision + 1,
-			status: args.reviewed ? 'reviewed' : 'needs_review',
+			status: reviewed ? 'reviewed' : 'needs_review',
 			duplicateResolved: args.duplicateResolved,
 			excluded: args.excluded,
 			error: null

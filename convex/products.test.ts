@@ -157,7 +157,8 @@ it('finishes uncertain processing and atomically reuses new product mappings on 
 		matches: [{ lineId: 'battery', kind: 'uncertain', productId: null }]
 	});
 	const uncertain = (await user.query(api.receipts.detail, { id: third })).receipt;
-	expect(uncertain.status).toBe('needs_review');
+	expect(uncertain.status).toBe('reviewed');
+	expect(uncertain.autoAccepted).toBe(true);
 	expect(uncertain.data!.lines[0].productId).toBeNull();
 });
 
