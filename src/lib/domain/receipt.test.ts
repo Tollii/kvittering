@@ -148,3 +148,18 @@ it('keeps unknown and foreign currencies out of NOK totals', () => {
 	expect(totals.products).toBe(0);
 	expect(totals.unconverted).toEqual([receipt]);
 });
+
+it('provides structured category evidence without unknown package fields or accounting data', async () => {
+	const { classificationState } = await import('./classification');
+	const data = batteryFixture();
+	data.lines[0].name = 'MONSTER PIPELINE PUNCH';
+	data.lines[0].brand = null;
+	data.lines[0].packageSize = null;
+	data.lines[0].packageUnit = null;
+	const state = classificationState(classificationInputs(data)[0].description);
+	expect(state.name).toBe('MONSTER PIPELINE PUNCH');
+	expect(state).not.toHaveProperty('packageSize');
+	expect(state).not.toHaveProperty('brand');
+	expect(state).not.toHaveProperty('amountOre');
+	expect(state).toHaveProperty('relatedProductDescriptions');
+});

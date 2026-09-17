@@ -1,7 +1,7 @@
 'use node';
 import OpenAI from 'openai';
 import { zodTextFormat } from 'openai/helpers/zod';
-import { TypeSafeClient, choice } from '@typesafe-ai/sdk';
+import { TypeSafeClient } from '@typesafe-ai/sdk';
 import { z } from 'zod';
 import { v } from 'convex/values';
 import { internalAction, env } from './_generated/server';
@@ -12,7 +12,8 @@ import {
 	lineKinds,
 	validateReceipt
 } from '../src/lib/domain/receipt';
-import { categories, categoryRules } from '../src/lib/domain/categories';
+import { categories } from '../src/lib/domain/categories';
+import { classificationQuestion, classificationState } from '../src/lib/domain/classification';
 const text = z.string().nullable();
 const number = z.number().nullable();
 const extractionSchema = z.object({
@@ -109,23 +110,16 @@ export const classify = internalAction({
 				provider: 'mock: classification unavailable'
 			};
 		const client = new TypeSafeClient({ apiKey: env.TYPESAFE_API_KEY });
-		const criteria = Object.fromEntries(categories.map((c) => [c.id, `${c.groupName}: ${c.name}`]));
 		const results: { id: string; categoryId: string; confidence: number }[] = [];
 		const model = env.TYPESAFE_MODEL ?? 'jev-latest';
 		for (let offset = 0; offset < args.products.length; offset += 12) {
 			const batch = args.products.slice(offset, offset + 12);
 			const questions = Object.fromEntries(
-				batch.map((p, index) => [
-					`item_${index}`,
-					choice(
-						`Choose the primary leaf category for products[${index}].description. This description is a JSON object: use relatedProductDescriptions as supporting evidence about the same product. ${categoryRules}`,
-						criteria
-					)
-				])
+				batch.map((_, index) => [`item_${index}`, classificationQuestion(index)])
 			);
 			const response = await client.systemOne({
 				model,
-				state: { products: batch.map((p) => ({ description: p.description })) },
+				state: { products: batch.map((p) => classificationState(p.description)) },
 				questions
 			});
 			batch.forEach((product, index) => {
