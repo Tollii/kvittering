@@ -119,7 +119,11 @@ This repository uses SvelteKit 3 preview. Use the pinned matching preview Vercel
 5. Set the Convex `SITE_URL` to the exact HTTPS Vercel or custom-domain origin. Redeploy when public URLs change. Use a separate Convex preview deployment and matching origin for preview URLs.
 6. Open the HTTPS site, create the two accounts and household, test capture, close/reopen recovery, review, and install on each phone.
 
-No Vercel site or production deployment was published as part of the local build task. Authentication data, receipt images, model processing, and the receipt database all remain in Convex. The unused SQLite starter backend has been removed.
+The phone test site is [kvittering-kappa.vercel.app](https://kvittering-kappa.vercel.app). Its private source repository is [Tollii/kvittering](https://github.com/Tollii/kvittering), connected to the `kvittering` project in the `tolliis-projects` Vercel account. Updates to `main` deploy the frontend automatically.
+
+This test site uses the existing Convex **development** deployment, `agile-falcon-148`, including its test accounts and data. Its `SITE_URL` is now `https://kvittering-kappa.vercel.app`. The single-origin auth and image configuration accepts this hosted origin; local authenticated testing requires changing `SITE_URL` back to `http://localhost:5180`, which temporarily disables hosted authentication. Use a separate Convex deployment for independent local and hosted testing. Backend changes still require an explicit Convex deployment.
+
+Only the two public Convex URLs are configured on Vercel. Authentication data, receipt images, model processing, and provider secrets remain in Convex. The unused SQLite starter backend has been removed.
 
 ## Verified provider references
 
