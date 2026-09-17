@@ -37,7 +37,3 @@
 			>{/snippet}
 	</BarChart>
 </Chart.Container>
-<p class="footnote">
-	Kjøp i datorekkefølge, eldste først. Trykk på en søyle eller et kjøp nedenfor for å åpne
-	kvitteringen.
-</p>

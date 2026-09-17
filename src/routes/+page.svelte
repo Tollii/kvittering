@@ -209,7 +209,6 @@
 		<section class="login-panel">
 			<div class="section-eyebrow">ET LITE REGNSKAP FOR HVERDAGEN</div>
 			<h1>Dagligvarene.<br />Samlet.</h1>
-			<p class="intro">Fra en kvittering i lomma til oversikt over det dere kjøper.</p>
 			<div class="login-receipt" aria-hidden="true">
 				<ReceiptText size={44} strokeWidth={1.2} /><span>Handle. Ta et bilde. Ferdig.</span>
 			</div>
@@ -247,7 +246,6 @@
 				}}>{signingUp ? 'Har du konto? Logg inn' : 'Ny her? Opprett konto'}</Button
 			>
 		</section>
-		<p class="login-footer">Laget for hverdagen. Og kvitteringene som følger med.</p>
 	</div>
 {:else if auth.isAuthenticated && !household.data}
 	<div class="setup-page">
@@ -305,7 +303,6 @@
 					>{/each}
 			</nav>
 			<div class="sidebar-bottom">
-				<p>Små kjøp.<br />Bedre oversikt.</p>
 				<Button
 					variant="ghost"
 					class="text-button"
@@ -430,7 +427,7 @@
 										onopen={openReceipt}
 									/>{:else}<div class="empty-recent">
 										<ReceiptText size={26} />
-										<p>Den første kvitteringen<br />er starten på oversikten.</p>
+										<p>Ingen kvitteringer ennå.</p>
 									</div>{/each}{#if queue.length}<Button
 										variant="ghost"
 										class="notice queue-notice"
@@ -438,16 +435,14 @@
 										><CloudUpload size={19} />{queue.length} lagret på enheten</Button
 									>{/if}
 							</section>
-							<p class="capture-aside-note">Du tar bildet.<br />Vi holder orden på detaljene.</p>
 						</aside>
 					</div>
 				{:else if area === 'inbox'}<div class="page-heading">
-						<div class="section-eyebrow">KLART NÅR DU ER DET</div>
-						<h1>En ting mindre å huske.</h1>
+						<h1>Innboks</h1>
 						<p class="muted">
 							{pending.length
 								? `${pending.length} kvittering(er) venter på kontroll.`
-								: 'Du er ajour. Nye kvitteringer kommer hit.'}
+								: 'Alt er kontrollert.'}
 						</p>
 					</div>
 					{#if queue.length}<section class="panel">
@@ -504,7 +499,7 @@
 					</p>{/if}
 			</main>
 			<footer class="app-footer">
-				<span>Kvittering</span><span>Hverdagen, litt mer oversiktlig.</span><span>NOK · Norge</span>
+				<span>Kvittering</span><span>NOK · Norge</span>
 			</footer>
 		</div>
 		<nav class="mobile-nav" aria-label="Mobilmeny">

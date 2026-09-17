@@ -72,9 +72,7 @@
 		</h2>
 		<span class="text-xs text-muted-foreground">{active} dager med registrerte kjøp</span>
 	</div>
-	<p class="text-sm text-muted-foreground">
-		Små ruter, store og små handledager. Sterkere grønn betyr mer vareforbruk, uten pant.
-	</p>
+	<p class="text-sm text-muted-foreground">Vareforbruk uten pant.</p>
 	<div class="overflow-x-auto pb-2" aria-label={`Forbrukskalender ${year}`}>
 		<div class="calendar-grid" style={`--weeks:${weeks}`}>
 			<div class="calendar-months" aria-hidden="true">
@@ -140,10 +138,7 @@
 				></span>{/each} Mer</span
 		>
 	</div>
-	<p class="text-xs text-muted-foreground">
-		Fargen er relativ til årets høyeste dagsbeløp. Tomme ruter betyr ingen registrerte kjøp.
-		Foreløpige beløp kan endres.
-	</p>
+	<p class="text-xs text-muted-foreground">Foreløpige beløp kan endres ved kontroll.</p>
 </Card.Root>
 
 {#if tooltip}

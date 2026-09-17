@@ -45,6 +45,7 @@
 	let productEditorOpen = $state<Record<string, boolean>>({});
 	let error = $state('');
 	let busy = $state(false);
+	let confirmDelete = $state(false);
 	let message = $state('');
 	let urls = $state<string[]>([]);
 	let photoError = $state('');
@@ -157,6 +158,19 @@
 			busy = false;
 		}
 	}
+	async function remove() {
+		busy = true;
+		error = '';
+		try {
+			await client.mutation(api.receipts.remove, { id: initial._id, revision });
+			onclose();
+		} catch (cause) {
+			error = cause instanceof Error ? cause.message : 'Kunne ikke slette kvitteringen.';
+		} finally {
+			busy = false;
+		}
+	}
+
 	function reload() {
 		const current = detail.data?.receipt;
 		if (current?.data) {
@@ -173,7 +187,7 @@
 <div class="page-heading">
 	<div class="section-eyebrow">KONTROLLER KVITTERING</div>
 	<h1>{data?.store ?? 'Ny kvittering'}</h1>
-	<p class="muted">Lastet opp av {initial.uploaderName}. Dette angir ikke hvem som betalte.</p>
+	<p class="muted">Lastet opp av {initial.uploaderName}.</p>
 </div>
 {#if detail.data?.receipt.revision !== undefined && detail.data.receipt.revision !== revision}<div
 		class="notice warning"
@@ -188,7 +202,6 @@
 		{#each urls as url, index (url)}<a href={url} target="_blank" rel="noreferrer"
 				><img src={url} alt={`Original kvittering, bilde ${index + 1}`} /></a
 			>{:else}<p class="muted">{photoError || 'Henter bilder …'}</p>{/each}
-		<p class="footnote">Trykk på et bilde for å se det i full størrelse.</p>
 	</section>
 	<section class="review-content">
 		{#if initial.provider.includes('mock')}<div class="notice warning">
@@ -200,7 +213,7 @@
 		{#if initial.duplicateOf}<div class="notice warning">
 				<div>
 					<strong>Mulig duplikat</strong>
-					<p>En annen kvittering har samme bilde eller kjøpsdetaljer. Begge beholdes.</p>
+					<p>Samme bilde eller kjøpsdetaljer finnes fra før.</p>
 					<label class="check-label"
 						><input type="checkbox" bind:checked={duplicateResolved} />Jeg har kontrollert dette</label
 					><label class="check-label"
@@ -312,10 +325,6 @@
 										: ''}</summary
 								>
 								{#if productEditorOpen[line.id]}
-									<p class="footnote">
-										Produkter kobles automatisk i bakgrunnen. Du trenger bare å endre dette hvis en
-										kobling er feil.
-									</p>
 									<ProductSelector
 										receiptId={initial._id}
 										retailer={data.store ?? ''}
@@ -406,15 +415,8 @@
 							{#each totals.issues as issue, index (index)}<p>{issue}</p>{/each}
 						</div>
 					</div>{:else}<p class="success-text"><Check size={17} />Beløpene stemmer</p>{/if}
-				<p class="footnote">
-					MVA og gjentatte sparesummer telles ikke på nytt. Foreløpig til du har kontrollert
-					kvitteringen.
-				</p>
 			</div>
-			{#if error}<p class="error" role="alert">{error}</p>{/if}{#if message}<p
-					class="success-text"
-					role="status"
-				>
+			{#if message}<p class="success-text" role="status">
 					{message}
 				</p>{/if}
 			<div class="review-actions">
@@ -437,7 +439,7 @@
 						? 'Kvitteringen behandles'
 						: 'Ingen resultater ennå'}
 				</h2>
-				<p>Du kan gå tilbake. Resultatet kommer i innboksen.</p>
+				<p>Resultatet kommer i innboksen.</p>
 				{#if detail.data?.receipt.data}<Button variant="default" class="primary" onclick={reload}
 						>Vis resultatet</Button
 					>{/if}
@@ -449,9 +451,7 @@
 					Uttrekking {extraction.generation}
 				</h3>
 				<pre>{JSON.stringify(extraction.data, null, 2)}</pre>{/each}
-			<p class="footnote">
-				Ved ny behandling beholdes manuelle endringer. Ny uttrekking lagres her til sammenligning.
-			</p>
+			<p class="footnote">Manuelle endringer beholdes ved ny behandling.</p>
 		</details>
 		<Button
 			variant="ghost"
@@ -462,5 +462,26 @@
 					detail.data?.receipt.status ?? initial.status
 				)}><RotateCcw size={15} />Les bildene på nytt</Button
 		>
+		{#if error}<p class="error" role="alert">{error}</p>{/if}
+		{#if confirmDelete}
+			<div class="panel" role="group" aria-label="Bekreft sletting">
+				<p>Slette kvitteringen og bildene? Dette kan ikke angres.</p>
+				<div class="flex gap-3 mt-3">
+					<Button variant="outline" disabled={busy} onclick={() => (confirmDelete = false)}
+						>Avbryt</Button
+					>
+					<Button variant="destructive" disabled={busy} onclick={remove}
+						>{busy ? 'Sletter …' : 'Slett kvittering'}</Button
+					>
+				</div>
+			</div>
+		{:else}
+			<Button
+				variant="ghost"
+				class="text-button danger"
+				disabled={busy || (detail.data?.receipt.status ?? initial.status) === 'uploading'}
+				onclick={() => (confirmDelete = true)}><Trash2 size={15} />Slett kvittering</Button
+			>
+		{/if}
 	</section>
 </div>

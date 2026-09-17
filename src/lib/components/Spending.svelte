@@ -94,7 +94,6 @@
 	<div>
 		<div class="section-eyebrow">HUSSTANDENS FORBRUK</div>
 		<h1>Forbruk</h1>
-		<p class="muted">Se hvor dagligvarepengene går.</p>
 	</div>
 </div>
 <div class="month-control">
@@ -361,10 +360,7 @@
 			<h3>Ingen registrerte kjøp</h3>
 			<p>Legg til en kvittering for å se forbruket.</p>
 		</div>{/if}
-	<p class="footnote">
-		Trykk på en kategori eller butikk for å se varene. Uavklart forbruk er alltid med. Foreløpige
-		verdier kan endres ved kontroll.
-	</p>
+	<p class="footnote">Uavklart forbruk er inkludert. Foreløpige beløp kan endres ved kontroll.</p>
 </section>
 <Sheet.Root bind:open={sheetOpen}
 	><Sheet.Content

@@ -37,7 +37,6 @@
 <div class="page-heading">
 	<div class="section-eyebrow">DET DERE HAR HANDLET</div>
 	<h1>Historikk</h1>
-	<p class="muted">Finn igjen en kvittering, en vare eller en pris.</p>
 </div>
 <label class="search-field"
 	><Search size={19} /><Input
@@ -71,8 +70,7 @@
 		{#if prices && prices.observations.length}
 			<h3>Beløp per kjøp</h3>
 			<p class="footnote">
-				Rabatter på varen er trukket fra. Typisk er medianen av kjøpssummene. Ufordelte
-				kvitteringsrabatter inngår ikke.
+				Etter varerabatter. Typisk = median. Kvitteringsrabatter er ikke fordelt.
 			</p>
 			<div class="grid grid-cols-3 gap-3 my-5">
 				{#each [{ label: 'Siste', value: prices.latest }, { label: 'Typisk', value: prices.typical }, { label: 'Laveste', value: prices.lowest }] as metric (metric.label)}<div
@@ -127,6 +125,5 @@
 			>
 				<Search size={28} />
 				<h3>Ingen kvitteringer funnet</h3>
-				<p>De lagrede kvitteringene kommer hit.</p>
 			</div>{/each}
 	</div>{/if}

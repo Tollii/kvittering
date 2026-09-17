@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { Button } from '#lib/components/ui/button/index.js';
-	import { Camera, ImagePlus, Plus, X, Check, WifiOff, ReceiptText } from '@lucide/svelte';
+	import { Camera, ImagePlus, Plus, X, Check, WifiOff } from '@lucide/svelte';
 	import { prepareImage, saveLocalReceipts } from '#lib/upload-queue.js';
 	import { onDestroy } from 'svelte';
 	let {
@@ -64,11 +64,7 @@
 </script>
 
 <section class="capture-panel">
-	<div class="section-eyebrow">FRA BUTIKKEN TIL OVERSIKTEN</div>
-	<h1>Ta bildet.<br /><span class="muted-heading">Resten kan vente.</span></h1>
-	<p class="intro">
-		Lagre kvitteringen nå. Se hva dere handlet<br class="desktop-break" /> når det passer dere.
-	</p>
+	<h1>Ny kvittering</h1>
 	<input
 		class="visually-hidden"
 		tabindex="-1"
@@ -136,7 +132,7 @@
 			disabled={working}
 			><span class="camera-symbol"><Camera size={34} strokeWidth={1.6} /></span><strong
 				>{working ? 'Klargjør bilde …' : 'Ta bilde av kvittering'}</strong
-			><span>Kameraet åpnes på telefonen</span></Button
+			></Button
 		>
 	{/if}
 	<Button
@@ -146,11 +142,4 @@
 		disabled={working}><ImagePlus size={19} />Velg bilder fra enheten</Button
 	>
 	{#if error}<p class="error" role="alert">{error}</p>{/if}
-	<div class="capture-note">
-		<span class="note-icon"><ReceiptText size={19} /></span>
-		<p>
-			<strong>Én kvittering, flere detaljer.</strong><br />Varer, rabatter og pant holdes fra
-			hverandre. Du kan kontrollere alt senere.
-		</p>
-	</div>
 </section>

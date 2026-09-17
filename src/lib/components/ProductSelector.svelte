@@ -43,8 +43,7 @@
 		</NativeSelect.Root></label
 	>
 	<p class="footnote">
-		Koblingen lagres med «Lagre endringer» og huskes for samme kvitteringsnavn i denne butikken.
-		Smak og zero skal stemme. Søk for å finne eldre produkter.
+		Lagres for denne varen og fremtidige kjøp med samme kvitteringsnavn i butikken.
 	</p>
 	{#if products.error}<p class="error">Kunne ikke hente produkter. Prøv igjen.</p>{/if}
 </div>

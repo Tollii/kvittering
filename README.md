@@ -86,6 +86,8 @@ Jev receives only product names, brands, explicit package details, and attribute
 
 Product matching runs in the background and does not require a review decision. To correct a match, expand a product line, open **Endre produktkobling**, and use **Koblet produkt**. The product search loads only when this optional editor is opened. Search existing products, create a separate product from the line, or choose **Hold varen separat**. Press **Lagre endringer** to save. The choice applies to that line and future matching receipt names from the same retailer. It does not rewrite other historical receipts. Explicit separation is also remembered. Reprocessing keeps manual corrections. Existing receipts can receive product links through the same review control; there is no automatic historical migration.
 
+Receipt review includes **Slett kvittering** with a confirmation step. Deletion removes the receipt from totals immediately and removes its images, extraction history, and edit history. Shared products and saved mappings remain. Uploads must finish before deletion; receipts can be deleted during processing.
+
 Product purchase counts, cumulative spending, and price history group by product record. Category aliases no longer establish product identity. Package-size and unit-price controls and comparisons are omitted. Raw receipt details remain stored. Product matching does not change receipt amounts or category assignments.
 
 ## Tests and verification

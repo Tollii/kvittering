@@ -289,3 +289,52 @@ export const attachImage = internalMutation({
 		return null;
 	}
 });
+
+/** Delete only a household receipt that has finished uploading. Processing cannot recreate it. */
+export const remove = mutation({
+	args: { id: v.id('receipts'), revision: v.number() },
+	returns: v.null(),
+	handler: async (ctx, { id, revision }) => {
+		const member = await requireMember(ctx);
+		const receipt = await ctx.db.get('receipts', id);
+		if (!receipt) return null;
+		if (receipt.householdId !== member.householdId)
+			throw new Error('Kvitteringen er ikke tilgjengelig.');
+		if (receipt.status === 'uploading') throw new Error('Vent til bildene er lastet opp.');
+		if (receipt.revision !== revision)
+			throw new Error('Kvitteringen er endret. Hent siste versjon før du sletter.');
+		await ctx.db.delete('receipts', id);
+		await ctx.runMutation(internal.receipts.cleanupDeleted, { id });
+		return null;
+	}
+});
+
+/** Remove dependent records in bounded transactions; shared products and mappings remain. */
+export const cleanupDeleted = internalMutation({
+	args: { id: v.id('receipts') },
+	returns: v.null(),
+	handler: async (ctx, { id }) => {
+		if (await ctx.db.get('receipts', id)) throw new Error('Kvitteringen er ikke slettet.');
+		let remaining = false;
+		for (const table of ['images', 'extractions', 'revisions'] as const) {
+			const rows = await ctx.db
+				.query(table)
+				.withIndex('by_receiptId', (q) => q.eq('receiptId', id))
+				.take(3);
+			for (const row of rows) {
+				if ('storageId' in row) await ctx.storage.delete(row.storageId);
+				await ctx.db.delete(table, row._id);
+			}
+			remaining ||= rows.length === 3;
+		}
+		const duplicates = await ctx.db
+			.query('receipts')
+			.withIndex('by_duplicateOf', (q) => q.eq('duplicateOf', id))
+			.take(5);
+		for (const receipt of duplicates)
+			await ctx.db.patch('receipts', receipt._id, { duplicateOf: null, duplicateResolved: false });
+		if (remaining || duplicates.length === 5)
+			await ctx.scheduler.runAfter(0, internal.receipts.cleanupDeleted, { id });
+		return null;
+	}
+});

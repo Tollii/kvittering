@@ -52,6 +52,7 @@ export default defineSchema({
 		.index('by_identity', ['identity'])
 		.index('by_householdId', ['householdId']),
 	receipts: defineTable(receiptFields)
+		.index('by_duplicateOf', ['duplicateOf'])
 		.index('by_householdId', ['householdId'])
 		.index('by_householdId_and_clientId', ['householdId', 'clientId']),
 	images: defineTable({

@@ -202,3 +202,80 @@ it('applies confirmed matches while keeping item-only category corrections', asy
 	expect(matched.receipt.data?.lines[0].productKey).toBe(aliases[0].key);
 	expect(manual.receipt.data?.lines[0].categoryId).toBe('drinks.soft-drinks');
 });
+
+it('deletes a household receipt, its images and history without allowing a late processing result', async () => {
+	const { t, first, second, outsider, householdId } = await setup();
+	await outsider.mutation(api.households.create, {
+		name: 'Other home',
+		invitation: 'ffffffffffffffffffffffffffffffff'
+	});
+	const id = await first.mutation(api.receipts.reserve, {
+		clientId: 'delete-request-0001',
+		householdId,
+		imageCount: 1
+	});
+	const other = await first.mutation(api.receipts.reserve, {
+		clientId: 'delete-request-0002',
+		householdId,
+		imageCount: 1
+	});
+	const storageId = await t.run(async (ctx) => {
+		const storageId = await ctx.storage.store(new Blob(['receipt']));
+		await ctx.db.insert('images', { receiptId: id, position: 0, storageId, sha256: 'test' });
+		await ctx.db.insert('extractions', {
+			receiptId: id,
+			generation: 1,
+			data: batteryFixture(),
+			provider: 'test'
+		});
+		await ctx.db.insert('revisions', {
+			receiptId: id,
+			revision: 0,
+			data: batteryFixture(),
+			editor: 'test'
+		});
+		await ctx.db.patch('receipts', id, { status: 'processing', generation: 2, revision: 1 });
+		await ctx.db.patch('receipts', other, { duplicateOf: id });
+		return storageId;
+	});
+	await expect(outsider.mutation(api.receipts.remove, { id, revision: 1 })).rejects.toThrow(
+		'ikke tilgjengelig'
+	);
+	await expect(t.mutation(api.receipts.remove, { id, revision: 1 })).rejects.toThrow('Logg inn');
+	await expect(first.mutation(api.receipts.remove, { id, revision: 0 })).rejects.toThrow('endret');
+	await second.mutation(api.receipts.remove, { id, revision: 1 });
+	await second.mutation(api.receipts.remove, { id, revision: 1 });
+	await t.mutation(internal.processing.finish, {
+		id,
+		generation: 2,
+		data: batteryFixture(),
+		original: batteryFixture(),
+		provider: 'late result'
+	});
+	await t.run(async (ctx) => {
+		expect(await ctx.db.get('receipts', id)).toBeNull();
+		expect(await ctx.storage.get(storageId)).toBeNull();
+		for (const table of ['images', 'extractions', 'revisions'] as const) {
+			expect(
+				await ctx.db
+					.query(table)
+					.withIndex('by_receiptId', (q) => q.eq('receiptId', id))
+					.take(1)
+			).toEqual([]);
+		}
+		expect((await ctx.db.get('receipts', other))?.duplicateOf).toBeNull();
+	});
+});
+
+it('requires an upload to finish before deleting it', async () => {
+	const { first, householdId } = await setup();
+	const id = await first.mutation(api.receipts.reserve, {
+		clientId: 'delete-request-0001',
+		householdId,
+		imageCount: 1
+	});
+	await expect(first.mutation(api.receipts.remove, { id, revision: 0 })).rejects.toThrow(
+		'lastet opp'
+	);
+	expect((await first.query(api.receipts.detail, { id })).receipt.status).toBe('uploading');
+});
