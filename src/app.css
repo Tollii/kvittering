@@ -1434,3 +1434,111 @@ summary {
 .review-grid:not(.original-visible) {
 	grid-template-columns: minmax(0, 1fr);
 }
+
+.camera-active main {
+	padding: 18px 24px;
+}
+.camera-active .app-footer {
+	display: none;
+}
+.camera-capture {
+	position: relative;
+	max-width: 700px;
+	margin-inline: auto;
+}
+.receipt-camera {
+	display: flex;
+	flex-direction: column;
+	height: calc(100dvh - 130px);
+	min-height: 350px;
+	gap: 14px;
+}
+.camera-preview {
+	position: relative;
+	flex: 1;
+	min-height: 0;
+	overflow: hidden;
+	border-radius: 16px;
+	background: #101713;
+}
+.camera-preview video {
+	width: 100%;
+	height: 100%;
+	object-fit: contain;
+}
+.camera-placeholder {
+	position: absolute;
+	inset: 0;
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	justify-content: center;
+	gap: 14px;
+	padding: 24px;
+	text-align: center;
+	color: #fafbef;
+}
+.camera-placeholder button {
+	color: #fafbef;
+	min-height: 44px;
+}
+.camera-controls {
+	display: grid;
+	grid-template-columns: 1fr 84px 1fr;
+	align-items: center;
+	gap: 16px;
+	padding: 0 12px;
+}
+.camera-import {
+	display: flex;
+	flex-direction: column;
+	height: auto;
+	min-height: 64px;
+	gap: 6px;
+	color: var(--green);
+	font-size: 12px;
+}
+.camera-shutter {
+	width: 76px;
+	height: 76px;
+	border-radius: 50%;
+	padding: 5px;
+	border: 3px solid var(--green);
+	background: transparent;
+}
+.camera-shutter span {
+	display: block;
+	width: 100%;
+	height: 100%;
+	border-radius: 50%;
+	background: var(--green);
+}
+.camera-shutter:disabled {
+	opacity: 0.35;
+}
+.camera-saved {
+	position: absolute;
+	top: 14px;
+	left: 50%;
+	transform: translateX(-50%);
+	padding: 8px 14px;
+	border-radius: 999px;
+	background: #f5f7ed;
+	color: var(--green);
+	white-space: nowrap;
+	font-size: 12px;
+}
+@media (max-width: 760px) {
+	.camera-active .topbar {
+		display: none;
+	}
+	.camera-active main {
+		padding: max(12px, env(safe-area-inset-top)) 12px 0;
+		min-height: 0;
+	}
+	.receipt-camera {
+		height: calc(
+			100dvh - 104px - max(12px, env(safe-area-inset-top)) - max(8px, env(safe-area-inset-bottom))
+		);
+	}
+}

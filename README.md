@@ -165,3 +165,7 @@ Push delivery depends on the device's notification permission, connectivity and 
 Newly processed receipts are accepted automatically when the store, date, currency, product names and amounts are present, the total reconciles exactly, and no extraction, overlap or duplicate issues remain. Optional package information and unresolved product links do not block acceptance. Category warnings start below 50% confidence; an unclassified product still needs review. Extraction asks only for issues that affect receipt correctness, rather than missing optional details.
 
 Review shows unresolved lines by default. **Vis alle linjer** opens the full list. Each line approval is saved; resolving the last issue completes the receipt. Saving other corrections also accepts the receipt if all checks pass. Existing user edits are preserved during reprocessing. Automatically accepted receipts appear in History and still receive a completion notification.
+
+### Inline camera
+
+The app opens on a live camera view. It requests the rear camera with no audio and plays video inline. The shutter captures a JPEG frame into the existing preview and upload flow. **Velg bilder** imports images; **Bruk systemkameraet** remains available if inline capture is unavailable. Camera tracks stop when another view or the image preview opens, when the app is hidden, or when the component is destroyed. Returning to the camera restarts the feed; a denied permission requires a deliberate retry. Video is not uploaded. Only captured or selected images enter the receipt queue after saving.

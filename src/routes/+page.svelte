@@ -38,9 +38,8 @@
 	import type { Id } from '../../convex/_generated/dataModel';
 	import type { Receipt } from '#lib/domain/insights.js';
 	import { onMount, tick } from 'svelte';
-	let area = $state<'inbox' | 'spending' | 'history'>('inbox');
+	let area = $state<'capture' | 'inbox' | 'spending' | 'history'>('capture');
 	let selected = $state<Receipt | null>(null);
-	let capture = $state<ReturnType<typeof Capture>>();
 	let returnScroll = 0;
 	let notificationReceiptId = $state<string | null>(null);
 	let notificationError = $state('');
@@ -142,6 +141,7 @@
 	});
 	onMount(() => {
 		notificationReceiptId = new URLSearchParams(window.location.search).get('receipt');
+		if (notificationReceiptId) area = 'inbox';
 	});
 	$effect(() => {
 		if (auth.isAuthenticated && household.data && notificationReceiptId) {
@@ -217,7 +217,7 @@
 		window.scrollTo({ top: 0 });
 	}
 	function openCapture() {
-		capture?.openPicker();
+		navigate('capture');
 	}
 	function openProfile() {
 		settings = true;
@@ -357,7 +357,7 @@
 				>
 			</div>
 		</aside>
-		<div class="main-shell">
+		<div class="main-shell" class:camera-active={area === 'capture' && !settings && !selected}>
 			<header class="topbar">
 				<span class="mobile-brand"><ReceiptText size={20} />Kvittering.</span><span
 					class="topbar-label"
@@ -367,6 +367,7 @@
 						: settings
 							? 'Husstanden'
 							: {
+									capture: 'Kamera',
 									inbox: 'Innboks',
 									spending: 'Forbruk',
 									history: 'Historikk'
@@ -487,11 +488,10 @@
 					</div>
 				{/if}
 				<Capture
-					bind:this={capture}
+					active={area === 'capture' && !settings && !selected}
 					householdId={householdId!}
 					offline={!online}
 					onsaved={() => {
-						navigate('inbox');
 						void synchronize();
 					}}
 				/>
@@ -537,10 +537,11 @@
 			<Button
 				variant="ghost"
 				class="mobile-camera"
-				aria-label="Legg til kvittering"
+				aria-label="Kamera"
+				aria-current={area === 'capture' && !settings ? 'page' : undefined}
 				onclick={openCapture}
 			>
-				<span class="mobile-camera-icon"><Camera size={26} /></span><span>Legg til</span>
+				<span class="mobile-camera-icon"><Camera size={26} /></span><span>Kamera</span>
 			</Button>
 			<Button
 				variant="ghost"

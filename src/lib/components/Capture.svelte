@@ -3,14 +3,17 @@
 	import * as Sheet from '#lib/components/ui/sheet/index.js';
 	import { Camera, ImagePlus, X, Check, WifiOff } from '@lucide/svelte';
 	import { prepareImage, saveLocalReceipts } from '#lib/upload-queue.js';
+	import ReceiptCamera from './ReceiptCamera.svelte';
 	import { onDestroy } from 'svelte';
 	let {
 		householdId,
+		active = false,
 		onsaved,
 		offline = false
-	}: { householdId: string; onsaved: () => void; offline?: boolean } = $props();
+	}: { householdId: string; active?: boolean; onsaved: () => void; offline?: boolean } = $props();
 	let photos = $state<{ blob: Blob; url: string }[]>([]);
 	let working = $state(false);
+	let saved = $state(false);
 	let error = $state('');
 	let open = $state(false);
 	let opener: HTMLElement | null = null;
@@ -23,11 +26,12 @@
 	function openCamera() {
 		if (!working) document.getElementById(`${inputId}-camera`)?.click();
 	}
-	async function addImages(event: Event) {
-		const input = event.currentTarget as HTMLInputElement;
-		const chosen = Array.from(input.files ?? []);
+	async function addFiles(chosen: File[]) {
+		if (!chosen.length || working) return;
 		working = true;
+		saved = false;
 		error = '';
+		openPicker();
 		try {
 			if (photos.length + chosen.length > 8)
 				throw new Error('Du kan ha opptil åtte bilder om gangen.');
@@ -39,8 +43,12 @@
 			error = cause instanceof Error ? cause.message : 'Bildet kunne ikke åpnes.';
 		} finally {
 			working = false;
-			input.value = '';
 		}
+	}
+	async function addImages(event: Event) {
+		const input = event.currentTarget as HTMLInputElement;
+		await addFiles(Array.from(input.files ?? []));
+		input.value = '';
 	}
 	function remove(index: number) {
 		URL.revokeObjectURL(photos[index].url);
@@ -60,6 +68,7 @@
 			photos = [];
 			combined = false;
 			open = false;
+			saved = true;
 			onsaved();
 			navigator.storage?.persist?.().catch(() => false);
 		} catch {
@@ -89,6 +98,17 @@
 	id={`${inputId}-files`}
 	onchange={addImages}
 />
+<div hidden={!active} class="camera-capture">
+	<ReceiptCamera
+		active={active && !open}
+		oncapture={(file) => addFiles([file])}
+		onimport={() => document.getElementById(`${inputId}-files`)?.click()}
+		onfallback={openCamera}
+		onreview={openPicker}
+		photoCount={photos.length}
+	/>
+	{#if saved}<p class="camera-saved" role="status">Lagret på enheten</p>{/if}
+</div>
 <Sheet.Root bind:open>
 	<Sheet.Content
 		side="bottom"
@@ -136,7 +156,7 @@
 				<Button
 					variant="outline"
 					class="secondary capture-option"
-					onclick={openCamera}
+					onclick={() => (open = false)}
 					disabled={working}><Camera class="size-6" /><span>Ta bilde</span></Button
 				>
 				<Button
