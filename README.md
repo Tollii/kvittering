@@ -70,7 +70,7 @@ Stop the development server first. Install the app from the browser menu or use 
 - Amounts are never changed to force a receipt to balance. Unknown values remain null. Repeated equivalent discount lines, invalid signs, quantity/price discrepancies, and total differences need review.
 - Pant is included in cash paid and excluded from product spending. Reviewed and provisional data are labelled separately. Suspected duplicates remain present until a member explicitly excludes one from spending.
 - Alias matches require the same store, exact normalized product name, brand, package size, package unit, and sale unit. There is no fuzzy name matching. Choosing **Husk kategori** saves only the classification for matching descriptions. Product identity is stored separately. Existing matches update in small batches. Item-only category corrections keep their category.
-- Products without a product record remain separate in product history. Unit-price comparison requires an explicit quantity and comparable mass or volume. It does not infer package size from a name.
+- Products without a product record remain separate in product history. Price history shows net amounts per purchase.
 - Every extraction is stored separately. Reprocessing after manual edits keeps the edited receipt intact and stores the new extraction for comparison. Revision checks prevent one member from silently replacing another member's changes.
 - Search and reports load the household history through paginated, indexed queries. The interface labels totals as incomplete while pages are still loading. This first version is intended for one small household, not a large reporting workload.
 
@@ -86,7 +86,7 @@ Jev receives only product names, brands, explicit package details, and attribute
 
 In receipt review, expand a product line and use **Koblet produkt**. Search existing products, create a separate product from the line, or choose **Hold varen separat**. Press **Lagre endringer** to save. The choice applies to that line and future matching receipt names from the same retailer. It does not rewrite other historical receipts. Explicit separation is also remembered. Reprocessing keeps manual corrections. Existing receipts can receive product links through the same review control; there is no automatic historical migration.
 
-Product purchase counts, cumulative spending, and price history group by product record. Category aliases no longer establish product identity. Unit-price comparisons still require explicit quantity and comparable package size or weight. Product matching does not change receipt amounts or category assignments.
+Product purchase counts, cumulative spending, and price history group by product record. Category aliases no longer establish product identity. Package-size and unit-price controls and comparisons are omitted. Raw receipt details remain stored. Product matching does not change receipt amounts or category assignments.
 
 ## Tests and verification
 
@@ -142,4 +142,4 @@ The interface uses Tailwind CSS 4, shadcn-svelte components, Geist typography an
 
 Current-month comparisons use the same calendar days in the previous month, limited to that month's last day. Completed months use the full month. Figures describe recorded receipts, with pending review and missing product links shown separately. Receipt review retains summary and VAT lines behind a display option.
 
-Product history shows net prices per kg or litre only when explicit quantities and package sizes permit comparison. Otherwise it labels the figures as purchase totals. Typical price is the median observation. Returns, unknown dates and incompatible observations are excluded from price summaries and counted in the displayed omission notice. Automatic product links and user confirmations have separate labels.
+Product history shows net purchase totals, without volume or weight conversion. Typical price is the median observation. Returns and unknown dates are excluded from price summaries and counted in the displayed omission notice. Automatic product links and user confirmations have separate labels.

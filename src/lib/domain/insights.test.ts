@@ -46,24 +46,22 @@ function contribution(date: string, ore: number, size: number | null): Contribut
 		amountOre: ore
 	};
 }
-it('compares explicit sizes, excludes unknown sizes and calculates median prices in øre', () => {
+it('calculates purchase totals and median amounts in øre', () => {
 	const result = productPrices([
 		contribution('2026-09-03', 6000, null),
 		contribution('2026-09-02', 3000, 500),
 		contribution('2026-09-01', 2000, 500)
 	]);
-	expect(result.unit).toBe('kg');
 	expect(result.latest).toBe(6000);
-	expect(result.typical).toBe(5000);
-	expect(result.lowest).toBe(4000);
-	expect(result.omitted).toBe(1);
+	expect(result.typical).toBe(3000);
+	expect(result.lowest).toBe(2000);
+	expect(result.omitted).toBe(0);
 });
-it('labels unknown sizes as purchase totals and does not graph returns', () => {
+it('does not graph returns', () => {
 	const result = productPrices([
 		contribution('2026-09-01', 2000, null),
 		contribution('2026-09-02', -1000, null)
 	]);
-	expect(result.unit).toBeNull();
 	expect(result.latest).toBe(2000);
 	expect(result.omitted).toBe(1);
 });

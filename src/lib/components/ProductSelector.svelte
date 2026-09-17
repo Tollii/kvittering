@@ -24,10 +24,7 @@
 
 <div class="panel">
 	<label
-		>Søk etter lagret produkt<Input
-			bind:value={search}
-			placeholder="Varenavn, smak eller størrelse"
-		/></label
+		>Søk etter lagret produkt<Input bind:value={search} placeholder="Varenavn eller smak" /></label
 	>
 	<label
 		>Koblet produkt<NativeSelect.Root
@@ -41,15 +38,13 @@
 			<option value="new">Opprett et eget produkt fra denne varen</option>
 			<option value="separate">Hold varen separat</option>
 			{#each products.data ?? [] as product (product._id)}<option value={product._id}
-					>{product.name}{product.packageSize !== null
-						? ` · ${product.packageSize} ${product.packageUnit ?? ''}`
-						: ''}</option
+					>{product.name}</option
 				>{/each}
 		</NativeSelect.Root></label
 	>
 	<p class="footnote">
 		Koblingen lagres med «Lagre endringer» og huskes for samme kvitteringsnavn i denne butikken.
-		Smak, størrelse og zero skal stemme. Søk for å finne eldre produkter.
+		Smak og zero skal stemme. Søk for å finne eldre produkter.
 	</p>
 	{#if products.error}<p class="error">Kunne ikke hente produkter. Prøv igjen.</p>{/if}
 </div>

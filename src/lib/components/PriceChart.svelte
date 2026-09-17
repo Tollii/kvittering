@@ -25,7 +25,7 @@
 		series={[
 			{
 				key: 'value',
-				label: prices.unit ? `kr/${prices.unit}` : 'Beløp per kjøp',
+				label: 'Beløp per kjøp',
 				color: 'var(--chart-1)'
 			}
 		]}

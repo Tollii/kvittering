@@ -9,7 +9,7 @@ import {
 	aliasKey,
 	classificationInputs
 } from './receipt';
-import { comparableUnitPrice, monthlyInsights, type Receipt } from './insights';
+import { monthlyInsights, type Receipt } from './insights';
 describe('receipt accounting', () => {
 	it('separates the Battery purchase, discount and deposit', () => {
 		const result = reconcile(batteryFixture());
@@ -26,7 +26,7 @@ describe('receipt accounting', () => {
 		);
 		expect(reconcile(receipt).calculated).toBe(2531);
 	});
-	it('calculates weighted products without rounding quantities', () => {
+	it('reconciles printed line amounts against the receipt total', () => {
 		const receipt = batteryFixture();
 		receipt.lines = [
 			{
@@ -41,7 +41,7 @@ describe('receipt accounting', () => {
 		receipt.totalOre = 1222;
 		expect(reconcile(receipt).issues).toEqual([]);
 		receipt.lines[0].amountOre = 1400;
-		expect(reconcile(receipt).issues.join(' ')).toContain('Mengde og enhetspris');
+		expect(reconcile(receipt).issues.join(' ')).toContain('Avvik mot betalt');
 	});
 	it('flags an unreadable total instead of replacing it with a sum', () => {
 		const receipt = batteryFixture();
@@ -84,14 +84,6 @@ describe('receipt accounting', () => {
 		receipt.store = 'Eksempelbutikk';
 		receipt.lines[0].name = 'BATTERY';
 		expect(aliasKey(receipt, receipt.lines[0])).not.toBe(key);
-	});
-	it('only compares unit prices with explicit quantities', () => {
-		const line = emptyLine('item');
-		expect(comparableUnitPrice(line, 1000)).toBeNull();
-		line.quantity = 2;
-		line.packageSize = 500;
-		line.packageUnit = 'ml';
-		expect(comparableUnitPrice(line, 5000)).toEqual({ ore: 5000, unit: 'l' });
 	});
 	it('rejects fractional øre and duplicate line IDs', () => {
 		const receipt = batteryFixture();

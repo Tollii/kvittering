@@ -2,7 +2,7 @@ import type { Id } from '../../../convex/_generated/dataModel';
 import { expect, it } from 'vitest';
 import { matchingKey, compatibleProduct, similarProducts } from './product-matching';
 import { emptyLine, batteryFixture } from './receipt';
-import { productHistory, comparableUnitPrice, type Receipt } from './insights';
+import { productHistory, type Receipt } from './insights';
 
 it('normalizes only case and whitespace, preserving flavour, size and zero', () => {
 	expect(matchingKey('  PEPSI   Max ZERO  0,5L ')).toBe('pepsi max zero 0,5l');
@@ -53,7 +53,4 @@ it('groups linked products across receipt descriptions and keeps unknown items s
 		data: { ...second.data!, lines: second.data!.lines.map((l) => ({ ...l, productId: null })) }
 	};
 	expect(productHistory([first, separate])).toHaveLength(2);
-	expect(
-		comparableUnitPrice({ ...data.lines[0], quantity: 1, packageSize: null }, 2331)
-	).toBeNull();
 });

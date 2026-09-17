@@ -169,13 +169,6 @@ export function reconcile(data: ReceiptData) {
 			if (line.amountOre > 0) issues.push('En pantretur er positiv.');
 		}
 		if (line.kind === 'adjustment') adjustments += line.amountOre;
-		if (
-			line.kind === 'product' &&
-			line.quantity !== null &&
-			line.unitPriceOre !== null &&
-			Math.abs(Math.round(line.quantity * line.unitPriceOre) - line.amountOre) > 1
-		)
-			issues.push(`Mengde og enhetspris stemmer ikke: ${line.name}`);
 	}
 	const calculated = products + discounts + deposits + returns + adjustments;
 	if (unknown) issues.push(`${unknown} linje(r) mangler beløp.`);

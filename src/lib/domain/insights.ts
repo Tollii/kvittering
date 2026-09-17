@@ -172,26 +172,6 @@ export function productHistory(receipts: Receipt[]) {
 	}
 	return [...products.values()].sort((a, b) => b.amountOre - a.amountOre);
 }
-/** Compare only explicit mass/volume quantities; never derive size from product names. */
-export function comparableUnitPrice(line: ReceiptLine, netOre: number) {
-	if (line.quantity === null) return null;
-	let amount: number;
-	let unit: string;
-	if (line.unit === 'kg' || line.unit === 'l') {
-		amount = line.quantity;
-		unit = line.unit;
-	} else if (line.packageSize !== null && line.packageUnit) {
-		const factor = line.packageUnit === 'g' || line.packageUnit === 'ml' ? 0.001 : 1;
-		unit = ['g', 'kg'].includes(line.packageUnit)
-			? 'kg'
-			: ['ml', 'l'].includes(line.packageUnit)
-				? 'l'
-				: '';
-		amount = line.quantity * line.packageSize * factor;
-	} else return null;
-	return amount > 0 && unit ? { ore: Math.round(netOre / amount), unit } : null;
-}
-
 /** Current months compare equal calendar ranges; completed months compare in full. */
 export function comparisonInsights(
 	receipts: Receipt[],
@@ -247,29 +227,19 @@ export function matchLabel(line: ReceiptLine) {
 			? 'Bekreftet av deg'
 			: 'Automatisk koblet';
 }
-/** Unknown sizes stay purchase totals. Returns and unknown dates do not become price observations. */
+/** Purchase totals after item discounts. Returns and unknown dates are omitted. */
 export function productPrices(contributions: Contribution[]) {
 	const purchases = contributions.filter(
 		(c) => c.line && c.amountOre > 0 && c.receipt.data?.purchaseDate
 	);
-	const comparable = purchases.map((c) => ({
-		contribution: c,
-		price: comparableUnitPrice(c.line!, c.amountOre)
-	}));
-	const units = new Set(comparable.flatMap((p) => (p.price ? [p.price.unit] : [])));
-	const unit = units.size === 1 ? [...units][0] : null;
-	const observations = (
-		unit
-			? comparable
-					.filter((p) => p.price?.unit === unit)
-					.map((p) => ({ contribution: p.contribution, ore: p.price!.ore }))
-			: purchases.map((c) => ({ contribution: c, ore: c.amountOre }))
-	).sort(
-		(a, b) =>
-			a.contribution.receipt.data!.purchaseDate!.localeCompare(
-				b.contribution.receipt.data!.purchaseDate!
-			) || a.contribution.receipt._creationTime - b.contribution.receipt._creationTime
-	);
+	const observations = purchases
+		.map((contribution) => ({ contribution, ore: contribution.amountOre }))
+		.sort(
+			(a, b) =>
+				a.contribution.receipt.data!.purchaseDate!.localeCompare(
+					b.contribution.receipt.data!.purchaseDate!
+				) || a.contribution.receipt._creationTime - b.contribution.receipt._creationTime
+		);
 	const sorted = observations.map((p) => p.ore).sort((a, b) => a - b);
 	const middle = Math.floor(sorted.length / 2);
 	const typical = !sorted.length
@@ -278,7 +248,6 @@ export function productPrices(contributions: Contribution[]) {
 			? sorted[middle]
 			: Math.round((sorted[middle - 1] + sorted[middle]) / 2);
 	return {
-		unit,
 		observations,
 		omitted: contributions.length - observations.length,
 		latest: observations.at(-1)?.ore ?? null,

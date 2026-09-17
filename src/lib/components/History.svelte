@@ -5,13 +5,7 @@
 	import * as Tabs from '#lib/components/ui/tabs/index.js';
 	import { Badge } from '#lib/components/ui/badge/index.js';
 	import { Search, ArrowLeft, ChevronRight } from '@lucide/svelte';
-	import {
-		productHistory,
-		productPrices,
-		matchLabel,
-		comparableUnitPrice,
-		type Receipt
-	} from '#lib/domain/insights.js';
+	import { productHistory, productPrices, matchLabel, type Receipt } from '#lib/domain/insights.js';
 	import { formatMoney } from '#lib/domain/receipt.js';
 	import ReceiptCard from './ReceiptCard.svelte';
 	let { receipts, onopen }: { receipts: Receipt[]; onopen: (receipt: Receipt) => void } = $props();
@@ -72,16 +66,13 @@
 		<p class="footnote">
 			{selected.linked
 				? 'Prisene gjelder samme koblede produkt fra denne butikken.'
-				: 'Varen er ikke bekreftet som en match. Den vises separat.'} Enhetspriser vises bare når mengde
-			og størrelse er oppgitt.
+				: 'Varen er ikke bekreftet som en match. Den vises separat.'}
 		</p>
 		{#if prices && prices.observations.length}
-			<h3>{prices.unit ? `Pris per ${prices.unit}` : 'Beløp per kjøp'}</h3>
+			<h3>Beløp per kjøp</h3>
 			<p class="footnote">
-				{prices.unit
-					? 'Sammenlignbare mengder. Rabatter på varen er trukket fra.'
-					: 'Størrelse eller mengde mangler. Beløpene er kjøpssummer, ikke enhetspriser.'} Typisk er medianen
-				av registrerte observasjoner. Ufordelte kvitteringsrabatter inngår ikke.
+				Rabatter på varen er trukket fra. Typisk er medianen av kjøpssummene. Ufordelte
+				kvitteringsrabatter inngår ikke.
 			</p>
 			<div class="grid grid-cols-3 gap-3 my-5">
 				{#each [{ label: 'Siste', value: prices.latest }, { label: 'Typisk', value: prices.typical }, { label: 'Laveste', value: prices.lowest }] as metric (metric.label)}<div
@@ -92,14 +83,11 @@
 			</div>
 			<PriceChart {prices} {onopen} />
 			{#if prices.omitted}<p class="footnote">
-					{prices.omitted} kjøp uten sammenlignbar pris, dato eller positivt beløp er utelatt fra diagrammet.
+					{prices.omitted} kjøp uten dato eller positivt beløp er utelatt fra diagrammet.
 				</p>{/if}
 		{/if}
 
-		{#each [...selected.contributions].sort( (a, b) => (a.receipt.data?.purchaseDate ?? '').localeCompare(b.receipt.data?.purchaseDate ?? '') ) as contribution, index (index)}{@const unit =
-				contribution.line
-					? comparableUnitPrice(contribution.line, contribution.amountOre)
-					: null}<Button
+		{#each [...selected.contributions].sort( (a, b) => (a.receipt.data?.purchaseDate ?? '').localeCompare(b.receipt.data?.purchaseDate ?? '') ) as contribution, index (index)}<Button
 				variant="ghost"
 				class="contribution-row"
 				onclick={() => onopen(contribution.receipt)}
@@ -110,7 +98,7 @@
 						>{contribution.receipt.data?.store} · {contribution.receipt.status === 'reviewed'
 							? 'Kontrollert'
 							: 'Foreløpig'}</small
-					>{#if unit}<small>{formatMoney(unit.ore)} / {unit.unit}</small>{/if}</span
+					></span
 				><strong>{formatMoney(contribution.amountOre)}</strong><ChevronRight size={16} /></Button
 			>{/each}
 	</section>

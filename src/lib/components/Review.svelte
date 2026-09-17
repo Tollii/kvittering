@@ -88,7 +88,7 @@
 			resources.forEach((url) => URL.revokeObjectURL(url));
 		};
 	});
-	function setAmount(line: ReceiptLine, field: 'amountOre' | 'unitPriceOre', event: Event) {
+	function setAmount(line: ReceiptLine, field: 'amountOre', event: Event) {
 		const key = line.id + field;
 		try {
 			line[field] = parseOre((event.target as HTMLInputElement).value);
@@ -314,59 +314,8 @@
 								/>Husk kategori for samme vare i denne butikken</label
 							>
 							<details open={line.issues.length > 0}>
-								<summary>Mengde, størrelse og andre detaljer</summary>
+								<summary>Andre detaljer</summary>
 								<div class="grid gap-4">
-									<div class="field-row">
-										<label
-											>Mengde<Input
-												type="number"
-												min="0.001"
-												step="any"
-												value={line.quantity ?? ''}
-												onchange={(event) =>
-													(line.quantity =
-														event.currentTarget.value === ''
-															? null
-															: Number(event.currentTarget.value))}
-											/></label
-										><label
-											>Enhet<NativeSelect.Root bind:value={line.unit}
-												><option value={null}>Ukjent</option><option value="stk">stk</option><option
-													value="kg">kg</option
-												><option value="l">l</option></NativeSelect.Root
-											></label
-										>
-									</div>
-									<label
-										>Enhetspris (kr)<Input
-											inputmode="decimal"
-											value={moneyInput(line.unitPriceOre)}
-											onchange={(event) => setAmount(line, 'unitPriceOre', event)}
-										/></label
-									>
-									<div class="field-row">
-										<label
-											>Pakkestørrelse<Input
-												type="number"
-												min="0.001"
-												step="any"
-												value={line.packageSize ?? ''}
-												onchange={(event) =>
-													(line.packageSize =
-														event.currentTarget.value === ''
-															? null
-															: Number(event.currentTarget.value))}
-											/></label
-										><label
-											>Pakkeenhet<NativeSelect.Root bind:value={line.packageUnit}
-												><option value={null}>Ukjent</option
-												>{#each ['g', 'kg', 'ml', 'l', 'stk'] as unit (unit)}<option value={unit}
-														>{unit}</option
-													>{/each}</NativeSelect.Root
-											></label
-										>
-									</div>
-
 									<label>Merke<Input bind:value={line.brand} /></label><label
 										>Etiketter (kommadelt)<Input
 											value={line.tags.join(', ')}
