@@ -228,7 +228,7 @@
 					<label>Butikk<Input bind:value={data.store} /></label><label
 						>Avdeling / sted<Input bind:value={data.branch} /></label
 					>
-					<div class="field-row">
+					<div class="field-row receipt-date-time">
 						<label>Kjøpsdato<Input type="date" bind:value={data.purchaseDate} /></label><label
 							>Klokkeslett<Input type="time" bind:value={data.purchaseTime} /></label
 						>
