@@ -57,3 +57,47 @@ worker.addEventListener('fetch', (event) => {
 			})()
 		);
 });
+
+worker.addEventListener('push', (event) => {
+	event.waitUntil(
+		(async () => {
+			let payload: { title?: string; body?: string; receiptId?: string } = {};
+			try {
+				payload = event.data?.json() ?? {};
+			} catch {
+				/* Show a useful notification even if a payload is unreadable. */
+			}
+			const id =
+				typeof payload.receiptId === 'string' && /^[a-z0-9]{20,64}$/.test(payload.receiptId)
+					? payload.receiptId
+					: null;
+			await worker.registration.showNotification(
+				typeof payload.title === 'string' ? payload.title : 'Kvittering',
+				{
+					body:
+						typeof payload.body === 'string' ? payload.body : 'En kvittering er klar til kontroll.',
+					icon: '/icon-192.png',
+					tag: id ? `receipt-${id}` : 'receipt-ready',
+					data: { url: id ? `/?receipt=${encodeURIComponent(id)}` : '/' }
+				}
+			);
+		})()
+	);
+});
+worker.addEventListener('notificationclick', (event) => {
+	event.notification.close();
+	event.waitUntil(
+		(async () => {
+			const url = new URL(event.notification.data?.url ?? '/', worker.location.origin);
+			if (url.origin !== worker.location.origin) return;
+			const windows = await worker.clients.matchAll({ type: 'window', includeUncontrolled: true });
+			const existing = windows.find(
+				(client) => new URL(client.url).origin === worker.location.origin
+			);
+			if (existing) {
+				await existing.navigate(url.href);
+				await existing.focus();
+			} else await worker.clients.openWindow(url.href);
+		})()
+	);
+});

@@ -190,6 +190,22 @@ export const finish = internalMutation({
 			error: null,
 			duplicateOf
 		});
+		if (!receipt.receiptReadyNotified) {
+			await ctx.db.patch('receipts', args.id, { receiptReadyNotified: true });
+			const subscriptions = await ctx.db
+				.query('pushSubscriptions')
+				.withIndex('by_identity', (q) => q.eq('identity', receipt.uploadedBy))
+				.take(10);
+			for (const subscription of subscriptions) {
+				if (subscription.householdId === receipt.householdId)
+					await ctx.scheduler.runAfter(0, internal.pushDelivery.send, {
+						receiptId: args.id,
+						subscriptionId: subscription._id,
+						attempt: 0
+					});
+			}
+		}
+
 		return null;
 	}
 });

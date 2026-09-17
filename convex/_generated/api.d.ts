@@ -13,10 +13,12 @@ import type * as aliases from "../aliases.js";
 import type * as auth from "../auth.js";
 import type * as households from "../households.js";
 import type * as http from "../http.js";
+import type * as notifications from "../notifications.js";
 import type * as processing from "../processing.js";
 import type * as productMatching from "../productMatching.js";
 import type * as products from "../products.js";
 import type * as providers from "../providers.js";
+import type * as pushDelivery from "../pushDelivery.js";
 import type * as receipts from "../receipts.js";
 import type * as samples from "../samples.js";
 
@@ -32,10 +34,12 @@ declare const fullApi: ApiFromModules<{
   auth: typeof auth;
   households: typeof households;
   http: typeof http;
+  notifications: typeof notifications;
   processing: typeof processing;
   productMatching: typeof productMatching;
   products: typeof products;
   providers: typeof providers;
+  pushDelivery: typeof pushDelivery;
   receipts: typeof receipts;
   samples: typeof samples;
 }>;

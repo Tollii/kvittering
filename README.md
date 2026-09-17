@@ -145,3 +145,13 @@ The interface uses Tailwind CSS 4, shadcn-svelte components, Geist typography an
 Current-month comparisons use the same calendar days in the previous month, limited to that month's last day. Completed months use the full month. Figures describe recorded receipts, with pending review and missing product links shown separately. Receipt review retains summary and VAT lines behind a display option.
 
 Product history shows net purchase totals, without volume or weight conversion. Typical price is the median observation. Returns and unknown dates are excluded from price summaries and counted in the displayed omission notice. Automatic product links and user confirmations have separate labels.
+
+## Receipt-ready notifications
+
+Open household settings and select **Slå på varsler** under **Varsler**. This opts in the current device for receipts uploaded by the signed-in person. On iPhone and iPad, first add the app to the Home Screen and open it there. Browser permission must be granted from the button press.
+
+The existing service worker displays Web Push messages and opens the receipt when tapped. Images must finish uploading before the app can be closed. Receipt processing schedules notifications independently; delivery failures cannot fail receipt processing. Each receipt schedules at most one notification per subscribed device, with up to two retries for temporary failures. Notification tags replace duplicate deliveries. Deleted, excluded, or already-reviewed receipts are skipped. Expired subscriptions are removed. Signing out disables notifications on that device.
+
+Convex requires `VAPID_PUBLIC_KEY` and `VAPID_PRIVATE_KEY`. Generate one pair with `web-push.generateVAPIDKeys()` and keep the private key only in Convex environment variables. Keep the same pair across deploys; rotation requires devices to subscribe again. `SITE_URL` is the VAPID contact URL. No Vercel secret or additional push service account is needed. Apple, Google, Mozilla and Windows browser push endpoints are accepted.
+
+Push delivery depends on the device's notification permission, connectivity and operating-system settings. The inbox remains the authoritative receipt status.

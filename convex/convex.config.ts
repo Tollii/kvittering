@@ -10,7 +10,9 @@ const app = defineApp({
 		TYPESAFE_MODEL: v.optional(v.string()),
 		BETTER_AUTH_SECRET: v.optional(v.string()),
 		SITE_URL: v.optional(v.string()),
-		RECEIPT_PROVIDER: v.optional(v.string())
+		RECEIPT_PROVIDER: v.optional(v.string()),
+		VAPID_PUBLIC_KEY: v.optional(v.string()),
+		VAPID_PRIVATE_KEY: v.optional(v.string())
 	}
 });
 app.use(betterAuth);

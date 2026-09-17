@@ -23,9 +23,18 @@ export const receiptFields = {
 	error: v.union(v.string(), v.null()),
 	duplicateOf: v.union(v.id('receipts'), v.null()),
 	duplicateResolved: v.boolean(),
-	excluded: v.boolean()
+	excluded: v.boolean(),
+	receiptReadyNotified: v.optional(v.boolean())
 };
 export default defineSchema({
+	pushSubscriptions: defineTable({
+		identity: v.string(),
+		householdId: v.id('households'),
+		endpoint: v.string(),
+		keys: v.object({ p256dh: v.string(), auth: v.string() })
+	})
+		.index('by_endpoint', ['endpoint'])
+		.index('by_identity', ['identity']),
 	products: defineTable({
 		householdId: v.id('households'),
 		retailer: v.string(),

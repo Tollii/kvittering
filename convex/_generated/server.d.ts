@@ -37,6 +37,8 @@ type Env = {
   readonly SITE_URL: string | undefined;
   readonly TYPESAFE_API_KEY: string | undefined;
   readonly TYPESAFE_MODEL: string | undefined;
+  readonly VAPID_PRIVATE_KEY: string | undefined;
+  readonly VAPID_PUBLIC_KEY: string | undefined;
 };
 
 /**

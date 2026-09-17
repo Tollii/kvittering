@@ -25,6 +25,9 @@
 	import Spending from '#lib/components/Spending.svelte';
 	import History from '#lib/components/History.svelte';
 	import Review from '#lib/components/Review.svelte';
+	import NotificationSettings from '#lib/components/NotificationSettings.svelte';
+	import { disableNotifications } from '#lib/notifications.js';
+	import { replaceState } from '$app/navigation';
 	import {
 		drainQueue,
 		localReceipts,
@@ -39,6 +42,8 @@
 	let area = $state<'capture' | 'inbox' | 'spending' | 'history'>('capture');
 	let selected = $state<Receipt | null>(null);
 	let returnScroll = 0;
+	let notificationReceiptId = $state<string | null>(null);
+	let notificationError = $state('');
 	async function closeReceipt() {
 		selected = null;
 		await tick();
@@ -136,6 +141,29 @@
 			clearInterval(interval);
 		};
 	});
+	onMount(() => {
+		notificationReceiptId = new URLSearchParams(window.location.search).get('receipt');
+	});
+	$effect(() => {
+		if (auth.isAuthenticated && household.data && notificationReceiptId) {
+			const id = notificationReceiptId;
+			notificationReceiptId = null;
+			void (async () => {
+				try {
+					const result = await client.query(api.receipts.detail, { id: id as Id<'receipts'> });
+					if (!auth.isAuthenticated || result.receipt.householdId !== householdId) return;
+					settings = false;
+					area = 'inbox';
+					openReceipt(result.receipt);
+				} catch {
+					notificationError = 'Kvitteringen er slettet eller ikke tilgjengelig for denne kontoen.';
+				} finally {
+					replaceState('/', {});
+				}
+			})();
+		}
+	});
+
 	async function authenticate(event: SubmitEvent) {
 		event.preventDefault();
 		working = true;
@@ -170,6 +198,12 @@
 		}
 	}
 	async function signOut() {
+		try {
+			await disableNotifications(client);
+		} catch {
+			notificationError = 'Kunne ikke slå av varsler. Prøv å logge ut igjen med nett.';
+			return;
+		}
 		await authClient.signOut();
 		localStorage.removeItem('receipt-household');
 		offlineHousehold = null;
@@ -340,6 +374,7 @@
 				>
 			</header>
 			<main>
+				{#if notificationError}<p class="error" role="alert">{notificationError}</p>{/if}
 				{#if !online}<div class="offline-indicator">
 						<WifiOff size={15} />Uten nett · nye bilder lagres på enheten
 					</div>{/if}
@@ -391,6 +426,7 @@
 							opplasting.
 						</p>
 					</section>
+					<NotificationSettings />
 				{:else if selected}{#key selected._id}<Review
 							receipt={selected}
 							onclose={closeReceipt}
