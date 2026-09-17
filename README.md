@@ -4,7 +4,7 @@ A mobile-first grocery receipt app for a private household with two members. The
 
 ## Local setup
 
-Use Bun and Node.js 22 or later.
+Use Bun 1.4.0 and Node.js 22 or later.
 
 ```sh
 bun install
@@ -114,7 +114,7 @@ This repository uses SvelteKit 3 preview. Use the pinned matching preview Vercel
 
 1. Create a Convex production deployment. Set its `SITE_URL`, `BETTER_AUTH_SECRET`, and provider variables. Use different secrets for production.
 2. Deploy the Convex functions with `bunx convex deploy` after confirming the production target.
-3. Import the repository into Vercel. Use `bun install --frozen-lockfile` as the install command and `bun run build` as the build command. Select Node.js 22. The adapter creates the Build Output API files in `.vercel/output` and uses Stockholm (`arn1`) for server functions.
+3. Import the repository into Vercel. The commands in `vercel.json` select Bun 1.4.0 explicitly for installation and build, because older Bun versions cannot read this lockfile. Select Node.js 22. The adapter creates the Build Output API files in `.vercel/output` and uses Stockholm (`arn1`) for server functions.
 4. Set `PUBLIC_CONVEX_URL` and `PUBLIC_CONVEX_SITE_URL` on Vercel to the production deployment URLs. Provider keys belong in Convex, not in public Vercel variables.
 5. Set the Convex `SITE_URL` to the exact HTTPS Vercel or custom-domain origin. Redeploy when public URLs change. Use a separate Convex preview deployment and matching origin for preview URLs.
 6. Open the HTTPS site, create the two accounts and household, test capture, close/reopen recovery, review, and install on each phone.
