@@ -383,7 +383,10 @@
 									{#each line.issues as issue, i (i)}<p>{issue}</p>{/each}<Button
 										variant="ghost"
 										class="text-button"
-										onclick={() => (line.issues = [])}>Linjen er kontrollert</Button
+										onclick={() => {
+											line.issues = [];
+											expanded[line.id] = false;
+										}}>Linjen er kontrollert</Button
 									>
 								</div>
 							</div>{/if}
