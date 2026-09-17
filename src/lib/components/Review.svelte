@@ -1,4 +1,8 @@
 <script lang="ts">
+	import * as NativeSelect from '#lib/components/ui/native-select/index.js';
+	import { Input } from '#lib/components/ui/input/index.js';
+	import { Button } from '#lib/components/ui/button/index.js';
+	let showSummaryLines = $state(false);
 	import {
 		ArrowLeft,
 		Plus,
@@ -162,7 +166,9 @@
 	}
 </script>
 
-<button class="text-button back-button" onclick={onclose}><ArrowLeft size={17} />Tilbake</button>
+<Button variant="ghost" class="text-button back-button" onclick={onclose}
+	><ArrowLeft size={17} />Tilbake</Button
+>
 <div class="page-heading">
 	<div class="section-eyebrow">KONTROLLER KVITTERING</div>
 	<h1>{data?.store ?? 'Ny kvittering'}</h1>
@@ -171,8 +177,8 @@
 {#if detail.data?.receipt.revision !== undefined && detail.data.receipt.revision !== revision}<div
 		class="notice warning"
 	>
-		Kvitteringen har nye endringer.<button class="text-button" onclick={reload}
-			>Hent siste versjon</button
+		Kvitteringen har nye endringer.<Button variant="ghost" class="text-button" onclick={reload}
+			>Hent siste versjon</Button
 		>
 	</div>{/if}
 <div class="review-grid">
@@ -202,40 +208,50 @@
 				</div>
 			</div>{/if}
 		{#if data && totals}
-			<div class="panel receipt-fields">
-				<label>Butikk<input bind:value={data.store} /></label><label
-					>Avdeling / sted<input bind:value={data.branch} /></label
-				>
-				<div class="field-row">
-					<label>Kjøpsdato<input type="date" bind:value={data.purchaseDate} /></label><label
-						>Klokkeslett<input type="time" bind:value={data.purchaseTime} /></label
+			<details class="panel">
+				<summary>Butikk, dato og betalingsdetaljer</summary>
+				<div class="receipt-fields">
+					<label>Butikk<Input bind:value={data.store} /></label><label
+						>Avdeling / sted<Input bind:value={data.branch} /></label
 					>
+					<div class="field-row">
+						<label>Kjøpsdato<Input type="date" bind:value={data.purchaseDate} /></label><label
+							>Klokkeslett<Input type="time" bind:value={data.purchaseTime} /></label
+						>
+					</div>
+					<div class="field-row">
+						<label
+							>Betalt (kr)<Input
+								inputmode="decimal"
+								value={moneyInput(data.totalOre)}
+								onchange={setTotal}
+							/></label
+						><label>Valuta<Input bind:value={data.currency} /></label>
+					</div>
+					<label>Kvitteringsnummer<Input bind:value={data.receiptNumber} /></label>
 				</div>
-				<div class="field-row">
-					<label
-						>Betalt (kr)<input
-							inputmode="decimal"
-							value={moneyInput(data.totalOre)}
-							onchange={setTotal}
-						/></label
-					><label>Valuta<input bind:value={data.currency} /></label>
-				</div>
-				<label>Kvitteringsnummer<input bind:value={data.receiptNumber} /></label>
-			</div>
+			</details>
 			{#if data.issues.length}<div class="notice warning">
 					<div>
 						<strong>Uklare felt</strong>{#each data.issues as issue, index (index)}<p>
 								{issue}
-							</p>{/each}<button class="text-button" onclick={() => (data!.issues = [])}
-							>Feltene er kontrollert</button
+							</p>{/each}<Button
+							variant="ghost"
+							class="text-button"
+							onclick={() => (data!.issues = [])}>Feltene er kontrollert</Button
 						>
 					</div>
 				</div>{/if}
 			<div class="section-header">
 				<h2>Varer og beløp</h2>
-				<span class="muted small">{data.lines.length} linjer</span>
+				<span class="muted small"
+					>{data.lines.filter((line) => !['summary', 'vat'].includes(line.kind)).length} vare- og beløpslinjer</span
+				>
 			</div>
-			{#each data.lines as line, index (line.id)}<details
+			<label class="check-label"
+				><input type="checkbox" bind:checked={showSummaryLines} /> Vis også betalings- og avgiftssammendrag</label
+			>
+			{#each data.lines.filter((line) => showSummaryLines || !['summary', 'vat'].includes(line.kind) || line.issues.length > 0) as line (line.id)}<details
 					class="line-editor"
 					bind:open={expanded[line.id]}
 				>
@@ -250,19 +266,19 @@
 					>
 					<div class="line-fields">
 						<p class="original-text">Original: {line.originalText || 'Manuelt lagt til'}</p>
-						<label>Navn<input bind:value={line.name} /></label>
+						<label>Navn<Input bind:value={line.name} /></label>
 						<div class="field-row">
 							<label
-								>Linjetype<select
+								>Linjetype<NativeSelect.Root
 									bind:value={line.kind}
 									onchange={() => {
 										line.categoryId = line.kind === 'product' ? 'fallback.unclear' : null;
 									}}
 									>{#each lineKinds as kind (kind)}<option value={kind}>{labels[kind]}</option
-										>{/each}</select
+										>{/each}</NativeSelect.Root
 								></label
 							><label
-								>Linjesum (kr)<input
+								>Linjesum (kr)<Input
 									inputmode="decimal"
 									value={moneyInput(line.amountOre)}
 									onchange={(event) => setAmount(line, 'amountOre', event)}
@@ -280,12 +296,12 @@
 								}}
 							/>
 							<label
-								>Kategori<select bind:value={line.categoryId}
+								>Kategori<NativeSelect.Root bind:value={line.categoryId}
 									>{#each categoryGroups as [group, name] (group)}<optgroup label={name}
 											>{#each categories.filter((c) => c.group === group) as category (category.id)}<option
 													value={category.id}>{category.name}</option
 												>{/each}</optgroup
-										>{/each}</select
+										>{/each}</NativeSelect.Root
 								></label
 							><label class="check-label"
 								><input
@@ -297,91 +313,102 @@
 											: remember.filter((id) => id !== line.id))}
 								/>Husk kategori for samme vare i denne butikken</label
 							>
-							<div class="field-row">
-								<label
-									>Mengde<input
-										type="number"
-										min="0.001"
-										step="any"
-										value={line.quantity ?? ''}
-										onchange={(event) =>
-											(line.quantity =
-												event.currentTarget.value === ''
-													? null
-													: Number(event.currentTarget.value))}
-									/></label
-								><label
-									>Enhet<select bind:value={line.unit}
-										><option value={null}>Ukjent</option><option value="stk">stk</option><option
-											value="kg">kg</option
-										><option value="l">l</option></select
-									></label
-								>
-							</div>
-							<label
-								>Enhetspris (kr)<input
-									inputmode="decimal"
-									value={moneyInput(line.unitPriceOre)}
-									onchange={(event) => setAmount(line, 'unitPriceOre', event)}
-								/></label
-							>
-							<div class="field-row">
-								<label
-									>Pakkestørrelse<input
-										type="number"
-										min="0.001"
-										step="any"
-										value={line.packageSize ?? ''}
-										onchange={(event) =>
-											(line.packageSize =
-												event.currentTarget.value === ''
-													? null
-													: Number(event.currentTarget.value))}
-									/></label
-								><label
-									>Pakkeenhet<select bind:value={line.packageUnit}
-										><option value={null}>Ukjent</option
-										>{#each ['g', 'kg', 'ml', 'l', 'stk'] as unit (unit)}<option value={unit}
-												>{unit}</option
-											>{/each}</select
-									></label
-								>
-							</div>
+							<details open={line.issues.length > 0}>
+								<summary>Mengde, størrelse og andre detaljer</summary>
+								<div class="grid gap-4">
+									<div class="field-row">
+										<label
+											>Mengde<Input
+												type="number"
+												min="0.001"
+												step="any"
+												value={line.quantity ?? ''}
+												onchange={(event) =>
+													(line.quantity =
+														event.currentTarget.value === ''
+															? null
+															: Number(event.currentTarget.value))}
+											/></label
+										><label
+											>Enhet<NativeSelect.Root bind:value={line.unit}
+												><option value={null}>Ukjent</option><option value="stk">stk</option><option
+													value="kg">kg</option
+												><option value="l">l</option></NativeSelect.Root
+											></label
+										>
+									</div>
+									<label
+										>Enhetspris (kr)<Input
+											inputmode="decimal"
+											value={moneyInput(line.unitPriceOre)}
+											onchange={(event) => setAmount(line, 'unitPriceOre', event)}
+										/></label
+									>
+									<div class="field-row">
+										<label
+											>Pakkestørrelse<Input
+												type="number"
+												min="0.001"
+												step="any"
+												value={line.packageSize ?? ''}
+												onchange={(event) =>
+													(line.packageSize =
+														event.currentTarget.value === ''
+															? null
+															: Number(event.currentTarget.value))}
+											/></label
+										><label
+											>Pakkeenhet<NativeSelect.Root bind:value={line.packageUnit}
+												><option value={null}>Ukjent</option
+												>{#each ['g', 'kg', 'ml', 'l', 'stk'] as unit (unit)}<option value={unit}
+														>{unit}</option
+													>{/each}</NativeSelect.Root
+											></label
+										>
+									</div>
 
-							<label>Merke<input bind:value={line.brand} /></label><label
-								>Etiketter (kommadelt)<input
-									value={line.tags.join(', ')}
-									placeholder="Jobblunsj, felles, personlig"
-									onchange={(event) =>
-										(line.tags = event.currentTarget.value
-											.split(',')
-											.map((tag) => tag.trim())
-											.filter(Boolean))}
-								/></label
-							>
-						{:else if line.kind === 'item_discount'}<label
-								>Rabatten gjelder<select bind:value={line.relatedLineId}
+									<label>Merke<Input bind:value={line.brand} /></label><label
+										>Etiketter (kommadelt)<Input
+											value={line.tags.join(', ')}
+											placeholder="Jobblunsj, felles, personlig"
+											onchange={(event) =>
+												(line.tags = event.currentTarget.value
+													.split(',')
+													.map((tag) => tag.trim())
+													.filter(Boolean))}
+										/></label
+									>
+								</div>
+							</details>{:else if line.kind === 'item_discount'}<label
+								>Rabatten gjelder<NativeSelect.Root bind:value={line.relatedLineId}
 									><option value={null}>Uavklart</option
 									>{#each data.lines.filter((item) => item.kind === 'product') as product (product.id)}<option
 											value={product.id}>{product.name}</option
-										>{/each}</select
+										>{/each}</NativeSelect.Root
 								></label
 							>{/if}
 						{#if line.issues.length}<div class="notice warning">
 								<div>
-									{#each line.issues as issue, i (i)}<p>{issue}</p>{/each}<button
+									{#each line.issues as issue, i (i)}<p>{issue}</p>{/each}<Button
+										variant="ghost"
 										class="text-button"
-										onclick={() => (line.issues = [])}>Linjen er kontrollert</button
+										onclick={() => (line.issues = [])}>Linjen er kontrollert</Button
 									>
 								</div>
 							</div>{/if}
-						<button class="text-button danger" onclick={() => data!.lines.splice(index, 1)}
-							><Trash2 size={15} />Fjern linje</button
+						<Button
+							variant="ghost"
+							class="text-button danger"
+							onclick={() =>
+								data!.lines.splice(
+									data!.lines.findIndex((item) => item.id === line.id),
+									1
+								)}><Trash2 size={15} />Fjern linje</Button
 						>
 					</div>
 				</details>{/each}
-			<button class="secondary wide" onclick={() => data!.lines.push(emptyLine())}
-				><Plus size={18} />Legg til manglende linje</button
+			<Button variant="outline" class="secondary wide" onclick={() => data!.lines.push(emptyLine())}
+				><Plus size={18} />Legg til manglende linje</Button
 			>
 			<div class="panel reconciliation">
 				<h2>Stemmer beløpene?</h2>
@@ -428,15 +455,17 @@
 					{message}
 				</p>{/if}
 			<div class="review-actions">
-				<button
+				<Button
+					variant="outline"
 					class="secondary"
 					onclick={() => save(false)}
-					disabled={busy || invalidMoney.length > 0}>Lagre endringer</button
-				><button
+					disabled={busy || invalidMoney.length > 0}>Lagre endringer</Button
+				><Button
+					variant="default"
 					class="primary"
 					onclick={() => save(true)}
 					disabled={busy || invalidMoney.length > 0 || totals.issues.length > 0}
-					><Check size={18} />Marker kontrollert</button
+					><Check size={18} />Marker kontrollert</Button
 				>
 			</div>
 		{:else}<div class="panel">
@@ -446,8 +475,8 @@
 						: 'Ingen resultater ennå'}
 				</h2>
 				<p>Du kan gå tilbake. Resultatet kommer i innboksen.</p>
-				{#if detail.data?.receipt.data}<button class="primary" onclick={reload}
-						>Vis resultatet</button
+				{#if detail.data?.receipt.data}<Button variant="default" class="primary" onclick={reload}
+						>Vis resultatet</Button
 					>{/if}
 			</div>{/if}
 		<details class="panel extraction-details">
@@ -461,13 +490,14 @@
 				Ved ny behandling beholdes manuelle endringer. Ny uttrekking lagres her til sammenligning.
 			</p>
 		</details>
-		<button
+		<Button
+			variant="ghost"
 			class="text-button"
 			onclick={retry}
 			disabled={busy ||
 				['processing', 'uploaded', 'uploading'].includes(
 					detail.data?.receipt.status ?? initial.status
-				)}><RotateCcw size={15} />Les bildene på nytt</button
+				)}><RotateCcw size={15} />Les bildene på nytt</Button
 		>
 	</section>
 </div>

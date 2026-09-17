@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { Button } from '#lib/components/ui/button/index.js';
 	import { ChevronRight, ReceiptText, TriangleAlert, LoaderCircle, Check } from '@lucide/svelte';
 	import type { Receipt } from '#lib/domain/insights.js';
 	import { formatMoney } from '#lib/domain/receipt.js';
@@ -23,7 +24,7 @@
 	);
 </script>
 
-<button class="receipt-card" onclick={() => onopen(receipt)}>
+<Button variant="ghost" class="receipt-card" onclick={() => onopen(receipt)}>
 	<span class="store-icon"><ReceiptText size={23} /></span>
 	<span class="receipt-description"
 		><strong>{receipt.data?.store ?? 'Ny kvittering'}</strong><span class="muted small"
@@ -46,4 +47,4 @@
 	<span class="receipt-price"
 		>{formatMoney(receipt.data?.totalOre ?? null)}<ChevronRight size={16} /></span
 	>
-</button>
+</Button>

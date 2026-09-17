@@ -1,0 +1,9 @@
+.env
+.env.*
+!.env.example
+.git
+.agents
+receipts
+node_modules
+.svelte-kit
+.vercel

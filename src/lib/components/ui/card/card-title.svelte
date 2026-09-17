@@ -1,0 +1,28 @@
+<script lang="ts">
+	import { untrack } from 'svelte';
+	import { cn, type WithElementRef } from '#lib/utils.js';
+	import type { HTMLAttributes } from 'svelte/elements';
+
+	let {
+		ref = $bindable(null),
+		class: className,
+		children,
+		...restProps
+	}: WithElementRef<HTMLAttributes<HTMLDivElement>> = $props();
+</script>
+
+<div
+	{@attach (element: HTMLElement) => {
+		untrack(() => {
+			if (ref !== element) ref = element;
+		});
+		return () => {
+			ref = null;
+		};
+	}}
+	data-slot="card-title"
+	class={cn('text-base leading-snug font-medium group-data-[size=sm]/card:text-sm', className)}
+	{...restProps}
+>
+	{@render children?.()}
+</div>

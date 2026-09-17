@@ -1,4 +1,6 @@
 <script lang="ts">
+	import { Input } from '#lib/components/ui/input/index.js';
+	import { Button } from '#lib/components/ui/button/index.js';
 	import {
 		Camera,
 		Inbox,
@@ -33,9 +35,15 @@
 	import type { Receipt } from '#lib/domain/insights.js';
 	import { formatMoney, osloDate } from '#lib/domain/receipt.js';
 	import { monthlyInsights } from '#lib/domain/insights.js';
-	import { onMount } from 'svelte';
+	import { onMount, tick } from 'svelte';
 	let area = $state<'capture' | 'inbox' | 'spending' | 'history'>('capture');
 	let selected = $state<Receipt | null>(null);
+	let returnScroll = 0;
+	async function closeReceipt() {
+		selected = null;
+		await tick();
+		window.scrollTo(0, returnScroll);
+	}
 	let settings = $state(false);
 	let name = $state('');
 	let email = $state('');
@@ -176,6 +184,7 @@
 		window.scrollTo({ top: 0 });
 	}
 	function openReceipt(receipt: Receipt) {
+		returnScroll = window.scrollY;
 		selected = receipt;
 		window.scrollTo({ top: 0 });
 	}
@@ -206,33 +215,36 @@
 			</div>
 			<h2>{signingUp ? 'Opprett konto' : 'Velkommen hjem'}</h2>
 			<form onsubmit={authenticate}>
-				{#if signingUp}<label>Navn<input autocomplete="name" bind:value={name} required /></label
+				{#if signingUp}<label>Navn<Input autocomplete="name" bind:value={name} required /></label
 					>{/if}<label
-					>E-post<input type="email" autocomplete="email" bind:value={email} required /></label
+					>E-post<Input type="email" autocomplete="email" bind:value={email} required /></label
 				><label
-					>Passord<input
+					>Passord<Input
 						type="password"
 						autocomplete={signingUp ? 'new-password' : 'current-password'}
 						bind:value={password}
-						minlength="12"
+						minlength={12}
 						required
 					/></label
 				>{#if signingUp}<p class="footnote">
 						Bruk minst 12 tegn. Dere oppretter hver deres konto og deler én privat husstand.
-					</p>{/if}{#if error}<p class="error" role="alert">{error}</p>{/if}<button
+					</p>{/if}{#if error}<p class="error" role="alert">{error}</p>{/if}<Button
+					type="submit"
+					variant="default"
 					class="primary wide"
 					disabled={working}
 					>{working ? 'Et øyeblikk …' : signingUp ? 'Opprett konto' : 'Logg inn'}<ChevronRight
 						size={18}
-					/></button
+					/></Button
 				>
 			</form>
-			<button
+			<Button
+				variant="ghost"
 				class="text-button login-toggle"
 				onclick={() => {
 					signingUp = !signingUp;
 					error = '';
-				}}>{signingUp ? 'Har du konto? Logg inn' : 'Ny her? Opprett konto'}</button
+				}}>{signingUp ? 'Har du konto? Logg inn' : 'Ny her? Opprett konto'}</Button
 			>
 		</section>
 		<p class="login-footer">Laget for hverdagen. Og kvitteringene som følger med.</p>
@@ -248,21 +260,24 @@
 					onsubmit={configureHousehold}
 				>
 					{#if joinExisting}<label
-							>Invitasjonskode<input bind:value={invitation} autocomplete="off" required /></label
+							>Invitasjonskode<Input bind:value={invitation} autocomplete="off" required /></label
 						>{:else}<label
-							>Navn på husstanden<input bind:value={householdName} maxlength="80" required /></label
-						>{/if}{#if error}<p class="error" role="alert">{error}</p>{/if}<button
+							>Navn på husstanden<Input bind:value={householdName} maxlength={80} required /></label
+						>{/if}{#if error}<p class="error" role="alert">{error}</p>{/if}<Button
+						type="submit"
+						variant="default"
 						class="primary wide"
-						disabled={working}>{joinExisting ? 'Bli med' : 'Opprett husstand'}</button
+						disabled={working}>{joinExisting ? 'Bli med' : 'Opprett husstand'}</Button
 					>
 				</form>
-				<button
+				<Button
+					variant="ghost"
 					class="text-button"
 					onclick={() => {
 						joinExisting = !joinExisting;
 						error = '';
-					}}>{joinExisting ? 'Opprett en ny husstand' : 'Jeg har en invitasjonskode'}</button
-				>{/if}<button class="text-button" onclick={signOut}>Logg ut</button>
+					}}>{joinExisting ? 'Opprett en ny husstand' : 'Jeg har en invitasjonskode'}</Button
+				>{/if}<Button variant="ghost" class="text-button" onclick={signOut}>Logg ut</Button>
 		</section>
 	</div>
 {:else}
@@ -278,24 +293,26 @@
 				<div><strong>{householdTitle}</strong><span>Deres dagligvarer</span></div>
 			</div>
 			<nav aria-label="Hovedmeny">
-				{#each [{ id: 'capture' as const, label: 'Ny kvittering', icon: Camera }, { id: 'inbox' as const, label: 'Innboks', icon: Inbox }, { id: 'spending' as const, label: 'Forbruk', icon: ChartNoAxesCombined }, { id: 'history' as const, label: 'Historikk', icon: Search }] as item (item.id)}<button
-						class:active={area === item.id && !settings}
+				{#each [{ id: 'capture' as const, label: 'Ny kvittering', icon: Camera }, { id: 'inbox' as const, label: 'Innboks', icon: Inbox }, { id: 'spending' as const, label: 'Forbruk', icon: ChartNoAxesCombined }, { id: 'history' as const, label: 'Historikk', icon: Search }] as item (item.id)}<Button
+						variant="ghost"
+						class={area === item.id && !settings ? 'active' : ''}
 						onclick={() => navigate(item.id)}
 						><item.icon
 							size={20}
 						/>{item.label}{#if item.id === 'inbox' && pending.length + queue.length}<span
 								class="nav-count">{pending.length + queue.length}</span
-							>{/if}</button
+							>{/if}</Button
 					>{/each}
 			</nav>
 			<div class="sidebar-bottom">
 				<p>Små kjøp.<br />Bedre oversikt.</p>
-				<button
+				<Button
+					variant="ghost"
 					class="text-button"
 					onclick={() => {
 						settings = true;
 						selected = null;
-					}}><Settings size={17} />Husstanden</button
+					}}><Settings size={17} />Husstanden</Button
 				>
 			</div>
 		</aside>
@@ -314,14 +331,15 @@
 									spending: 'Forbruk',
 									history: 'Historikk'
 								}[area]}</span
-				><button
+				><Button
+					variant="ghost"
 					class="account-button"
 					onclick={() => {
 						settings = !settings;
 						selected = null;
 					}}
 					><Users size={16} /><span>{household.data?.members.length ?? 2} i husstanden</span
-					></button
+					></Button
 				>
 			</header>
 			<main>
@@ -342,24 +360,25 @@
 							Partneren oppretter en konto og bruker denne koden. Husstanden har plass til to.
 						</p>
 						<label
-							>Invitasjonskode<input
+							>Invitasjonskode<Input
 								readonly
 								value={household.data?.household.invitation ?? ''}
 							/></label
-						><button class="secondary" onclick={copyInvitation}
-							>{#if copied}<Check size={16} />Kopiert{:else}<Copy size={16} />Kopier kode{/if}</button
+						><Button variant="outline" class="secondary" onclick={copyInvitation}
+							>{#if copied}<Check size={16} />Kopiert{:else}<Copy size={16} />Kopier kode{/if}</Button
 						>
 						<p class="footnote">
 							Del koden privat. Alle med koden kan bli medlem hvis det er en ledig plass.
 						</p>
-						<button
+						<Button
+							variant="ghost"
 							class="text-button"
 							onclick={async () => {
 								await client.mutation(api.households.rotateInvitation, {
 									invitation: crypto.randomUUID().replaceAll('-', '')
 								});
 								copied = false;
-							}}>Lag ny invitasjonskode</button
+							}}>Lag ny invitasjonskode</Button
 						>
 						<hr />
 						<h2>På denne enheten</h2>
@@ -367,7 +386,9 @@
 							{queue.length} kvittering(er) venter på opplasting. Hold appen åpen for å laste opp. Legg
 							appen til på Hjem-skjermen fra nettlesermenyen.
 						</p>
-						<button class="text-button" onclick={signOut}><LogOut size={17} />Logg ut</button>
+						<Button variant="ghost" class="text-button" onclick={signOut}
+							><LogOut size={17} />Logg ut</Button
+						>
 						<p class="footnote">
 							Lokalt lagrede bilder beholdes for denne husstanden til neste innlogging og vellykket
 							opplasting.
@@ -375,7 +396,7 @@
 					</section>
 				{:else if selected}{#key selected._id}<Review
 							receipt={selected}
-							onclose={() => (selected = null)}
+							onclose={closeReceipt}
 						/>{/key}
 				{:else if area === 'capture'}<div class="capture-layout">
 						<Capture
@@ -393,15 +414,15 @@
 										>{totals.provisional ? 'Foreløpig' : 'Kontrollert'}</span
 									>
 								</div>
-								<button class="text-button" onclick={() => navigate('spending')}
-									>Se forbruket<ChevronRight size={16} /></button
+								<Button variant="ghost" class="text-button" onclick={() => navigate('spending')}
+									>Se forbruket<ChevronRight size={16} /></Button
 								>
 							</section>
 							<section class="recent-section">
 								<div class="section-header">
 									<h2>Siste kvitteringer</h2>
-									<button class="text-button" onclick={() => navigate('inbox')}
-										>Se alle<ChevronRight size={14} /></button
+									<Button variant="ghost" class="text-button" onclick={() => navigate('inbox')}
+										>Se alle<ChevronRight size={14} /></Button
 									>
 								</div>
 								{#each receipts.results.slice(0, 3) as receipt (receipt._id)}<ReceiptCard
@@ -410,10 +431,11 @@
 									/>{:else}<div class="empty-recent">
 										<ReceiptText size={26} />
 										<p>Den første kvitteringen<br />er starten på oversikten.</p>
-									</div>{/each}{#if queue.length}<button
+									</div>{/each}{#if queue.length}<Button
+										variant="ghost"
 										class="notice queue-notice"
 										onclick={() => navigate('inbox')}
-										><CloudUpload size={19} />{queue.length} lagret på enheten</button
+										><CloudUpload size={19} />{queue.length} lagret på enheten</Button
 									>{/if}
 							</section>
 							<p class="capture-aside-note">Du tar bildet.<br />Vi holder orden på detaljene.</p>
@@ -431,8 +453,8 @@
 					{#if queue.length}<section class="panel">
 							<div class="section-header">
 								<h2>På denne enheten</h2>
-								<button class="text-button" onclick={() => void synchronize()}
-									>Prøv opplasting</button
+								<Button variant="ghost" class="text-button" onclick={() => void synchronize()}
+									>Prøv opplasting</Button
 								>
 							</div>
 							{#each queue as entry (entry.id)}<div class="queue-row">
@@ -460,13 +482,18 @@
 								<Inbox size={35} />
 								<h2>Innboksen er tom.</h2>
 								<p>Ta et bilde neste gang dere handler.</p>
-								<button class="primary" onclick={() => navigate('capture')}
-									><Camera size={18} />Ny kvittering</button
+								<Button variant="default" class="primary" onclick={() => navigate('capture')}
+									><Camera size={18} />Ny kvittering</Button
 								>
 							</div>{/each}
 					</div>
-				{:else if area === 'spending'}<Spending receipts={receipts.results} onopen={openReceipt} />
-				{:else}<History receipts={receipts.results} onopen={openReceipt} />{/if}
+				{/if}
+				{#if area === 'spending'}<div hidden={!!selected || settings}>
+						<Spending receipts={receipts.results} onopen={openReceipt} />
+					</div>{/if}
+				{#if area === 'history'}<div hidden={!!selected || settings}>
+						<History receipts={receipts.results} onopen={openReceipt} />
+					</div>{/if}
 				{#if receipts.error}<p class="error" role="alert">
 						Kunne ikke hente kvitteringer. {receipts.error.message}
 					</p>{:else if receipts.status !== 'Exhausted' && auth.isAuthenticated}<p
@@ -481,16 +508,26 @@
 			</footer>
 		</div>
 		<nav class="mobile-nav" aria-label="Mobilmeny">
-			<button class:active={area === 'capture'} onclick={() => navigate('capture')}
-				><Camera size={22} /><span>Ta bilde</span></button
-			><button class:active={area === 'inbox'} onclick={() => navigate('inbox')}
+			<Button
+				variant="ghost"
+				class={area === 'capture' ? 'active' : ''}
+				onclick={() => navigate('capture')}><Camera size={22} /><span>Ta bilde</span></Button
+			><Button
+				variant="ghost"
+				class={area === 'inbox' ? 'active' : ''}
+				onclick={() => navigate('inbox')}
 				><Inbox size={22} /><span
 					>Innboks{pending.length + queue.length ? ` (${pending.length + queue.length})` : ''}</span
-				></button
-			><button class:active={area === 'spending'} onclick={() => navigate('spending')}
-				><ChartNoAxesCombined size={22} /><span>Forbruk</span></button
-			><button class:active={area === 'history'} onclick={() => navigate('history')}
-				><Search size={22} /><span>Historikk</span></button
+				></Button
+			><Button
+				variant="ghost"
+				class={area === 'spending' ? 'active' : ''}
+				onclick={() => navigate('spending')}
+				><ChartNoAxesCombined size={22} /><span>Forbruk</span></Button
+			><Button
+				variant="ghost"
+				class={area === 'history' ? 'active' : ''}
+				onclick={() => navigate('history')}><Search size={22} /><span>Historikk</span></Button
 			>
 		</nav>
 	</div>

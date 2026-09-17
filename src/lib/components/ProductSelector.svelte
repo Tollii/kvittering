@@ -1,4 +1,6 @@
 <script lang="ts">
+	import * as NativeSelect from '#lib/components/ui/native-select/index.js';
+	import { Input } from '#lib/components/ui/input/index.js';
 	import { useQuery } from 'convex-svelte';
 	import { api } from '../../../convex/_generated/api';
 	import type { Id } from '../../../convex/_generated/dataModel';
@@ -22,13 +24,13 @@
 
 <div class="panel">
 	<label
-		>Søk etter lagret produkt<input
+		>Søk etter lagret produkt<Input
 			bind:value={search}
 			placeholder="Varenavn, smak eller størrelse"
 		/></label
 	>
 	<label
-		>Koblet produkt<select
+		>Koblet produkt<NativeSelect.Root
 			aria-label="Koblet produkt"
 			{value}
 			onchange={(event) => onchange(event.currentTarget.value)}
@@ -43,7 +45,7 @@
 						? ` · ${product.packageSize} ${product.packageUnit ?? ''}`
 						: ''}</option
 				>{/each}
-		</select></label
+		</NativeSelect.Root></label
 	>
 	<p class="footnote">
 		Koblingen lagres med «Lagre endringer» og huskes for samme kvitteringsnavn i denne butikken.

@@ -131,3 +131,11 @@ No Vercel site or production deployment was published as part of the local build
 - [SvelteKit Vercel adapter](https://svelte.dev/docs/kit/adapter-vercel).
 
 Model identifiers and account access were checked on 17 September 2026. Model classifications remain provisional until reviewed. A single receipt test does not establish general extraction accuracy.
+
+### Interface and insight conventions
+
+The interface uses Tailwind CSS 4, shadcn-svelte components, Geist typography and Lucide icons. Shared controls are in `src/lib/components/ui`; the green theme is in `src/app.css`. Charts use LayerChart through the shadcn chart container. Each chart has a selectable list as a keyboard-accessible alternative.
+
+Current-month comparisons use the same calendar days in the previous month, limited to that month's last day. Completed months use the full month. Figures describe recorded receipts, with pending review and missing product links shown separately. Receipt review retains summary and VAT lines behind a display option.
+
+Product history shows net prices per kg or litre only when explicit quantities and package sizes permit comparison. Otherwise it labels the figures as purchase totals. Typical price is the median observation. Returns, unknown dates and incompatible observations are excluded from price summaries and counted in the displayed omission notice. Automatic product links and user confirmations have separate labels.

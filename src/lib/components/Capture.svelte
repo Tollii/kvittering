@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { Button } from '#lib/components/ui/button/index.js';
 	import { Camera, ImagePlus, Plus, X, Check, WifiOff, ReceiptText } from '@lucide/svelte';
 	import { prepareImage, saveLocalReceipt } from '#lib/upload-queue.js';
 	import { onDestroy } from 'svelte';
@@ -96,39 +97,43 @@
 		<div class="photo-previews">
 			{#each photos as photo, index (photo.url)}<div class="photo-preview">
 					<img src={photo.url} alt={`Kvitteringsbilde ${index + 1}`} /><span>{index + 1}</span
-					><button
+					><Button
+						variant="ghost"
 						class="icon-button"
 						aria-label={`Fjern bilde ${index + 1}`}
-						onclick={() => remove(index)}><X size={16} /></button
+						onclick={() => remove(index)}><X size={16} /></Button
 					>
-				</div>{/each}<button
+				</div>{/each}<Button
+				variant="ghost"
 				class="add-photo"
 				onclick={() => document.getElementById(`${inputId}-camera`)?.click()}
-				disabled={working}><Plus /><span>Flere bilder</span></button
+				disabled={working}><Plus /><span>Flere bilder</span></Button
 			>
 		</div>
 		<p class="muted small">
 			Lang kvittering? Legg til bilder i rekkefølge. Fjern et bilde for å ta det på nytt.
 		</p>
-		<button class="primary wide" onclick={save} disabled={working}
+		<Button variant="default" class="primary wide" onclick={save} disabled={working}
 			>{#if working}Lagrer …{:else}<Check size={20} />Lagre {photos.length === 1
 					? 'kvittering'
-					: `${photos.length} bilder`}{/if}</button
+					: `${photos.length} bilder`}{/if}</Button
 		>
 	{:else}
-		<button
+		<Button
+			variant="ghost"
 			class="camera-button"
 			onclick={() => document.getElementById(`${inputId}-camera`)?.click()}
 			disabled={working}
 			><span class="camera-symbol"><Camera size={34} strokeWidth={1.6} /></span><strong
 				>{working ? 'Klargjør bilde …' : 'Ta bilde av kvittering'}</strong
-			><span>Kameraet åpnes på telefonen</span></button
+			><span>Kameraet åpnes på telefonen</span></Button
 		>
 	{/if}
-	<button
+	<Button
+		variant="outline"
 		class="secondary wide"
 		onclick={() => document.getElementById(`${inputId}-files`)?.click()}
-		disabled={working}><ImagePlus size={19} />Velg bilder fra enheten</button
+		disabled={working}><ImagePlus size={19} />Velg bilder fra enheten</Button
 	>
 	{#if error}<p class="error" role="alert">{error}</p>{/if}
 	<div class="capture-note">

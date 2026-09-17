@@ -142,7 +142,7 @@ export function productHistory(receipts: Receipt[]) {
 		{
 			key: string;
 			name: string;
-			confirmed: boolean;
+			linked: boolean;
 			quantity: number;
 			purchases: Set<string>;
 			amountOre: number;
@@ -152,12 +152,12 @@ export function productHistory(receipts: Receipt[]) {
 	for (const receipt of receipts) {
 		if (!receipt.data || receipt.excluded || receipt.data.currency !== 'NOK') continue;
 		for (const line of spendingLines(receipt.data).products) {
-			// Unconfirmed items remain separate; similar names do not establish identity.
+			// Unlinked items remain separate; similar names do not establish identity.
 			const key = line.productId ?? `${receipt._id}:${line.id}`;
 			const product = products.get(key) ?? {
 				key,
 				name: line.productName || line.name,
-				confirmed: !!line.productId,
+				linked: !!line.productId,
 				quantity: 0,
 				purchases: new Set<string>(),
 				amountOre: 0,
@@ -190,4 +190,151 @@ export function comparableUnitPrice(line: ReceiptLine, netOre: number) {
 		amount = line.quantity * line.packageSize * factor;
 	} else return null;
 	return amount > 0 && unit ? { ore: Math.round(netOre / amount), unit } : null;
+}
+
+/** Current months compare equal calendar ranges; completed months compare in full. */
+export function comparisonInsights(
+	receipts: Receipt[],
+	month: string,
+	reviewedOnly = false,
+	today = new Date().toLocaleDateString('sv-SE', { timeZone: 'Europe/Oslo' })
+) {
+	const priorMonth = monthBefore(month);
+	const lastDay = (value: string) =>
+		new Date(Date.UTC(Number(value.slice(0, 4)), Number(value.slice(5, 7)), 0)).getUTCDate();
+	const partial = month === today.slice(0, 7);
+	const day = partial ? Number(today.slice(8, 10)) : lastDay(month);
+	const currentEnd = `${month}-${String(day).padStart(2, '0')}`;
+	const previousEnd = `${priorMonth}-${String(partial ? Math.min(day, lastDay(priorMonth)) : lastDay(priorMonth)).padStart(2, '0')}`;
+	const through = (end: string) =>
+		receipts.filter((r) => !r.data?.purchaseDate || r.data.purchaseDate <= end);
+	const current = monthlyInsights(through(currentEnd), month, reviewedOnly);
+	const previous = monthlyInsights(through(previousEnd), priorMonth, reviewedOnly);
+	const changes = [...new Set([...current.groups, ...previous.groups].map((g) => g.id))]
+		.map((id) => {
+			const now = current.groups.find((g) => g.id === id);
+			const before = previous.groups.find((g) => g.id === id);
+			return {
+				id,
+				name: now?.name ?? before!.name,
+				current: now?.amountOre ?? 0,
+				previous: before?.amountOre ?? 0,
+				difference: (now?.amountOre ?? 0) - (before?.amountOre ?? 0),
+				currentContributions: now?.contributions ?? [],
+				previousContributions: before?.contributions ?? []
+			};
+		})
+		.sort((a, b) => Math.abs(b.difference) - Math.abs(a.difference));
+	return { current, previous, currentEnd, previousEnd, partial, changes };
+}
+export function receiptCoverage(receipts: Receipt[]) {
+	const included = receipts.filter((r) => !r.excluded);
+	return {
+		pending: included.filter((r) => r.status !== 'reviewed'),
+		unlinked: included.filter((r) =>
+			r.data?.lines.some((l) => l.kind === 'product' && !l.productId)
+		),
+		unlinkedCount: included.reduce(
+			(n, r) => n + (r.data?.lines.filter((l) => l.kind === 'product' && !l.productId).length ?? 0),
+			0
+		)
+	};
+}
+export function matchLabel(line: ReceiptLine) {
+	return !line.productId
+		? 'Ikke koblet'
+		: line.productMatchManual
+			? 'Bekreftet av deg'
+			: 'Automatisk koblet';
+}
+/** Unknown sizes stay purchase totals. Returns and unknown dates do not become price observations. */
+export function productPrices(contributions: Contribution[]) {
+	const purchases = contributions.filter(
+		(c) => c.line && c.amountOre > 0 && c.receipt.data?.purchaseDate
+	);
+	const comparable = purchases.map((c) => ({
+		contribution: c,
+		price: comparableUnitPrice(c.line!, c.amountOre)
+	}));
+	const units = new Set(comparable.flatMap((p) => (p.price ? [p.price.unit] : [])));
+	const unit = units.size === 1 ? [...units][0] : null;
+	const observations = (
+		unit
+			? comparable
+					.filter((p) => p.price?.unit === unit)
+					.map((p) => ({ contribution: p.contribution, ore: p.price!.ore }))
+			: purchases.map((c) => ({ contribution: c, ore: c.amountOre }))
+	).sort(
+		(a, b) =>
+			a.contribution.receipt.data!.purchaseDate!.localeCompare(
+				b.contribution.receipt.data!.purchaseDate!
+			) || a.contribution.receipt._creationTime - b.contribution.receipt._creationTime
+	);
+	const sorted = observations.map((p) => p.ore).sort((a, b) => a - b);
+	const middle = Math.floor(sorted.length / 2);
+	const typical = !sorted.length
+		? null
+		: sorted.length % 2
+			? sorted[middle]
+			: Math.round((sorted[middle - 1] + sorted[middle]) / 2);
+	return {
+		unit,
+		observations,
+		omitted: contributions.length - observations.length,
+		latest: observations.at(-1)?.ore ?? null,
+		lowest: sorted[0] ?? null,
+		typical
+	};
+}
+
+/** Daily net product spending, using receipt purchase dates rather than upload timestamps. */
+export function spendingCalendar(
+	receipts: Receipt[],
+	year: number,
+	reviewedOnly = false,
+	today = new Date().toLocaleDateString('sv-SE', { timeZone: 'Europe/Oslo' })
+) {
+	const days = new Map<
+		string,
+		{
+			date: string;
+			amountOre: number;
+			contributions: Contribution[];
+			provisional: number;
+			unknown: number;
+		}
+	>();
+	for (
+		let date = new Date(Date.UTC(year, 0, 1));
+		date.getUTCFullYear() === year;
+		date.setUTCDate(date.getUTCDate() + 1)
+	) {
+		const key = date.toISOString().slice(0, 10);
+		days.set(key, { date: key, amountOre: 0, contributions: [], provisional: 0, unknown: 0 });
+	}
+	for (const receipt of receipts) {
+		if (
+			receipt.excluded ||
+			!receipt.data ||
+			receipt.data.currency !== 'NOK' ||
+			(reviewedOnly && receipt.status !== 'reviewed')
+		)
+			continue;
+		const date = receipt.data.purchaseDate;
+		if (!date || date > today) continue;
+		const day = days.get(date);
+		if (!day) continue;
+		const totals = reconcile(receipt.data);
+		day.amountOre += totals.productSpending;
+		day.unknown += totals.unknown;
+		day.provisional += receipt.status === 'reviewed' ? 0 : 1;
+		day.contributions.push({ receipt, line: null, amountOre: totals.productSpending });
+	}
+	const maximum = Math.max(0, ...[...days.values()].map((day) => day.amountOre));
+	return [...days.values()].map((day) => ({
+		...day,
+		future: day.date > today,
+		level:
+			day.amountOre > 0 && maximum > 0 ? Math.max(1, Math.ceil((day.amountOre / maximum) * 4)) : 0
+	}));
 }
