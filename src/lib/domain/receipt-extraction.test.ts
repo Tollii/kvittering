@@ -57,3 +57,29 @@ describe('receipt image evidence', () => {
 		expect(data.lines[0].amountOre).toBe(2590);
 	});
 });
+
+describe('missing purchase year', () => {
+	it('uses the current year in Norway and leaves printed years unchanged', () => {
+		const extracted = fixture();
+		extracted.purchaseDate = '--08-20';
+		const referenceTime = Date.parse('2026-12-31T23:30:00Z');
+		const data = prepareExtraction(extractionSchema.parse(extracted), 1, referenceTime);
+		expect(data.purchaseDate).toBe('2027-08-20');
+		expect(data.issues).toEqual([]);
+		extracted.purchaseDate = '2024-08-20';
+		expect(
+			prepareExtraction(extractionSchema.parse(extracted), 1, referenceTime).purchaseDate
+		).toBe('2024-08-20');
+	});
+	it('keeps missing dates unknown and flags an invalid leap day without stopping extraction', () => {
+		const extracted = fixture();
+		extracted.purchaseDate = null;
+		expect(prepareExtraction(extractionSchema.parse(extracted), 1).purchaseDate).toBeNull();
+		extracted.purchaseDate = '--02-29';
+		const data = prepareExtraction(extractionSchema.parse(extracted), 1, Date.parse('2026-09-17'));
+		expect(data.purchaseDate).toBeNull();
+		expect(data.issues).toContain(
+			'Datoen er ikke gyldig i inneværende år. Kontroller kjøpsdatoen.'
+		);
+	});
+});
