@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { Button } from '#lib/components/ui/button/index.js';
 	import { Camera, ImagePlus, Plus, X, Check, WifiOff, ReceiptText } from '@lucide/svelte';
-	import { prepareImage, saveLocalReceipt } from '#lib/upload-queue.js';
+	import { prepareImage, saveLocalReceipts } from '#lib/upload-queue.js';
 	import { onDestroy } from 'svelte';
 	let {
 		householdId,
@@ -12,6 +12,7 @@
 	let working = $state(false);
 	let error = $state('');
 	let saved = $state(false);
+	let combined = $state(false);
 	const inputId = $props.id();
 	async function addImages(event: Event) {
 		const input = event.currentTarget as HTMLInputElement;
@@ -21,7 +22,7 @@
 		saved = false;
 		try {
 			if (photos.length + chosen.length > 8)
-				throw new Error('Du kan ha opptil åtte bilder per kvittering.');
+				throw new Error('Du kan ha opptil åtte bilder om gangen.');
 			for (const file of chosen) {
 				const blob = await prepareImage(file);
 				photos.push({ blob, url: URL.createObjectURL(blob) });
@@ -36,17 +37,20 @@
 	function remove(index: number) {
 		URL.revokeObjectURL(photos[index].url);
 		photos.splice(index, 1);
+		if (photos.length < 2) combined = false;
 	}
 	async function save() {
 		working = true;
 		error = '';
 		try {
-			await saveLocalReceipt(
+			await saveLocalReceipts(
 				householdId,
-				photos.map((photo) => photo.blob)
+				photos.map((photo) => photo.blob),
+				combined
 			);
 			photos.forEach((photo) => URL.revokeObjectURL(photo.url));
 			photos = [];
+			combined = false;
 			saved = true;
 			onsaved();
 			navigator.storage?.persist?.().catch(() => false);
@@ -101,6 +105,7 @@
 						variant="ghost"
 						class="icon-button"
 						aria-label={`Fjern bilde ${index + 1}`}
+						disabled={working}
 						onclick={() => remove(index)}><X size={16} /></Button
 					>
 				</div>{/each}<Button
@@ -110,13 +115,18 @@
 				disabled={working}><Plus /><span>Flere bilder</span></Button
 			>
 		</div>
-		<p class="muted small">
-			Lang kvittering? Legg til bilder i rekkefølge. Fjern et bilde for å ta det på nytt.
-		</p>
+		{#if !combined}<p class="muted small">Hvert bilde lagres som en egen kvittering.</p>{/if}
+		{#if photos.length > 1}
+			<label class="flex min-h-12 items-center gap-3 py-3">
+				<input type="checkbox" bind:checked={combined} disabled={working} />
+				<span>Bildene er deler av én lang kvittering</span>
+			</label>
+			{#if combined}<p class="muted small">Bildene behandles sammen, i valgt rekkefølge.</p>{/if}
+		{/if}
 		<Button variant="default" class="primary wide" onclick={save} disabled={working}
-			>{#if working}Lagrer …{:else}<Check size={20} />Lagre {photos.length === 1
+			>{#if working}Lagrer …{:else}<Check size={20} />Lagre {photos.length === 1 || combined
 					? 'kvittering'
-					: `${photos.length} bilder`}{/if}</Button
+					: `${photos.length} kvitteringer`}{/if}</Button
 		>
 	{:else}
 		<Button

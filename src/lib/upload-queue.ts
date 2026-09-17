@@ -24,20 +24,26 @@ export async function localReceipts(householdId: string) {
 		.filter((row) => row.householdId === householdId)
 		.sort((a, b) => b.createdAt - a.createdAt);
 }
-export async function saveLocalReceipt(householdId: string, images: Blob[]) {
+/** Save the entire selection in one transaction so a failed save cannot leave a partial batch. */
+export async function saveLocalReceipts(householdId: string, images: Blob[], combined = false) {
 	if (!images.length || images.length > 8) throw new Error('Velg mellom ett og åtte bilder.');
-	const receipt: LocalReceipt = {
+	const groups = combined ? [images] : images.map((image) => [image]);
+	const receipts: LocalReceipt[] = groups.map((group) => ({
 		id: crypto.randomUUID(),
 		householdId,
 		createdAt: Date.now(),
-		images,
-		uploaded: images.map(() => false),
+		images: group,
+		uploaded: group.map(() => false),
 		receiptId: null,
 		state: 'saved',
 		error: null
-	};
-	await (await database()).put('uploads', receipt);
-	return receipt;
+	}));
+	const transaction = (await database()).transaction('uploads', 'readwrite');
+	await Promise.all([
+		...receipts.map((receipt) => transaction.store.add(receipt)),
+		transaction.done
+	]);
+	return receipts;
 }
 export async function removeLocalReceipt(id: string) {
 	await (await database()).delete('uploads', id);
