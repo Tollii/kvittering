@@ -30,7 +30,7 @@
 	import { categoryGroups, categories, categoryById } from '#lib/domain/categories.js';
 	import { fetchAccessToken } from '#lib/auth-client.js';
 	import { PUBLIC_CONVEX_SITE_URL } from '$app/env/public';
-	import { onMount, untrack } from 'svelte';
+	import { onDestroy, untrack } from 'svelte';
 	let { receipt, onclose }: { receipt: Receipt; onclose: () => void } = $props();
 	const initial = untrack(() => receipt);
 	let expanded = $state<Record<string, boolean>>(
@@ -49,6 +49,9 @@
 	let message = $state('');
 	let urls = $state<string[]>([]);
 	let photoError = $state('');
+	let showOriginal = $state(false);
+	let loadingPhotos = $state(false);
+	const photoRequest = new AbortController();
 	let invalidMoney = $state<string[]>([]);
 	const client = useConvexClient();
 	const detail = useQuery(api.receipts.detail, { id: initial._id });
@@ -63,32 +66,36 @@
 		summary: 'Oppsummering (telles ikke)',
 		vat: 'MVA (telles ikke)'
 	};
-	onMount(() => {
-		let cancelled = false;
-		const resources: string[] = [];
-		async function load() {
-			try {
-				const token = await fetchAccessToken();
-				for (let position = 0; position < initial.imageCount; position++) {
-					const response = await fetch(
-						`${PUBLIC_CONVEX_SITE_URL}/receipt-image?receipt=${initial._id}&position=${position}`,
-						{ headers: { Authorization: `Bearer ${token}` } }
-					);
-					if (!response.ok) throw new Error('Bildet kunne ikke hentes.');
-					const url = URL.createObjectURL(await response.blob());
-					resources.push(url);
-					if (!cancelled) urls = [...resources];
-					else URL.revokeObjectURL(url);
-				}
-			} catch {
-				if (!cancelled) photoError = 'Bildene kunne ikke hentes. Kontroller nettilkoblingen.';
+	async function loadOriginal() {
+		if (loadingPhotos || photoRequest.signal.aborted) return;
+		showOriginal = true;
+		loadingPhotos = true;
+		photoError = '';
+		try {
+			const token = await fetchAccessToken();
+			if (!token) throw new Error('Innlogging mangler.');
+			// Retry from the first missing image, keeping images already downloaded.
+			for (let position = urls.length; position < initial.imageCount; position++) {
+				if (photoRequest.signal.aborted) return;
+				const response = await fetch(
+					`${PUBLIC_CONVEX_SITE_URL}/receipt-image?receipt=${initial._id}&position=${position}`,
+					{ headers: { Authorization: `Bearer ${token}` }, signal: photoRequest.signal }
+				);
+				if (!response.ok) throw new Error('Bildet kunne ikke hentes.');
+				const blob = await response.blob();
+				if (photoRequest.signal.aborted) return;
+				urls = [...urls, URL.createObjectURL(blob)];
 			}
+		} catch {
+			if (!photoRequest.signal.aborted)
+				photoError = 'Bildene kunne ikke hentes. Kontroller nettilkoblingen.';
+		} finally {
+			loadingPhotos = false;
 		}
-		void load();
-		return () => {
-			cancelled = true;
-			resources.forEach((url) => URL.revokeObjectURL(url));
-		};
+	}
+	onDestroy(() => {
+		photoRequest.abort();
+		urls.forEach((url) => URL.revokeObjectURL(url));
 	});
 	function setAmount(line: ReceiptLine, field: 'amountOre', event: Event) {
 		const key = line.id + field;
@@ -196,13 +203,25 @@
 			>Hent siste versjon</Button
 		>
 	</div>{/if}
-<div class="review-grid">
-	<section class="receipt-photos">
-		<h2>Originalen</h2>
-		{#each urls as url, index (url)}<a href={url} target="_blank" rel="noreferrer"
-				><img src={url} alt={`Original kvittering, bilde ${index + 1}`} /></a
-			>{:else}<p class="muted">{photoError || 'Henter bilder …'}</p>{/each}
-	</section>
+{#if !showOriginal}
+	<Button variant="outline" class="secondary mb-5" onclick={loadOriginal}
+		>Vis originalkvittering</Button
+	>
+{/if}
+<div class="review-grid" class:original-visible={showOriginal}>
+	{#if showOriginal}
+		<section class="receipt-photos">
+			<h2>Originalen</h2>
+			{#each urls as url, index (url)}<a href={url} target="_blank" rel="noreferrer"
+					><img src={url} alt={`Original kvittering, bilde ${index + 1}`} /></a
+				>{/each}
+			{#if loadingPhotos}<p class="muted" role="status">Henter bilder …</p>{/if}
+			{#if photoError}<div>
+					<p class="error" role="alert">{photoError}</p>
+					<Button variant="outline" onclick={loadOriginal}>Prøv igjen</Button>
+				</div>{/if}
+		</section>
+	{/if}
 	<section class="review-content">
 		{#if initial.provider.includes('mock')}<div class="notice warning">
 				<TriangleAlert size={19} /><span

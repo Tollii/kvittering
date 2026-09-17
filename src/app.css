@@ -1430,3 +1430,7 @@ summary {
 .capture-sheet .photo-previews {
 	margin: 0;
 }
+
+.review-grid:not(.original-visible) {
+	grid-template-columns: minmax(0, 1fr);
+}
