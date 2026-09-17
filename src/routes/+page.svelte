@@ -9,6 +9,7 @@
 		ReceiptText,
 		LogOut,
 		Users,
+		UserRound,
 		WifiOff,
 		CloudUpload,
 		ChevronRight,
@@ -41,6 +42,7 @@
 	import { onMount, tick } from 'svelte';
 	let area = $state<'capture' | 'inbox' | 'spending' | 'history'>('capture');
 	let selected = $state<Receipt | null>(null);
+	let capture = $state<ReturnType<typeof Capture>>();
 	let returnScroll = 0;
 	let notificationReceiptId = $state<string | null>(null);
 	let notificationError = $state('');
@@ -215,6 +217,16 @@
 		area = next;
 		selected = null;
 		settings = false;
+		window.scrollTo({ top: 0 });
+	}
+	function openCamera() {
+		navigate('capture');
+		// Keep the native camera request inside the user's tap.
+		capture?.openCamera();
+	}
+	function openProfile() {
+		settings = true;
+		selected = null;
 		window.scrollTo({ top: 0 });
 	}
 	function openReceipt(receipt: Receipt) {
@@ -431,48 +443,6 @@
 							receipt={selected}
 							onclose={closeReceipt}
 						/>{/key}
-				{:else if area === 'capture'}<div class="capture-layout">
-						<Capture
-							householdId={householdId!}
-							offline={!online}
-							onsaved={() => void synchronize()}
-						/>
-						<aside class="capture-sidebar">
-							<section class="month-summary">
-								<div class="section-eyebrow">DENNE MÅNEDEN</div>
-								<h2>{formatMoney(totals.products)}</h2>
-								<p>Vareforbruk uten pant</p>
-								<div>
-									<span>{totals.selected.length} kvitteringer</span><span
-										>{totals.provisional ? 'Foreløpig' : 'Kontrollert'}</span
-									>
-								</div>
-								<Button variant="ghost" class="text-button" onclick={() => navigate('spending')}
-									>Se forbruket<ChevronRight size={16} /></Button
-								>
-							</section>
-							<section class="recent-section">
-								<div class="section-header">
-									<h2>Siste kvitteringer</h2>
-									<Button variant="ghost" class="text-button" onclick={() => navigate('inbox')}
-										>Se alle<ChevronRight size={14} /></Button
-									>
-								</div>
-								{#each receipts.results.slice(0, 3) as receipt (receipt._id)}<ReceiptCard
-										{receipt}
-										onopen={openReceipt}
-									/>{:else}<div class="empty-recent">
-										<ReceiptText size={26} />
-										<p>Ingen kvitteringer ennå.</p>
-									</div>{/each}{#if queue.length}<Button
-										variant="ghost"
-										class="notice queue-notice"
-										onclick={() => navigate('inbox')}
-										><CloudUpload size={19} />{queue.length} lagret på enheten</Button
-									>{/if}
-							</section>
-						</aside>
-					</div>
 				{:else if area === 'inbox'}<div class="page-heading">
 						<h1>Innboks</h1>
 						<p class="muted">
@@ -519,6 +489,51 @@
 							</div>{/each}
 					</div>
 				{/if}
+				<div hidden={area !== 'capture' || !!selected || settings}>
+					<div class="capture-layout">
+						<Capture
+							bind:this={capture}
+							householdId={householdId!}
+							offline={!online}
+							onsaved={() => void synchronize()}
+						/>
+						<aside class="capture-sidebar">
+							<section class="month-summary">
+								<div class="section-eyebrow">DENNE MÅNEDEN</div>
+								<h2>{formatMoney(totals.products)}</h2>
+								<p>Vareforbruk uten pant</p>
+								<div>
+									<span>{totals.selected.length} kvitteringer</span><span
+										>{totals.provisional ? 'Foreløpig' : 'Kontrollert'}</span
+									>
+								</div>
+								<Button variant="ghost" class="text-button" onclick={() => navigate('spending')}
+									>Se forbruket<ChevronRight size={16} /></Button
+								>
+							</section>
+							<section class="recent-section">
+								<div class="section-header">
+									<h2>Siste kvitteringer</h2>
+									<Button variant="ghost" class="text-button" onclick={() => navigate('inbox')}
+										>Se alle<ChevronRight size={14} /></Button
+									>
+								</div>
+								{#each receipts.results.slice(0, 3) as receipt (receipt._id)}<ReceiptCard
+										{receipt}
+										onopen={openReceipt}
+									/>{:else}<div class="empty-recent">
+										<ReceiptText size={26} />
+										<p>Ingen kvitteringer ennå.</p>
+									</div>{/each}{#if queue.length}<Button
+										variant="ghost"
+										class="notice queue-notice"
+										onclick={() => navigate('inbox')}
+										><CloudUpload size={19} />{queue.length} lagret på enheten</Button
+									>{/if}
+							</section>
+						</aside>
+					</div>
+				</div>
 				{#if area === 'spending'}<div hidden={!!selected || settings}>
 						<Spending receipts={receipts.results} onopen={openReceipt} />
 					</div>{/if}
@@ -541,24 +556,42 @@
 		<nav class="mobile-nav" aria-label="Mobilmeny">
 			<Button
 				variant="ghost"
-				class={area === 'capture' ? 'active' : ''}
-				onclick={() => navigate('capture')}><Camera size={22} /><span>Ta bilde</span></Button
-			><Button
-				variant="ghost"
-				class={area === 'inbox' ? 'active' : ''}
+				class={area === 'inbox' && !settings ? 'active' : ''}
+				aria-current={area === 'inbox' && !settings ? 'page' : undefined}
 				onclick={() => navigate('inbox')}
-				><Inbox size={22} /><span
-					>Innboks{pending.length + queue.length ? ` (${pending.length + queue.length})` : ''}</span
-				></Button
-			><Button
+			>
+				<span class="nav-icon"
+					><Inbox size={22} />{#if pending.length + queue.length}<span class="mobile-nav-count"
+							>{pending.length + queue.length}</span
+						>{/if}</span
+				><span>Innboks</span>
+			</Button>
+			<Button
 				variant="ghost"
-				class={area === 'spending' ? 'active' : ''}
+				class={area === 'spending' && !settings ? 'active' : ''}
+				aria-current={area === 'spending' && !settings ? 'page' : undefined}
 				onclick={() => navigate('spending')}
 				><ChartNoAxesCombined size={22} /><span>Forbruk</span></Button
-			><Button
+			>
+			<Button
 				variant="ghost"
-				class={area === 'history' ? 'active' : ''}
+				class="mobile-camera"
+				aria-label="Ta bilde av kvittering"
+				onclick={openCamera}
+			>
+				<span class="mobile-camera-icon"><Camera size={26} /></span><span>Ta bilde</span>
+			</Button>
+			<Button
+				variant="ghost"
+				class={area === 'history' && !settings ? 'active' : ''}
+				aria-current={area === 'history' && !settings ? 'page' : undefined}
 				onclick={() => navigate('history')}><Search size={22} /><span>Historikk</span></Button
+			>
+			<Button
+				variant="ghost"
+				class={settings ? 'active' : ''}
+				aria-current={settings ? 'page' : undefined}
+				onclick={openProfile}><UserRound size={22} /><span>Profil</span></Button
 			>
 		</nav>
 	</div>

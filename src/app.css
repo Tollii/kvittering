@@ -1324,9 +1324,7 @@
 		letter-spacing: -0.8px;
 	}
 	.account-button {
-		font-size: 10px;
-		padding: 6px 10px;
-		min-height: 40px;
+		display: none;
 	}
 	main {
 		padding: 29px 22px 110px;
@@ -1395,7 +1393,8 @@
 		display: none;
 	}
 	.mobile-nav {
-		display: flex;
+		display: grid;
+		grid-template-columns: repeat(5, minmax(0, 1fr));
 		position: fixed;
 		bottom: 0;
 		left: 0;
@@ -1413,13 +1412,44 @@
 		align-items: center;
 		justify-content: center;
 		gap: 5px;
-		width: 25%;
-		min-height: 53px;
+		width: 100%;
+		min-width: 0;
+		min-height: 60px;
+		padding: 4px 2px;
 		border: 0;
 		background: transparent;
 		color: #89967f;
 		border-radius: 9px;
 		font-size: 10px;
+	}
+	.mobile-nav .nav-icon {
+		position: relative;
+	}
+	.mobile-nav-count {
+		position: absolute;
+		top: -6px;
+		left: 15px;
+		min-width: 16px;
+		padding: 1px 4px;
+		border-radius: 999px;
+		background: var(--green);
+		color: white;
+		font-size: 9px;
+		line-height: 14px;
+		font-variant-numeric: tabular-nums;
+	}
+	.mobile-nav .mobile-camera {
+		color: var(--green);
+		gap: 2px;
+	}
+	.mobile-camera-icon {
+		display: grid;
+		place-items: center;
+		width: 48px;
+		height: 40px;
+		border-radius: 14px;
+		background: var(--green);
+		color: white;
 	}
 	.mobile-nav button.active {
 		color: var(--green);
@@ -1487,7 +1517,7 @@
 		object-position: top;
 	}
 	.review-actions {
-		bottom: 77px;
+		bottom: calc(76px + max(8px, env(safe-area-inset-bottom)));
 	}
 	.review-actions .primary,
 	.review-actions .secondary {

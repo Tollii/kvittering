@@ -14,6 +14,9 @@
 	let saved = $state(false);
 	let combined = $state(false);
 	const inputId = $props.id();
+	export function openCamera() {
+		if (!working) document.getElementById(`${inputId}-camera`)?.click();
+	}
 	async function addImages(event: Event) {
 		const input = event.currentTarget as HTMLInputElement;
 		const chosen = Array.from(input.files ?? []);
@@ -107,7 +110,7 @@
 				</div>{/each}<Button
 				variant="ghost"
 				class="add-photo"
-				onclick={() => document.getElementById(`${inputId}-camera`)?.click()}
+				onclick={openCamera}
 				disabled={working}><Plus /><span>Flere bilder</span></Button
 			>
 		</div>
@@ -125,11 +128,7 @@
 					: `${photos.length} kvitteringer`}{/if}</Button
 		>
 	{:else}
-		<Button
-			variant="ghost"
-			class="camera-button"
-			onclick={() => document.getElementById(`${inputId}-camera`)?.click()}
-			disabled={working}
+		<Button variant="ghost" class="camera-button" onclick={openCamera} disabled={working}
 			><span class="camera-symbol"><Camera size={34} strokeWidth={1.6} /></span><strong
 				>{working ? 'Klargjør bilde …' : 'Ta bilde av kvittering'}</strong
 			></Button
