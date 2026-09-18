@@ -2,20 +2,17 @@ import type { ReceiptLine } from "../domain/receipt";
 import { compatibleProduct, matchingKey } from "../domain/product-matching";
 import type { CatalogProduct, PhysicalStore } from "./model";
 import { normalizeSearch } from "./policy";
+import { productSearch } from "./search";
+export { productSearch } from "./search";
 
-/** Keep package evidence in the query so common brands return the relevant size. */
-export function productSearch(name: string) {
-  return normalizeSearch(name)
-    .replace(/(\p{L})(\d)/gu, "$1 $2")
-    .replace(/(\d)\s+(kg|g|ml|cl|l|stk|pk)\b/gi, "$1$2")
-    .slice(0, 120);
-}
 export function compatibleCatalogProduct(
   line: ReceiptLine,
   product: CatalogProduct,
   allowMissingSize = false,
 ) {
-  const size = line.name.match(/\b(\d+(?:[.,]\d+)?)\s*(kg|g|ml|cl|l)\b/i);
+  const size = productSearch(line.name).match(
+    /\b(\d+(?:[.,]\d+)?)\s*(kg|g|ml|cl|l)\b/i,
+  );
   const isWeightOrVolume = /^(kg|g|ml|cl|l)$/i.test(line.packageUnit ?? "");
   const amount = isWeightOrVolume
     ? line.packageSize
@@ -26,7 +23,7 @@ export function compatibleCatalogProduct(
     ? line.packageUnit
     : (size?.[2]?.toLowerCase() ?? null);
   const packCount = (name: string) => {
-    const match = normalizeSearch(name).match(
+    const match = productSearch(name).match(
       /(\d+)\s*(?:pk|stk|bx)\b|\bx\s*(\d+)\b|(\d+)\s*x\s*\d/,
     );
     return match ? Number(match[1] ?? match[2] ?? match[3]) : null;
@@ -69,7 +66,7 @@ export function compatibleCatalogProduct(
 /** Normalize text without removing flavour, variant or multipack evidence. */
 function productWords(name: string) {
   return new Set(
-    normalizeSearch(name)
+    productSearch(name)
       .replace(
         /(\d+(?:[.,]\d+)?)\s*(kg|g|ml|cl|l)\b/g,
         (_, amount: string, unit: string) => {
@@ -102,28 +99,80 @@ export function rankCatalogProducts(name: string, products: CatalogProduct[]) {
     );
 }
 
-/** A unique full text match can be linked without waiting for an AI response. */
+/**
+ * Words a catalog name may add without changing which product it is: sizes,
+ * pack counts, packaging, and markers for the ordinary (non-Zero) variant.
+ */
+function neutralWord(word: string) {
+  return (
+    /^\d+(?:[.,]\d+)?(?:g|ml|pk|stk|bx|x)?$/.test(word) ||
+    [
+      "x",
+      "pk",
+      "stk",
+      "bx",
+      "sugar",
+      "sukker",
+      "original",
+      "classic",
+      "regular",
+      "sleek",
+      "glass",
+      "kartong",
+      "beger",
+      "pose",
+    ].includes(word)
+  );
+}
+
+/**
+ * Link without waiting for an AI response when the text leaves no doubt: a
+ * unique full match, or the only compatible product that contains every
+ * receipt word and adds nothing but size, pack or packaging words.
+ */
 export function automaticCatalogProduct(
   line: ReceiptLine,
   products: CatalogProduct[],
 ) {
-  const matches = rankCatalogProducts(
-    line.receiptName || line.name,
-    products,
-  ).filter(
-    ({ product, score }) =>
-      score === 1 && compatibleCatalogProduct(line, product),
-  );
+  const name = line.receiptName || line.name;
+  const source = productWords(name);
   // Single generic words such as “Agurk” do not establish a retail product.
-  if (productWords(line.receiptName || line.name).size < 2) return null;
-  const barcoded = matches.filter(({ product }) => product.ean);
-  const candidates = barcoded.length ? barcoded : matches;
-  const unique = [
-    ...new Map(
-      candidates.map(({ product }) => [product.key, product]),
-    ).values(),
-  ];
-  return unique.length === 1 ? unique[0] : null;
+  if (source.size < 2) return null;
+  const unique = (items: CatalogProduct[]) => {
+    const barcoded = items.filter((product) => product.ean);
+    return [
+      ...new Map(
+        (barcoded.length ? barcoded : items).map((product) => [
+          product.key,
+          product,
+        ]),
+      ).values(),
+    ];
+  };
+  const ranked = rankCatalogProducts(name, products);
+  const exact = unique(
+    ranked
+      .filter(
+        ({ product, score }) =>
+          score === 1 && compatibleCatalogProduct(line, product),
+      )
+      .map(({ product }) => product),
+  );
+  if (exact.length === 1) return exact[0];
+  if (exact.length > 1) return null;
+  const contained = unique(
+    ranked
+      .filter(({ product }) => {
+        const target = productWords(product.name);
+        return (
+          [...source].every((word) => target.has(word)) &&
+          [...target].every((word) => source.has(word) || neutralWord(word)) &&
+          compatibleCatalogProduct(line, product, true)
+        );
+      })
+      .map(({ product }) => product),
+  );
+  return contained.length === 1 ? contained[0] : null;
 }
 export function retailerCode(store: string | null): string | null {
   const name = normalizeSearch(store ?? "");

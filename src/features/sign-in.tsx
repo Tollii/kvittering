@@ -13,6 +13,41 @@ import {
   Panel,
   Screen,
 } from "@/components/ui";
+import { Mosaic } from "@/components/mosaic";
+import { useTheme } from "@/constants/theme";
+
+function Brand({ tagline }: { tagline: string }) {
+  const colors = useTheme();
+  return (
+    <View style={{ paddingTop: 20, gap: 14 }}>
+      <View style={{ flexDirection: "row", alignItems: "center", gap: 10 }}>
+        <View
+          style={{
+            width: 40,
+            height: 40,
+            borderRadius: 12,
+            borderCurve: "continuous",
+            backgroundColor: colors.primary,
+            alignItems: "center",
+            justifyContent: "center",
+          }}
+        >
+          <Icon name="receipt" size={20} color={colors.onPrimary} />
+        </View>
+        <Copy size={20} weight="700">
+          Kvitto
+        </Copy>
+      </View>
+      <Copy size={44} weight="800" style={{ color: colors.primary }}>
+        Dagligvarene.{"\n"}Samlet.
+      </Copy>
+      <Mosaic seed={1000} height={5} block={5} columns={44} />
+      <Copy muted size={16}>
+        {tagline}
+      </Copy>
+    </View>
+  );
+}
 
 export function SignIn() {
   const [register, setRegister] = useState(false);
@@ -45,18 +80,9 @@ export function SignIn() {
   }
   return (
     <Screen>
-      <View style={{ paddingTop: 24, gap: 12 }}>
-        <Icon name="receipt" size={42} />
-        <Copy size={20} weight="700">
-          Kvitto.
-        </Copy>
-        <Copy size={44} weight="700">
-          Dagligvarene.{"\n"}Samlet.
-        </Copy>
-        <Copy muted>Handle. Ta et bilde. Ferdig.</Copy>
-      </View>
-      <Panel>
-        <Copy size={23} weight="600">
+      <Brand tagline="Handle. Ta et bilde. Ferdig." />
+      <Panel style={{ gap: 12 }}>
+        <Copy size={22} weight="700">
           {register ? "Opprett konto" : "Velkommen hjem"}
         </Copy>
         {register && (
@@ -87,13 +113,8 @@ export function SignIn() {
           autoComplete={register ? "new-password" : "current-password"}
           textContentType={register ? "newPassword" : "password"}
           onSubmitEditing={() => void submit()}
+          hint={register ? "Minst 12 tegn" : undefined}
         />
-        {register && (
-          <Copy size={13} muted>
-            Bruk minst 12 tegn. Dere oppretter hver deres konto og deler én
-            husstand.
-          </Copy>
-        )}
         {!!error && <Notice error>{error}</Notice>}
         <Button
           title={register ? "Opprett konto" : "Logg inn"}
@@ -145,11 +166,8 @@ export function HouseholdSetup() {
     }
   }
   return (
-    <Screen
-      title={join ? "Bli med hjem." : "En husstand for to."}
-      subtitle="Begge kan legge til og kontrollere kvitteringer."
-    >
-      <Panel>
+    <Screen title={join ? "Bli med hjem." : "En husstand for to."}>
+      <Panel style={{ gap: 12 }}>
         {join ? (
           <Field
             label="Invitasjonskode"
@@ -181,16 +199,16 @@ export function HouseholdSetup() {
             setError("");
           }}
         />
-        <Button
-          secondary
-          title="Logg ut"
-          onPress={() => {
-            void authClient
-              .signOut()
-              .catch(() => setError("Kunne ikke logge ut. Prøv igjen."));
-          }}
-        />
       </Panel>
+      <Button
+        secondary
+        title="Logg ut"
+        onPress={() => {
+          void authClient
+            .signOut()
+            .catch(() => setError("Kunne ikke logge ut. Prøv igjen."));
+        }}
+      />
     </Screen>
   );
 }

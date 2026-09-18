@@ -1,88 +1,175 @@
 import { router } from "expo-router";
-import { View } from "react-native";
+import { ActivityIndicator, View } from "react-native";
 import {
   Button,
   Copy,
   Empty,
+  Icon,
   Loading,
   Notice,
   Panel,
   Screen,
+  SectionTitle,
 } from "@/components/ui";
-import { ReceiptCard } from "@/components/receipt-card";
+import { ReceiptCard, openReceipt } from "@/components/receipt-card";
+import { SwipeToApprove } from "@/features/swipe-approve";
 import { useHousehold } from "@/features/session";
+import { useTheme } from "@/constants/theme";
+import { quickApproveData } from "@/lib/domain/receipt-review";
 export default function Inbox() {
+  const colors = useTheme();
   const { receipts, loadingReceipts, queue, online, synchronize } =
     useHousehold();
   const reserved = new Set(queue.map((entry) => entry.receiptId));
-  const pending = receipts.filter(
+  const open = receipts.filter(
     (receipt) =>
       receipt.status !== "reviewed" &&
       !receipt.excluded &&
       !reserved.has(receipt._id),
   );
+  const attention = open.filter((receipt) =>
+    ["needs_review", "failed"].includes(receipt.status),
+  );
+  const working = open.filter(
+    (receipt) => !["needs_review", "failed"].includes(receipt.status),
+  );
+  const empty = !loadingReceipts && open.length === 0 && queue.length === 0;
   return (
     <Screen
       title="Innboks"
       subtitle={
-        pending.length
-          ? `${pending.length} ${pending.length === 1 ? "kvittering" : "kvitteringer"} venter`
-          : undefined
+        attention.length
+          ? `${attention.length} til kontroll`
+          : working.length + queue.length
+            ? "Behandles"
+            : undefined
       }
       settings
     >
-      {!online && (
-        <Notice>
-          Uten nett. Lagrede bilder lastes opp når forbindelsen er tilbake.
-        </Notice>
-      )}
-      {queue.length > 0 && (
-        <Panel>
-          <Copy size={16} weight="600">
-            På denne enheten
-          </Copy>
-          {queue.map((entry) => (
-            <View key={entry.id} style={{ gap: 4 }}>
-              <Copy weight="600">{entry.images.length} bilde(r) lagret</Copy>
-              <Copy muted>
-                {entry.uploaded.filter(Boolean).length} av {entry.images.length}{" "}
-                lastet opp
-              </Copy>
-              {entry.processingEngine === "foundation" && !entry.error && (
-                <Copy size={13} muted>
-                  Leses med Foundation Models. Hold appen åpen.
-                </Copy>
-              )}
-              {!!entry.error && <Notice error>{entry.error}</Notice>}
-            </View>
-          ))}
-          <Button
-            title="Prøv igjen"
-            onPress={() => void synchronize(true)}
-            disabled={!online}
-            secondary
-          />
-        </Panel>
-      )}
-      {loadingReceipts ? (
-        <Loading />
-      ) : (
-        pending.map((receipt) => (
-          <ReceiptCard key={receipt._id} receipt={receipt} />
-        ))
-      )}
-      {!loadingReceipts && pending.length === 0 && queue.length === 0 && (
+      {!online && <Notice icon="wifi.slash">Uten nett</Notice>}
+      {loadingReceipts && <Loading />}
+      {attention.length > 0 && (
         <>
-          <Empty
-            title="Innboksen er tom."
-            message="Ta et bilde neste gang dere handler."
+          <SectionTitle
+            title="Til kontroll"
+            action={attention.length > 1 ? "Start" : undefined}
+            onAction={() => openReceipt(attention[0])}
           />
+          {attention.map((receipt) => (
+            <SwipeToApprove
+              key={receipt._id}
+              receipt={receipt}
+              enabled={online}
+            >
+              <ReceiptCard receipt={receipt} />
+            </SwipeToApprove>
+          ))}
+          {attention.some(
+            (receipt) =>
+              !!quickApproveData(
+                receipt.data,
+                !!receipt.duplicateOf && !receipt.duplicateResolved,
+              ),
+          ) && (
+            <Copy size={12} muted style={{ textAlign: "center" }}>
+              Sveip for å godkjenne
+            </Copy>
+          )}
+        </>
+      )}
+      {(working.length > 0 || queue.length > 0) && (
+        <>
+          <SectionTitle title="Under behandling" />
+          {queue.map((entry) => {
+            const uploaded = entry.uploaded.filter(Boolean).length;
+            return (
+              <Panel key={entry.id} style={{ gap: 8 }}>
+                <View
+                  style={{
+                    flexDirection: "row",
+                    alignItems: "center",
+                    gap: 12,
+                  }}
+                >
+                  <View
+                    style={{
+                      width: 36,
+                      height: 36,
+                      borderRadius: 10,
+                      backgroundColor: colors.accentSoft,
+                      alignItems: "center",
+                      justifyContent: "center",
+                    }}
+                  >
+                    {entry.error ? (
+                      <Icon
+                        name="exclamationmark.circle"
+                        size={18}
+                        color={colors.danger}
+                      />
+                    ) : (
+                      <ActivityIndicator color={colors.accent} />
+                    )}
+                  </View>
+                  <View style={{ flex: 1, gap: 2 }}>
+                    <Copy weight="600">
+                      {entry.images.length === 1
+                        ? "Ny kvittering"
+                        : `Ny kvittering · ${entry.images.length} bilder`}
+                    </Copy>
+                    <Copy size={13} muted>
+                      {entry.error
+                        ? "Prøver igjen"
+                        : online
+                          ? `Laster opp · ${uploaded} av ${entry.images.length}`
+                          : "Venter på nett"}
+                    </Copy>
+                  </View>
+                </View>
+                <View
+                  style={{
+                    height: 4,
+                    borderRadius: 2,
+                    backgroundColor: colors.muted,
+                    overflow: "hidden",
+                  }}
+                >
+                  <View
+                    style={{
+                      height: 4,
+                      width: `${Math.max(6, (uploaded / entry.images.length) * 100)}%`,
+                      backgroundColor: entry.error
+                        ? colors.danger
+                        : colors.accent,
+                    }}
+                  />
+                </View>
+                {!!entry.error && (
+                  <Button
+                    title="Prøv igjen"
+                    tint
+                    compact
+                    icon="arrow.clockwise"
+                    onPress={() => void synchronize(true)}
+                    disabled={!online}
+                  />
+                )}
+              </Panel>
+            );
+          })}
+          {working.map((receipt) => (
+            <ReceiptCard key={receipt._id} receipt={receipt} compact />
+          ))}
+        </>
+      )}
+      {empty && (
+        <Empty title="Alt er kontrollert" icon="checkmark.seal">
           <Button
             title="Ny kvittering"
             icon="camera"
             onPress={() => router.navigate("/")}
           />
-        </>
+        </Empty>
       )}
     </Screen>
   );

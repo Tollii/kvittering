@@ -8,8 +8,8 @@ import {
 import { emptyLine, batteryFixture } from "./receipt";
 import { productHistory, type Receipt } from "./insights";
 
-it("normalizes only case and whitespace, preserving flavour, size and zero", () => {
-  expect(matchingKey("  PEPSI   Max ZERO  0,5L ")).toBe("pepsi max zero 0,5l");
+it("normalizes formatting while preserving flavour, size and zero", () => {
+  expect(matchingKey("  PEPSI   Max ZERO  0,5L ")).toBe("pepsi max zero 0.5l");
   expect(matchingKey("Battery Orange")).not.toBe(
     matchingKey("Battery Original"),
   );

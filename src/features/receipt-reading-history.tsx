@@ -18,6 +18,7 @@ export function ReceiptReadingHistory({
       <Row
         title="Sammenlign lesinger"
         detail={`${readings.length} lagrede resultater`}
+        icon="clock.arrow.circlepath"
         onPress={() => setOpen(true)}
       />
       <Sheet
@@ -28,10 +29,6 @@ export function ReceiptReadingHistory({
           setSelected(null);
         }}
       >
-        <Copy size={13} muted>
-          Resultatene er fra den enkelte lesingen, før senere produktkoblinger
-          og manuelle endringer. Kjøpet telles bare én gang i forbruket.
-        </Copy>
         {!reading
           ? readings.map((item) => (
               <Row

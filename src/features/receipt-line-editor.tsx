@@ -5,6 +5,7 @@ import { api } from "../../convex/_generated/api";
 import type { Id } from "../../convex/_generated/dataModel";
 import {
   Button,
+  Chip,
   Copy,
   Field,
   Icon,
@@ -12,11 +13,14 @@ import {
   Panel,
   Row,
   Select,
+  pressed,
 } from "@/components/ui";
 import { MoneyField } from "@/components/money-field";
 import { categoryById } from "@/lib/domain/categories";
 import { lineKinds, formatMoney, type ReceiptLine } from "@/lib/domain/receipt";
 import {
+  canConfirmSuggestedCategory,
+  categoryUncertainIssue,
   confirmLineCategory,
   lineReviewIssues,
 } from "@/lib/domain/receipt-review";
@@ -27,6 +31,7 @@ import {
 } from "./catalog-product-sheet";
 import type { CatalogProduct } from "@/lib/catalog/model";
 import { useTheme } from "@/constants/theme";
+import { tapFeedback } from "@/lib/haptics";
 
 export const lineLabels: Record<ReceiptLine["kind"], string> = {
   product: "Vare",
@@ -51,6 +56,8 @@ type Props = {
   remember: boolean;
   recentCategories: string[];
   productChoice?: ProductChoice;
+  /** Review mode shows only what needs a decision, with one-tap answers. */
+  review?: boolean;
   onChange: (line: ReceiptLine) => void;
   onRemember: (value: boolean) => void;
   onProduct: (choice: ProductChoice) => void;
@@ -65,6 +72,7 @@ export function ReceiptLineEditor({
   remember,
   recentCategories,
   productChoice,
+  review = false,
   onChange,
   onRemember,
   onProduct,
@@ -73,10 +81,14 @@ export function ReceiptLineEditor({
 }: Props) {
   const colors = useTheme();
   const issues = lineReviewIssues(line);
-  const categoryUncertain = line.issues.includes("Kategorien er usikker.");
-  const [expanded, setExpanded] = useState(
-    !line.name || line.amountOre === null,
+  const categoryUncertain = line.issues.includes(categoryUncertainIssue);
+  const otherIssues = issues.filter(
+    (issue) => issue !== categoryUncertainIssue,
   );
+  const missingAmount =
+    line.amountOre === null && !["summary", "vat"].includes(line.kind);
+  const missingName = line.kind === "product" && !line.name.trim();
+  const [expanded, setExpanded] = useState(false);
   const [categoryOpen, setCategoryOpen] = useState(false);
   const [productOpen, setProductOpen] = useState(false);
   const [details, setDetails] = useState(false);
@@ -93,111 +105,184 @@ export function ReceiptLineEditor({
         : line.catalogProduct;
   const patch = (value: Partial<ReceiptLine>) =>
     onChange({ ...line, ...value, manual: true });
+  const category = categoryById.get(line.categoryId ?? "");
+  const categoryLabel = category?.name ?? "Velg kategori";
+  const showEditor = expanded || (review && (missingAmount || missingName));
+  const kindLabel =
+    line.kind === "product" ||
+    lineLabels[line.kind].toLocaleLowerCase("nb-NO") ===
+      line.name.trim().toLocaleLowerCase("nb-NO")
+      ? null
+      : lineLabels[line.kind];
   return (
     <View
       style={{
         borderBottomWidth: 1,
         borderBottomColor: colors.line,
-        paddingVertical: 2,
+        paddingVertical: review ? 10 : 4,
+        gap: review ? 8 : 0,
       }}
     >
       <Pressable
         accessibilityRole="button"
-        accessibilityLabel={`Rediger ${line.name || "ny vare"}, ${formatMoney(line.amountOre)}`}
+        accessibilityLabel={`${expanded ? "Skjul" : "Rediger"} ${line.name || "ny vare"}, ${formatMoney(line.amountOre)}`}
         accessibilityState={{ expanded }}
         onPress={() => setExpanded(!expanded)}
-        style={({ pressed }) => ({
-          minHeight: 44,
+        style={({ pressed: down }) => ({
+          minHeight: 40,
           flexDirection: "row",
           alignItems: "center",
           gap: 10,
-          opacity: pressed ? 0.6 : 1,
+          opacity: down ? 0.6 : 1,
         })}
       >
-        {issues.length > 0 && (
-          <Icon
-            name="exclamationmark.circle"
-            size={16}
-            color={colors.warning}
-          />
-        )}
-        <Copy size={15} weight="600" numberOfLines={2} style={{ flex: 1 }}>
-          {line.name || "Ny vare"}
-        </Copy>
-        <Copy size={15} weight="600" style={{ flexShrink: 0 }}>
-          {formatMoney(line.amountOre)}
+        <View style={{ flex: 1, gap: 1 }}>
+          <Copy size={16} weight="600" numberOfLines={2}>
+            {line.name || (missingName ? "Navn mangler" : "Ny vare")}
+          </Copy>
+          {(kindLabel || (line.quantity && line.quantity !== 1)) && (
+            <Copy size={12} muted>
+              {[
+                kindLabel,
+                line.quantity && line.quantity !== 1
+                  ? `${line.quantity} ${line.unit ?? "stk"}`
+                  : null,
+              ]
+                .filter(Boolean)
+                .join(" · ")}
+            </Copy>
+          )}
+        </View>
+        <Copy
+          size={16}
+          weight="600"
+          style={{
+            flexShrink: 0,
+            color: missingAmount ? colors.warning : colors.text,
+          }}
+        >
+          {missingAmount ? "Beløp?" : formatMoney(line.amountOre)}
         </Copy>
         <Icon
           name={expanded ? "chevron.up" : "chevron.down"}
-          size={12}
+          size={11}
           color={colors.secondary}
         />
       </Pressable>
       {line.kind === "product" && (
-        <View style={{ flexDirection: "row", alignItems: "center", gap: 12 }}>
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel={`Velg kategori for ${line.name}. Nå: ${categoryById.get(line.categoryId ?? "")?.name ?? "Uavklart"}`}
-            onPress={() => setCategoryOpen(true)}
-            style={({ pressed }) => ({
-              flex: 1,
-              minHeight: 44,
-              flexDirection: "row",
-              alignItems: "center",
-              gap: 6,
-              opacity: pressed ? 0.6 : 1,
-            })}
-          >
-            <Icon
-              name="tag"
-              size={14}
-              color={categoryUncertain ? colors.warning : colors.secondary}
+        <View
+          style={{
+            flexDirection: "row",
+            alignItems: "center",
+            gap: 8,
+            flexWrap: "wrap",
+            paddingBottom: review ? 0 : 6,
+          }}
+        >
+          {review && canConfirmSuggestedCategory(line) ? (
+            <>
+              <Chip
+                label={
+                  typeof line.confidence === "number" && line.confidence < 1
+                    ? `${categoryLabel} · ${Math.round(line.confidence * 100)} %`
+                    : categoryLabel
+                }
+                icon="tag"
+                tone="warning"
+                accessibilityLabel={`Forslag: ${categoryLabel}${typeof line.confidence === "number" ? `, ${Math.round(line.confidence * 100)} prosent sikker` : ""}. Trykk for å velge en annen kategori`}
+                onPress={() => setCategoryOpen(true)}
+              />
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel={`Bekreft kategorien ${categoryLabel} for ${line.name}`}
+                onPress={() => {
+                  tapFeedback();
+                  onChange(confirmLineCategory(line, line.categoryId!));
+                }}
+                hitSlop={6}
+                style={(state) => [
+                  {
+                    flexDirection: "row",
+                    alignItems: "center",
+                    gap: 5,
+                    minHeight: 30,
+                    paddingHorizontal: 11,
+                    borderRadius: 10,
+                    borderCurve: "continuous",
+                    backgroundColor: colors.primary,
+                  },
+                  pressed(state),
+                ]}
+              >
+                <Icon name="checkmark" size={11} color={colors.onPrimary} />
+                <Copy
+                  size={13}
+                  weight="700"
+                  style={{ color: colors.onPrimary }}
+                >
+                  Riktig
+                </Copy>
+              </Pressable>
+            </>
+          ) : (
+            <Chip
+              label={
+                categoryUncertain && line.categoryId === "fallback.unclear"
+                  ? "Velg kategori"
+                  : categoryLabel
+              }
+              icon="tag"
+              tone={categoryUncertain ? "warning" : "muted"}
+              accessibilityLabel={`Kategori for ${line.name}: ${categoryLabel}. Trykk for å endre`}
+              onPress={() => setCategoryOpen(true)}
             />
-            <Copy
-              size={13}
-              numberOfLines={2}
-              style={{
-                flexShrink: 1,
-                color: categoryUncertain ? colors.warning : colors.secondary,
-              }}
+          )}
+          {!review && (
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={
+                catalogProduct
+                  ? `Produktinformasjon for ${catalogProduct.name}`
+                  : `Finn produkt for ${line.name}`
+              }
+              onPress={() =>
+                setCatalogScreen(catalogProduct ? "details" : "search")
+              }
+              hitSlop={6}
+              style={({ pressed: down }) => ({
+                minHeight: 30,
+                flexDirection: "row",
+                alignItems: "center",
+                gap: 5,
+                marginLeft: "auto",
+                opacity: down ? 0.6 : 1,
+              })}
             >
-              {categoryById.get(line.categoryId ?? "")?.name ?? "Velg kategori"}
-              {categoryUncertain ? " · usikker" : ""}
-            </Copy>
-            <Icon name="chevron.down" size={10} color={colors.secondary} />
-          </Pressable>
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel={
-              catalogProduct
-                ? `Produktinformasjon for ${catalogProduct.name}`
-                : `Finn produkt for ${line.name}`
-            }
-            onPress={() =>
-              setCatalogScreen(catalogProduct ? "details" : "search")
-            }
-            style={({ pressed }) => ({
-              minHeight: 44,
-              flexDirection: "row",
-              alignItems: "center",
-              gap: 5,
-              opacity: pressed ? 0.6 : 1,
-            })}
-          >
-            <Icon
-              name={catalogProduct ? "info.circle" : "magnifyingglass"}
-              size={15}
-            />
-            <Copy size={13} weight="500">
-              {catalogProduct ? "Produkt" : "Finn produkt"}
-            </Copy>
-          </Pressable>
+              <Icon
+                name={catalogProduct ? "checkmark.seal" : "magnifyingglass"}
+                size={13}
+                color={catalogProduct ? colors.accent : colors.secondary}
+              />
+              <Copy
+                size={13}
+                weight="500"
+                style={{
+                  color: catalogProduct ? colors.accent : colors.secondary,
+                }}
+              >
+                {catalogProduct ? "Produkt" : "Finn produkt"}
+              </Copy>
+            </Pressable>
+          )}
         </View>
       )}
       {categoryOpen && (
         <CategoryPicker
           name={line.name}
           value={line.categoryId}
+          confidence={categoryUncertain ? line.confidence : null}
+          originalText={line.originalText}
+          brand={line.brand}
           recent={recentCategories}
           remember={remember}
           onRemember={onRemember}
@@ -225,30 +310,53 @@ export function ReceiptLineEditor({
           onChange={() => setCatalogScreen("search")}
         />
       )}
-      {issues
-        .filter((issue) => issue !== "Kategorien er usikker.")
+      {otherIssues
+        .filter(
+          (issue) =>
+            !(
+              showEditor &&
+              ["Beløpet mangler.", "Varenavnet mangler."].includes(issue)
+            ),
+        )
         .map((issue) => (
-          <Copy key={issue} size={13} style={{ color: colors.warning }}>
-            {issue}
-          </Copy>
+          <View
+            key={issue}
+            style={{ flexDirection: "row", alignItems: "center", gap: 6 }}
+          >
+            <Icon
+              name="exclamationmark.circle"
+              size={13}
+              color={colors.warning}
+            />
+            <Copy size={13} style={{ color: colors.warning, flex: 1 }}>
+              {issue}
+            </Copy>
+          </View>
         ))}
-      {expanded && (
-        <View style={{ gap: 10, paddingVertical: 10 }}>
-          <Copy muted size={13}>
-            Original: {line.originalText || "Manuelt lagt til"}
-          </Copy>
-          <Field
-            label="Navn"
-            value={line.name}
-            onChangeText={(name) => patch({ name })}
-          />
-          <MoneyField
-            label="Linjesum (kr)"
-            value={line.amountOre}
-            onChange={(amountOre) => patch({ amountOre })}
-            onError={onMoneyError}
-          />
-          {line.kind === "product" && (
+      {showEditor && (
+        <View style={{ gap: 10, paddingVertical: 6 }}>
+          {expanded && !!line.originalText && (
+            <Copy muted size={13}>
+              Lest: {line.originalText}
+            </Copy>
+          )}
+          {(!review || missingName || expanded) && (
+            <Field
+              label="Navn"
+              value={line.name}
+              placeholder="Hva er varen?"
+              onChangeText={(name) => patch({ name })}
+            />
+          )}
+          {(!review || missingAmount || expanded) && (
+            <MoneyField
+              label="Linjesum (kr)"
+              value={line.amountOre}
+              onChange={(amountOre) => patch({ amountOre })}
+              onError={onMoneyError}
+            />
+          )}
+          {expanded && line.kind === "product" && (
             <>
               <Button
                 title={
@@ -257,6 +365,7 @@ export function ReceiptLineEditor({
                     : "Endre produktkobling"
                 }
                 secondary
+                compact
                 onPress={() => setProductOpen(!productOpen)}
               />
               {productOpen && (
@@ -291,7 +400,7 @@ export function ReceiptLineEditor({
               )}
             </>
           )}
-          {line.kind === "item_discount" && (
+          {expanded && line.kind === "item_discount" && (
             <Select
               label="Rabatten gjelder"
               value={line.relatedLineId ?? ""}
@@ -306,11 +415,13 @@ export function ReceiptLineEditor({
               }
             />
           )}
-          <Row
-            title={details ? "Skjul flere detaljer" : "Flere detaljer"}
-            onPress={() => setDetails(!details)}
-          />
-          {details && (
+          {expanded && (
+            <Row
+              title={details ? "Skjul flere detaljer" : "Flere detaljer"}
+              onPress={() => setDetails(!details)}
+            />
+          )}
+          {expanded && details && (
             <Select
               label="Linjetype"
               value={line.kind}
@@ -323,39 +434,66 @@ export function ReceiptLineEditor({
                   kind: kind as ReceiptLine["kind"],
                   categoryId: kind === "product" ? "fallback.unclear" : null,
                   issues: line.issues.filter(
-                    (issue) => issue !== "Kategorien er usikker.",
+                    (issue) => issue !== categoryUncertainIssue,
                   ),
                 })
               }
             />
           )}
-          {issues.some((issue) => issue !== "Kategorien er usikker.") && (
+          {line.issues.some((issue) => issue !== categoryUncertainIssue) && (
             <>
-              <Notice>
-                {issues
-                  .filter((issue) => issue !== "Kategorien er usikker.")
+              <Notice tone="warning">
+                {line.issues
+                  .filter((issue) => issue !== categoryUncertainIssue)
                   .join("\n")}
               </Notice>
-              {line.issues.some(
-                (issue) => issue !== "Kategorien er usikker.",
-              ) && (
-                <Button
-                  title="Bekreft opplysningene"
-                  secondary
-                  onPress={() =>
-                    patch({
-                      issues: line.issues.filter(
-                        (issue) => issue === "Kategorien er usikker.",
-                      ),
-                    })
-                  }
-                />
-              )}
+              <Button
+                title="Dette stemmer"
+                tint
+                compact
+                icon="checkmark"
+                onPress={() => {
+                  tapFeedback();
+                  patch({
+                    issues: line.issues.filter(
+                      (issue) => issue === categoryUncertainIssue,
+                    ),
+                  });
+                }}
+              />
             </>
           )}
-          {details && <Button title="Fjern linje" danger onPress={onRemove} />}
+          {expanded && (
+            <Button title="Fjern linje" danger compact onPress={onRemove} />
+          )}
         </View>
       )}
+      {!showEditor &&
+        review &&
+        line.issues.some((issue) => issue !== categoryUncertainIssue) && (
+          <View style={{ flexDirection: "row", gap: 8 }}>
+            <Button
+              title="Dette stemmer"
+              tint
+              compact
+              icon="checkmark"
+              onPress={() => {
+                tapFeedback();
+                patch({
+                  issues: line.issues.filter(
+                    (issue) => issue === categoryUncertainIssue,
+                  ),
+                });
+              }}
+            />
+            <Button
+              title="Rediger"
+              secondary
+              compact
+              onPress={() => setExpanded(true)}
+            />
+          </View>
+        )}
     </View>
   );
 }
@@ -379,7 +517,7 @@ function ProductSelector({
     search,
   });
   return (
-    <Panel>
+    <Panel tone="plain">
       <Field
         label="Søk etter lagret produkt"
         value={search}
@@ -388,32 +526,32 @@ function ProductSelector({
       <Copy size={13} muted>
         {line.productName || "Ingen sikker produktkobling"}
       </Copy>
-      <Button
-        title="Opprett eget produkt"
-        secondary
-        onPress={() => onChange({ kind: "new" })}
-      />
-      <Button
-        title="Hold varen separat"
-        secondary
-        onPress={() => onChange({ kind: "separate" })}
-      />
+      <View style={{ flexDirection: "row", gap: 8 }}>
+        <View style={{ flex: 1 }}>
+          <Button
+            title="Opprett eget produkt"
+            secondary
+            compact
+            onPress={() => onChange({ kind: "new" })}
+          />
+        </View>
+        <View style={{ flex: 1 }}>
+          <Button
+            title="Hold varen separat"
+            secondary
+            compact
+            onPress={() => onChange({ kind: "separate" })}
+          />
+        </View>
+      </View>
       {products?.map((product) => (
         <Row
           key={product._id}
           title={product.name}
-          value={
-            choice?.kind === "existing" && choice.id === product._id
-              ? "✓"
-              : undefined
-          }
+          selected={choice?.kind === "existing" && choice.id === product._id}
           onPress={() => onChange({ kind: "existing", id: product._id })}
         />
       ))}
-      <Copy size={12} muted>
-        Lagres for denne varen og fremtidige kjøp med samme kvitteringsnavn i
-        butikken.
-      </Copy>
     </Panel>
   );
 }

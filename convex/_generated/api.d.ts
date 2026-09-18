@@ -16,8 +16,8 @@ import type * as catalogClassifier from "../catalogClassifier.js";
 import type * as catalogLinks from "../catalogLinks.js";
 import type * as catalogMatching from "../catalogMatching.js";
 import type * as catalogQueue from "../catalogQueue.js";
+import type * as catalogSearchRepair from "../catalogSearchRepair.js";
 import type * as catalogWorker from "../catalogWorker.js";
-import type * as foundationResults from "../foundationResults.js";
 import type * as households from "../households.js";
 import type * as http from "../http.js";
 import type * as kassalapp_generated_client from "../kassalapp/generated/client.js";
@@ -75,6 +75,9 @@ import type * as kassalapp_normalize from "../kassalapp/normalize.js";
 import type * as kassalapp_transport from "../kassalapp/transport.js";
 import type * as notifications from "../notifications.js";
 import type * as processing from "../processing.js";
+import type * as productAnalysis from "../productAnalysis.js";
+import type * as productAnalysisEvaluation from "../productAnalysisEvaluation.js";
+import type * as productAnalysisWorker from "../productAnalysisWorker.js";
 import type * as productMatching from "../productMatching.js";
 import type * as products from "../products.js";
 import type * as providers from "../providers.js";
@@ -97,8 +100,8 @@ declare const fullApi: ApiFromModules<{
   catalogLinks: typeof catalogLinks;
   catalogMatching: typeof catalogMatching;
   catalogQueue: typeof catalogQueue;
+  catalogSearchRepair: typeof catalogSearchRepair;
   catalogWorker: typeof catalogWorker;
-  foundationResults: typeof foundationResults;
   households: typeof households;
   http: typeof http;
   "kassalapp/generated/client": typeof kassalapp_generated_client;
@@ -156,6 +159,9 @@ declare const fullApi: ApiFromModules<{
   "kassalapp/transport": typeof kassalapp_transport;
   notifications: typeof notifications;
   processing: typeof processing;
+  productAnalysis: typeof productAnalysis;
+  productAnalysisEvaluation: typeof productAnalysisEvaluation;
+  productAnalysisWorker: typeof productAnalysisWorker;
   productMatching: typeof productMatching;
   products: typeof products;
   providers: typeof providers;
@@ -193,5 +199,6 @@ export declare const internal: FilterApi<
 export declare const components: {
   betterAuth: import("@convex-dev/better-auth/_generated/component.js").ComponentApi<"betterAuth">;
   workflow: import("@convex-dev/workflow/_generated/component.js").ComponentApi<"workflow">;
+  productAnalysisWorkflow: import("@convex-dev/workflow/_generated/component.js").ComponentApi<"productAnalysisWorkflow">;
   catalogWorkpool: import("@convex-dev/workpool/_generated/component.js").ComponentApi<"catalogWorkpool">;
 };

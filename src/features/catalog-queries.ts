@@ -4,14 +4,19 @@ import { useConvex } from "convex/react";
 import { api } from "../../convex/_generated/api";
 import type { Id } from "../../convex/_generated/dataModel";
 import { normalizeSearch, day } from "@/lib/catalog/policy";
+import { productSearch } from "@/lib/catalog/search";
 
 export function useCatalogSearch(search: string, receiptId?: Id<"receipts">) {
   const convex = useConvex();
   const [term, setTerm] = useState("");
   useEffect(() => {
-    const timeout = setTimeout(() => setTerm(normalizeSearch(search)), 350);
+    const timeout = setTimeout(
+      () =>
+        setTerm(receiptId ? normalizeSearch(search) : productSearch(search)),
+      350,
+    );
     return () => clearTimeout(timeout);
-  }, [search]);
+  }, [search, receiptId]);
   return useQuery({
     queryKey: [
       "catalog",

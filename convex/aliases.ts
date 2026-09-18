@@ -1,8 +1,64 @@
 import { v } from "convex/values";
-import { internalMutation } from "./_generated/server";
+import { internalMutation, type QueryCtx } from "./_generated/server";
 import { internal } from "./_generated/api";
-import { aliasKey } from "../src/lib/domain/receipt";
-/** Apply a confirmed exact match in bounded batches. Item-only corrections keep their category. */
+import type { Id } from "./_generated/dataModel";
+import { aliasKey, type ReceiptData } from "../src/lib/domain/receipt";
+import {
+  canAcceptReceipt,
+  categoryUncertainIssue,
+} from "../src/lib/domain/receipt-review";
+
+/**
+ * A remembered household decision settles the category: it replaces the
+ * automatic suggestion and removes the uncertainty flag for that line.
+ * Lines a person edited by hand keep their own category.
+ */
+export function settleLineWithAlias(
+  line: ReceiptData["lines"][number],
+  key: string,
+  categoryId: string,
+): boolean {
+  const nextCategory = line.manual ? line.categoryId : categoryId;
+  const issues = line.issues.filter(
+    (issue) => issue !== categoryUncertainIssue,
+  );
+  const changed =
+    line.productKey !== key ||
+    line.categoryId !== nextCategory ||
+    issues.length !== line.issues.length ||
+    line.confidence !== 1;
+  line.productKey = key;
+  line.categoryId = nextCategory;
+  line.issues = issues;
+  line.confidence = 1;
+  return changed;
+}
+
+/** Apply every remembered alias in the household to freshly read receipt data. */
+export async function applyHouseholdAliases(
+  ctx: QueryCtx,
+  householdId: Id<"households">,
+  data: ReceiptData,
+): Promise<ReceiptData> {
+  for (const line of data.lines) {
+    if (line.kind !== "product") continue;
+    const key = aliasKey(data, line);
+    if (!key) continue;
+    const alias = await ctx.db
+      .query("aliases")
+      .withIndex("by_householdId_and_key", (q) =>
+        q.eq("householdId", householdId).eq("key", key),
+      )
+      .unique();
+    if (alias) settleLineWithAlias(line, key, alias.categoryId);
+  }
+  return data;
+}
+
+/**
+ * Apply a confirmed exact match in bounded batches. Item-only corrections keep
+ * their category. A receipt waiting only on that item is approved on the spot.
+ */
 export const applyToMatching = internalMutation({
   args: {
     householdId: v.id("households"),
@@ -29,14 +85,17 @@ export const applyToMatching = internalMutation({
       for (const line of data.lines) {
         if (line.kind !== "product" || aliasKey(data, line) !== args.key)
           continue;
-        const categoryId = line.manual ? line.categoryId : alias.categoryId;
-        if (line.productKey !== args.key || line.categoryId !== categoryId) {
-          line.productKey = args.key;
-          line.categoryId = categoryId;
+        if (settleLineWithAlias(line, args.key, alias.categoryId))
           changed = true;
-        }
       }
       if (changed) {
+        const autoAccepted =
+          receipt.status === "needs_review" &&
+          !receipt.provider.includes("mock") &&
+          canAcceptReceipt(
+            data,
+            !!receipt.duplicateOf && !receipt.duplicateResolved,
+          );
         await ctx.db.insert("revisions", {
           receiptId: receipt._id,
           data: receipt.data,
@@ -46,6 +105,10 @@ export const applyToMatching = internalMutation({
         await ctx.db.patch("receipts", receipt._id, {
           data,
           revision: receipt.revision + 1,
+          ...(autoAccepted ? { status: "reviewed", autoAccepted: true } : {}),
+        });
+        await ctx.scheduler.runAfter(0, internal.productAnalysis.start, {
+          id: receipt._id,
         });
       }
     }

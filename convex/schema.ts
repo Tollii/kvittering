@@ -1,4 +1,5 @@
 import { processingEngineValidator } from "../src/lib/domain/processing-engine";
+import { catalogDecision } from "../src/lib/catalog/decisions";
 import { defineSchema, defineTable } from "convex/server";
 import { v } from "convex/values";
 import { receiptDataValidator } from "../src/lib/domain/receipt";
@@ -9,6 +10,11 @@ import {
   physicalStoreValidator,
 } from "../src/lib/catalog/model";
 import { vEventId, vWorkflowId } from "@convex-dev/workflow";
+import { searchRepairValidator } from "../src/lib/catalog/search-repair";
+import {
+  packageProfileValidator,
+  productAnalysisValidator,
+} from "../src/lib/domain/product-families";
 export const statusValidator = v.union(
   v.literal("uploading"),
   v.literal("uploaded"),
@@ -39,8 +45,46 @@ export const receiptFields = {
     v.union(v.literal("pending"), v.literal("complete"), v.literal("error")),
   ),
   catalogWorkflowId: v.optional(vWorkflowId),
+  catalogDecisions: v.optional(v.array(catalogDecision)),
+  catalogSearchRepairs: v.optional(v.array(searchRepairValidator)),
+  productAnalysis: v.optional(productAnalysisValidator),
 };
 export default defineSchema({
+  productFamilies: defineTable({
+    householdId: v.id("households"),
+    key: v.string(),
+    name: v.string(),
+    categoryId: v.string(),
+    representative: v.object({
+      name: v.string(),
+      brand: v.union(v.string(), v.null()),
+      attributes: v.array(v.string()),
+    }),
+  })
+    .index("by_householdId_and_key", ["householdId", "key"])
+    .index("by_householdId_and_categoryId", ["householdId", "categoryId"])
+    .searchIndex("search_name", {
+      searchField: "name",
+      filterFields: ["householdId"],
+    }),
+  productProfiles: defineTable({
+    householdId: v.id("households"),
+    key: v.string(),
+    familyId: v.union(v.id("productFamilies"), v.null()),
+    package: packageProfileValidator,
+    decisions: v.array(
+      v.object({
+        question: v.string(),
+        choice: v.string(),
+        confidence: v.number(),
+      }),
+    ),
+  }).index("by_householdId_and_key", ["householdId", "key"]),
+  catalogSearchSuggestions: defineTable({
+    householdId: v.id("households"),
+    key: v.string(),
+    search: v.union(v.string(), v.null()),
+  }).index("by_householdId_and_key", ["householdId", "key"]),
   catalogRequests: defineTable({
     key: v.string(),
     request: catalogRequestValidator,

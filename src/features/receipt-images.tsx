@@ -6,9 +6,13 @@ import type { Receipt } from "@/lib/domain/insights";
 export function ReceiptImages({
   receipt,
   compact = false,
+  color,
+  background,
 }: {
   receipt: Receipt;
   compact?: boolean;
+  color?: string;
+  background?: string;
 }) {
   const [token, setToken] = useState<string | null>(null);
   const [open, setOpen] = useState(false);
@@ -32,6 +36,9 @@ export function ReceiptImages({
         <IconButton
           name="doc.viewfinder"
           label="Vis originalkvittering"
+          filled={background ?? true}
+          size={17}
+          color={color}
           disabled={busy}
           onPress={() => void load()}
         />

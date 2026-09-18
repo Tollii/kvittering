@@ -6,6 +6,9 @@ An Expo 57 / React Native app for household grocery receipts. iOS is the primary
 
 Use Node.js 22.13 or later and Xcode 26.4 or later.
 
+For Xcode 27, keep `ios.enableSceneSupport` enabled in the `expo-build-properties`
+plugin. This generates the scene lifecycle required to launch on iOS 27.
+
 ```sh
 npm install
 cp .env.example .env.local # Only if .env.local does not exist.
@@ -27,19 +30,58 @@ npm run ios:build
 
 After the first build, use `npm start` to start Metro. Press `i` to open the simulator. Rebuild with `npm run ios:build` after changes to native packages or app plugins. On a physical iPhone, configure signing in Xcode and use `npx expo run:ios --device`.
 
+For a signed development build with the Apple credentials stored in Expo, use the
+`development` profile. Local EAS builds require Xcode, CocoaPods, and Fastlane.
+
+```sh
+npx eas-cli build --platform ios --profile development --local --output /tmp/kvitto-development.ipa
+npx expo start --dev-client --lan
+```
+
+The iPhone must be registered in the provisioning profile for this build. After
+installation, open Kvitto and connect to Metro on the Mac. Keep both devices on
+the same network and allow local network access when iOS asks. The development
+profile uses the existing Convex development deployment.
+
 The simulator has no receipt camera. Import an image into its photo library, then select **Velg fra bilder**. Check camera capture on a physical iPhone.
+
+## Release to TestFlight
+
+Use the **TestFlight** workflow under **Actions** in GitHub. Select **Run workflow**,
+choose the branch to release, and select an operation:
+
+- `build-and-submit`: Check the code, build iOS on Expo, and upload to TestFlight.
+  Leave `build_id` empty. Expo increments the build number.
+- `submit-existing`: Upload a completed Expo build. Enter its build ID from the
+  Expo build page. This does not rebuild the selected branch.
+
+The workflow runs only when started manually. It waits for the Expo build and
+upload to finish. Apple then processes the upload before testers can install it.
+The workflow summary links to the build and TestFlight.
+
+Before the first run, add an [Expo access token](https://expo.dev/accounts/atolnes/settings/access-tokens)
+as the GitHub repository secret `EXPO_TOKEN`. The token's account must have access
+to `@atolness-team/kvitto`. Apple signing and submission credentials are already
+stored in Expo. The workflow file must be on the repository's default branch to
+show the **Run workflow** button.
+
+The `production` build profile currently connects to the existing Convex development
+deployment. Set the public Convex URLs in `eas.json` when this should change.
+For a release from your computer, use `npm run testflight`.
 
 ## App functions
 
 - Email and password sign-in. Sessions use iOS Keychain through Expo SecureStore.
 - Shared households with two members and private invitation codes.
-- Camera and photo-library capture. Up to eight images can form one receipt or separate receipts. Images are converted to JPEG.
-- Persistent receipt images and an SQLite upload queue. Uploads resume when the app is open and connected. A failed request does not create a second receipt.
+- Full-screen camera and photo-library capture. Up to eight images can form one receipt or separate receipts. Images are converted to JPEG.
+- PDF receipts: pick them from Files, or share images and PDFs to Kvitto from any app via the iOS share sheet (`expo-share-intent`). PDF pages are rendered to JPEG on the device (PDFKit, in the `receipt-intelligence` module) and enter the normal upload queue as one receipt.
+- Persistent receipt images and an SQLite upload queue. Uploads start immediately and retry silently while the app is open and connected. A failed request does not create a second receipt. Reading and categorization run as a durable Convex workflow on the server, so the phone is only needed for the upload.
+- Receipt review as a checklist: one action chip per open question, one-tap confirmation of suggested categories, and swipe-to-approve in the inbox when categories are all that remain. Confirmed categories are remembered per store and settle the same item on later receipts, approving them automatically when nothing else is open.
 - Receipt review, correction, category memory, product matching, duplicate checks, exclusion, reprocessing, and deletion.
 - Spending by month, category, store, and purchase type; daily purchase calendar; receipt and product history.
 - Native tabs, SF Symbols, native date selection, light and dark themes, and system sharing.
 
-Capture works offline after the account and household have been loaded once. Receipt images stay on the device until the server confirms the upload. The queue is separate for each account and household. Server receipt history and edits need a connection; the app does not promise background uploads after iOS suspends it.
+Capture works offline after the account and household have been loaded once. Receipt images stay on the device until the server confirms the upload. The queue is separate for each account and household. Server receipt history and edits need a connection; the app does not promise background uploads after iOS suspends it, but processing never depends on the phone once the images are in storage.
 
 The browser command is for layout inspection. Native capture and persistent offline storage require iOS or Android. The old PWA in `sveltemo/` is a reference and is excluded from Metro, TypeScript, lint, and tests. The active backend is `convex/` at the root; do not run the old backend at the same time.
 
@@ -75,6 +117,8 @@ Set `KASSALAPP_API_KEY` in the **Convex development deployment**. Keep it out of
 
 New receipts get catalog enrichment after extraction. On an existing receipt, select **Finn produkter og butikk**. Each product row also has a catalog search and product details. Physical stores can be selected in receipt details. A failed lookup or an item missing from the catalog does not block receipt approval. Explicit category and product corrections take priority over automatic results.
 
+Matching collects the search results first, then sends all candidate and category questions for the receipt in one Jev request. Each unresolved candidate uses Noul to estimate the probability that it is the purchased product. One compatible candidate at or above 0.80 is linked automatically; competing matches stay unresolved. Saved links and unique exact matches do not need another model decision. Candidate probabilities and decision reasons are stored on the receipt for diagnosis. Provider failures remain separate from negative matches.
+
 - Orval generates the server client from `api/kassalapp.openapi.json`. Run `npm run generate:catalog` after updating the spec. The transport adapts boolean query parameters to the API's required `1`/`0` encoding.
 - Convex shares normalized search results and product records across households. Search results last one day, empty results seven days, product and store data thirty days, and requested prices six hours. Identical pending requests share one job. Receipt data and saved corrections remain private to the household.
 - TanStack Query caches lookup results on the device with SQLite persistence, scoped to the account and household. Receipt subscriptions continue to use Convex directly. The API client is generated; the app hooks are small wrappers around authenticated Convex functions so the API key remains on the server.
@@ -83,23 +127,46 @@ New receipts get catalog enrichment after extraction. On an existing receipt, se
 
 Prices are fetched only when **Hent butikkpriser** is selected. Fresh foods and unlisted items remain ordinary receipt lines. Nutrition is displayed as product information; it is not used to calculate intake.
 
-### Compare receipt engines on iOS
+Searches and saved product matching use the same formatting rules. For example,
+`COCA-COLA10PK BX` and `COCA-COLA 10 PK BX` use one query and cache key. Receipt text,
+quantities and amounts stay unchanged. Package counts and variants remain distinct.
 
-In Settings, select **GPT** or **Foundation Models** under **Lesing av kvitteringer**.
-The choice is stored on this device and captured when a receipt enters the upload queue.
-GPT uses the existing server pipeline. Foundation Models uses Apple Vision document OCR
-and on-device Foundation Models for extraction and categorization. It requires iOS 26+
-and an available Apple Intelligence model with Norwegian support. Build the native app
-with `npm run ios:build`; the custom module is not included in Expo Go.
+Catalog matching links a line without asking the model when the text leaves no doubt: a unique
+full match, or the only compatible product that contains every receipt word and adds nothing but
+size, pack, packaging or ordinary-variant words (`BATTERY WHIRL` → `Battery Whirl Sugar 0,5l boks`).
+**Finn produkter på nytt** in the receipt menu re-runs matching for an existing receipt.
 
-To compare the same images, change the setting, open a receipt, and choose **Les bildene
-på nytt**. **Sammenlign lesinger** shows the saved text, amounts, categories, engine and
-processing time. Existing manual edits remain in place, and the purchase is counted once.
-Catalog enrichment is shared by both engines and runs after the saved reading, so compare
-the reading snapshots when evaluating OCR and categorization. Older snapshots have no
-category or timing details. Times cover extraction and classification, exclude upload/download and catalog matching,
-and are not a controlled performance benchmark.
+After a completed catalog search returns no products, the iOS app can use the on-device
+Foundation Model to suggest a repaired query. This runs while the app is open and online;
+it does not delay receipt processing. It requires the native `suggestProductSearch` method
+and an available Apple Intelligence model. Unsupported devices keep the normal lookup path.
+Convex validates the suggestion, stores it within the household, and runs catalog matching
+again using the original receipt evidence. A suggestion does not establish product identity.
+Unchanged or rejected suggestions are recorded to avoid repeated model calls. Service errors
+are retried separately and are never treated as empty catalog results. Manual product choices
+and edits made during generation take priority. This improves product links for aggregation;
+it does not infer missing quantities. Product-family analysis runs separately after catalog matching.
 
-Keep the app open during local processing. A local failure stays in the inbox for an
-explicit retry; it never switches to GPT. Successful local results remain in the durable
-queue if upload completion fails. Receipt images still synchronize to Convex.
+### Product families and purchased quantities
+
+**Forbruk → Mengder kjøpt** groups the same product across package sizes and stores.
+Jev selects a family using receipt and cached catalog evidence. It keeps different brands,
+flavours and variants such as Original and Zero separate. Exact catalog links and receipt
+text remain unchanged. Fresh products can have a family without a catalog match.
+
+Jev also selects the pack count, the meaning of a stated size, and the purchased quantity.
+Code converts the selected source values to item counts, grams and millilitres. For example,
+two confirmed packs of 10 × 330 ml give 20 items and 6.6 litres. A catalog entry whose pack
+count conflicts with the receipt cannot supply missing size data. Unknown amounts stay
+unknown; partial totals are labelled. These are household purchases, not measured consumption.
+
+Convex stores household product profiles and reuses them on later receipts. Purchase quantities
+are calculated for each receipt line. A durable workflow runs after receipt processing,
+catalog matching and edits. Older receipts are analysed when the app is open and online.
+Generation, revision, evidence and analysis-version checks reject stale results. Provider
+failures leave the receipt usable and can retry later. This stage uses `TYPESAFE_API_KEY`
+and `TYPESAFE_MODEL` (default `jev-latest`); it does not make extra Kassal.app requests.
+
+Run the arithmetic, ownership and stale-result checks with `npm test`. The internal
+`productAnalysisEvaluation:evaluate` action runs six fixed family cases against Jev and
+returns expected and actual choices. It calls the model but does not change receipt data.

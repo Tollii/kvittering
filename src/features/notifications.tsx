@@ -97,20 +97,17 @@ export function NotificationSettings() {
   }
   return (
     <Panel>
-      <Copy size={20} weight="600">
-        Varsler
-      </Copy>
-      <Copy muted>Få beskjed når en kvittering er ferdig behandlet.</Copy>
       {!available && (
         <Copy size={13} muted>
-          Varsler krever en utviklingsversjon på en fysisk iPhone med push
-          konfigurert.
+          Ikke tilgjengelig i denne versjonen
         </Copy>
       )}
       {available && (
         <Button
           title={enabled ? "Slå av varsler" : "Slå på varsler"}
-          secondary
+          tint={!enabled}
+          secondary={!!enabled}
+          icon={enabled ? "bell.slash" : "bell"}
           busy={busy}
           onPress={() => void change()}
         />
@@ -147,6 +144,7 @@ export function NotificationRouting() {
         const result = await client.query(api.receipts.detail, {
           id: id as Id<"receipts">,
         });
+        if (!result) throw new Error("Receipt unavailable");
         if (active && result.receipt.householdId === household.id)
           router.push({ pathname: "/receipt/[id]", params: { id } });
       } catch {

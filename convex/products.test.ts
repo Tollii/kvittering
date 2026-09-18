@@ -47,7 +47,7 @@ it("saves a product correction, reuses the retailer mapping and preserves the or
     excluded: false,
     productChanges: [{ lineId: "battery", productId: null, createNew: true }],
   });
-  const saved = (await user.query(api.receipts.detail, { id })).receipt;
+  const saved = (await user.query(api.receipts.detail, { id }))!.receipt;
   const line = saved.data!.lines[0];
   expect(line.productId).toBeTruthy();
   expect(line.originalText).toBe(batteryFixture().lines[0].originalText);
@@ -84,7 +84,7 @@ it("saves a product correction, reuses the retailer mapping and preserves the or
     matches: [{ lineId: "battery", kind: "new", productId: null }],
   });
   expect(
-    (await user.query(api.receipts.detail, { id })).receipt.data!.lines[0]
+    (await user.query(api.receipts.detail, { id }))!.receipt.data!.lines[0]
       .productId,
   ).toBe(line.productId);
 });
@@ -159,9 +159,9 @@ it("finishes uncertain processing and atomically reuses new product mappings on 
       matches: [{ lineId: "battery", kind: "new", productId: null }],
     });
   }
-  const one = (await user.query(api.receipts.detail, { id: first })).receipt
+  const one = (await user.query(api.receipts.detail, { id: first }))!.receipt
     .data!.lines[0];
-  const two = (await user.query(api.receipts.detail, { id: second })).receipt
+  const two = (await user.query(api.receipts.detail, { id: second }))!.receipt
     .data!.lines[0];
   expect(two.productId).toBe(one.productId);
   expect(
@@ -188,7 +188,7 @@ it("finishes uncertain processing and atomically reuses new product mappings on 
     provider: "test",
     matches: [{ lineId: "battery", kind: "uncertain", productId: null }],
   });
-  const uncertain = (await user.query(api.receipts.detail, { id: third }))
+  const uncertain = (await user.query(api.receipts.detail, { id: third }))!
     .receipt;
   expect(uncertain.status).toBe("reviewed");
   expect(uncertain.autoAccepted).toBe(true);

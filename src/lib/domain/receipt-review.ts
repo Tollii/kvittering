@@ -1,7 +1,13 @@
-import { reconcile, type ReceiptData, type ReceiptLine } from "./receipt";
+import {
+  emptyLine,
+  reconcile,
+  type ReceiptData,
+  type ReceiptLine,
+} from "./receipt";
 import { categoryById } from "./categories";
 
 export const categoryReviewThreshold = 0.5;
+export const categoryUncertainIssue = "Kategorien er usikker.";
 
 /** A category decision resolves category uncertainty, not reading or amount errors. */
 export function confirmLineCategory(
@@ -18,7 +24,30 @@ export function confirmLineCategory(
     issues:
       categoryId === "fallback.unclear"
         ? line.issues
-        : line.issues.filter((issue) => issue !== "Kategorien er usikker."),
+        : line.issues.filter((issue) => issue !== categoryUncertainIssue),
+  };
+}
+
+/** A line whose only open question is its suggested category can be confirmed in one step. */
+export function canConfirmSuggestedCategory(line: ReceiptLine): boolean {
+  return (
+    line.kind === "product" &&
+    !!line.categoryId &&
+    line.categoryId !== "fallback.unclear" &&
+    categoryById.has(line.categoryId) &&
+    line.issues.includes(categoryUncertainIssue)
+  );
+}
+
+/** Accept every suggested category that only needs confirmation. Other issues stay open. */
+export function confirmSuggestedCategories(data: ReceiptData): ReceiptData {
+  return {
+    ...data,
+    lines: data.lines.map((line) =>
+      canConfirmSuggestedCategory(line)
+        ? confirmLineCategory(line, line.categoryId!)
+        : line,
+    ),
   };
 }
 
@@ -44,6 +73,44 @@ export function receiptReviewIssues(data: ReceiptData): string[] {
   ];
 }
 
+/**
+ * If accepting every suggested category is all that stands between the receipt
+ * and approval, return that confirmed data. Otherwise null: a person must look.
+ */
+export function quickApproveData(
+  data: ReceiptData | null,
+  unresolvedDuplicate: boolean,
+): ReceiptData | null {
+  if (!data) return null;
+  const confirmed = confirmSuggestedCategories(data);
+  return canAcceptReceipt(confirmed, unresolvedDuplicate) ? confirmed : null;
+}
+
+/**
+ * Close a small gap between the lines and the printed total with an explicit
+ * adjustment line, so the receipt balances without guessing which line is off.
+ */
+export function balanceWithAdjustment(
+  data: ReceiptData,
+  id: string,
+): ReceiptData {
+  const { difference } = reconcile(data);
+  if (difference === null || difference === 0) return data;
+  return {
+    ...data,
+    lines: [
+      ...data.lines,
+      {
+        ...emptyLine(id),
+        kind: "adjustment",
+        name: "Justering mot betalt beløp",
+        amountOre: -difference,
+        categoryId: null,
+      },
+    ],
+  };
+}
+
 /** Product matching and optional package information do not require receipt review. */
 export function canAcceptReceipt(
   data: ReceiptData,
@@ -54,4 +121,114 @@ export function canAcceptReceipt(
     receiptReviewIssues(data).length === 0 &&
     data.lines.every((line) => lineReviewIssues(line).length === 0)
   );
+}
+
+export type ReviewTask =
+  | { kind: "duplicate" }
+  | { kind: "store" }
+  | { kind: "total" }
+  | { kind: "date" }
+  | { kind: "currency" }
+  | { kind: "difference"; amountOre: number }
+  | { kind: "no-lines" }
+  | { kind: "categories"; count: number }
+  | { kind: "amounts"; count: number }
+  | { kind: "names"; count: number }
+  | { kind: "line-issues"; count: number }
+  | { kind: "receipt-issues"; issues: string[] };
+
+/**
+ * Everything standing between the receipt and approval, grouped the way a
+ * person would fix it: receipt facts first, then the affected product lines.
+ */
+export function reviewTasks(
+  data: ReceiptData,
+  unresolvedDuplicate: boolean,
+): ReviewTask[] {
+  const tasks: ReviewTask[] = [];
+  if (unresolvedDuplicate) tasks.push({ kind: "duplicate" });
+  if (!data.store?.trim()) tasks.push({ kind: "store" });
+  if (data.totalOre === null) tasks.push({ kind: "total" });
+  if (!data.purchaseDate) tasks.push({ kind: "date" });
+  if (data.currency !== "NOK") tasks.push({ kind: "currency" });
+  const totals = reconcile(data);
+  if (
+    totals.difference !== null &&
+    totals.difference !== 0 &&
+    totals.unknown === 0
+  )
+    tasks.push({ kind: "difference", amountOre: totals.difference });
+  if (!data.lines.some((line) => line.kind === "product"))
+    tasks.push({ kind: "no-lines" });
+  const receiptIssues = [
+    ...new Set([
+      ...data.issues,
+      ...totals.issues.filter(
+        (issue) => issue.includes("rabatt") || issue.includes("pantretur"),
+      ),
+    ]),
+  ];
+  if (receiptIssues.length)
+    tasks.push({ kind: "receipt-issues", issues: receiptIssues });
+  const counted = (predicate: (line: ReceiptLine) => boolean) =>
+    data.lines.filter(predicate).length;
+  const categories = counted(canConfirmSuggestedCategory);
+  const unclear = counted(
+    (line) =>
+      line.kind === "product" &&
+      line.issues.includes(categoryUncertainIssue) &&
+      !canConfirmSuggestedCategory(line),
+  );
+  if (categories + unclear)
+    tasks.push({ kind: "categories", count: categories + unclear });
+  const amounts = counted(
+    (line) =>
+      !["summary", "vat"].includes(line.kind) && line.amountOre === null,
+  );
+  if (amounts) tasks.push({ kind: "amounts", count: amounts });
+  const names = counted((line) => line.kind === "product" && !line.name.trim());
+  if (names) tasks.push({ kind: "names", count: names });
+  const other = counted((line) =>
+    line.issues.some((issue) => issue !== categoryUncertainIssue),
+  );
+  if (other) tasks.push({ kind: "line-issues", count: other });
+  return tasks;
+}
+
+/** Short, plain-language summary of what a receipt still needs, for lists. */
+export function reviewSummary(
+  data: ReceiptData | null,
+  unresolvedDuplicate: boolean,
+): string[] {
+  if (!data) return [];
+  const plural = (count: number, one: string, many: string) =>
+    `${count} ${count === 1 ? one : many}`;
+  return reviewTasks(data, unresolvedDuplicate).map((task) => {
+    switch (task.kind) {
+      case "duplicate":
+        return "Mulig duplikat";
+      case "store":
+        return "Butikk mangler";
+      case "total":
+        return "Betalt beløp mangler";
+      case "date":
+        return "Dato mangler";
+      case "currency":
+        return "Valuta må sjekkes";
+      case "difference":
+        return "Beløpene stemmer ikke";
+      case "no-lines":
+        return "Ingen varer lest";
+      case "receipt-issues":
+        return plural(task.issues.length, "merknad", "merknader");
+      case "categories":
+        return plural(task.count, "kategori", "kategorier");
+      case "amounts":
+        return `${task.count} beløp mangler`;
+      case "names":
+        return `${task.count} navn mangler`;
+      case "line-issues":
+        return plural(task.count, "vare å sjekke", "varer å sjekke");
+    }
+  });
 }

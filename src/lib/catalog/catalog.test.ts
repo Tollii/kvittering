@@ -109,6 +109,45 @@ it("links ordinary Coca-Cola by receipt text even when Light is the first search
   ).toBeNull();
 });
 
+it("links the only compatible product when the catalog adds nothing but size, pack or variant-neutral words", () => {
+  const products = normalizeProducts({
+    data: [
+      { id: 1, name: "Battery Whirl Sugar 0,5l boks", ean: "7310865000001" },
+      { id: 2, name: "Battery Whirl Zero 0,5l boks", ean: "7310865000002" },
+    ],
+  });
+  const line = { ...emptyLine(), name: "BATTERY WHIRL" };
+  expect(automaticCatalogProduct(line, products)?.key).toBe(products[0].key);
+  // A second size makes the receipt ambiguous again.
+  expect(
+    automaticCatalogProduct(line, [
+      ...products,
+      ...normalizeProducts({
+        data: [
+          {
+            id: 3,
+            name: "Battery Whirl Sugar 0,33l boks",
+            ean: "7310865000003",
+          },
+        ],
+      }),
+    ]),
+  ).toBeNull();
+  const cola = normalizeProducts({
+    data: [
+      { id: 4, name: "Coca-Cola 330ml Sleek X 10pk bx", ean: "5449000000001" },
+      {
+        id: 5,
+        name: "Coca-Cola uten Sukker 330ml Sleek X 10pk bx",
+        ean: "5449000000002",
+      },
+    ],
+  });
+  expect(
+    automaticCatalogProduct({ ...line, name: "COCA-COLA10PK BX" }, cola)?.key,
+  ).toBe(cola[0].key);
+});
+
 it("keeps multipacks, flavours, generic fresh food and missing package evidence distinct", () => {
   const products = normalizeProducts({
     data: [

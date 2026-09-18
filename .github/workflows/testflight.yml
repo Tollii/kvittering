@@ -1,0 +1,106 @@
+name: TestFlight
+
+on:
+  workflow_dispatch:
+    inputs:
+      operation:
+        description: Release operation
+        type: choice
+        required: true
+        default: build-and-submit
+        options:
+          - build-and-submit
+          - submit-existing
+      build_id:
+        description: Expo build ID (required for submit-existing)
+        type: string
+        required: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: testflight
+  cancel-in-progress: false
+
+jobs:
+  release:
+    name: Release to TestFlight
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    env:
+      EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+    steps:
+      - name: Check release inputs
+        env:
+          OPERATION: ${{ inputs.operation }}
+          BUILD_ID: ${{ inputs.build_id }}
+        run: |
+          if [[ -z "$EXPO_TOKEN" ]]; then
+            echo "::error::Add an Expo access token as the EXPO_TOKEN repository secret."
+            exit 1
+          fi
+          if [[ "$OPERATION" == "submit-existing" ]]; then
+            if [[ ! "$BUILD_ID" =~ ^[0-9a-fA-F]{8}(-[0-9a-fA-F]{4}){3}-[0-9a-fA-F]{12}$ ]]; then
+              echo "::error::Enter the Expo build ID to submit."
+              exit 1
+            fi
+          elif [[ -n "$BUILD_ID" ]]; then
+            echo "::error::Leave build_id empty when creating a new build."
+            exit 1
+          fi
+
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Set up Expo
+        uses: expo/expo-github-action@v8
+        with:
+          eas-version: 24.7.0
+          token: ${{ secrets.EXPO_TOKEN }}
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Check application
+        if: inputs.operation == 'build-and-submit'
+        run: |
+          npm run typecheck
+          npm run lint
+          npm test
+
+      - name: Build iOS app
+        id: build
+        if: inputs.operation == 'build-and-submit'
+        run: |
+          eas build --platform ios --profile production --non-interactive --wait --json > "$RUNNER_TEMP/testflight-build.json"
+          build_id=$(jq -er '.[0] | select(.status == "FINISHED") | .id' "$RUNNER_TEMP/testflight-build.json")
+          echo "build_id=$build_id" >> "$GITHUB_OUTPUT"
+
+      - name: Check selected build
+        env:
+          BUILD_ID: ${{ steps.build.outputs.build_id || inputs.build_id }}
+        run: |
+          eas build:view "$BUILD_ID" --json > "$RUNNER_TEMP/testflight-build-details.json"
+          project_id=$(jq -r '.expo.extra.eas.projectId' app.json)
+          bundle_id=$(jq -r '.expo.ios.bundleIdentifier' app.json)
+          jq -e --arg project_id "$project_id" --arg bundle_id "$bundle_id" '
+            .status == "FINISHED" and
+            .platform == "IOS" and
+            .distribution == "STORE" and
+            .app.id == $project_id and
+            .appIdentifier == $bundle_id
+          ' "$RUNNER_TEMP/testflight-build-details.json" > /dev/null
+          build_url="https://expo.dev/accounts/atolness-team/projects/kvitto/builds/$BUILD_ID"
+          echo "Build: [$BUILD_ID]($build_url)" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Submit to TestFlight
+        env:
+          BUILD_ID: ${{ steps.build.outputs.build_id || inputs.build_id }}
+        run: |
+          eas submit --platform ios --profile production --id "$BUILD_ID" --non-interactive --wait
+          echo "Upload complete. [Check Apple processing and tester access](https://appstoreconnect.apple.com/apps/6813602733/testflight)." >> "$GITHUB_STEP_SUMMARY"

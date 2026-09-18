@@ -1,0 +1,112 @@
+/// <reference types="vite/client" />
+import { convexTest } from "convex-test";
+import { expect, it, vi, afterEach } from "vitest";
+import schema from "./schema";
+import { api, internal } from "./_generated/api";
+import { batteryFixture } from "../src/lib/domain/receipt";
+import {
+  purchaseEvidenceKey,
+  productAnalysisVersion,
+} from "../src/lib/domain/product-families";
+const modules = import.meta.glob("./**/*.ts");
+afterEach(() => vi.unstubAllEnvs());
+async function setup() {
+  vi.stubEnv("TYPESAFE_API_KEY", "");
+  const t = convexTest(schema, modules);
+  const first = t.withIdentity({
+    subject: "first",
+    issuer: "https://test.local",
+  });
+  const other = t.withIdentity({
+    subject: "other",
+    issuer: "https://test.local",
+  });
+  const householdId = await first.mutation(api.households.create, {
+    name: "First",
+    invitation: "11111111111111111111111111111111",
+  });
+  await other.mutation(api.households.create, {
+    name: "Other",
+    invitation: "22222222222222222222222222222222",
+  });
+  const id = await first.mutation(api.receipts.reserve, {
+    householdId,
+    clientId: "product-analysis-0001",
+    imageCount: 1,
+  });
+  const data = batteryFixture();
+  await t.run((ctx) =>
+    ctx.db.patch("receipts", id, {
+      data,
+      status: "reviewed",
+      catalogStatus: "complete",
+    }),
+  );
+  const line = data.lines[0];
+  return {
+    t,
+    first,
+    other,
+    id,
+    data,
+    args: {
+      id,
+      version: productAnalysisVersion,
+      generation: 0,
+      revision: 0,
+      lineId: line.id,
+      evidenceKey: purchaseEvidenceKey(line),
+      family: "new" as const,
+      package: { unitsPerPackage: 1, measurePerPackage: null },
+      decisions: [],
+    },
+  };
+}
+it("rejects access from another household", async () => {
+  const { other, id } = await setup();
+  await expect(
+    other.mutation(api.productAnalysis.ensure, { ids: [id] }),
+  ).rejects.toThrow("ikke tilgjengelig");
+});
+it("persists one family and cached profile for repeated decisions", async () => {
+  const { t, args } = await setup();
+  await t.mutation(internal.productAnalysis.saveProfile, args);
+  await t.mutation(internal.productAnalysis.saveProfile, args);
+  const prepared = await t.query(internal.productAnalysis.prepare, {
+    id: args.id,
+    version: productAnalysisVersion,
+    generation: args.generation,
+    revision: args.revision,
+    lineId: args.lineId,
+  });
+  expect(prepared?.profile?.package.unitsPerPackage).toBe(1);
+  expect(prepared?.families).toHaveLength(1);
+  expect(prepared?.profile?.familyId).toBe(prepared?.families[0]._id);
+});
+it("discards stale results after a receipt edit and records failures separately from receipt status", async () => {
+  const { t, id, args } = await setup();
+  await t.run((ctx) => ctx.db.patch("receipts", id, { revision: 1 }));
+  await t.mutation(internal.productAnalysis.saveProfile, args);
+  await t.mutation(internal.productAnalysis.finish, {
+    id,
+    version: productAnalysisVersion,
+    generation: 0,
+    revision: 0,
+    results: [],
+    failed: false,
+  });
+  expect(
+    (await t.run((ctx) => ctx.db.get("receipts", id)))?.productAnalysis,
+  ).toBeUndefined();
+  await t.mutation(internal.productAnalysis.finish, {
+    id,
+    version: productAnalysisVersion,
+    generation: 0,
+    revision: 1,
+    results: [],
+    failed: true,
+  });
+  const receipt = await t.run((ctx) => ctx.db.get("receipts", id));
+  expect(receipt?.status).toBe("reviewed");
+  expect(receipt?.productAnalysis?.state).toBe("error");
+});

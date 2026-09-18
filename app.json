@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "Kvitto",
+    "name": "kvitto",
     "slug": "kvitto",
     "version": "1.0.0",
     "orientation": "portrait",
@@ -8,20 +8,24 @@
     "scheme": "kvitto",
     "userInterfaceStyle": "automatic",
     "ios": {
-      "bundleIdentifier": "no.kvitto.app",
+      "bundleIdentifier": "no.tolnes.kvitto",
       "supportsTablet": true,
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false
-      }
+      },
+      "appleTeamId": "592JWHZRVQ"
     },
     "android": {
       "adaptiveIcon": {
-        "backgroundColor": "#E6F4FE",
+        "backgroundColor": "#F4F2FA",
         "foregroundImage": "./assets/images/android-icon-foreground.png",
         "backgroundImage": "./assets/images/android-icon-background.png",
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
       },
-      "predictiveBackGestureEnabled": false
+      "predictiveBackGestureEnabled": false,
+      "permissions": [
+        "android.permission.CAMERA"
+      ]
     },
     "web": {
       "output": "static",
@@ -32,7 +36,7 @@
       [
         "expo-splash-screen",
         {
-          "backgroundColor": "#F6F5F0",
+          "backgroundColor": "#F4F2FA",
           "image": "./assets/images/icon.png",
           "imageWidth": 100
         }
@@ -54,11 +58,37 @@
           "cameraPermission": "Ta bilder av kvitteringer.",
           "microphonePermission": false
         }
+      ],
+      [
+        "expo-build-properties",
+        {
+          "ios": {
+            "enableSceneSupport": true
+          }
+        }
+      ],
+      [
+        "expo-share-intent",
+        {
+          "iosActivationRules": {
+            "NSExtensionActivationSupportsImageWithMaxCount": 8,
+            "NSExtensionActivationSupportsFileWithMaxCount": 8
+          },
+          "iosShareExtensionName": "Del til Kvitto",
+          "disableAndroid": true
+        }
       ]
     ],
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true
-    }
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "321ce577-fd8e-49c7-a2e3-619f8ac904b8"
+      }
+    },
+    "owner": "atolness-team"
   }
 }

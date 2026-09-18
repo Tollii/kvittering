@@ -32,14 +32,10 @@ import { canAcceptReceipt } from "../src/lib/domain/receipt-review";
 import { categoryById } from "../src/lib/domain/categories";
 import { lineValidator } from "../src/lib/domain/receipt";
 import type { Id } from "./_generated/dataModel";
+import { savedSearchRepair } from "../src/lib/catalog/search-repair";
 
-export const catalogDecision = v.object({
-  lineId: v.string(),
-  evidenceKey: v.string(),
-  productKey: v.union(v.string(), v.null()),
-  categoryId: v.union(v.string(), v.null()),
-  categoryConfidence: v.number(),
-});
+import { catalogDecision } from "../src/lib/catalog/decisions";
+export { catalogDecision } from "../src/lib/catalog/decisions";
 const workflow = new WorkflowManager(components.workflow);
 export const process = workflow
   .define({
@@ -85,23 +81,21 @@ export const process = workflow
           eventId ? step.awaitEvent({ id: eventId }) : Promise.resolve(),
         ),
       );
-      for (let offset = 0; offset < inputs.length; offset += 8) {
-        const decisions = await step.runAction(
-          internal.catalogClassifier.classify,
-          {
-            items: inputs.slice(offset, offset + 8).map((item) => ({
-              ...item,
-              requestId:
-                entries.find((entry) => entry.key === item.search)?.id ?? null,
-            })),
-          },
-        );
-        await step.runMutation(internal.catalogMatching.apply, {
-          ...args,
-          store: receipt.data.store,
-          decisions,
-        });
-      }
+      const decisions = await step.runAction(
+        internal.catalogClassifier.classify,
+        {
+          items: inputs.map((item) => ({
+            ...item,
+            requestId:
+              entries.find((entry) => entry.key === item.search)?.id ?? null,
+          })),
+        },
+      );
+      await step.runMutation(internal.catalogMatching.apply, {
+        ...args,
+        store: receipt.data.store,
+        decisions,
+      });
       await step.runMutation(internal.catalogMatching.finish, {
         ...args,
         workflowId: step.workflowId,
@@ -212,7 +206,9 @@ export const inputs = internalQuery({
         : null;
       result.push({
         line,
-        search: productSearch(line.name),
+        search:
+          savedSearchRepair(receipt.catalogSearchRepairs, line)?.search ??
+          productSearch(line.name).slice(0, 120),
         product:
           record &&
           compatibleCatalogProduct(line, record.product, !!mapping?.confirmedBy)
@@ -241,6 +237,12 @@ export const apply = internalMutation({
       return null;
     const data = receipt.data;
     let changed = false;
+    const diagnostics = new Map(
+      (receipt.catalogDecisions ?? []).map((decision) => [
+        decision.lineId,
+        decision,
+      ]),
+    );
     for (const decision of args.decisions) {
       const line = data.lines.find((line) => line.id === decision.lineId);
       if (
@@ -249,7 +251,9 @@ export const apply = internalMutation({
         lineEvidenceKey(line) !== decision.evidenceKey
       )
         continue;
-      if (decision.productKey && !line.productMatchManual) {
+      if (line.productMatchManual) continue;
+      diagnostics.set(line.id, decision);
+      if (decision.productKey) {
         const product = await ctx.db
           .query("catalogProducts")
           .withIndex("by_key", (q) => q.eq("key", decision.productKey!))
@@ -287,6 +291,16 @@ export const apply = internalMutation({
         }
       }
     }
+    await ctx.db.patch("receipts", args.id, {
+      catalogDecisions: [...diagnostics.values()].filter((decision) =>
+        data.lines.some(
+          (line) =>
+            line.id === decision.lineId &&
+            !line.productMatchManual &&
+            lineEvidenceKey(line) === decision.evidenceKey,
+        ),
+      ),
+    });
     if (changed) {
       const acceptable =
         canAcceptReceipt(
@@ -350,10 +364,25 @@ export const finish = internalMutation({
       args.requestIds.map((id) => ctx.db.get("catalogRequests", id)),
     );
     await ctx.db.patch("receipts", args.id, {
-      catalogStatus: requests.some((request) => request?.state === "error")
-        ? "error"
-        : "complete",
+      catalogStatus:
+        requests.some((request) => request?.state === "error") ||
+        receipt.catalogDecisions?.some(
+          (decision) =>
+            (decision.reason === "provider_error" ||
+              decision.reason === "unavailable") &&
+            data.lines.some(
+              (line) =>
+                line.id === decision.lineId &&
+                !line.productMatchManual &&
+                lineEvidenceKey(line) === decision.evidenceKey,
+            ),
+        )
+          ? "error"
+          : "complete",
       ...(changed ? { data, revision: receipt.revision + 1 } : {}),
+    });
+    await ctx.scheduler.runAfter(0, internal.productAnalysis.start, {
+      id: args.id,
     });
     return null;
   },
@@ -370,8 +399,12 @@ export const failed = internalMutation({
     if (
       receipt?.generation === args.generation &&
       receipt.catalogWorkflowId === args.workflowId
-    )
+    ) {
       await ctx.db.patch("receipts", args.id, { catalogStatus: "error" });
+      await ctx.scheduler.runAfter(0, internal.productAnalysis.start, {
+        id: args.id,
+      });
+    }
     return null;
   },
 });

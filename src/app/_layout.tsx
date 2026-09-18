@@ -7,10 +7,12 @@ import {
 } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { SafeAreaProvider } from "react-native-safe-area-context";
+import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { useColorScheme } from "react-native";
 import { SessionProvider } from "@/features/session";
 import { useTheme } from "@/constants/theme";
 import { Button, Notice, Screen } from "@/components/ui";
+import { ShareIntentRoot, ShareIntentRouting } from "@/features/share-intent";
 
 export function ErrorBoundary({ retry }: ErrorBoundaryProps) {
   return (
@@ -25,32 +27,51 @@ export function ErrorBoundary({ retry }: ErrorBoundaryProps) {
 export default function RootLayout() {
   const colors = useTheme();
   const scheme = useColorScheme();
+  const base = scheme === "dark" ? DarkTheme : DefaultTheme;
+  const navigationTheme = {
+    ...base,
+    colors: {
+      ...base.colors,
+      primary: colors.primary,
+      background: colors.background,
+      card: colors.background,
+      text: colors.text,
+      border: colors.line,
+      notification: colors.primary,
+    },
+  };
   return (
-    <SafeAreaProvider>
-      <ThemeProvider value={scheme === "dark" ? DarkTheme : DefaultTheme}>
-        <StatusBar style="auto" />
-        <SessionProvider>
-          <Stack
-            screenOptions={{
-              headerTintColor: colors.primary,
-              headerStyle: { backgroundColor: colors.background },
-              contentStyle: { backgroundColor: colors.background },
-              headerShadowVisible: false,
-              headerBackButtonDisplayMode: "minimal",
-            }}
-          >
-            <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-            <Stack.Screen
-              name="receipt/[id]"
-              options={{ title: "Kvittering" }}
-            />
-            <Stack.Screen
-              name="settings"
-              options={{ title: "Husstanden", presentation: "modal" }}
-            />
-          </Stack>
-        </SessionProvider>
-      </ThemeProvider>
-    </SafeAreaProvider>
+    <ShareIntentRoot>
+      <GestureHandlerRootView style={{ flex: 1 }}>
+        <SafeAreaProvider>
+          <ThemeProvider value={navigationTheme}>
+            <StatusBar style="auto" />
+            <ShareIntentRouting />
+            <SessionProvider>
+              <Stack
+                screenOptions={{
+                  headerTintColor: colors.primary,
+                  headerStyle: { backgroundColor: colors.background },
+                  headerTitleStyle: { color: colors.text, fontWeight: "700" },
+                  contentStyle: { backgroundColor: colors.background },
+                  headerShadowVisible: false,
+                  headerBackButtonDisplayMode: "minimal",
+                }}
+              >
+                <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+                <Stack.Screen
+                  name="receipt/[id]"
+                  options={{ title: "Kvittering" }}
+                />
+                <Stack.Screen
+                  name="settings"
+                  options={{ title: "Husstanden", presentation: "modal" }}
+                />
+              </Stack>
+            </SessionProvider>
+          </ThemeProvider>
+        </SafeAreaProvider>
+      </GestureHandlerRootView>
+    </ShareIntentRoot>
   );
 }

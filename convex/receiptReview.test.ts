@@ -41,7 +41,7 @@ it("keeps unresolved extraction issues, mismatches, duplicates and mock results 
       original: data,
       provider: scenario === "mock" ? "mock" : "test",
     });
-    const receipt = (await user.query(api.receipts.detail, { id })).receipt;
+    const receipt = (await user.query(api.receipts.detail, { id }))!.receipt;
     expect(receipt.status).toBe(
       scenario === "clean" ? "reviewed" : "needs_review",
     );
@@ -58,7 +58,7 @@ it("keeps unresolved extraction issues, mismatches, duplicates and mock results 
         excluded: false,
       });
       expect(
-        (await user.query(api.receipts.detail, { id })).receipt.status,
+        (await user.query(api.receipts.detail, { id }))!.receipt.status,
       ).toBe("reviewed");
     }
     previousId = id;

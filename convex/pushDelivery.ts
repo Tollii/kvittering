@@ -34,10 +34,8 @@ export const send = internalAction({
         body: JSON.stringify({
           to: target.subscription.token,
           sound: "default",
-          title: "Kvitteringen er klar",
-          body: target.autoAccepted
-            ? "Kvitteringen er behandlet og automatisk godkjent."
-            : "Kvitteringen er klar til kontroll.",
+          title: target.title,
+          body: target.body,
           data: { receiptId: args.receiptId },
         }),
       });

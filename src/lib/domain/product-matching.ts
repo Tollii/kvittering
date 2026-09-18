@@ -1,8 +1,9 @@
 import type { ReceiptLine } from "./receipt";
+import { productSearch } from "../catalog/search";
 
-/** Keep all description details; only case and whitespace are insignificant. */
+/** Use the same conservative formatting for saved identities and catalog searches. */
 export function matchingKey(description: string) {
-  return description.trim().toLocaleLowerCase("nb-NO").replace(/\s+/g, " ");
+  return productSearch(description);
 }
 export type ProductEvidence = Pick<
   ReceiptLine,

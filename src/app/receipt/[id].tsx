@@ -1,10 +1,13 @@
-import { useProcessingEngine } from "@/lib/processing-preferences";
-import { processingEngineName } from "@/lib/domain/processing-engine";
-import { rereadWithFoundation } from "@/lib/foundation-reprocessing";
 import { ReceiptReadingHistory } from "@/features/receipt-reading-history";
 import { usePreventRemove } from "expo-router/react-navigation";
 import { useEffect, useRef, useState } from "react";
-import { Alert, Platform, View } from "react-native";
+import {
+  ActivityIndicator,
+  Alert,
+  Platform,
+  Pressable,
+  View,
+} from "react-native";
 import {
   router,
   Stack,
@@ -14,10 +17,12 @@ import {
 import { useConvex, useQuery } from "convex/react";
 import { randomUUID } from "expo-crypto";
 import { api } from "../../../convex/_generated/api";
-import type { Doc, Id } from "../../../convex/_generated/dataModel";
+import type { Doc } from "../../../convex/_generated/dataModel";
 import {
   Button,
+  Chip,
   Copy,
+  Disclosure,
   Icon,
   IconButton,
   Loading,
@@ -28,7 +33,9 @@ import {
   Segments,
   Sheet,
   Toggle,
+  pressed,
 } from "@/components/ui";
+import { Mosaic } from "@/components/mosaic";
 import {
   ReceiptLineEditor,
   type ProductChoice,
@@ -36,30 +43,82 @@ import {
 import { ReceiptFields } from "@/features/receipt-fields";
 import { ReceiptImages } from "@/features/receipt-images";
 import {
+  aliasKey,
   formatMoney,
   emptyLine,
   reconcile,
   type ReceiptData,
 } from "@/lib/domain/receipt";
 import {
+  balanceWithAdjustment,
   canAcceptReceipt,
+  canConfirmSuggestedCategory,
+  categoryUncertainIssue,
+  confirmSuggestedCategories,
   lineReviewIssues,
-  receiptReviewIssues,
+  reviewTasks,
+  type ReviewTask,
 } from "@/lib/domain/receipt-review";
 import { useHousehold } from "@/features/session";
 import type { Receipt } from "@/lib/domain/insights";
 import { receiptStatusLabel } from "@/components/receipt-card";
 import { formatDate } from "@/lib/format-date";
 import { useTheme } from "@/constants/theme";
+import { errorFeedback, successFeedback, tapFeedback } from "@/lib/haptics";
 
 export default function ReceiptPage() {
   const { id } = useLocalSearchParams<{ id: string }>();
+  return <ReceiptDetail key={id} id={id} />;
+}
+function ReceiptDetail({ id }: { id: string }) {
   const { online } = useHousehold();
-  const detail = useQuery(api.receipts.detail, { id: id as Id<"receipts"> });
-  if (!detail)
+  const detail = useQuery(api.receipts.detail, { id: id ?? "" });
+  const [deletion, setDeletion] = useState<"idle" | "deleting" | "deleted">(
+    "idle",
+  );
+  useEffect(() => {
+    // The editor has unmounted, so its unsaved-change guard cannot block leaving.
+    if (deletion === "deleted") {
+      if (router.canGoBack()) router.back();
+      else router.replace("/(tabs)/history");
+    }
+  }, [deletion]);
+  if (deletion === "deleted" || (deletion === "deleting" && detail === null))
+    return (
+      <Screen insetTop={false}>
+        <Loading title="Sletter kvittering …" />
+      </Screen>
+    );
+  if (detail === undefined)
     return (
       <Screen insetTop={false}>
         <Loading title="Henter kvittering …" />
+      </Screen>
+    );
+  if (detail === null)
+    return (
+      <Screen insetTop={false}>
+        <Stack.Screen
+          options={{ title: "Kvittering", headerRight: () => null }}
+        />
+        <View style={{ paddingVertical: 48, gap: 16, alignItems: "center" }}>
+          <Icon name="doc.questionmark" size={44} />
+          <Copy
+            accessibilityRole="header"
+            size={22}
+            weight="600"
+            style={{ textAlign: "center" }}
+          >
+            Kvitteringen er ikke tilgjengelig
+          </Copy>
+          <Copy muted style={{ textAlign: "center", maxWidth: 340 }}>
+            Den kan være slettet.
+          </Copy>
+          <Button
+            title="Til kvitteringene"
+            onPress={() => router.dismissTo("/(tabs)/history")}
+          />
+        </View>
       </Screen>
     );
   return (
@@ -68,6 +127,7 @@ export default function ReceiptPage() {
       receipt={detail.receipt}
       readings={detail.extractions}
       online={online}
+      onDeletionChange={setDeletion}
     />
   );
 }
@@ -75,12 +135,13 @@ function ReceiptEditor({
   receipt,
   readings,
   online,
+  onDeletionChange,
 }: {
   receipt: Receipt;
   readings: Doc<"extractions">[];
   online: boolean;
+  onDeletionChange: (state: "idle" | "deleting" | "deleted") => void;
 }) {
-  const engine = useProcessingEngine();
   const client = useConvex();
   const colors = useTheme();
   const { receipts } = useHousehold();
@@ -103,6 +164,7 @@ function ReceiptEditor({
   const operationActive = useRef(false);
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
+  const [approved, setApproved] = useState(false);
   const [allLines, setAllLines] = useState(receipt.status === "reviewed");
   const [reviewLineIds, setReviewLineIds] = useState(
     () =>
@@ -148,11 +210,7 @@ function ReceiptEditor({
         id: receipt._id,
         onlyIfMissing: true,
       })
-      .catch(() =>
-        setError(
-          "Kunne ikke starte produktsøk. Kvitteringen kan brukes som vanlig.",
-        ),
-      );
+      .catch(() => setError("Produktsøket startet ikke."));
   }, [
     client,
     dirty,
@@ -163,12 +221,13 @@ function ReceiptEditor({
     receipt.data,
   ]);
   const totals = data ? reconcile(data) : null;
-  const issues = data ? receiptReviewIssues(data) : [];
+  const unresolvedDuplicate = !!receipt.duplicateOf && !duplicateResolved;
+  const tasks = data ? reviewTasks(data, unresolvedDuplicate) : [];
   const remaining =
     data?.lines.filter((line) => lineReviewIssues(line).length).length ?? 0;
-  const ready =
-    !!data &&
-    canAcceptReceipt(data, !!receipt.duplicateOf && !duplicateResolved);
+  const confirmable =
+    data?.lines.filter(canConfirmSuggestedCategory).length ?? 0;
+  const ready = !!data && canAcceptReceipt(data, unresolvedDuplicate);
   const saveDisabled =
     !online ||
     processing ||
@@ -180,6 +239,8 @@ function ReceiptEditor({
         line.categoryId ? [line.categoryId] : [],
       ) ?? [],
   );
+  const productLines =
+    data?.lines.filter((line) => !["summary", "vat"].includes(line.kind)) ?? [];
   const visibleLines =
     data?.lines.filter((line) =>
       allLines
@@ -188,6 +249,12 @@ function ReceiptEditor({
           lineReviewIssues(line).length
         : reviewLineIds.has(line.id) || lineReviewIssues(line).length,
     ) ?? [];
+  const nextPending = receipts.find(
+    (item) =>
+      item._id !== receipt._id &&
+      ["needs_review", "failed"].includes(item.status) &&
+      !item.excluded,
+  );
 
   function change(next: ReceiptData) {
     if (data && (next.store !== data.store || next.branch !== data.branch)) {
@@ -197,6 +264,16 @@ function ReceiptEditor({
     setData(next);
     setDirty(true);
     setMessage("");
+    setApproved(false);
+  }
+  /** A person's category decision is worth keeping for the next receipt with the same item. */
+  function rememberLines(ids: string[], value = true) {
+    setRemember((previous) =>
+      value
+        ? [...new Set([...previous, ...ids])]
+        : previous.filter((id) => !ids.includes(id)),
+    );
+    setDirty(true);
   }
   function reset(current: Receipt) {
     setData(current.data);
@@ -240,6 +317,7 @@ function ReceiptEditor({
     try {
       await action();
     } catch (cause) {
+      errorFeedback();
       setError(cause instanceof Error ? cause.message : "Kunne ikke lagre.");
     } finally {
       operationActive.current = false;
@@ -254,7 +332,17 @@ function ReceiptEditor({
         revision,
         data,
         reviewed: ready,
-        rememberLineIds: remember,
+        // The server needs a store and a name to build a memory key.
+        rememberLineIds: remember.filter((id) => {
+          const line = data.lines.find((item) => item.id === id);
+          return (
+            line &&
+            line.kind === "product" &&
+            !!line.categoryId &&
+            line.categoryId !== "fallback.unclear" &&
+            aliasKey(data, line) !== null
+          );
+        }),
         productChanges: Object.entries(productChanges)
           .filter(([, choice]) => choice.kind !== "catalog")
           .map(([lineId, choice]) => ({
@@ -279,12 +367,11 @@ function ReceiptEditor({
       const result = await client.query(api.receipts.detail, {
         id: receipt._id,
       });
+      if (!result) return;
       reset(result.receipt);
-      setMessage(
-        ready
-          ? "Kvitteringen er kontrollert."
-          : "Lagret. Du kan fortsette kontrollen senere.",
-      );
+      setApproved(ready);
+      if (ready) successFeedback();
+      setMessage(ready ? "Godkjent" : "Lagret");
     });
   }
   function addLine() {
@@ -303,11 +390,17 @@ function ReceiptEditor({
           style: "destructive",
           onPress: () =>
             void run(async () => {
-              await client.mutation(api.receipts.remove, {
-                id: receipt._id,
-                revision,
-              });
-              router.back();
+              onDeletionChange("deleting");
+              try {
+                await client.mutation(api.receipts.remove, {
+                  id: receipt._id,
+                  revision,
+                });
+                onDeletionChange("deleted");
+              } catch (cause) {
+                onDeletionChange("idle");
+                throw cause;
+              }
             }),
         },
       ],
@@ -315,21 +408,140 @@ function ReceiptEditor({
   }
   const retry = () =>
     void run(async () => {
-      if (engine === "foundation") {
-        const result = await rereadWithFoundation(receipt);
-        await client.mutation(api.receipts.reprocessFoundation, {
-          id: receipt._id,
-          revision: receipt.revision,
-          generation: receipt.generation,
-          result,
-        });
-      } else
-        await client.mutation(api.receipts.retry, {
-          id: receipt._id,
-          processingEngine: "gpt",
-        });
-      setMessage("Kvitteringen behandles på nytt.");
+      await client.mutation(api.receipts.retry, { id: receipt._id });
+      setMessage("Leser på nytt …");
     });
+  function confirmAllCategories() {
+    if (!data) return;
+    tapFeedback();
+    const ids = data.lines
+      .filter(canConfirmSuggestedCategory)
+      .map((line) => line.id);
+    change(confirmSuggestedCategories(data));
+    rememberLines(ids);
+  }
+  /** One compact chip per open question. Tapping it jumps straight to the fix. */
+  function taskChip(task: ReviewTask) {
+    const chip = (
+      label: string,
+      icon: Parameters<typeof Chip>[0]["icon"],
+      onPress: () => void,
+    ) => (
+      <Chip
+        key={task.kind}
+        label={label}
+        icon={icon}
+        tone="warning"
+        trailing="none"
+        onPress={onPress}
+      />
+    );
+    const toLines = () => setAllLines(false);
+    switch (task.kind) {
+      case "duplicate":
+        return chip("Mulig duplikat", "doc.on.doc", () =>
+          Alert.alert(
+            "Mulig duplikat",
+            "Samme bilde eller kjøp finnes fra før.",
+            [
+              { text: "Avbryt", style: "cancel" },
+              {
+                text: "Dette er et eget kjøp",
+                onPress: () => {
+                  setDuplicateResolved(true);
+                  setDirty(true);
+                },
+              },
+            ],
+          ),
+        );
+      case "store":
+        return chip("Butikk mangler", "storefront", () => setFields(true));
+      case "total":
+        return chip("Betalt beløp mangler", "banknote", () => setFields(true));
+      case "date":
+        return chip("Dato mangler", "calendar", () => setFields(true));
+      case "currency":
+        return chip(
+          `Valuta: ${data?.currency ?? "ukjent"}`,
+          "coloncurrencysign.circle",
+          () => setFields(true),
+        );
+      case "no-lines":
+        return chip("Ingen varer lest", "plus", addLine);
+      case "difference":
+        return chip(
+          `Avvik ${formatMoney(task.amountOre)}`,
+          "equal.circle",
+          () =>
+            Alert.alert(
+              `Avvik ${formatMoney(task.amountOre)}`,
+              `Linjene gir ${formatMoney(totals?.calculated ?? null)}. Kvitteringen sier ${formatMoney(data?.totalOre ?? null)}.`,
+              [
+                { text: "Avbryt", style: "cancel" },
+                { text: "Se alle linjer", onPress: () => setAllLines(true) },
+                {
+                  text: "Legg inn justering",
+                  onPress: () => {
+                    if (data) change(balanceWithAdjustment(data, randomUUID()));
+                    setAllLines(true);
+                  },
+                },
+              ],
+            ),
+        );
+      case "receipt-issues":
+        return chip(
+          task.issues.length === 1
+            ? "1 merknad"
+            : `${task.issues.length} merknader`,
+          "exclamationmark.bubble",
+          () =>
+            Alert.alert(
+              "Merknader fra lesingen",
+              task.issues.join("\n"),
+              data?.issues.length
+                ? [
+                    { text: "Avbryt", style: "cancel" },
+                    {
+                      text: "Dette stemmer",
+                      onPress: () => data && change({ ...data, issues: [] }),
+                    },
+                  ]
+                : [{ text: "OK" }],
+            ),
+        );
+      case "categories":
+        return chip(
+          `${task.count} ${task.count === 1 ? "kategori" : "kategorier"}`,
+          "tag",
+          toLines,
+        );
+      case "amounts":
+        return chip(`${task.count} beløp mangler`, "numbers", toLines);
+      case "names":
+        return chip(`${task.count} navn mangler`, "textformat", toLines);
+      case "line-issues":
+        return chip(
+          `${task.count} ${task.count === 1 ? "vare" : "varer"} å sjekke`,
+          "exclamationmark.circle",
+          toLines,
+        );
+    }
+  }
+  const footerLabel = processing
+    ? receiptStatusLabel(receipt)
+    : approved
+      ? "Godkjent"
+      : ready
+        ? dirty
+          ? "Klar til godkjenning"
+          : receipt.status === "reviewed"
+            ? receiptStatusLabel(receipt)
+            : "Klar til godkjenning"
+        : tasks.length === 1
+          ? "Én ting igjen"
+          : `${tasks.length} ting igjen`;
   return (
     <>
       <Stack.Screen
@@ -387,11 +599,31 @@ function ReceiptEditor({
               Utelat fra forbruk
             </Stack.Toolbar.MenuAction>
             <Stack.Toolbar.MenuAction
+              icon="barcode.viewfinder"
+              disabled={
+                processing ||
+                !online ||
+                busy ||
+                dirty ||
+                receipt.catalogStatus === "pending"
+              }
+              onPress={() =>
+                void run(async () => {
+                  await client.mutation(api.catalogMatching.enrich, {
+                    id: receipt._id,
+                  });
+                  setMessage("Søker etter produkter …");
+                })
+              }
+            >
+              Finn produkter på nytt
+            </Stack.Toolbar.MenuAction>
+            <Stack.Toolbar.MenuAction
               icon="arrow.clockwise"
               disabled={processing || !online || busy || dirty}
               onPress={retry}
             >
-              Les bildene på nytt ({processingEngineName(engine)})
+              Les bildene på nytt
             </Stack.Toolbar.MenuAction>
             <Stack.Toolbar.MenuAction
               icon="trash"
@@ -418,59 +650,77 @@ function ReceiptEditor({
                   {error}
                 </Copy>
               )}
-              {!!message && (
-                <Copy
-                  size={13}
-                  style={{ color: colors.primary }}
-                  accessibilityLiveRegion="polite"
-                >
-                  {message}
-                </Copy>
-              )}
               <View
                 style={{ flexDirection: "row", alignItems: "center", gap: 8 }}
               >
                 <Icon
-                  name={ready ? "checkmark.circle" : "exclamationmark.circle"}
+                  name={
+                    ready || approved
+                      ? "checkmark.circle.fill"
+                      : "circle.dotted"
+                  }
                   size={17}
-                  color={ready ? colors.primary : colors.warning}
+                  color={ready || approved ? colors.success : colors.primary}
                 />
-                <Copy size={13} muted style={{ flex: 1 }}>
-                  {remaining
-                    ? `${remaining} ${remaining === 1 ? "vare" : "varer"} må kontrolleres`
-                    : !ready
-                      ? "Kontroller kvitteringsdetaljene"
-                      : dirty
-                        ? "Endringene er klare til lagring"
-                        : receiptStatusLabel(receipt)}
+                <Copy
+                  size={13}
+                  weight="500"
+                  muted
+                  style={{ flex: 1 }}
+                  accessibilityLiveRegion="polite"
+                >
+                  {message || footerLabel}
                 </Copy>
               </View>
-              {(dirty || receipt.status !== "reviewed") && (
-                <Button
-                  title={
-                    !ready && dirty
-                      ? "Lagre for senere"
-                      : dirty
-                        ? "Lagre og godkjenn"
-                        : "Godkjenn kvittering"
-                  }
-                  busy={busy}
-                  disabled={saveDisabled || (!dirty && !ready)}
-                  onPress={() => void save()}
-                />
+              {approved ? (
+                <View style={{ flexDirection: "row", gap: 8 }}>
+                  <View style={{ flex: 1 }}>
+                    <Button
+                      title="Til innboksen"
+                      secondary
+                      onPress={() => router.dismissTo("/(tabs)/inbox")}
+                    />
+                  </View>
+                  {nextPending && (
+                    <View style={{ flex: 1.4 }}>
+                      <Button
+                        title="Neste til kontroll"
+                        icon="arrow.right"
+                        onPress={() =>
+                          router.replace({
+                            pathname: "/receipt/[id]",
+                            params: { id: nextPending._id },
+                          })
+                        }
+                      />
+                    </View>
+                  )}
+                </View>
+              ) : (
+                (dirty || receipt.status !== "reviewed") && (
+                  <Button
+                    title={
+                      !ready && dirty
+                        ? "Lagre for senere"
+                        : dirty
+                          ? "Lagre og godkjenn"
+                          : "Godkjenn kvittering"
+                    }
+                    icon={ready ? "checkmark" : undefined}
+                    busy={busy}
+                    disabled={saveDisabled || (!dirty && !ready)}
+                    onPress={() => void save()}
+                  />
+                )
               )}
             </>
           ) : undefined
         }
       >
-        {!online && (
-          <Notice>Uten nett. Koble til nettet før du lagrer endringer.</Notice>
-        )}
+        {!online && <Notice icon="wifi.slash">Uten nett</Notice>}
         {receipt.revision !== revision && (
           <Panel>
-            <Notice>
-              Kvitteringen har nye endringer. Hent siste versjon før du lagrer.
-            </Notice>
+            <Notice tone="warning">Endret på en annen enhet</Notice>
             <Button
               title="Hent siste versjon"
               secondary
@@ -489,117 +739,146 @@ function ReceiptEditor({
             />
           </Panel>
         )}
-        <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
-          <View style={{ flex: 1, gap: 4 }}>
-            <Copy size={28} weight="700">
-              {formatMoney(data?.totalOre ?? null)}
-            </Copy>
-            <Copy size={13} muted>
-              {formatDate(data?.purchaseDate)}
-              {data?.branch ? ` · ${data.branch}` : ""}
-            </Copy>
-          </View>
-          <ReceiptImages receipt={receipt} compact />
-          <IconButton
-            name="pencil"
-            label="Rediger kvitteringsdetaljer"
-            disabled={!data || busy}
-            onPress={() => setFields(true)}
+        <Panel tone="primary" style={{ padding: 0, gap: 0 }}>
+          <Mosaic
+            seed={receipt._creationTime % 9973}
+            height={6}
+            block={5}
+            columns={80}
+            fade={false}
           />
-        </View>
-        <Copy size={12} muted>
-          Seneste lesing: {receipt.provider}
-        </Copy>
-        {readings.length > 0 && <ReceiptReadingHistory readings={readings} />}
-        {busy && engine === "foundation" && (
-          <Notice>Leser med Foundation Models. Hold appen åpen …</Notice>
-        )}
-        {excluded && <Notice>Utelatt fra forbruk.</Notice>}
-        {data && !processing && receipt.catalogStatus === "pending" && (
-          <Copy size={13} muted>
-            Henter produktinformasjon automatisk …
-          </Copy>
-        )}
-        {data && !processing && receipt.catalogStatus === "error" && (
-          <Row
-            title="Prøv produktsøk igjen"
-            detail="Produktinformasjonen kunne ikke hentes. Kvitteringen kan brukes som vanlig."
-            onPress={
-              !online || busy || dirty
-                ? undefined
-                : () =>
-                    void run(async () => {
-                      await client.mutation(api.catalogMatching.enrich, {
-                        id: receipt._id,
-                      });
-                    })
-            }
-          />
-        )}
-        {receipt.provider.includes("mock") && (
-          <Notice>Demodata. Bildet er ikke lest av en modell.</Notice>
-        )}
-        {!!receipt.error && <Notice error>{receipt.error}</Notice>}
-        {!!receipt.duplicateOf && !duplicateResolved && (
-          <Panel>
-            <Copy weight="600">Mulig duplikat</Copy>
-            <Copy muted size={13}>
-              Samme bilde eller kjøpsdetaljer finnes fra før.
-            </Copy>
-            <Button
-              title="Dette er et eget kjøp"
-              secondary
-              disabled={busy}
-              onPress={() => {
-                setDuplicateResolved(true);
-                setDirty(true);
+          <View style={{ padding: 16, gap: 10 }}>
+            <View
+              style={{ flexDirection: "row", alignItems: "flex-start", gap: 8 }}
+            >
+              <View style={{ flex: 1, gap: 4 }}>
+                <Copy
+                  size={13}
+                  weight="600"
+                  style={{ color: colors.onHero, opacity: 0.8 }}
+                >
+                  {formatDate(data?.purchaseDate)}
+                  {data?.purchaseDate && data.purchaseTime
+                    ? ` kl. ${data.purchaseTime}`
+                    : ""}
+                  {data?.branch ? ` · ${data.branch}` : ""}
+                </Copy>
+                <Copy size={40} weight="800" style={{ color: colors.onHero }}>
+                  {formatMoney(data?.totalOre ?? null)}
+                </Copy>
+              </View>
+              <View style={{ flexDirection: "row", gap: 6 }}>
+                <ReceiptImages
+                  receipt={receipt}
+                  compact
+                  color={colors.onHero}
+                  background="#FFFFFF22"
+                />
+                <IconButton
+                  name="pencil"
+                  label="Rediger kvitteringsdetaljer"
+                  filled="#FFFFFF22"
+                  size={17}
+                  color={colors.onHero}
+                  disabled={!data || busy}
+                  onPress={() => setFields(true)}
+                />
+              </View>
+            </View>
+            <View
+              style={{
+                flexDirection: "row",
+                gap: 6,
+                flexWrap: "wrap",
+                alignItems: "center",
               }}
-            />
-          </Panel>
+            >
+              <Chip
+                label={receiptStatusLabel(receipt)}
+                tone={receipt.status === "reviewed" ? "success" : "muted"}
+                icon={
+                  receipt.status === "reviewed"
+                    ? "checkmark.seal"
+                    : processing
+                      ? "hourglass"
+                      : receipt.status === "failed"
+                        ? "exclamationmark.triangle"
+                        : "doc.text.magnifyingglass"
+                }
+              />
+              {excluded && <Chip label="Utelatt" icon="eye.slash" />}
+              {!approved && tasks.map(taskChip)}
+            </View>
+          </View>
+        </Panel>
+        {receipt.provider.includes("mock") && <Notice>Demodata</Notice>}
+        {!!receipt.error && <Notice error>{receipt.error}</Notice>}
+        {receipt.status === "failed" && !processing && (
+          <Button
+            title="Les bildene på nytt"
+            icon="arrow.clockwise"
+            disabled={!online || busy}
+            onPress={retry}
+          />
         )}
         {data && totals ? (
           <View
             pointerEvents={busy || processing ? "none" : "auto"}
-            style={{ gap: 10 }}
+            style={{ gap: 12 }}
           >
-            {issues.length > 0 && (
-              <Panel>
-                <Notice>{issues.join("\n")}</Notice>
-                <Row
-                  title="Kontroller kvitteringsdetaljer"
-                  onPress={() => setFields(true)}
-                />
-                {data.issues.length > 0 && (
-                  <Button
-                    title="Bekreft opplysningene"
-                    secondary
-                    onPress={() => change({ ...data, issues: [] })}
-                  />
-                )}
-              </Panel>
+            {productLines.length > 0 && (
+              <Segments
+                value={allLines ? "all" : "review"}
+                onChange={(value) => setAllLines(value === "all")}
+                options={[
+                  { value: "review", label: `Til kontroll (${remaining})` },
+                  {
+                    value: "all",
+                    label: `Alle linjer (${productLines.length})`,
+                  },
+                ]}
+              />
             )}
-            <Segments
-              value={allLines ? "all" : "review"}
-              onChange={(value) => setAllLines(value === "all")}
-              options={[
-                { value: "review", label: `Til kontroll (${remaining})` },
-                {
-                  value: "all",
-                  label: `Alle (${data.lines.filter((line) => !["summary", "vat"].includes(line.kind)).length})`,
-                },
-              ]}
-            />
+            {!allLines && confirmable > 1 && (
+              <Pressable
+                accessibilityRole="button"
+                onPress={confirmAllCategories}
+                style={(state) => [
+                  {
+                    flexDirection: "row",
+                    alignItems: "center",
+                    gap: 10,
+                    padding: 12,
+                    borderRadius: 14,
+                    borderCurve: "continuous",
+                    backgroundColor: colors.surface,
+                    borderWidth: 1.5,
+                    borderColor: colors.primary,
+                  },
+                  pressed(state),
+                ]}
+              >
+                <Icon name="checkmark.circle" size={20} />
+                <Copy weight="600" style={{ color: colors.primary, flex: 1 }}>
+                  Bekreft alle {confirmable} foreslåtte kategorier
+                </Copy>
+              </Pressable>
+            )}
             {!allLines && visibleLines.length === 0 && (
-              <Panel>
-                <Copy weight="600">Ingen varer trenger kontroll</Copy>
-                <Copy size={13} muted>
-                  Du kan se alle linjene eller godkjenne kvitteringen.
+              <Panel style={{ alignItems: "center", paddingVertical: 24 }}>
+                <Icon
+                  name="checkmark.circle"
+                  size={28}
+                  color={colors.success}
+                />
+                <Copy weight="600">
+                  {tasks.length ? "Varene er avklart" : "Klar til godkjenning"}
                 </Copy>
               </Panel>
             )}
             {visibleLines.length > 0 && (
               <Panel
-                style={{ gap: 0, paddingVertical: 0, paddingHorizontal: 14 }}
+                style={{ gap: 0, paddingVertical: 2, paddingHorizontal: 14 }}
               >
                 {visibleLines.map((line) => (
                   <ReceiptLineEditor
@@ -611,22 +890,22 @@ function ReceiptEditor({
                     recentCategories={recentCategories}
                     remember={remember.includes(line.id)}
                     productChoice={productChanges[line.id]}
-                    onChange={(next) =>
+                    review={!allLines}
+                    onChange={(next) => {
                       change({
                         ...data,
                         lines: data.lines.map((item) =>
                           item.id === line.id ? next : item,
                         ),
-                      })
-                    }
-                    onRemember={(value) => {
-                      setRemember((previous) =>
-                        value
-                          ? [...new Set([...previous, line.id])]
-                          : previous.filter((id) => id !== line.id),
-                      );
-                      setDirty(true);
+                      });
+                      const categoryDecided =
+                        next.kind === "product" &&
+                        (next.categoryId !== line.categoryId ||
+                          (line.issues.includes(categoryUncertainIssue) &&
+                            !next.issues.includes(categoryUncertainIssue)));
+                      if (categoryDecided) rememberLines([line.id]);
                     }}
+                    onRemember={(value) => rememberLines([line.id], value)}
                     onProduct={(choice) => {
                       setProductChanges((previous) => ({
                         ...previous,
@@ -654,15 +933,21 @@ function ReceiptEditor({
                 ))}
               </Panel>
             )}
-            <Panel style={{ gap: 8 }}>
-              <Row
-                title={
-                  totals.difference === 0
-                    ? "Beløpene stemmer"
-                    : `Avvik: ${formatMoney(totals.difference)}`
-                }
-                detail={`${data.lines.filter((line) => line.kind === "product").length} varer · ${receipt.uploaderName}`}
-              />
+            {Object.values(moneyErrors).map((value, index) => (
+              <Notice key={index} error>
+                {value}
+              </Notice>
+            ))}
+            <Disclosure
+              title={
+                totals.difference === 0
+                  ? "Beløpene stemmer"
+                  : totals.difference === null
+                    ? "Betalt beløp mangler"
+                    : `Avvik ${formatMoney(totals.difference)}`
+              }
+              value={`${data.lines.filter((line) => line.kind === "product").length} varer`}
+            >
               {[
                 { label: "Varer før rabatt", amount: totals.products },
                 { label: "Rabatter", amount: totals.discounts },
@@ -671,35 +956,68 @@ function ReceiptEditor({
                   amount: totals.deposits + totals.returns,
                 },
                 { label: "Andre justeringer", amount: totals.adjustments },
-                { label: "Beregnet", amount: totals.calculated },
+                { label: "Sum av linjene", amount: totals.calculated },
                 { label: "Betalt", amount: data.totalOre },
-              ].map((row) => (
-                <View
-                  key={row.label}
-                  style={{
-                    flexDirection: "row",
-                    justifyContent: "space-between",
-                    gap: 16,
-                    paddingVertical: 3,
-                  }}
-                >
-                  <Copy size={14} muted>
-                    {row.label}
-                  </Copy>
-                  <Copy
-                    size={14}
-                    weight={row.label === "Betalt" ? "700" : "500"}
+              ]
+                .filter(
+                  (row) =>
+                    row.amount !== 0 ||
+                    ["Sum av linjene", "Betalt"].includes(row.label),
+                )
+                .map((row) => (
+                  <View
+                    key={row.label}
+                    style={{
+                      flexDirection: "row",
+                      justifyContent: "space-between",
+                      gap: 16,
+                      paddingVertical: 3,
+                    }}
                   >
-                    {formatMoney(row.amount)}
-                  </Copy>
-                </View>
-              ))}
-            </Panel>
-            {Object.values(moneyErrors).map((value, index) => (
-              <Notice key={index} error>
-                {value}
-              </Notice>
-            ))}
+                    <Copy size={14} muted>
+                      {row.label}
+                    </Copy>
+                    <Copy
+                      size={14}
+                      weight={row.label === "Betalt" ? "700" : "500"}
+                    >
+                      {formatMoney(row.amount)}
+                    </Copy>
+                  </View>
+                ))}
+            </Disclosure>
+            <Disclosure title="Om lesingen" value={receipt.uploaderName}>
+              <Row title="Lest med" detail={receipt.provider} icon="sparkles" />
+              {receipt.catalogStatus === "pending" && (
+                <Row title="Henter produktinformasjon …" icon="barcode" />
+              )}
+              {receipt.catalogStatus === "complete" && (
+                <Row
+                  title="Produktkatalog"
+                  detail={`${data.lines.filter((line) => line.catalogProduct).length} av ${data.lines.filter((line) => line.kind === "product").length} varer koblet`}
+                  icon="barcode"
+                />
+              )}
+              {receipt.catalogStatus === "error" && (
+                <Row
+                  title="Prøv produktsøk igjen"
+                  icon="barcode"
+                  onPress={
+                    !online || busy || dirty
+                      ? undefined
+                      : () =>
+                          void run(async () => {
+                            await client.mutation(api.catalogMatching.enrich, {
+                              id: receipt._id,
+                            });
+                          })
+                  }
+                />
+              )}
+              {readings.length > 0 && (
+                <ReceiptReadingHistory readings={readings} />
+              )}
+            </Disclosure>
             <ReceiptFields
               key={`fields-${generation}`}
               visible={fields}
@@ -719,9 +1037,10 @@ function ReceiptEditor({
             />
           </View>
         ) : (
-          <Panel>
-            <Copy weight="600">
-              {processing ? "Kvitteringen behandles" : "Ingen resultater ennå"}
+          <Panel style={{ alignItems: "center", paddingVertical: 28, gap: 8 }}>
+            {processing && <ActivityIndicator color={colors.accent} />}
+            <Copy weight="600" size={18}>
+              {processing ? "Kvitteringen leses" : "Ingen resultater ennå"}
             </Copy>
             {receipt.data && (
               <Button title="Vis resultatet" onPress={() => reset(receipt)} />

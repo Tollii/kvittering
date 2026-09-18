@@ -135,29 +135,32 @@ it("uses category-only evidence but preserves manual edits, stale lines and a ch
     productKey: null,
     categoryId: "drinks.energy-drinks",
     categoryConfidence: 0.95,
+    reason: "below_threshold" as const,
+    candidates: [],
   };
   const args = { id, generation: 0, store: data.store, decisions: [decision] };
   await t.mutation(internal.catalogMatching.apply, { ...args, store: "Other" });
   expect(
-    (await first.query(api.receipts.detail, { id })).receipt.revision,
+    (await first.query(api.receipts.detail, { id }))!.receipt.revision,
   ).toBe(0);
   await t.mutation(internal.catalogMatching.apply, {
     ...args,
     decisions: [{ ...decision, evidenceKey: "stale" }],
   });
   expect(
-    (await first.query(api.receipts.detail, { id })).receipt.revision,
+    (await first.query(api.receipts.detail, { id }))!.receipt.revision,
   ).toBe(0);
   await t.mutation(internal.catalogMatching.apply, args);
-  let saved = (await first.query(api.receipts.detail, { id })).receipt;
+  let saved = (await first.query(api.receipts.detail, { id }))!.receipt;
   expect(saved.data?.lines[0].categoryId).toBe("drinks.energy-drinks");
   expect(saved.data?.lines[0].catalogProduct).toBeUndefined();
+  expect(saved.catalogDecisions).toEqual([decision]);
   const manual = saved.data!;
   manual.lines[0].manual = true;
   manual.lines[0].categoryId = "drinks.soft-drinks";
   await t.run((ctx) => ctx.db.patch("receipts", id, { data: manual }));
   await t.mutation(internal.catalogMatching.apply, args);
-  saved = (await first.query(api.receipts.detail, { id })).receipt;
+  saved = (await first.query(api.receipts.detail, { id }))!.receipt;
   expect(saved.data?.lines[0].categoryId).toBe("drinks.soft-drinks");
 });
 
@@ -216,7 +219,7 @@ it("saves a selected catalog product and prevents background matching from repla
     duplicateResolved: false,
     excluded: false,
   });
-  const saved = (await first.query(api.receipts.detail, { id })).receipt.data!;
+  const saved = (await first.query(api.receipts.detail, { id }))!.receipt.data!;
   expect(saved.lines[0].catalogProduct?.key).toBe(products[0].key);
   expect(saved.lines[0].productMatchManual).toBe(true);
   await t.mutation(internal.catalogMatching.apply, {
@@ -233,7 +236,7 @@ it("saves a selected catalog product and prevents background matching from repla
       },
     ],
   });
-  const current = (await first.query(api.receipts.detail, { id })).receipt
+  const current = (await first.query(api.receipts.detail, { id }))!.receipt
     .data!;
   expect(current.lines[0].catalogProduct?.key).toBe(products[0].key);
   expect(current.lines[0].categoryId).toBe(saved.lines[0].categoryId);

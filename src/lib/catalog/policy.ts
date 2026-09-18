@@ -1,17 +1,15 @@
 import type { CatalogRequest, CatalogResult } from "./model";
+import { normalizeSearch, productSearch } from "./search";
+export { normalizeSearch } from "./search";
 
 export const day = 86_400_000;
 export const catalogDetailsTtl = 30 * day;
-export function normalizeSearch(value: string) {
-  return value
-    .normalize("NFKC")
-    .toLocaleLowerCase("nb-NO")
-    .replace(/\s+/g, " ")
-    .trim();
-}
 export function normalizeRequest(request: CatalogRequest): CatalogRequest {
   if (request.kind === "prices" || request.kind === "details") return request;
-  const search = normalizeSearch(request.search);
+  const search =
+    request.kind === "products"
+      ? productSearch(request.search)
+      : normalizeSearch(request.search);
   if (search.length < 3 || search.length > 120)
     throw new Error("Søk med 3–120 tegn.");
   return { ...request, search };

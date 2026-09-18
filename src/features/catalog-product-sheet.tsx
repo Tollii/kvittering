@@ -57,16 +57,13 @@ export function CatalogProductPicker({
         />
       }
     >
-      {!online && <Notice>Uten nett. Viser lagrede søkeresultater.</Notice>}
+      {!online && <Notice icon="wifi.slash">Uten nett</Notice>}
       {((query.isFetching && !query.data) ||
         query.data?.status === "pending") && (
         <Loading title="Henter produkter …" />
       )}
       {(query.isError || query.data?.status === "error") && (
-        <Notice>
-          {query.data?.message ??
-            "Kunne ikke hente produkter. Du kan bruke kvitteringen uten produktkobling."}
-        </Notice>
+        <Notice>{query.data?.message ?? "Kunne ikke hente produkter"}</Notice>
       )}
       {products
         .filter((product) => !hasBarcode || product.ean || showWithoutBarcode)
@@ -109,27 +106,21 @@ export function CatalogProductPicker({
               ? "Skjul oppføringer uten strekkode"
               : `Andre oppføringer uten strekkode (${withoutBarcode})`
           }
-          detail="Kan være samme vare eller en annen variant"
           onPress={() => setShowWithoutBarcode(!showWithoutBarcode)}
         />
       )}
       {query.data?.status === "ready" && !query.data.products.length && (
-        <Copy muted>
-          Ingen treff. Ferskvarer og butikkens egne retter kan mangle i
-          katalogen.
-        </Copy>
+        <Copy muted>Ingen treff</Copy>
       )}
       <Row
         title="Ingen av produktene passer"
-        detail="Behold varen uten katalogkobling"
         onPress={() => {
           onSelect(null);
           onClose();
         }}
       />
       <Copy muted size={12}>
-        Produktdata fra Kassalapp. Kontroller størrelse og variant før du
-        velger.
+        Produktdata fra Kassalapp
       </Copy>
     </Sheet>
   );
@@ -231,9 +222,6 @@ export function CatalogProductSheet({
       )}
       {!!full?.nutrition.length && (
         <Disclosure title="Næringsinnhold">
-          <Copy muted size={12}>
-            Verdier fra produktkatalogen. Dette er ikke en beregning av inntak.
-          </Copy>
           {full.nutrition.map((item) => (
             <Row
               key={item.name}
@@ -282,12 +270,8 @@ export function CatalogProductSheet({
             />
           ))}
           {prices.data?.status === "ready" && !prices.data.prices.length && (
-            <Copy muted>Ingen prisdata tilgjengelig.</Copy>
+            <Copy muted>Ingen priser</Copy>
           )}
-          <Copy size={12} muted>
-            Katalogpriser kan avvike fra pris og tilbud i den enkelte butikk.
-            Kvitteringsbeløpet brukes i forbruket ditt.
-          </Copy>
         </Panel>
       )}
       <Copy size={12} muted>

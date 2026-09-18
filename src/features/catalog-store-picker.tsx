@@ -51,10 +51,10 @@ export function CatalogStorePicker({
         />
       ))}
       {query.data?.status === "ready" && !query.data.stores.length && (
-        <Copy muted>Ingen butikker funnet. Prøv stedsnavnet.</Copy>
+        <Copy muted>Ingen treff</Copy>
       )}
       <Row
-        title="Behold uten butikkkobling"
+        title="Ingen av disse"
         onPress={() => {
           onSelect(null);
           onClose();

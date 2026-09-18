@@ -1,6 +1,15 @@
 import { useState } from "react";
 import { Pressable, View } from "react-native";
-import { Copy, Field, Icon, Panel, Row, Sheet, Toggle } from "@/components/ui";
+import {
+  Copy,
+  Field,
+  Icon,
+  Panel,
+  Row,
+  Sheet,
+  Toggle,
+  pressed,
+} from "@/components/ui";
 import {
   categories,
   categoryById,
@@ -22,6 +31,9 @@ const keywords: Record<string, string> = {
 export function CategoryPicker({
   name,
   value,
+  confidence,
+  originalText,
+  brand,
   recent,
   remember,
   onRemember,
@@ -30,6 +42,11 @@ export function CategoryPicker({
 }: {
   name: string;
   value: string | null;
+  /** The reader's confidence in the current suggestion, 0–1. */
+  confidence?: number | null;
+  /** The raw receipt text the suggestion was based on. */
+  originalText?: string;
+  brand?: string | null;
   recent: string[];
   remember: boolean;
   onRemember: (value: boolean) => void;
@@ -48,9 +65,14 @@ export function CategoryPicker({
           .includes(query)
       : category.group === group,
   );
-  const recentCategories = [...new Set(recent)]
-    .filter((id) => id !== value && !id.startsWith("fallback."))
-    .slice(0, 4);
+  // Most-used first: the household's own habits are the best predictor.
+  const usage = new Map<string, number>();
+  for (const id of recent) usage.set(id, (usage.get(id) ?? 0) + 1);
+  const recentCategories = [...usage.entries()]
+    .filter(([id]) => id !== value && !id.startsWith("fallback."))
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 6)
+    .map(([id]) => id);
   const choose = (id: string) => {
     onSelect(id);
     onClose();
@@ -63,11 +85,26 @@ export function CategoryPicker({
         key={id}
         title={category.name}
         detail={showGroup ? category.groupName : undefined}
-        value={id === value ? "✓" : undefined}
+        selected={id === value}
         onPress={() => choose(id)}
       />
     );
   };
+  const list = (ids: string[], showGroup: boolean) => (
+    <Panel style={{ gap: 0, paddingVertical: 4 }}>
+      {ids.map((id, index) => (
+        <View
+          key={id}
+          style={{
+            borderTopWidth: index ? 1 : 0,
+            borderTopColor: colors.line,
+          }}
+        >
+          {categoryRow(id, showGroup)}
+        </View>
+      ))}
+    </Panel>
+  );
   return (
     <Sheet
       title="Velg kategori"
@@ -75,65 +112,100 @@ export function CategoryPicker({
       onClose={onClose}
       header={
         <>
-          <Copy weight="600">{name}</Copy>
+          <Copy size={15} weight="600" numberOfLines={2}>
+            {name}
+          </Copy>
+          {(originalText || brand || typeof confidence === "number") && (
+            <Copy size={12} muted numberOfLines={2}>
+              {[
+                originalText && originalText !== name
+                  ? `Lest: ${originalText}`
+                  : null,
+                brand,
+                typeof confidence === "number" && confidence < 1
+                  ? `${Math.round(confidence * 100)} % sikker`
+                  : null,
+              ]
+                .filter(Boolean)
+                .join(" · ")}
+            </Copy>
+          )}
           <Field
             label="Søk etter kategori eller vare"
             placeholder="F.eks. tannbørste, pizza eller frukt"
             value={search}
-            onChangeText={setSearch}
+            onChangeText={(text) => {
+              setSearch(text);
+              if (text) setGroup(null);
+            }}
             autoCorrect={false}
+            autoFocus={!current || current.id === "fallback.unclear"}
             clearButtonMode="while-editing"
           />
         </>
       }
       footer={
-        <>
-          <Toggle
-            label="Husk for samme vare"
-            value={remember}
-            onChange={onRemember}
-          />
-          <Copy size={12} muted>
-            Gjelder fremtidige kjøp i samme butikk når du lagrer kvitteringen.
-          </Copy>
-        </>
+        <Toggle
+          label="Husk for samme vare i butikken"
+          value={remember}
+          onChange={onRemember}
+        />
       }
     >
       {query || group ? (
         <>
           {!query && (
-            <Row title="Alle kategorier" onPress={() => setGroup(null)} />
+            <Pressable
+              accessibilityRole="button"
+              onPress={() => setGroup(null)}
+              style={(state) => [
+                {
+                  flexDirection: "row",
+                  alignItems: "center",
+                  gap: 6,
+                  minHeight: 36,
+                },
+                pressed(state),
+              ]}
+            >
+              <Icon name="chevron.left" size={12} />
+              <Copy size={14} weight="600" style={{ color: colors.primary }}>
+                Alle kategorier
+              </Copy>
+            </Pressable>
           )}
           <Copy size={13} weight="600" muted>
             {query
               ? `${results.length} treff`
               : categoryGroups.find(([id]) => id === group)?.[1]}
           </Copy>
-          <Panel style={{ gap: 2 }}>
-            {results.map((category) => categoryRow(category.id, !!query))}
-            {!results.length && (
-              <Copy muted>Ingen treff. Prøv et annet ord.</Copy>
-            )}
-          </Panel>
+          {results.length ? (
+            list(
+              results.map((category) => category.id),
+              !!query,
+            )
+          ) : (
+            <Copy muted>Ingen treff</Copy>
+          )}
         </>
       ) : (
         <>
-          {current && (
+          {current && current.id !== "fallback.unclear" && (
             <>
-              <Copy size={13} muted>
-                Valgt nå · trykk for å bekrefte
+              <Copy size={13} weight="600" muted>
+                {typeof confidence === "number" && confidence < 1
+                  ? `Forslag · ${Math.round(confidence * 100)} %`
+                  : "Valgt"}
               </Copy>
-              <Panel>{categoryRow(current.id, true)}</Panel>
+              {list([current.id], true)}
             </>
           )}
           {recentCategories.length > 0 && (
             <>
-              <Copy size={13} muted>
-                Brukt på kvitteringene dine
+              <Copy size={13} weight="600" muted>
+                Ofte brukt
               </Copy>
-              <Panel style={{ gap: 2 }}>
-                {recentCategories.map((id) => categoryRow(id, true))}
-              </Panel>
+              {list(recentCategories, true)}
             </>
           )}
           <Copy size={13} weight="600" muted>
@@ -146,23 +218,29 @@ export function CategoryPicker({
                 accessibilityRole="button"
                 accessibilityLabel={label}
                 onPress={() => setGroup(id)}
-                style={({ pressed }) => ({
-                  width: "48%",
-                  flexGrow: 1,
-                  minHeight: 58,
-                  padding: 12,
-                  borderRadius: 12,
-                  backgroundColor: colors.surface,
-                  opacity: pressed ? 0.6 : 1,
-                  flexDirection: "row",
-                  alignItems: "center",
-                  gap: 8,
-                })}
+                style={(state) => [
+                  {
+                    width: "48%",
+                    flexGrow: 1,
+                    minHeight: 54,
+                    paddingHorizontal: 12,
+                    paddingVertical: 10,
+                    borderRadius: 14,
+                    borderCurve: "continuous",
+                    backgroundColor: colors.surface,
+                    borderWidth: 1,
+                    borderColor: colors.line,
+                    flexDirection: "row",
+                    alignItems: "center",
+                    gap: 8,
+                  },
+                  pressed(state),
+                ]}
               >
                 <Copy size={15} weight="600" style={{ flex: 1 }}>
                   {label}
                 </Copy>
-                <Icon name="chevron.right" size={12} />
+                <Icon name="chevron.right" size={11} color={colors.secondary} />
               </Pressable>
             ))}
           </View>

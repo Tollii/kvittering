@@ -1,7 +1,4 @@
-import type {
-  ProcessingEngine,
-  FoundationResult,
-} from "./domain/processing-engine";
+import type { ProcessingEngine } from "./domain/processing-engine";
 import type { Id } from "../../convex/_generated/dataModel";
 
 export type LocalReceipt = {
@@ -14,7 +11,6 @@ export type LocalReceipt = {
   receiptId?: Id<"receipts">;
   error?: string;
   processingEngine?: ProcessingEngine;
-  foundationResult?: FoundationResult;
 };
 export interface QueueStore {
   list(owner: string, householdId: Id<"households">): LocalReceipt[];
@@ -24,7 +20,6 @@ export interface QueueStore {
 export interface UploadTransport {
   reserve(entry: LocalReceipt): Promise<Id<"receipts">>;
   upload(id: Id<"receipts">, position: number, uri: string): Promise<void>;
-  prepare?(entry: LocalReceipt): Promise<void>;
   complete(id: Id<"receipts">, entry: LocalReceipt): Promise<unknown>;
 }
 
@@ -43,7 +38,6 @@ export function createQueueRunner(store: QueueStore) {
     try {
       for (const entry of store.list(owner, householdId)) {
         if (!active()) break;
-        if (entry.processingEngine === "foundation" && entry.error) continue;
         try {
           entry.error = undefined;
           if (!entry.receiptId) {
@@ -62,9 +56,6 @@ export function createQueueRunner(store: QueueStore) {
             store.update(entry);
             changed();
           }
-          if (!active()) return;
-          await transport.prepare?.(entry);
-          store.update(entry);
           if (!active()) return;
           await transport.complete(entry.receiptId, entry);
           store.remove(entry);

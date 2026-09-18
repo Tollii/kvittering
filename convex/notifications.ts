@@ -7,6 +7,8 @@ import {
 } from "./_generated/server";
 import { requireMember } from "./access";
 import schema from "./schema";
+import { reviewSummary } from "../src/lib/domain/receipt-review";
+import { formatMoney } from "../src/lib/domain/receipt";
 
 export function validPushToken(token: string) {
   return /^(ExponentPushToken|ExpoPushToken)\[[A-Za-z0-9_-]{10,200}\]$/.test(
@@ -89,6 +91,8 @@ export const delivery = internalQuery({
       subscription: schema.doc("deviceSubscriptions"),
       store: v.union(v.string(), v.null()),
       autoAccepted: v.boolean(),
+      title: v.string(),
+      body: v.string(),
     }),
     v.null(),
   ),
@@ -113,10 +117,32 @@ export const delivery = internalQuery({
       .withIndex("by_identity", (q) => q.eq("identity", subscription.identity))
       .unique();
     if (member?.householdId !== receipt.householdId) return null;
+    const autoAccepted = receipt.autoAccepted ?? false;
+    const needs = reviewSummary(
+      receipt.data,
+      !!receipt.duplicateOf && !receipt.duplicateResolved,
+    );
+    const amount =
+      receipt.data?.totalOre !== null && receipt.data?.totalOre !== undefined
+        ? formatMoney(receipt.data.totalOre)
+        : null;
     return {
       subscription,
       store: receipt.data?.store ?? null,
-      autoAccepted: receipt.autoAccepted ?? false,
+      autoAccepted,
+      title: receipt.data?.store || "Kvitteringen er klar",
+      // Say what the person will have to do, so the tap is informed.
+      body: [
+        amount,
+        autoAccepted
+          ? "godkjent automatisk"
+          : needs.length
+            ? needs.slice(0, 3).join(" · ") +
+              (needs.length > 3 ? ` · +${needs.length - 3}` : "")
+            : "klar til kontroll",
+      ]
+        .filter(Boolean)
+        .join(" · "),
     };
   },
 });

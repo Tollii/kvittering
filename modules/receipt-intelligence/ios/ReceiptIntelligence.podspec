@@ -1,8 +1,8 @@
 Pod::Spec.new do |s|
   s.name           = 'ReceiptIntelligence'
   s.version        = '1.0.0'
-  s.summary        = 'On-device receipt recognition'
-  s.description    = 'Apple Vision and Foundation Models integration for Kvitto'
+  s.summary        = 'On-device catalog search suggestions'
+  s.description    = 'Foundation Models search-query repair for Kvitto'
   s.author         = ''
   s.homepage       = 'https://docs.expo.dev/modules/'
   s.platforms      = {

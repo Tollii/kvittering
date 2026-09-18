@@ -1,4 +1,3 @@
-import { recognizeWithFoundation } from "@/lib/foundation-recognition";
 import {
   createContext,
   useCallback,
@@ -40,6 +39,8 @@ import {
 import { createQueueRunner, type LocalReceipt } from "@/lib/upload-queue";
 import { Loading, Notice, Screen } from "@/components/ui";
 import { CatalogQueryProvider } from "./catalog-query-provider";
+import { ProductAnalysisSync } from "./product-analysis-sync";
+import { CatalogSearchRepair } from "./catalog-search-repair";
 import { SignIn, HouseholdSetup } from "./sign-in";
 
 type Household = NonNullable<FunctionReturnType<typeof api.households.current>>;
@@ -198,7 +199,6 @@ function HouseholdProvider({
             reserve: (entry) =>
               convex.mutation(api.receipts.reserve, {
                 clientId: entry.id,
-                processingEngine: entry.processingEngine ?? "gpt",
                 imageCount: entry.images.length,
                 householdId,
               }),
@@ -225,20 +225,8 @@ function HouseholdProvider({
                   "Bildet kunne ikke lastes opp. Prøv igjen med nett.",
                 );
             },
-            prepare: async (entry) => {
-              if (
-                entry.processingEngine === "foundation" &&
-                !entry.foundationResult
-              )
-                entry.foundationResult = await recognizeWithFoundation(
-                  entry.images.map((name) => imageFile(name).uri),
-                );
-            },
-            complete: (id, entry) =>
-              convex.mutation(api.receipts.completeUpload, {
-                id,
-                foundationResult: entry.foundationResult,
-              }),
+            complete: (id) =>
+              convex.mutation(api.receipts.completeUpload, { id }),
           },
           () => {},
           () =>
@@ -271,7 +259,7 @@ function HouseholdProvider({
   if (!online && !household)
     return (
       <Screen title="Uten nett">
-        <Notice>Koble til nettet for å hente husstanden første gang.</Notice>
+        <Notice icon="wifi.slash">Koble til nettet første gang</Notice>
       </Screen>
     );
   if (!household && (details === undefined || auth.isLoading))
@@ -301,6 +289,14 @@ function HouseholdProvider({
         scope={`${owner}:${household.id}`}
         online={online}
       >
+        <ProductAnalysisSync
+          receipts={page.results}
+          enabled={online && auth.isAuthenticated && !!details}
+        />
+        <CatalogSearchRepair
+          receipts={page.results}
+          enabled={online && auth.isAuthenticated && !!details}
+        />
         {children}
       </CatalogQueryProvider>
     </SessionContext.Provider>

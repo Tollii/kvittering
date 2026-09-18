@@ -3,6 +3,7 @@ import { Pressable, View } from "react-native";
 import {
   Button,
   Copy,
+  Icon,
   IconButton,
   Sheet,
   Empty,
@@ -11,10 +12,14 @@ import {
   Panel,
   Row,
   Screen,
+  SectionTitle,
   Segments,
   Toggle,
+  pressed,
 } from "@/components/ui";
+import { Mosaic } from "@/components/mosaic";
 import { SpendingBars, SpendingDetails } from "@/components/spending-details";
+import { FamilyPurchases } from "@/components/family-purchases";
 import { SpendingCalendar } from "@/components/spending-calendar";
 import { useHousehold } from "@/features/session";
 import {
@@ -25,7 +30,7 @@ import {
 } from "@/lib/domain/insights";
 import { formatMoney, osloDate } from "@/lib/domain/receipt";
 import { categoryById } from "@/lib/domain/categories";
-import { openReceipt } from "@/components/receipt-card";
+import { openReceipt, receiptNeeds } from "@/components/receipt-card";
 import { useTheme } from "@/constants/theme";
 import { formatDate } from "@/lib/format-date";
 import { catalogInsights } from "@/lib/catalog/insights";
@@ -35,7 +40,8 @@ export default function Spending() {
   const { receipts, loadingReceipts, completeReceipts, online } =
     useHousehold();
   const colors = useTheme();
-  const [month, setMonth] = useState(osloDate().slice(0, 7));
+  const currentMonth = osloDate().slice(0, 7);
+  const [month, setMonth] = useState(currentMonth);
   const [filters, setFilters] = useState(false);
   const [report, setReport] = useState<
     "catalog" | "calendar" | "meat" | "changes" | "coverage" | null
@@ -117,69 +123,157 @@ export default function Spending() {
         ) || b._creationTime - a._creationTime,
     )
     .slice(0, 3);
+  const rawMonth = new Intl.DateTimeFormat("nb-NO", {
+    month: "long",
+    year: "numeric",
+  }).format(new Date(`${month}-01T12:00:00Z`));
+  const monthLabel =
+    rawMonth.charAt(0).toLocaleUpperCase("nb-NO") + rawMonth.slice(1);
+  const [whole, fraction] = formatMoney(totals.products)
+    .replace(/\s?kr$/, "")
+    .split(",");
   return (
-    <Screen title="Forbruk" settings>
-      {!online && <Notice>Uten nett. Oversikten kan være ufullstendig.</Notice>}
-      {!completeReceipts && (
-        <Notice>Henter kvitteringer. Summene er foreløpige.</Notice>
-      )}
-      <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
-        <IconButton
-          name="chevron.left"
-          label="Forrige måned"
-          onPress={() => moveMonth(-1)}
-        />
-        <Copy size={17} weight="600" style={{ flex: 1, textAlign: "center" }}>
-          {new Intl.DateTimeFormat("nb-NO", {
-            month: "long",
-            year: "numeric",
-          }).format(new Date(`${month}-01T12:00:00Z`))}
-        </Copy>
-        <IconButton
-          name="chevron.right"
-          label="Neste måned"
-          onPress={() => moveMonth(1)}
-        />
+    <Screen
+      title="Forbruk"
+      settings
+      headerRight={
         <IconButton
           name="line.3.horizontal.decrease"
           label="Filtrer forbruk"
+          filled
+          size={17}
           onPress={() => setFilters(true)}
         />
-      </View>
+      }
+    >
+      {!online && <Notice icon="wifi.slash">Uten nett</Notice>}
       {loadingReceipts ? (
         <Loading />
       ) : (
         <>
-          <Panel style={{ backgroundColor: colors.primary, gap: 6 }}>
-            <Copy size={13} style={{ color: colors.onPrimary }}>
-              Vareforbruk · uten pant
-            </Copy>
-            <Copy size={32} weight="700" style={{ color: colors.onPrimary }}>
-              {formatMoney(totals.products)}
-            </Copy>
-            <Copy size={13} style={{ color: colors.onPrimary }}>
-              {totals.selected.length}{" "}
-              {totals.selected.length === 1 ? "kvittering" : "kvitteringer"}
-              {totals.provisional ? ` · ${totals.provisional} foreløpige` : ""}
-              {reviewedOnly ? " · bare godkjente" : ""}
-            </Copy>
-            {change !== null && (
-              <Copy size={13} style={{ color: colors.onPrimary }}>
-                {Math.abs(change)} % {change > 0 ? "mer" : "mindre"} enn{" "}
-                {comparison.partial
-                  ? "samme del av forrige måned"
-                  : "forrige måned"}
+          <Panel tone="primary" style={{ padding: 0, gap: 0 }}>
+            <Mosaic
+              seed={1000}
+              height={7}
+              block={5}
+              columns={80}
+              fade={false}
+            />
+            <View style={{ padding: 18, paddingTop: 14, gap: 4 }}>
+              <View
+                style={{
+                  flexDirection: "row",
+                  alignItems: "center",
+                  gap: 4,
+                }}
+              >
+                <Copy
+                  size={13}
+                  weight="600"
+                  style={{
+                    color: colors.onHero,
+                    opacity: 0.8,
+                    flex: 1,
+                  }}
+                >
+                  {monthLabel}
+                </Copy>
+                <IconButton
+                  name="chevron.left"
+                  label="Forrige måned"
+                  size={16}
+                  color={colors.onHero}
+                  onPress={() => moveMonth(-1)}
+                />
+                <IconButton
+                  name="chevron.right"
+                  label="Neste måned"
+                  size={16}
+                  color={colors.onHero}
+                  disabled={month >= currentMonth}
+                  onPress={() => moveMonth(1)}
+                />
+              </View>
+              <View
+                style={{
+                  flexDirection: "row",
+                  alignItems: "flex-end",
+                  gap: 6,
+                }}
+              >
+                <Copy
+                  size={46}
+                  weight="800"
+                  style={{ color: colors.onHero }}
+                  accessibilityLabel={formatMoney(totals.products)}
+                >
+                  {whole}
+                </Copy>
+                {fraction !== undefined && (
+                  <Copy
+                    size={22}
+                    weight="700"
+                    style={{
+                      color: colors.onHero,
+                      opacity: 0.75,
+                      paddingBottom: 6,
+                    }}
+                    accessibilityElementsHidden
+                  >
+                    ,{fraction} kr
+                  </Copy>
+                )}
+              </View>
+              <Copy size={13} style={{ color: colors.onHero, opacity: 0.8 }}>
+                {totals.selected.length}{" "}
+                {totals.selected.length === 1 ? "kvittering" : "kvitteringer"}
+                {totals.provisional
+                  ? ` · ${totals.provisional} foreløpige`
+                  : ""}
+                {reviewedOnly ? " · bare godkjente" : ""}
+                {change !== null
+                  ? ` · ${Math.abs(change)} % ${change > 0 ? "mer" : "mindre"} enn ${
+                      comparison.partial
+                        ? "samme del av forrige måned"
+                        : "forrige måned"
+                    }`
+                  : ""}
               </Copy>
-            )}
+            </View>
           </Panel>
+          {!completeReceipts && <Notice>Henter kvitteringer …</Notice>}
           {coverage.pending.length > 0 && (
-            <Panel style={{ gap: 0 }}>
-              <Row
-                title={`${coverage.pending.length} ${coverage.pending.length === 1 ? "kvittering trenger" : "kvitteringer trenger"} kontroll`}
-                detail="Kontroller usikre varer for sikrere summer"
-                onPress={() => router.navigate("/inbox")}
-              />
-            </Panel>
+            <Pressable
+              accessibilityRole="button"
+              onPress={() => router.navigate("/inbox")}
+              style={(state) => [
+                {
+                  flexDirection: "row",
+                  alignItems: "center",
+                  gap: 12,
+                  padding: 12,
+                  paddingLeft: 14,
+                  borderRadius: 14,
+                  borderCurve: "continuous",
+                  backgroundColor: colors.primarySoft,
+                },
+                pressed(state),
+              ]}
+            >
+              <Icon name="tray.full" size={18} />
+              <View style={{ flex: 1, gap: 1 }}>
+                <Copy size={14} weight="600">
+                  {coverage.pending.length === 1
+                    ? "Én kvittering venter på kontroll"
+                    : `${coverage.pending.length} kvitteringer venter på kontroll`}
+                </Copy>
+                <Copy size={12} muted numberOfLines={1}>
+                  {receiptNeeds(coverage.pending[0]).slice(0, 2).join(" · ") ||
+                    "Summene er foreløpige."}
+                </Copy>
+              </View>
+              <Icon name="chevron.right" size={12} color={colors.secondary} />
+            </Pressable>
           )}
           <Panel>
             <Segments
@@ -196,14 +290,31 @@ export default function Spending() {
               ]}
             />
             {group && (
-              <Row
-                title="Alle kategorier"
-                detail={categoryById.get(rows[0]?.id)?.groupName}
+              <Pressable
+                accessibilityRole="button"
                 onPress={() => setGroup(null)}
-              />
+                style={(state) => [
+                  {
+                    flexDirection: "row",
+                    alignItems: "center",
+                    gap: 6,
+                    minHeight: 36,
+                  },
+                  pressed(state),
+                ]}
+              >
+                <Icon name="chevron.left" size={12} />
+                <Copy size={14} weight="600" style={{ color: colors.primary }}>
+                  Alle kategorier
+                </Copy>
+                <Copy size={14} muted>
+                  · {categoryById.get(rows[0]?.id)?.groupName}
+                </Copy>
+              </Pressable>
             )}
             <SpendingBars
               rows={showAllGroups ? rows : rows.slice(0, 5)}
+              total={totals.products}
               onSelect={(row) => {
                 if (breakdown === "category" && !group) {
                   setGroup(row.id);
@@ -218,68 +329,45 @@ export default function Spending() {
               />
             )}
             {!rows.length && (
-              <Empty
-                title="Ingen kjøp denne måneden"
-                message="Legg til en kvittering for å se forbruket."
-              />
+              <Empty title="Ingen kjøp denne måneden" icon="cart" />
             )}
           </Panel>
           {recentReceipts.length > 0 && (
-            <View style={{ gap: 2 }}>
-              <View
-                style={{
-                  flexDirection: "row",
-                  alignItems: "center",
-                  justifyContent: "space-between",
-                }}
-              >
-                <Copy size={18} weight="600">
-                  Siste kjøp
-                </Copy>
-                <Pressable
-                  accessibilityRole="button"
-                  onPress={() => router.navigate("/history")}
-                  style={({ pressed }) => ({
-                    minHeight: 44,
-                    justifyContent: "center",
-                    paddingLeft: 16,
-                    opacity: pressed ? 0.6 : 1,
-                  })}
-                >
-                  <Copy size={14} weight="600">
-                    Se alle
-                  </Copy>
-                </Pressable>
-              </View>
-              {recentReceipts.map((receipt) => (
-                <View
-                  key={receipt._id}
-                  style={{
-                    borderBottomWidth: 1,
-                    borderBottomColor: colors.line,
-                    paddingVertical: 5,
-                  }}
-                >
-                  <Row
-                    title={receipt.data?.store ?? "Kvittering"}
-                    detail={[
-                      formatDate(receipt.data?.purchaseDate),
-                      receipt.data?.branch,
-                      receipt.status !== "reviewed" ? "Til kontroll" : null,
-                    ]
-                      .filter(Boolean)
-                      .join(" · ")}
-                    value={formatMoney(receipt.data?.totalOre ?? null)}
-                    onPress={() => openReceipt(receipt)}
-                  />
-                </View>
-              ))}
-            </View>
+            <>
+              <SectionTitle
+                title="Siste kjøp"
+                action="Se alle"
+                onAction={() => router.navigate("/history")}
+              />
+              <Panel style={{ gap: 0, paddingVertical: 4 }}>
+                {recentReceipts.map((receipt, index) => (
+                  <View
+                    key={receipt._id}
+                    style={{
+                      borderTopWidth: index ? 1 : 0,
+                      borderTopColor: colors.line,
+                      paddingVertical: 4,
+                    }}
+                  >
+                    <Row
+                      title={receipt.data?.store ?? "Kvittering"}
+                      detail={[
+                        formatDate(receipt.data?.purchaseDate),
+                        receipt.data?.branch,
+                        receipt.status !== "reviewed" ? "Til kontroll" : null,
+                      ]
+                        .filter(Boolean)
+                        .join(" · ")}
+                      value={formatMoney(receipt.data?.totalOre ?? null)}
+                      onPress={() => openReceipt(receipt)}
+                    />
+                  </View>
+                ))}
+              </Panel>
+            </>
           )}
-          <View style={{ gap: 4, paddingTop: 8 }}>
-            <Copy size={18} weight="600">
-              Betaling
-            </Copy>
+          <SectionTitle title="Betaling" />
+          <Panel style={{ gap: 0, paddingVertical: 4 }}>
             <Row
               title="Betalt"
               detail="Inkludert pant"
@@ -309,40 +397,46 @@ export default function Spending() {
                 kinds: ["deposit_return"],
               },
             ].map((metric) => (
-              <Row
+              <View
                 key={metric.name}
-                title={metric.name}
-                value={formatMoney(metric.amount)}
-                onPress={() =>
-                  select(
-                    metric.name,
-                    metric.amount,
-                    accounting.filter((item) =>
-                      metric.kinds.includes(item.line.kind),
-                    ),
-                  )
-                }
-              />
+                style={{ borderTopWidth: 1, borderTopColor: colors.line }}
+              >
+                <Row
+                  title={metric.name}
+                  value={formatMoney(metric.amount)}
+                  onPress={() =>
+                    select(
+                      metric.name,
+                      metric.amount,
+                      accounting.filter((item) =>
+                        metric.kinds.includes(item.line.kind),
+                      ),
+                    )
+                  }
+                />
+              </View>
             ))}
-          </View>
-          <View style={{ gap: 0, paddingTop: 8 }}>
-            <Copy size={18} weight="600" style={{ paddingBottom: 6 }}>
-              Utforsk forbruket
-            </Copy>
+          </Panel>
+          <FamilyPurchases receipts={totals.selected} />
+          <SectionTitle title="Utforsk forbruket" />
+          <Panel style={{ gap: 0, paddingVertical: 4 }}>
             {[
               {
                 id: "catalog" as const,
                 title: "Produkter og merker",
+                icon: "barcode" as const,
                 value: `${catalog.linked} av ${catalog.total} koblet`,
               },
               {
                 id: "calendar" as const,
                 title: "Handlekalender",
+                icon: "calendar" as const,
                 value: undefined,
               },
               {
                 id: "meat" as const,
                 title: "Kjøtt og fisk",
+                icon: "fish" as const,
                 value: formatMoney(
                   meatRows.reduce((sum, row) => sum + row.amountOre, 0),
                 ),
@@ -352,6 +446,7 @@ export default function Spending() {
                     {
                       id: "changes" as const,
                       title: "Endringer fra forrige måned",
+                      icon: "arrow.up.arrow.down" as const,
                       value: undefined,
                     },
                   ]
@@ -359,25 +454,27 @@ export default function Spending() {
               {
                 id: "coverage" as const,
                 title: "Om tallene",
+                icon: "info.circle" as const,
                 value: undefined,
               },
-            ].map((item) => (
+            ].map((item, index) => (
               <View
                 key={item.id}
                 style={{
-                  borderBottomWidth: 1,
-                  borderBottomColor: colors.line,
+                  borderTopWidth: index ? 1 : 0,
+                  borderTopColor: colors.line,
                   paddingVertical: 2,
                 }}
               >
                 <Row
                   title={item.title}
+                  icon={item.icon}
                   value={item.value}
                   onPress={() => setReport(item.id)}
                 />
               </View>
             ))}
-          </View>
+          </Panel>
         </>
       )}
       <Sheet
@@ -397,20 +494,13 @@ export default function Spending() {
       >
         {report === "catalog" && (
           <>
-            <Copy size={12} muted>
-              Viser koblede varer i perioden. Beløpene er fra kvitteringene,
-              etter varerabatt. Varer uten treff er fortsatt med i
-              totalforbruket.
-            </Copy>
             <Copy weight="600">Produkter</Copy>
             <SpendingBars
               rows={catalog.products.slice(0, 8)}
               onSelect={showDetails}
             />
             {!catalog.products.length && (
-              <Copy muted>
-                Ingen varer er koblet til produktkatalogen ennå.
-              </Copy>
+              <Copy muted>Ingen koblede varer ennå</Copy>
             )}
             {!!catalog.brands.length && (
               <>
@@ -433,23 +523,17 @@ export default function Spending() {
           </>
         )}
         {report === "calendar" && (
-          <>
-            <SpendingCalendar
-              receipts={receipts}
-              month={month}
-              reviewedOnly={reviewedOnly}
-              onSelect={showDetails}
-            />
-          </>
+          <SpendingCalendar
+            receipts={receipts}
+            month={month}
+            reviewedOnly={reviewedOnly}
+            onSelect={showDetails}
+          />
         )}
         {report === "meat" && (
           <>
             <SpendingBars rows={meatRows} onSelect={showDetails} />
-            <Copy size={12} muted>
-              {meatRows.length
-                ? "Råvarer. Pålegg og ferdigretter har egne kategorier."
-                : "Ingen registrerte kjøp i denne perioden."}
-            </Copy>
+            {!meatRows.length && <Copy muted>Ingen kjøp i perioden</Copy>}
           </>
         )}
         {report === "changes" && (
@@ -486,9 +570,6 @@ export default function Spending() {
         )}
         {report === "coverage" && (
           <>
-            <Copy size={13} muted>
-              Uavklart forbruk er med. Foreløpige beløp kan endres ved kontroll.
-            </Copy>
             <Row
               title={`${coverage.unlinkedCount} varer uten produktkobling`}
               onPress={() =>
@@ -500,30 +581,30 @@ export default function Spending() {
               }
             />
             {totals.unknownTotals + totals.unknownAmounts > 0 && (
-              <Notice>Beløp mangler. Summene er ufullstendige.</Notice>
+              <Notice tone="warning">Beløp mangler</Notice>
             )}
             {[
               {
-                label: "Ukjent eller annen valuta. Ikke med i NOK-summene.",
+                label: "Annen valuta",
                 receipts: totals.unconverted,
               },
               {
-                label: "Dato mangler. Ikke med i månedsoversikten.",
+                label: "Dato mangler",
                 receipts: totals.undated,
               },
               {
-                label: "Mulige duplikater er med i foreløpige summer.",
+                label: "Mulige duplikater",
                 receipts: totals.suspectedDuplicates,
               },
               {
-                label: "Varer og betalt beløp stemmer ikke.",
+                label: "Beløpene stemmer ikke",
                 receipts: totals.discrepancies,
               },
             ]
               .filter((item) => item.receipts.length)
               .map((item) => (
                 <View key={item.label}>
-                  <Notice>{item.label}</Notice>
+                  <Notice tone="warning">{item.label}</Notice>
                   {item.receipts.map((receipt) => (
                     <Row
                       key={receipt._id}
@@ -544,15 +625,13 @@ export default function Spending() {
         visible={filters}
         onClose={() => setFilters(false)}
       >
-        <Toggle
-          label="Bare godkjente kvitteringer"
-          value={reviewedOnly}
-          onChange={setReviewedOnly}
-        />
-        <Copy size={13} muted>
-          Godkjente kvitteringer omfatter automatisk godkjenning og din egen
-          kontroll.
-        </Copy>
+        <Panel>
+          <Toggle
+            label="Bare godkjente kvitteringer"
+            value={reviewedOnly}
+            onChange={setReviewedOnly}
+          />
+        </Panel>
         <Button title="Vis oversikt" onPress={() => setFilters(false)} />
       </Sheet>
       <SpendingDetails selected={selected} onClose={() => setSelected(null)} />

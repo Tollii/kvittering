@@ -43,7 +43,7 @@ it("allows two household members, refuses a third, and rejects unauthenticated a
     householdId,
     imageCount: 1,
   });
-  expect((await second.query(api.receipts.detail, { id })).receipt._id).toBe(
+  expect((await second.query(api.receipts.detail, { id }))!.receipt._id).toBe(
     id,
   );
   await expect(t.query(api.receipts.detail, { id })).rejects.toThrow(
@@ -61,9 +61,7 @@ it("enforces household checks for receipts and image access", async () => {
     householdId,
     imageCount: 1,
   });
-  await expect(outsider.query(api.receipts.detail, { id })).rejects.toThrow(
-    "ikke tilgjengelig",
-  );
+  await expect(outsider.query(api.receipts.detail, { id })).resolves.toBeNull();
   await expect(
     outsider.query(internal.receipts.imageAccess, { id, position: 0 }),
   ).rejects.toThrow("ikke tilgjengelig");
@@ -108,7 +106,7 @@ it("duplicate processing commits once and preserves all manual edits during repr
   };
   await t.mutation(internal.processing.finish, args);
   await t.mutation(internal.processing.finish, args);
-  let detail = await first.query(api.receipts.detail, { id });
+  let detail = (await first.query(api.receipts.detail, { id }))!;
   expect(detail.extractions).toHaveLength(1);
   data.lines[0].name = "Corrected product";
   data.lines = data.lines.filter((line) => line.id !== "deposit");
@@ -131,7 +129,7 @@ it("duplicate processing commits once and preserves all manual edits during repr
     data: batteryFixture(),
     original: batteryFixture(),
   });
-  detail = await first.query(api.receipts.detail, { id });
+  detail = (await first.query(api.receipts.detail, { id }))!;
   expect(detail.receipt.data?.lines[0].name).toBe("Corrected product");
   expect(detail.receipt.data?.lines).toHaveLength(2);
   expect(detail.extractions).toHaveLength(2);
@@ -227,13 +225,64 @@ it("applies confirmed matches while keeping item-only category corrections", asy
     key: aliases[0].key,
     cursor: null,
   });
-  const matched = await first.query(api.receipts.detail, { id: ids[1] });
-  const manual = await first.query(api.receipts.detail, { id: ids[2] });
+  const matched = (await first.query(api.receipts.detail, { id: ids[1] }))!;
+  const manual = (await first.query(api.receipts.detail, { id: ids[2] }))!;
   expect(matched.receipt.data?.lines[0].categoryId).toBe(
     "drinks.energy-drinks",
   );
   expect(matched.receipt.data?.lines[0].productKey).toBe(aliases[0].key);
   expect(manual.receipt.data?.lines[0].categoryId).toBe("drinks.soft-drinks");
+  // The remembered item was the only open question, so the receipt is approved.
+  expect(matched.receipt.status).toBe("reviewed");
+  expect(matched.receipt.autoAccepted).toBe(true);
+});
+it("settles remembered categories for a newly read receipt from any engine", async () => {
+  const { t, first, householdId } = await setup();
+  const reviewedId = await first.mutation(api.receipts.reserve, {
+    clientId: "capture-request-0001",
+    imageCount: 1,
+    householdId,
+  });
+  await t.run(async (ctx) => {
+    await ctx.db.patch("receipts", reviewedId, {
+      status: "needs_review",
+      data: batteryFixture(),
+    });
+  });
+  await first.mutation(api.receipts.save, {
+    id: reviewedId,
+    revision: 0,
+    data: batteryFixture(),
+    reviewed: true,
+    rememberLineIds: ["battery"],
+    duplicateResolved: false,
+    excluded: false,
+  });
+  const id = await first.mutation(api.receipts.reserve, {
+    clientId: "capture-request-0002",
+    imageCount: 1,
+    householdId,
+  });
+  await t.run(async (ctx) => {
+    await ctx.db.patch("receipts", id, { status: "processing", generation: 1 });
+  });
+  // A reading may arrive with an uncertain category the household has already settled.
+  const data = batteryFixture();
+  data.lines[0].categoryId = "fallback.unclear";
+  data.lines[0].confidence = 0;
+  data.lines[0].issues = ["Kategorien er usikker."];
+  await t.mutation(internal.processing.finish, {
+    id,
+    generation: 1,
+    data,
+    original: batteryFixture(),
+    provider: "test reader",
+  });
+  const detail = (await first.query(api.receipts.detail, { id }))!;
+  expect(detail.receipt.data?.lines[0].categoryId).toBe("drinks.energy-drinks");
+  expect(detail.receipt.data?.lines[0].issues).toEqual([]);
+  expect(detail.receipt.status).toBe("reviewed");
+  expect(detail.receipt.autoAccepted).toBe(true);
 });
 
 it("deletes a household receipt, its images and history without allowing a late processing result", async () => {
@@ -291,6 +340,8 @@ it("deletes a household receipt, its images and history without allowing a late 
   ).rejects.toThrow("endret");
   await second.mutation(api.receipts.remove, { id, revision: 1 });
   await second.mutation(api.receipts.remove, { id, revision: 1 });
+  await expect(first.query(api.receipts.detail, { id })).resolves.toBeNull();
+  await expect(second.query(api.receipts.detail, { id })).resolves.toBeNull();
   await t.mutation(internal.processing.finish, {
     id,
     generation: 2,
@@ -323,7 +374,14 @@ it("requires an upload to finish before deleting it", async () => {
   await expect(
     first.mutation(api.receipts.remove, { id, revision: 0 }),
   ).rejects.toThrow("lastet opp");
-  expect((await first.query(api.receipts.detail, { id })).receipt.status).toBe(
+  expect((await first.query(api.receipts.detail, { id }))!.receipt.status).toBe(
     "uploading",
   );
+});
+
+it("treats malformed receipt links and IDs from other tables as unavailable", async () => {
+  const { first, householdId } = await setup();
+  for (const id of ["", "not-a-receipt", householdId]) {
+    await expect(first.query(api.receipts.detail, { id })).resolves.toBeNull();
+  }
 });

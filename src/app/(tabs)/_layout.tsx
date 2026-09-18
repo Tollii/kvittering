@@ -5,10 +5,13 @@ import { NotificationRouting } from "@/features/notifications";
 export default function TabLayout() {
   const colors = useTheme();
   const { receipts, queue } = useHousehold();
+  // Badge only what needs a person; processing receipts resolve on their own.
   const pending =
     receipts.filter(
-      (receipt) => receipt.status !== "reviewed" && !receipt.excluded,
-    ).length + queue.length;
+      (receipt) =>
+        ["needs_review", "failed"].includes(receipt.status) &&
+        !receipt.excluded,
+    ).length + queue.filter((entry) => entry.error).length;
   return (
     <>
       <NotificationRouting />

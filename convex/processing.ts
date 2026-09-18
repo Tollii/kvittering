@@ -4,11 +4,11 @@ import { components, internal } from "./_generated/api";
 import { internalMutation, internalQuery, env } from "./_generated/server";
 import {
   receiptDataValidator,
-  aliasKey,
   normalizeAlias,
   classificationInputs,
   type ReceiptData,
 } from "../src/lib/domain/receipt";
+import { applyHouseholdAliases } from "./aliases";
 import {
   productDecision,
   findMapping,
@@ -115,23 +115,7 @@ export const applyAliases = internalQuery({
   handler: async (ctx, args) => {
     const receipt = await ctx.db.get("receipts", args.id);
     if (!receipt) throw new Error("Kvitteringen mangler.");
-    for (const line of args.data.lines) {
-      if (line.kind !== "product") continue;
-      const key = aliasKey(args.data, line);
-      if (!key) continue;
-      const alias = await ctx.db
-        .query("aliases")
-        .withIndex("by_householdId_and_key", (q) =>
-          q.eq("householdId", receipt.householdId).eq("key", key),
-        )
-        .unique();
-      if (alias) {
-        line.categoryId = alias.categoryId;
-        line.productKey = key;
-        line.confidence = 1;
-      }
-    }
-    return args.data;
+    return applyHouseholdAliases(ctx, receipt.householdId, args.data);
   },
 });
 export const finish = internalMutation({
@@ -201,6 +185,8 @@ export const finish = internalMutation({
     const data =
       receipt.revision > 0 && receipt.data ? receipt.data : args.data;
     if (data === args.data) {
+      // Remembered household decisions settle categories for every engine.
+      await applyHouseholdAliases(ctx, receipt.householdId, data);
       const retailer = matchingKey(data.store ?? "");
       for (const line of data.lines) {
         if (line.kind !== "product" || !retailer) continue;
@@ -281,6 +267,10 @@ export const finish = internalMutation({
       await ctx.scheduler.runAfter(0, internal.catalogMatching.start, {
         id: args.id,
         generation: args.generation,
+      });
+    else if (env.TYPESAFE_API_KEY)
+      await ctx.scheduler.runAfter(0, internal.productAnalysis.start, {
+        id: args.id,
       });
     if (!receipt.receiptReadyNotified) {
       await ctx.db.patch("receipts", args.id, { receiptReadyNotified: true });

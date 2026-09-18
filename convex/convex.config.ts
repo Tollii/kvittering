@@ -19,5 +19,6 @@ const app = defineApp({
 });
 app.use(betterAuth);
 app.use(workflow);
+app.use(workflow, { name: "productAnalysisWorkflow" });
 app.use(workpool, { name: "catalogWorkpool" });
 export default app;

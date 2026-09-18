@@ -1,8 +1,12 @@
-import { useProcessingEngine } from "@/lib/processing-preferences";
-import { processingEngineName } from "@/lib/domain/processing-engine";
-import { foundationUnavailableReason } from "@/lib/foundation-recognition";
-import { useCallback, useEffect, useRef, useState } from "react";
 import {
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  type ReactNode,
+} from "react";
+import {
+  ActivityIndicator,
   AppState,
   Image,
   Linking,
@@ -10,27 +14,46 @@ import {
   Pressable,
   StyleSheet,
   View,
+  useWindowDimensions,
+  type ViewStyle,
 } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 import { CameraView, useCameraPermissions } from "expo-camera";
-import { ImageManipulator, SaveFormat } from "expo-image-manipulator";
 import * as ImagePicker from "expo-image-picker";
+import * as DocumentPicker from "expo-document-picker";
 import { router, useIsFocused } from "expo-router";
 import {
   Button,
   Copy,
   Icon,
+  IconButton,
   Notice,
   Panel,
   Screen,
   Sheet,
   Toggle,
+  pressed,
 } from "@/components/ui";
+import { Mosaic } from "@/components/mosaic";
 import { useHousehold } from "@/features/session";
 import { saveLocalReceipts } from "@/lib/receipt-storage";
+import {
+  importReceiptFiles,
+  maxReceiptImages,
+  prepareImage,
+  type ImportedFile,
+} from "@/lib/receipt-import";
+import { takeImportedFiles, usePendingImports } from "@/lib/pending-import";
+import { useTheme } from "@/constants/theme";
+
+const cameraBackground = "#1B1543";
+const onCamera = "#F1EDFB";
+const onCameraMuted = "#C9C0EA";
 
 export default function Capture() {
-  const engine = useProcessingEngine();
-  const { owner, household, online, synchronize } = useHousehold();
+  const colors = useTheme();
+  const { width } = useWindowDimensions();
+  const { owner, household, online, synchronize, queue } = useHousehold();
   const [permission, requestPermission] = useCameraPermissions();
   const camera = useRef<CameraView>(null);
   const focused = useIsFocused();
@@ -44,7 +67,7 @@ export default function Capture() {
   const [busy, setBusy] = useState(false);
   const busyRef = useRef(false);
   const [error, setError] = useState("");
-  const [saved, setSaved] = useState(false);
+  const [saved, setSaved] = useState(0);
   useEffect(() => {
     const listener = AppState.addEventListener("change", (state) =>
       setForeground(state === "active"),
@@ -60,7 +83,7 @@ export default function Capture() {
     busyRef.current = true;
     setBusy(true);
     setError("");
-    setSaved(false);
+    setSaved(0);
     try {
       await action();
     } catch (cause) {
@@ -72,209 +95,417 @@ export default function Capture() {
       setBusy(false);
     }
   }
-  async function prepare(uri: string, width: number, height: number) {
-    const image = ImageManipulator.manipulate(uri);
-    if (Math.max(width, height) > 2400)
-      image.resize(width > height ? { width: 2400 } : { height: 2400 });
-    const rendered = await image.renderAsync();
-    const result = await rendered.saveAsync({
-      compress: 0.85,
-      format: SaveFormat.JPEG,
+  /** Shared images and PDFs arrive here from the share sheet and the file picker. */
+  const addFiles = (files: ImportedFile[]) =>
+    run(async () => {
+      const room = maxReceiptImages - photos.length;
+      if (room <= 0) throw new Error(`Maks ${maxReceiptImages} bilder`);
+      const imported = await importReceiptFiles(files, room);
+      if (!imported.uris.length) return;
+      setPhotos((current) => [...current, ...imported.uris]);
+      if (imported.singleDocument && photos.length === 0) setCombined(true);
+      setReview(true);
     });
-    rendered.release();
-    image.release();
-    return result.uri;
-  }
   const takePhoto = () =>
     run(async () => {
       if (!ready || !camera.current) return;
-      if (photos.length >= 8)
-        throw new Error("Du kan velge opptil åtte bilder.");
+      if (photos.length >= maxReceiptImages)
+        throw new Error(`Maks ${maxReceiptImages} bilder`);
       const result = await camera.current.takePictureAsync({ quality: 0.9 });
       if (!result) throw new Error("Kameraet kunne ikke ta et bilde.");
-      const uri = await prepare(result.uri, result.width, result.height);
+      const uri = await prepareImage(result.uri, result.width, result.height);
       setPhotos((current) => [...current, uri]);
       setReview(true);
     });
   const choosePhotos = () =>
     run(async () => {
-      if (photos.length >= 8)
-        throw new Error("Du kan velge opptil åtte bilder.");
+      if (photos.length >= maxReceiptImages)
+        throw new Error(`Maks ${maxReceiptImages} bilder`);
       const result = await ImagePicker.launchImageLibraryAsync({
         mediaTypes: ["images"],
         allowsMultipleSelection: true,
-        selectionLimit: 8 - photos.length,
+        selectionLimit: maxReceiptImages - photos.length,
         orderedSelection: true,
         quality: 1,
       });
       if (result.canceled) return;
-      if (result.assets.length + photos.length > 8)
-        throw new Error("Du kan velge opptil åtte bilder.");
+      if (result.assets.length + photos.length > maxReceiptImages)
+        throw new Error(`Maks ${maxReceiptImages} bilder`);
       const selected: string[] = [];
       for (const asset of result.assets)
-        selected.push(await prepare(asset.uri, asset.width, asset.height));
+        selected.push(await prepareImage(asset.uri, asset.width, asset.height));
       setPhotos((current) => [...current, ...selected]);
       setReview(true);
     });
+  const chooseFiles = async () => {
+    const result = await DocumentPicker.getDocumentAsync({
+      type: ["application/pdf", "image/*"],
+      multiple: true,
+      copyToCacheDirectory: true,
+    });
+    if (result.canceled) return;
+    await addFiles(
+      result.assets.map((asset) => ({
+        uri: asset.uri,
+        mimeType: asset.mimeType,
+        name: asset.name,
+      })),
+    );
+  };
+  // Files shared from other apps wait until this screen is on show.
+  const pendingImports = usePendingImports();
+  useEffect(() => {
+    if (!focused || !pendingImports.length || busyRef.current) return;
+    void addFiles(takeImportedFiles());
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [focused, pendingImports]);
   const save = () =>
     run(async () => {
-      if (engine === "foundation") {
-        const reason = await foundationUnavailableReason();
-        if (reason) throw new Error(reason);
-      }
-      saveLocalReceipts(owner, household.id, photos, combined, engine);
+      const count = combined ? 1 : photos.length;
+      saveLocalReceipts(owner, household.id, photos, combined);
       setPhotos([]);
       setCombined(false);
       setReview(false);
-      setSaved(true);
+      setSaved(count);
       void synchronize();
     });
-  return (
-    <Screen title="Ny kvittering" subtitle={household.name} settings>
-      <Copy size={13} muted>
-        Leses med {processingEngineName(engine)} · kan endres i innstillinger
-      </Copy>
-      {!online && <Notice>Uten nett. Bilder lagres på denne enheten.</Notice>}
-      {Platform.OS === "web" ? (
+  const live = permission?.granted && focused && foreground && !review;
+  const uploading = queue.some((entry) => !entry.error);
+  const failed = queue.some((entry) => !!entry.error);
+  // Let the success note fade away on its own once the upload has landed.
+  useEffect(() => {
+    if (!saved || uploading || failed) return;
+    const timeout = setTimeout(() => setSaved(0), 8000);
+    return () => clearTimeout(timeout);
+  }, [saved, uploading, failed]);
+  // Two tiles per row inside the sheet's 16pt padding and 10pt gap.
+  const tile = Math.floor((width - 32 - 10) / 2);
+  const overlay = (children: ReactNode, style?: ViewStyle) => (
+    <View
+      style={[
+        {
+          flexDirection: "row",
+          alignItems: "center",
+          gap: 8,
+          paddingHorizontal: 12,
+          paddingVertical: 8,
+          borderRadius: 14,
+          borderCurve: "continuous",
+          backgroundColor: "#1B1543B3",
+        },
+        style,
+      ]}
+    >
+      {children}
+    </View>
+  );
+  if (Platform.OS === "web")
+    return (
+      <Screen title="Ny kvittering" subtitle={household.name} settings>
         <Notice>
           Åpne Kvitto på iPhone for å ta og lagre kvitteringsbilder.
         </Notice>
-      ) : (
-        <View
-          style={{
-            height: 330,
-            borderRadius: 20,
-            overflow: "hidden",
-            backgroundColor: "#14271F",
-            justifyContent: "center",
-          }}
-        >
-          {permission?.granted && focused && foreground && !review ? (
-            <CameraView
-              ref={attachCamera}
-              style={StyleSheet.absoluteFill}
-              facing="back"
-              mode="picture"
-              onCameraReady={() => setReady(true)}
-              onMountError={() =>
-                setError(
-                  "Kameraet er ikke tilgjengelig. Velg et bilde fra biblioteket.",
-                )
-              }
-            />
-          ) : (
-            <View style={{ padding: 28, gap: 18, alignItems: "center" }}>
-              <Icon name="camera" size={56} color="#D7E8DC" />
+      </Screen>
+    );
+  return (
+    <View style={{ flex: 1, backgroundColor: cameraBackground }}>
+      {live && (
+        <CameraView
+          ref={attachCamera}
+          style={StyleSheet.absoluteFill}
+          facing="back"
+          mode="picture"
+          onCameraReady={() => setReady(true)}
+          onMountError={() =>
+            setError(
+              "Kameraet er ikke tilgjengelig. Velg et bilde fra biblioteket.",
+            )
+          }
+        />
+      )}
+      <SafeAreaView
+        edges={["top", "left", "right", "bottom"]}
+        style={{ flex: 1, padding: 16, gap: 12 }}
+      >
+        <Mosaic
+          seed={1000}
+          height={4}
+          block={5}
+          columns={90}
+          fade={false}
+          opacity={0.9}
+          style={{ position: "absolute", top: 0, left: 0, right: 0 }}
+        />
+        <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+          {overlay(
+            <>
+              <Copy size={15} weight="700" style={{ color: onCamera }}>
+                Ny kvittering
+              </Copy>
               <Copy
-                size={22}
-                weight="600"
-                style={{ color: "#FFFFFF", textAlign: "center" }}
+                size={13}
+                numberOfLines={1}
+                style={{ color: onCameraMuted, flexShrink: 1 }}
               >
-                Et bilde. Full oversikt.
+                {household.name}
               </Copy>
-              <Copy style={{ color: "#D7E8DC", textAlign: "center" }}>
-                Legg kvitteringen flatt, og få med alle linjene.
-              </Copy>
-              {!permission?.granted && (
-                <Button
-                  title={
-                    permission?.canAskAgain === false
-                      ? "Åpne innstillinger"
-                      : "Tillat kamera"
+            </>,
+            { flexShrink: 1 },
+          )}
+          <View style={{ flex: 1 }} />
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Importer PDF eller bilde fra Filer"
+            disabled={busy}
+            onPress={() => void chooseFiles()}
+            hitSlop={6}
+            style={(state) => [
+              {
+                width: 40,
+                height: 40,
+                borderRadius: 20,
+                backgroundColor: "#1B1543B3",
+                alignItems: "center",
+                justifyContent: "center",
+              },
+              pressed(state),
+            ]}
+          >
+            <Icon name="doc.badge.plus" size={17} color={onCamera} />
+          </Pressable>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Husstanden og innstillinger"
+            onPress={() => router.push("/settings")}
+            hitSlop={6}
+            style={(state) => [
+              {
+                width: 40,
+                height: 40,
+                borderRadius: 20,
+                backgroundColor: "#1B1543B3",
+                alignItems: "center",
+                justifyContent: "center",
+              },
+              pressed(state),
+            ]}
+          >
+            <Icon name="person.2" size={17} color={onCamera} />
+          </Pressable>
+        </View>
+        {!online && <Notice icon="wifi.slash">Uten nett</Notice>}
+        {saved > 0 && (
+          <Panel style={{ gap: 4 }}>
+            <View
+              style={{ flexDirection: "row", alignItems: "center", gap: 10 }}
+            >
+              {uploading ? (
+                <ActivityIndicator color={colors.accent} />
+              ) : (
+                <Icon
+                  name={
+                    failed ? "arrow.clockwise.circle" : "checkmark.circle.fill"
                   }
-                  onPress={() =>
-                    void run(async () => {
-                      if (permission?.canAskAgain === false)
-                        await Linking.openSettings();
-                      else await requestPermission();
-                    })
-                  }
+                  size={22}
+                  color={failed ? colors.warning : colors.success}
                 />
               )}
+              <Copy weight="700" style={{ flex: 1 }}>
+                {uploading
+                  ? online
+                    ? "Laster opp …"
+                    : "Venter på nett"
+                  : failed
+                    ? "Prøver igjen"
+                    : saved === 1
+                      ? "Lastet opp"
+                      : `${saved} kvitteringer lastet opp`}
+              </Copy>
+              <IconButton
+                name="xmark"
+                label="Lukk"
+                size={14}
+                color={colors.secondary}
+                onPress={() => setSaved(0)}
+              />
             </View>
-          )}
-          {permission?.granted && (
+          </Panel>
+        )}
+        {!!error && !review && <Notice error>{error}</Notice>}
+        <View style={{ flex: 1, justifyContent: "center" }}>
+          {live ? (
             <View
               pointerEvents="none"
               style={{
                 position: "absolute",
-                top: 35,
-                bottom: 90,
-                left: 46,
-                right: 46,
-                borderColor: "#FFFFFFA0",
-                borderWidth: 1.5,
-                borderRadius: 12,
+                top: 24,
+                bottom: 24,
+                left: 18,
+                right: 18,
               }}
-            />
-          )}
-          {permission?.granted && (
-            <View
-              style={{ position: "absolute", bottom: 14, alignSelf: "center" }}
             >
-              <Pressable
-                accessibilityRole="button"
-                accessibilityLabel="Ta bilde av kvitteringen"
-                disabled={!ready || busy}
-                onPress={() => void takePhoto()}
-                style={{
-                  width: 68,
-                  height: 68,
-                  padding: 5,
-                  borderRadius: 34,
-                  borderWidth: 3,
-                  borderColor: "white",
-                  opacity: !ready || busy ? 0.4 : 1,
-                }}
-              >
+              {(["tl", "tr", "bl", "br"] as const).map((corner) => (
                 <View
+                  key={corner}
                   style={{
-                    flex: 1,
-                    borderRadius: 28,
-                    backgroundColor: "white",
+                    position: "absolute",
+                    width: 28,
+                    height: 28,
+                    borderColor: "#FFFFFFCC",
+                    top: corner.startsWith("t") ? 0 : undefined,
+                    bottom: corner.startsWith("b") ? 0 : undefined,
+                    left: corner.endsWith("l") ? 0 : undefined,
+                    right: corner.endsWith("r") ? 0 : undefined,
+                    borderTopWidth: corner.startsWith("t") ? 2 : 0,
+                    borderBottomWidth: corner.startsWith("b") ? 2 : 0,
+                    borderLeftWidth: corner.endsWith("l") ? 2 : 0,
+                    borderRightWidth: corner.endsWith("r") ? 2 : 0,
+                    borderTopLeftRadius: corner === "tl" ? 8 : 0,
+                    borderTopRightRadius: corner === "tr" ? 8 : 0,
+                    borderBottomLeftRadius: corner === "bl" ? 8 : 0,
+                    borderBottomRightRadius: corner === "br" ? 8 : 0,
                   }}
                 />
-              </Pressable>
+              ))}
             </View>
+          ) : (
+            !review && (
+              <View style={{ padding: 28, gap: 14, alignItems: "center" }}>
+                <Icon
+                  name="camera.viewfinder"
+                  size={52}
+                  color={onCameraMuted}
+                />
+                {!permission?.granted && (
+                  <Button
+                    title={
+                      permission?.canAskAgain === false
+                        ? "Åpne innstillinger"
+                        : "Tillat kamera"
+                    }
+                    onPress={() =>
+                      void run(async () => {
+                        if (permission?.canAskAgain === false)
+                          await Linking.openSettings();
+                        else await requestPermission();
+                      })
+                    }
+                  />
+                )}
+              </View>
+            )
           )}
         </View>
-      )}
-      {Platform.OS !== "web" && (
-        <Button
-          title="Velg fra bilder"
-          secondary
-          icon="photo.on.rectangle"
-          disabled={busy}
-          onPress={() => void choosePhotos()}
-        />
-      )}
-      {photos.length > 0 && (
-        <Button
-          title={`Se ${photos.length} valgte bilder`}
-          onPress={() => setReview(true)}
-        />
-      )}
-      {saved && (
-        <Panel>
-          <Copy weight="600">Kvitteringen er lagret på enheten.</Copy>
-          <Copy muted>
-            Hold appen åpen mens bildene lastes opp. Resultatet kommer i
-            innboksen.
-          </Copy>
-          <Button
-            title="Se i innboksen"
-            secondary
-            onPress={() => router.navigate("/inbox")}
-          />
-        </Panel>
-      )}
-      {!!error && !review && <Notice error>{error}</Notice>}
-      <Copy muted size={13}>
-        Lange kvitteringer kan deles i flere bilder. Ta med litt av forrige
-        bilde i neste bilde.
-      </Copy>
+        <View
+          style={{
+            flexDirection: "row",
+            alignItems: "center",
+            justifyContent: "space-between",
+            paddingHorizontal: 20,
+            paddingBottom: 4,
+          }}
+        >
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Velg fra bilder"
+            disabled={busy}
+            onPress={() => void choosePhotos()}
+            style={(state) => [
+              {
+                width: 54,
+                height: 54,
+                borderRadius: 18,
+                borderCurve: "continuous",
+                backgroundColor: "#1B1543B3",
+                alignItems: "center",
+                justifyContent: "center",
+              },
+              pressed(state),
+            ]}
+          >
+            <Icon name="photo.on.rectangle" size={22} color={onCamera} />
+          </Pressable>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Ta bilde av kvitteringen"
+            disabled={!ready || busy || !live}
+            onPress={() => void takePhoto()}
+            style={(state) => [
+              {
+                width: 78,
+                height: 78,
+                padding: 5,
+                borderRadius: 39,
+                borderWidth: 3,
+                borderColor: "white",
+                opacity: !ready || busy || !live ? 0.4 : 1,
+              },
+              state.pressed && { transform: [{ scale: 0.94 }] },
+            ]}
+          >
+            <View
+              style={{ flex: 1, borderRadius: 33, backgroundColor: "white" }}
+            />
+          </Pressable>
+          {photos.length ? (
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={`Se ${photos.length} valgte bilder`}
+              onPress={() => setReview(true)}
+              style={(state) => [
+                {
+                  width: 54,
+                  height: 54,
+                  borderRadius: 18,
+                  borderCurve: "continuous",
+                  overflow: "hidden",
+                  backgroundColor: "#1B1543B3",
+                  alignItems: "center",
+                  justifyContent: "center",
+                },
+                pressed(state),
+              ]}
+            >
+              <Image
+                source={{ uri: photos[photos.length - 1] }}
+                style={StyleSheet.absoluteFill}
+                resizeMode="cover"
+              />
+              <View
+                style={{
+                  position: "absolute",
+                  right: 4,
+                  bottom: 4,
+                  minWidth: 20,
+                  height: 20,
+                  borderRadius: 10,
+                  paddingHorizontal: 5,
+                  backgroundColor: colors.primary,
+                  alignItems: "center",
+                  justifyContent: "center",
+                }}
+              >
+                <Copy
+                  size={12}
+                  weight="700"
+                  style={{ color: colors.onPrimary }}
+                >
+                  {photos.length}
+                </Copy>
+              </View>
+            </Pressable>
+          ) : (
+            // Keeps the shutter centred; nothing to review yet.
+            <View style={{ width: 54, height: 54 }} />
+          )}
+        </View>
+      </SafeAreaView>
       <Sheet
-        title="Valgte bilder"
+        title={
+          photos.length === 1
+            ? "Ett bilde valgt"
+            : `${photos.length} bilder valgt`
+        }
         visible={review}
         onClose={() => {
           if (!busy) setReview(false);
@@ -286,8 +517,9 @@ export default function Capture() {
               title={
                 combined || photos.length === 1
                   ? "Lagre kvittering"
-                  : `Lagre ${photos.length} kvitteringer`
+                  : `Lagre som ${photos.length} kvitteringer`
               }
+              icon="checkmark"
               disabled={!photos.length}
               busy={busy}
               onPress={() => void save()}
@@ -295,55 +527,100 @@ export default function Capture() {
           </>
         }
       >
-        <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 12 }}>
+        <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 10 }}>
           {photos.map((uri, index) => (
-            <View key={uri} style={{ width: "46%", gap: 8 }}>
+            <View key={uri} style={{ width: tile, height: tile * 1.33 }}>
               <Image
                 source={{ uri }}
-                style={{ width: "100%", height: 210, borderRadius: 12 }}
+                style={{
+                  width: tile,
+                  height: tile * 1.33,
+                  borderRadius: 14,
+                  backgroundColor: colors.muted,
+                }}
                 resizeMode="cover"
                 accessibilityLabel={`Kvitteringsbilde ${index + 1}`}
               />
-              <Button
-                title={`Fjern bilde ${index + 1}`}
-                secondary
+              <View
+                pointerEvents="none"
+                style={{
+                  position: "absolute",
+                  left: 8,
+                  top: 8,
+                  width: 24,
+                  height: 24,
+                  borderRadius: 12,
+                  backgroundColor: "#1B1543CC",
+                  alignItems: "center",
+                  justifyContent: "center",
+                }}
+              >
+                <Copy size={12} weight="700" style={{ color: onCamera }}>
+                  {index + 1}
+                </Copy>
+              </View>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel={`Fjern bilde ${index + 1}`}
                 disabled={busy}
+                hitSlop={8}
                 onPress={() => {
                   setPhotos((current) =>
                     current.filter((photo) => photo !== uri),
                   );
                   if (photos.length <= 2) setCombined(false);
                 }}
-              />
+                style={(state) => [
+                  {
+                    position: "absolute",
+                    right: 8,
+                    top: 8,
+                    width: 28,
+                    height: 28,
+                    borderRadius: 14,
+                    backgroundColor: "#1B1543CC",
+                    alignItems: "center",
+                    justifyContent: "center",
+                  },
+                  pressed(state),
+                ]}
+              >
+                <Icon name="xmark" size={12} color={onCamera} />
+              </Pressable>
             </View>
           ))}
         </View>
         {photos.length > 1 && (
-          <Toggle
-            label="Bildene er deler av samme kvittering"
-            value={combined}
-            onChange={setCombined}
-            disabled={busy}
-          />
+          <Panel style={{ gap: 4 }}>
+            <Toggle
+              label="Samme kvittering"
+              value={combined}
+              onChange={setCombined}
+              disabled={busy}
+            />
+          </Panel>
         )}
-        <Copy muted>
-          {combined
-            ? "Bildene leses i rekkefølgen over."
-            : "Hvert bilde lagres som en egen kvittering."}
-        </Copy>
-        <Button
-          title="Ta flere bilder"
-          secondary
-          disabled={busy || photos.length >= 8}
-          onPress={() => setReview(false)}
-        />
-        <Button
-          title="Velg flere bilder"
-          secondary
-          disabled={busy || photos.length >= 8}
-          onPress={() => void choosePhotos()}
-        />
+        <View style={{ flexDirection: "row", gap: 8 }}>
+          <View style={{ flex: 1 }}>
+            <Button
+              title="Ta flere"
+              secondary
+              icon="camera"
+              disabled={busy || photos.length >= maxReceiptImages}
+              onPress={() => setReview(false)}
+            />
+          </View>
+          <View style={{ flex: 1 }}>
+            <Button
+              title="Velg flere"
+              secondary
+              icon="photo.on.rectangle"
+              disabled={busy || photos.length >= maxReceiptImages}
+              onPress={() => void choosePhotos()}
+            />
+          </View>
+        </View>
       </Sheet>
-    </Screen>
+    </View>
   );
 }

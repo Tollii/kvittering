@@ -1,4 +1,3 @@
-import type { ProcessingEngine } from "./domain/processing-engine";
 import { Directory, File, Paths } from "expo-file-system";
 import { openDatabaseSync } from "expo-sqlite";
 import { randomUUID } from "expo-crypto";
@@ -70,7 +69,6 @@ export function saveLocalReceipts(
   householdId: Id<"households">,
   uris: string[],
   combined: boolean,
-  processingEngine: ProcessingEngine = "gpt",
 ) {
   if (!uris.length || uris.length > 8)
     throw new Error("Velg mellom ett og åtte bilder.");
@@ -92,7 +90,7 @@ export function saveLocalReceipts(
           owner,
           householdId,
           createdAt: Date.now(),
-          processingEngine,
+          processingEngine: "gpt",
           images,
           uploaded: images.map(() => false),
         } satisfies LocalReceipt;

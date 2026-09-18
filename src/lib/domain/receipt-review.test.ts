@@ -1,9 +1,15 @@
 import { expect, it } from "vitest";
-import { batteryFixture } from "./receipt";
+import { batteryFixture, reconcile } from "./receipt";
 import {
+  balanceWithAdjustment,
   canAcceptReceipt,
+  canConfirmSuggestedCategory,
   confirmLineCategory,
+  confirmSuggestedCategories,
   lineReviewIssues,
+  quickApproveData,
+  reviewSummary,
+  reviewTasks,
 } from "./receipt-review";
 
 it("accepts balanced receipts without optional package details or product links", () => {
@@ -64,4 +70,102 @@ it("resolves category uncertainty without dismissing other review requirements",
     "Kategorien er usikker.",
   );
   expect(() => confirmLineCategory(line, "not-a-category")).toThrow();
+});
+
+it("lists nothing to do for an acceptable receipt", () => {
+  expect(reviewTasks(batteryFixture(), false)).toEqual([]);
+  expect(reviewSummary(null, false)).toEqual([]);
+});
+it("groups review work into receipt facts and line fixes", () => {
+  const data = batteryFixture();
+  data.store = null;
+  data.totalOre = null;
+  data.lines[0].issues = ["Kategorien er usikker."];
+  data.lines[1].amountOre = null;
+  const tasks = reviewTasks(data, true);
+  expect(tasks.map((task) => task.kind)).toEqual([
+    "duplicate",
+    "store",
+    "total",
+    "categories",
+    "amounts",
+  ]);
+  expect(reviewSummary(data, true)).toEqual([
+    "Mulig duplikat",
+    "Butikk mangler",
+    "Betalt beløp mangler",
+    "1 kategori",
+    "1 beløp mangler",
+  ]);
+});
+it("hides the total difference while amounts are still missing", () => {
+  const data = batteryFixture();
+  data.lines[1].amountOre = null;
+  expect(reviewTasks(data, false).map((task) => task.kind)).toEqual([
+    "amounts",
+  ]);
+  data.lines[1].amountOre = -100;
+  expect(reviewTasks(data, false)).toEqual([
+    { kind: "difference", amountOre: 159 },
+  ]);
+});
+it("balances a receipt with an explicit adjustment line", () => {
+  const data = batteryFixture();
+  data.totalOre = 2500;
+  const balanced = balanceWithAdjustment(data, "fix");
+  expect(balanced.lines.at(-1)).toMatchObject({
+    id: "fix",
+    kind: "adjustment",
+    amountOre: -31,
+    categoryId: null,
+    manual: true,
+  });
+  expect(reconcile(balanced).difference).toBe(0);
+  expect(canAcceptReceipt(balanced, false)).toBe(true);
+  expect(balanceWithAdjustment(batteryFixture(), "noop").lines).toHaveLength(3);
+});
+it("confirms suggested categories in bulk without touching unclear or other issues", () => {
+  const data = batteryFixture();
+  data.lines[0].issues = ["Kategorien er usikker."];
+  data.lines.push({
+    ...data.lines[0],
+    id: "unclear",
+    categoryId: "fallback.unclear",
+    issues: ["Kategorien er usikker."],
+  });
+  data.lines.push({
+    ...data.lines[0],
+    id: "overlap",
+    issues: ["Kategorien er usikker.", "Mulig overlapp."],
+  });
+  expect(canConfirmSuggestedCategory(data.lines[0])).toBe(true);
+  expect(canConfirmSuggestedCategory(data.lines[3])).toBe(false);
+  const confirmed = confirmSuggestedCategories(data);
+  expect(confirmed.lines[0].issues).toEqual([]);
+  expect(confirmed.lines[0].confidence).toBe(1);
+  expect(confirmed.lines[0].manual).toBe(true);
+  expect(confirmed.lines[3].issues).toEqual(["Kategorien er usikker."]);
+  expect(confirmed.lines[4].issues).toEqual(["Mulig overlapp."]);
+  expect(data.lines[0].issues).toEqual(["Kategorien er usikker."]);
+  expect(reviewTasks(confirmed, false).map((task) => task.kind)).toEqual([
+    "difference",
+    "categories",
+    "line-issues",
+  ]);
+});
+
+it("quick-approves only when suggested categories are the last open question", () => {
+  const data = batteryFixture();
+  data.lines[0].issues = ["Kategorien er usikker."];
+  const approved = quickApproveData(data, false);
+  expect(approved?.lines[0].issues).toEqual([]);
+  expect(approved?.lines[0].confidence).toBe(1);
+  expect(quickApproveData(data, true)).toBeNull();
+  data.lines[1].amountOre = null;
+  expect(quickApproveData(data, false)).toBeNull();
+  expect(quickApproveData(null, false)).toBeNull();
+  const unclear = batteryFixture();
+  unclear.lines[0].categoryId = "fallback.unclear";
+  unclear.lines[0].issues = ["Kategorien er usikker."];
+  expect(quickApproveData(unclear, false)).toBeNull();
 });

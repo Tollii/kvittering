@@ -85,7 +85,7 @@ it("schedules only the uploader once, and skips delivery after review, unsubscri
   const args = { id, generation: 1, data, original: data, provider: "fixture" };
   await t.mutation(internal.processing.finish, args);
   expect(
-    (await uploader.query(api.receipts.detail, { id })).receipt.autoAccepted,
+    (await uploader.query(api.receipts.detail, { id }))!.receipt.autoAccepted,
   ).toBe(true);
   await t.mutation(internal.processing.finish, args);
   const deliveries = await t.run((ctx) =>
@@ -99,6 +99,8 @@ it("schedules only the uploader once, and skips delivery after review, unsubscri
     subscriptionId: sendArgs.subscriptionId,
   });
   expect(target?.subscription.token).toBe(subscription.token);
+  expect(target?.title).toBe("Eksempelbutikk");
+  expect(target?.body).toContain("25,31");
   await t.run((ctx) =>
     ctx.db.patch("receipts", id, { status: "processing", generation: 2 }),
   );

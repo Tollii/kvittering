@@ -1,8 +1,3 @@
-import {
-  processingEngineValidator,
-  foundationResultValidator,
-} from "../src/lib/domain/processing-engine";
-import { prepareFoundationResult } from "./foundationResults";
 import { lineEvidenceKey } from "../src/lib/catalog/matching";
 import { productChange, correctProducts } from "./products";
 import { correctCatalogLinks } from "./catalogLinks";
@@ -42,14 +37,22 @@ export const list = query({
   },
 });
 export const detail = query({
-  args: { id: v.id("receipts") },
-  returns: v.object({
-    receipt: schema.doc("receipts"),
-    images: v.array(schema.doc("images")),
-    extractions: v.array(schema.doc("extractions")),
-  }),
-  handler: async (ctx, { id }) => {
-    const { receipt } = await requireReceipt(ctx, id);
+  // Route and notification values are untrusted strings until normalized below.
+  args: { id: v.string() },
+  returns: v.union(
+    v.null(),
+    v.object({
+      receipt: schema.doc("receipts"),
+      images: v.array(schema.doc("images")),
+      extractions: v.array(schema.doc("extractions")),
+    }),
+  ),
+  handler: async (ctx, args) => {
+    const member = await requireMember(ctx);
+    const id = ctx.db.normalizeId("receipts", args.id);
+    if (!id) return null;
+    const receipt = await ctx.db.get("receipts", id);
+    if (!receipt || receipt.householdId !== member.householdId) return null;
     return {
       receipt,
       images: await ctx.db
@@ -68,7 +71,6 @@ export const reserve = mutation({
   args: {
     clientId: v.string(),
     imageCount: v.number(),
-    processingEngine: v.optional(processingEngineValidator),
     householdId: v.id("households"),
   },
   returns: v.id("receipts"),
@@ -101,7 +103,7 @@ export const reserve = mutation({
       generation: 0,
       data: null,
       provider: "pending",
-      processingEngine: args.processingEngine ?? "gpt",
+      processingEngine: "gpt",
       error: null,
       duplicateOf: null,
       duplicateResolved: false,
@@ -109,13 +111,11 @@ export const reserve = mutation({
     });
   },
 });
+/** All images are in storage: hand the receipt to the server workflow. The phone is done. */
 export const completeUpload = mutation({
-  args: {
-    id: v.id("receipts"),
-    foundationResult: v.optional(foundationResultValidator),
-  },
+  args: { id: v.id("receipts") },
   returns: v.null(),
-  handler: async (ctx, { id, foundationResult }) => {
+  handler: async (ctx, { id }) => {
     const { receipt } = await requireReceipt(ctx, id);
     if (receipt.status !== "uploading") return null;
     const images = await ctx.db
@@ -124,43 +124,18 @@ export const completeUpload = mutation({
       .take(8);
     if (images.length !== receipt.imageCount)
       throw new Error("Noen bilder er ikke lastet opp.");
-    if (receipt.processingEngine === "foundation") {
-      if (!foundationResult)
-        throw new Error("Mangler resultatet fra Foundation Models på enheten.");
-      const result = prepareFoundationResult(
-        foundationResult,
-        receipt.imageCount,
-      );
-      await ctx.db.patch("receipts", id, {
-        status: "processing",
-        generation: 1,
-      });
-      await ctx.runMutation(internal.processing.finish, {
-        id,
-        generation: 1,
-        ...result,
-        durationMs: foundationResult.durationMs,
-      });
-      return null;
-    }
-    if (foundationResult) throw new Error("Kvitteringen er satt til GPT.");
     await ctx.db.patch("receipts", id, { status: "uploaded", generation: 1 });
     await start(ctx, internal.processing.processReceipt, { id, generation: 1 });
     return null;
   },
 });
 export const retry = mutation({
-  args: {
-    id: v.id("receipts"),
-    processingEngine: v.optional(processingEngineValidator),
-  },
+  args: { id: v.id("receipts") },
   returns: v.null(),
-  handler: async (ctx, { id, processingEngine }) => {
+  handler: async (ctx, { id }) => {
     const { receipt } = await requireReceipt(ctx, id);
     if (["processing", "uploaded", "uploading"].includes(receipt.status))
       throw new Error("Kvitteringen behandles allerede.");
-    if ((processingEngine ?? receipt.processingEngine ?? "gpt") !== "gpt")
-      throw new Error("Foundation Models må kjøre på enheten.");
     const generation = receipt.generation + 1;
     await ctx.db.patch("receipts", id, {
       status: "uploaded",
@@ -310,6 +285,9 @@ export const save = mutation({
       excluded: args.excluded,
       error: null,
     });
+    await ctx.scheduler.runAfter(0, internal.productAnalysis.start, {
+      id: args.id,
+    });
     return null;
   },
 });
@@ -445,43 +423,6 @@ export const cleanupDeleted = internalMutation({
       });
     if (remaining || duplicates.length === 5)
       await ctx.scheduler.runAfter(0, internal.receipts.cleanupDeleted, { id });
-    return null;
-  },
-});
-
-/** Store a second local reading without discarding edits or duplicating the purchase. */
-export const reprocessFoundation = mutation({
-  args: {
-    id: v.id("receipts"),
-    revision: v.number(),
-    generation: v.number(),
-    result: foundationResultValidator,
-  },
-  returns: v.null(),
-  handler: async (ctx, args) => {
-    const { receipt } = await requireReceipt(ctx, args.id);
-    if (
-      receipt.revision !== args.revision ||
-      receipt.generation !== args.generation ||
-      ["processing", "uploaded", "uploading"].includes(receipt.status)
-    )
-      throw new Error(
-        "Kvitteringen er endret. Åpne den på nytt før du sammenligner.",
-      );
-    const result = prepareFoundationResult(args.result, receipt.imageCount);
-    const generation = receipt.generation + 1;
-    await ctx.db.patch("receipts", args.id, {
-      status: "processing",
-      processingEngine: "foundation",
-      generation,
-      error: null,
-    });
-    await ctx.runMutation(internal.processing.finish, {
-      id: args.id,
-      generation,
-      ...result,
-      durationMs: args.result.durationMs,
-    });
     return null;
   },
 });
