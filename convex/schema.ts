@@ -194,4 +194,12 @@ export default defineSchema({
     categoryId: v.string(),
     confirmedBy: v.string(),
   }).index("by_householdId_and_key", ["householdId", "key"]),
+  /** Categories the household has approved, by store and receipt name. */
+  categoryMemory: defineTable({
+    householdId: v.id("households"),
+    key: v.string(),
+    categoryId: v.string(),
+    confirmations: v.number(),
+    confirmedBy: v.string(),
+  }).index("by_householdId_and_key", ["householdId", "key"]),
 });

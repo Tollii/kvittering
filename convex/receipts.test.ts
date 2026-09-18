@@ -3,7 +3,7 @@ import { convexTest } from "convex-test";
 import { expect, it } from "vitest";
 import { api, internal } from "./_generated/api";
 import schema from "./schema";
-import { batteryFixture } from "../src/lib/domain/receipt";
+import { batteryFixture, weeklyShopFixture } from "../src/lib/domain/receipt";
 const modules = import.meta.glob("./**/*.ts");
 async function setup() {
   const t = convexTest(schema, modules);
@@ -384,4 +384,84 @@ it("treats malformed receipt links and IDs from other tables as unavailable", as
   for (const id of ["", "not-a-receipt", householdId]) {
     await expect(first.query(api.receipts.detail, { id })).resolves.toBeNull();
   }
+});
+
+it("trusts a category after two approvals and settles the next reading without a person", async () => {
+  const { t, first, householdId } = await setup();
+  const approved = () => {
+    const data = weeklyShopFixture();
+    data.lines = data.lines.filter((line) => line.id !== "unknown");
+    data.totalOre = 28980;
+    const cheez = data.lines.find((line) => line.id === "cheez")!;
+    cheez.issues = [];
+    cheez.confidence = 1;
+    return data;
+  };
+  for (let index = 0; index < 2; index++) {
+    const id = await first.mutation(api.receipts.reserve, {
+      clientId: `weekly-request-000${index}`,
+      imageCount: 1,
+      householdId,
+    });
+    await t.run((ctx) =>
+      ctx.db.patch("receipts", id, {
+        status: "needs_review",
+        data: approved(),
+      }),
+    );
+    await first.mutation(api.receipts.save, {
+      id,
+      revision: 0,
+      data: approved(),
+      reviewed: true,
+      rememberLineIds: [],
+      duplicateResolved: false,
+      excluded: false,
+    });
+  }
+  const memory = await t.run((ctx) =>
+    ctx.db
+      .query("categoryMemory")
+      .withIndex("by_householdId_and_key", (q) =>
+        q.eq("householdId", householdId),
+      )
+      .collect(),
+  );
+  expect(
+    memory.find((entry) => entry.key.includes("CHEEZ DOODLES")),
+  ).toMatchObject({
+    categoryId: "snacks.crisps",
+    confirmations: 2,
+  });
+  const id = await first.mutation(api.receipts.reserve, {
+    clientId: "weekly-request-0009",
+    imageCount: 1,
+    householdId,
+  });
+  await t.run((ctx) =>
+    ctx.db.patch("receipts", id, { status: "processing", generation: 1 }),
+  );
+  const reading = approved();
+  // A different visit, so it is not flagged as a duplicate of the approved ones.
+  reading.receiptNumber = "9999";
+  reading.purchaseTime = "09:12";
+  const cheez = reading.lines.find((line) => line.id === "cheez")!;
+  cheez.categoryId = "snacks.sweets";
+  cheez.confidence = 0.3;
+  cheez.issues = ["Kategorien er usikker."];
+  await t.mutation(internal.processing.finish, {
+    id,
+    generation: 1,
+    data: reading,
+    original: approved(),
+    provider: "test reader",
+  });
+  const detail = (await first.query(api.receipts.detail, { id }))!;
+  const settled = detail.receipt.data!.lines.find(
+    (line) => line.id === "cheez",
+  )!;
+  expect(settled.categoryId).toBe("snacks.crisps");
+  expect(settled.issues).toEqual([]);
+  expect(detail.receipt.status).toBe("reviewed");
+  expect(detail.receipt.autoAccepted).toBe(true);
 });

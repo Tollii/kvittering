@@ -21,6 +21,7 @@ import {
   aliasKey,
 } from "../src/lib/domain/receipt";
 import { canAcceptReceipt } from "../src/lib/domain/receipt-review";
+import { learnCategories } from "./aliases";
 import { start } from "@convex-dev/workflow";
 export const list = query({
   args: { paginationOpts: paginationOptsValidator },
@@ -267,6 +268,14 @@ export const save = mutation({
         });
       }
     }
+    if (args.reviewed)
+      await learnCategories(
+        ctx,
+        member.householdId,
+        member.identity,
+        args.data,
+        args.rememberLineIds,
+      );
     if (receipt.data)
       await ctx.db.insert("revisions", {
         receiptId: receipt._id,
