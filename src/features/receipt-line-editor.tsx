@@ -31,6 +31,7 @@ import {
 } from "./catalog-product-sheet";
 import type { CatalogProduct } from "@/lib/catalog/model";
 import { useTheme } from "@/constants/theme";
+import { priceSignalLabel, type PriceSignal } from "@/lib/domain/price-signals";
 import { tapFeedback } from "@/lib/haptics";
 
 export const lineLabels: Record<ReceiptLine["kind"], string> = {
@@ -56,6 +57,8 @@ type Props = {
   remember: boolean;
   recentCategories: string[];
   productChoice?: ProductChoice;
+  /** Unusual unit price compared with the household's history for this product. */
+  priceSignal?: PriceSignal;
   /** Review mode shows only what needs a decision, with one-tap answers. */
   review?: boolean;
   onChange: (line: ReceiptLine) => void;
@@ -73,6 +76,7 @@ export function ReceiptLineEditor({
   recentCategories,
   productChoice,
   review = false,
+  priceSignal,
   onChange,
   onRemember,
   onProduct,
@@ -235,6 +239,14 @@ export function ReceiptLineEditor({
               tone={categoryUncertain ? "warning" : "muted"}
               accessibilityLabel={`Kategori for ${line.name}: ${categoryLabel}. Trykk for å endre`}
               onPress={() => setCategoryOpen(true)}
+            />
+          )}
+          {!review && priceSignal && (
+            <Chip
+              label={priceSignalLabel(priceSignal)}
+              icon={priceSignal.ratio > 1 ? "arrow.up" : "arrow.down"}
+              tone={priceSignal.ratio > 1 ? "warning" : "success"}
+              accessibilityLabel={`${priceSignalLabel(priceSignal)}. Vanlig pris ${formatMoney(priceSignal.typicalOre)}`}
             />
           )}
           {!review && (

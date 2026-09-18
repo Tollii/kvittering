@@ -63,6 +63,7 @@ import type { Receipt } from "@/lib/domain/insights";
 import { receiptStatusLabel } from "@/components/receipt-card";
 import { formatDate } from "@/lib/format-date";
 import { useTheme } from "@/constants/theme";
+import { priceSignals } from "@/lib/domain/price-signals";
 import { errorFeedback, successFeedback, tapFeedback } from "@/lib/haptics";
 
 export default function ReceiptPage() {
@@ -232,6 +233,7 @@ function ReceiptEditor({
     processing ||
     receipt.revision !== revision ||
     !!Object.keys(moneyErrors).length;
+  const signals = priceSignals(receipts, receipt);
   const recentCategories = receipts.flatMap(
     (item) =>
       item.data?.lines.flatMap((line) =>
@@ -889,6 +891,7 @@ function ReceiptEditor({
                     recentCategories={recentCategories}
                     remember={remember.includes(line.id)}
                     productChoice={productChanges[line.id]}
+                    priceSignal={signals.get(line.id)}
                     review={!allLines}
                     onChange={(next) => {
                       change({

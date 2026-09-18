@@ -33,6 +33,10 @@ import { categoryById } from "@/lib/domain/categories";
 import { openReceipt, receiptNeeds } from "@/components/receipt-card";
 import { mosaicHighlight, useTheme } from "@/constants/theme";
 import { budgetPace, paceLabel } from "@/lib/domain/budget";
+import {
+  monthPriceSignals,
+  priceSignalLabel,
+} from "@/lib/domain/price-signals";
 import { formatDate } from "@/lib/format-date";
 import { catalogInsights } from "@/lib/catalog/insights";
 import { router } from "expo-router";
@@ -45,7 +49,14 @@ export default function Spending() {
   const [month, setMonth] = useState(currentMonth);
   const [filters, setFilters] = useState(false);
   const [report, setReport] = useState<
-    "catalog" | "families" | "calendar" | "meat" | "changes" | "coverage" | null
+    | "catalog"
+    | "prices"
+    | "families"
+    | "calendar"
+    | "meat"
+    | "changes"
+    | "coverage"
+    | null
   >(null);
   const [showAllGroups, setShowAllGroups] = useState(false);
   const [reviewedOnly, setReviewedOnly] = useState(false);
@@ -130,6 +141,8 @@ export default function Spending() {
   }).format(new Date(`${month}-01T12:00:00Z`));
   const monthLabel =
     rawMonth.charAt(0).toLocaleUpperCase("nb-NO") + rawMonth.slice(1);
+  const surprises = monthPriceSignals(receipts, month);
+  const pricier = surprises.filter((signal) => signal.ratio > 1);
   const budgetOre = details?.household.monthlyBudgetOre ?? null;
   const pace =
     budgetOre && budgetOre > 0
@@ -473,6 +486,16 @@ export default function Spending() {
                 icon: "barcode" as const,
                 value: `${catalog.linked} av ${catalog.total} koblet`,
               },
+              ...(surprises.length
+                ? [
+                    {
+                      id: "prices" as const,
+                      title: "Prissjekk",
+                      icon: "tag" as const,
+                      value: `${pricier.length} dyrere enn vanlig`,
+                    },
+                  ]
+                : []),
               {
                 id: "families" as const,
                 title: "Mengder kjøpt",
@@ -533,15 +556,17 @@ export default function Spending() {
         title={
           report === "catalog"
             ? "Produkter og merker"
-            : report === "families"
-              ? "Mengder kjøpt"
-              : report === "calendar"
-                ? "Handlekalender"
-                : report === "meat"
-                  ? "Kjøtt og fisk"
-                  : report === "changes"
-                    ? "Endringer fra forrige måned"
-                    : "Om tallene"
+            : report === "prices"
+              ? "Prissjekk"
+              : report === "families"
+                ? "Mengder kjøpt"
+                : report === "calendar"
+                  ? "Handlekalender"
+                  : report === "meat"
+                    ? "Kjøtt og fisk"
+                    : report === "changes"
+                      ? "Endringer fra forrige måned"
+                      : "Om tallene"
         }
         visible={report !== null}
         onClose={() => setReport(null)}
@@ -575,6 +600,29 @@ export default function Spending() {
               </>
             )}
           </>
+        )}
+        {report === "prices" && (
+          <Panel style={{ gap: 0, paddingVertical: 4 }}>
+            {surprises.map((signal, index) => (
+              <View
+                key={`${signal.receipt._id}:${signal.line.id}`}
+                style={{
+                  borderTopWidth: index ? 1 : 0,
+                  borderTopColor: colors.line,
+                }}
+              >
+                <Row
+                  title={signal.name}
+                  detail={`${formatDate(signal.receipt.data?.purchaseDate)} · vanlig ${formatMoney(signal.typicalOre)}`}
+                  value={priceSignalLabel(signal)}
+                  onPress={() => {
+                    setReport(null);
+                    openReceipt(signal.receipt);
+                  }}
+                />
+              </View>
+            ))}
+          </Panel>
         )}
         {report === "families" && (
           <FamilyPurchases
