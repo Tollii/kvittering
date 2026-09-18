@@ -1,3 +1,6 @@
+import { useProcessingEngine } from "@/lib/processing-preferences";
+import { processingEngineName } from "@/lib/domain/processing-engine";
+import { foundationUnavailableReason } from "@/lib/foundation-recognition";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   AppState,
@@ -26,6 +29,7 @@ import { useHousehold } from "@/features/session";
 import { saveLocalReceipts } from "@/lib/receipt-storage";
 
 export default function Capture() {
+  const engine = useProcessingEngine();
   const { owner, household, online, synchronize } = useHousehold();
   const [permission, requestPermission] = useCameraPermissions();
   const camera = useRef<CameraView>(null);
@@ -114,7 +118,11 @@ export default function Capture() {
     });
   const save = () =>
     run(async () => {
-      saveLocalReceipts(owner, household.id, photos, combined);
+      if (engine === "foundation") {
+        const reason = await foundationUnavailableReason();
+        if (reason) throw new Error(reason);
+      }
+      saveLocalReceipts(owner, household.id, photos, combined, engine);
       setPhotos([]);
       setCombined(false);
       setReview(false);
@@ -123,6 +131,9 @@ export default function Capture() {
     });
   return (
     <Screen title="Ny kvittering" subtitle={household.name} settings>
+      <Copy size={13} muted>
+        Leses med {processingEngineName(engine)} · kan endres i innstillinger
+      </Copy>
       {!online && <Notice>Uten nett. Bilder lagres på denne enheten.</Notice>}
       {Platform.OS === "web" ? (
         <Notice>

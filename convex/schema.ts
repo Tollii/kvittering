@@ -1,3 +1,4 @@
+import { processingEngineValidator } from "../src/lib/domain/processing-engine";
 import { defineSchema, defineTable } from "convex/server";
 import { v } from "convex/values";
 import { receiptDataValidator } from "../src/lib/domain/receipt";
@@ -27,6 +28,7 @@ export const receiptFields = {
   generation: v.number(),
   data: v.union(receiptDataValidator, v.null()),
   provider: v.string(),
+  processingEngine: v.optional(processingEngineValidator),
   error: v.union(v.string(), v.null()),
   duplicateOf: v.union(v.id("receipts"), v.null()),
   duplicateResolved: v.boolean(),
@@ -140,6 +142,8 @@ export default defineSchema({
     generation: v.number(),
     data: receiptDataValidator,
     provider: v.string(),
+    classifiedData: v.optional(receiptDataValidator),
+    durationMs: v.optional(v.number()),
   })
     .index("by_receiptId", ["receiptId"])
     .index("by_receiptId_and_generation", ["receiptId", "generation"]),

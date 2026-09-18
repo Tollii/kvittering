@@ -82,3 +82,24 @@ New receipts get catalog enrichment after extraction. On an existing receipt, se
 - EAN identifies the same packaged product across shops. Records without EAN keep their Kassalapp ID; similar names alone do not merge products. Receipt rows are never merged. Product, brand, and store summaries use receipt amounts after item discounts, not current catalog prices. Unallocated receipt discounts remain in the existing accounting overview.
 
 Prices are fetched only when **Hent butikkpriser** is selected. Fresh foods and unlisted items remain ordinary receipt lines. Nutrition is displayed as product information; it is not used to calculate intake.
+
+### Compare receipt engines on iOS
+
+In Settings, select **GPT** or **Foundation Models** under **Lesing av kvitteringer**.
+The choice is stored on this device and captured when a receipt enters the upload queue.
+GPT uses the existing server pipeline. Foundation Models uses Apple Vision document OCR
+and on-device Foundation Models for extraction and categorization. It requires iOS 26+
+and an available Apple Intelligence model with Norwegian support. Build the native app
+with `npm run ios:build`; the custom module is not included in Expo Go.
+
+To compare the same images, change the setting, open a receipt, and choose **Les bildene
+på nytt**. **Sammenlign lesinger** shows the saved text, amounts, categories, engine and
+processing time. Existing manual edits remain in place, and the purchase is counted once.
+Catalog enrichment is shared by both engines and runs after the saved reading, so compare
+the reading snapshots when evaluating OCR and categorization. Older snapshots have no
+category or timing details. Times cover extraction and classification, exclude upload/download and catalog matching,
+and are not a controlled performance benchmark.
+
+Keep the app open during local processing. A local failure stays in the inbox for an
+explicit retry; it never switches to GPT. Successful local results remain in the durable
+queue if upload completion fails. Receipt images still synchronize to Convex.

@@ -48,12 +48,17 @@ export default function Inbox() {
                 {entry.uploaded.filter(Boolean).length} av {entry.images.length}{" "}
                 lastet opp
               </Copy>
+              {entry.processingEngine === "foundation" && !entry.error && (
+                <Copy size={13} muted>
+                  Leses med Foundation Models. Hold appen åpen.
+                </Copy>
+              )}
               {!!entry.error && <Notice error>{entry.error}</Notice>}
             </View>
           ))}
           <Button
-            title="Prøv opplasting"
-            onPress={() => void synchronize()}
+            title="Prøv igjen"
+            onPress={() => void synchronize(true)}
             disabled={!online}
             secondary
           />

@@ -22,12 +22,18 @@ import {
 } from "../src/lib/domain/classification";
 export const extract = internalAction({
   args: { storageIds: v.array(v.id("_storage")) },
-  returns: v.object({ data: receiptDataValidator, provider: v.string() }),
+  returns: v.object({
+    data: receiptDataValidator,
+    provider: v.string(),
+    durationMs: v.number(),
+  }),
   handler: async (ctx, args) => {
+    const started = Date.now();
     if (env.RECEIPT_PROVIDER === "mock" || !env.OPENAI_API_KEY)
       return {
         data: batteryFixture(),
         provider: "mock: Battery fixture; photo not read",
+        durationMs: 0,
       };
     const images = await Promise.all(
       args.storageIds.map(async (id) => {
@@ -69,7 +75,7 @@ export const extract = internalAction({
         "Modellen kunne ikke lese kvitteringen. Prøv et tydeligere bilde.",
       );
     const data = prepareExtraction(response.output_parsed, images.length);
-    return { data, provider: model };
+    return { data, provider: model, durationMs: Date.now() - started };
   },
 });
 export const classify = internalAction({
@@ -85,10 +91,16 @@ export const classify = internalAction({
       }),
     ),
     provider: v.string(),
+    durationMs: v.number(),
   }),
   handler: async (_ctx, args) => {
+    const started = Date.now();
     if (!args.products.length)
-      return { classifications: [], provider: "confirmed aliases" };
+      return {
+        classifications: [],
+        provider: "confirmed aliases",
+        durationMs: 0,
+      };
     if (env.RECEIPT_PROVIDER === "mock" || !env.TYPESAFE_API_KEY)
       return {
         classifications: args.products.map((p) => ({
@@ -97,6 +109,7 @@ export const classify = internalAction({
           confidence: 0,
         })),
         provider: "mock: classification unavailable",
+        durationMs: 0,
       };
     const client = new TypeSafeClient({ apiKey: env.TYPESAFE_API_KEY });
     const results: { id: string; categoryId: string; confidence: number }[] =
@@ -128,6 +141,10 @@ export const classify = internalAction({
         });
       });
     }
-    return { classifications: results, provider: model };
+    return {
+      classifications: results,
+      provider: model,
+      durationMs: Date.now() - started,
+    };
   },
 });

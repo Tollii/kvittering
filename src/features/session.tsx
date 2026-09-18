@@ -1,3 +1,4 @@
+import { recognizeWithFoundation } from "@/lib/foundation-recognition";
 import {
   createContext,
   useCallback,
@@ -51,7 +52,7 @@ type SessionData = {
   completeReceipts: boolean;
   online: boolean;
   queue: LocalReceipt[];
-  synchronize: () => Promise<void>;
+  synchronize: (retryFailed?: boolean) => Promise<void>;
 };
 const SessionContext = createContext<SessionData | null>(null);
 const client = convexUrl
@@ -178,59 +179,81 @@ function HouseholdProvider({
     if (status === "CanLoadMore") loadMore(100);
   }, [status, loadMore]);
   const householdId = household?.id;
-  const synchronize = useCallback(async () => {
-    if (!householdId || Platform.OS === "web") return;
+  const synchronize = useCallback(
+    async (retryFailed = false) => {
+      if (!householdId || Platform.OS === "web") return;
 
-    try {
-      if (!canUpload.current) return;
-      await drainQueue(
-        owner,
-        householdId,
-        {
-          reserve: (entry) =>
-            convex.mutation(api.receipts.reserve, {
-              clientId: entry.id,
-              imageCount: entry.images.length,
-              householdId,
-            }),
-          upload: async (id, position, name) => {
-            const token = await fetchAccessToken();
-            if (!active.current || !canUpload.current)
-              throw new Error(
-                "Opplastingen fortsetter når du åpner appen med nett.",
-              );
-            const response = await nativeFetch(
-              `${convexSiteUrl}/receipt-image?receipt=${id}&position=${position}`,
-              {
-                method: "POST",
-                headers: {
-                  Authorization: `Bearer ${token}`,
-                  "Content-Type": "image/jpeg",
+      try {
+        if (!canUpload.current) return;
+        if (retryFailed) {
+          for (const entry of receiptStorage.list(owner, householdId)) {
+            entry.error = undefined;
+            receiptStorage.update(entry);
+          }
+        }
+        await drainQueue(
+          owner,
+          householdId,
+          {
+            reserve: (entry) =>
+              convex.mutation(api.receipts.reserve, {
+                clientId: entry.id,
+                processingEngine: entry.processingEngine ?? "gpt",
+                imageCount: entry.images.length,
+                householdId,
+              }),
+            upload: async (id, position, name) => {
+              const token = await fetchAccessToken();
+              if (!active.current || !canUpload.current)
+                throw new Error(
+                  "Opplastingen fortsetter når du åpner appen med nett.",
+                );
+              const response = await nativeFetch(
+                `${convexSiteUrl}/receipt-image?receipt=${id}&position=${position}`,
+                {
+                  method: "POST",
+                  headers: {
+                    Authorization: `Bearer ${token}`,
+                    "Content-Type": "image/jpeg",
+                  },
+                  body: imageFile(name),
+                  signal: AbortSignal.timeout(60000),
                 },
-                body: imageFile(name),
-                signal: AbortSignal.timeout(60000),
-              },
-            );
-            if (!response.ok)
-              throw new Error(
-                "Bildet kunne ikke lastes opp. Prøv igjen med nett.",
               );
+              if (!response.ok)
+                throw new Error(
+                  "Bildet kunne ikke lastes opp. Prøv igjen med nett.",
+                );
+            },
+            prepare: async (entry) => {
+              if (
+                entry.processingEngine === "foundation" &&
+                !entry.foundationResult
+              )
+                entry.foundationResult = await recognizeWithFoundation(
+                  entry.images.map((name) => imageFile(name).uri),
+                );
+            },
+            complete: (id, entry) =>
+              convex.mutation(api.receipts.completeUpload, {
+                id,
+                foundationResult: entry.foundationResult,
+              }),
           },
-          complete: (id) =>
-            convex.mutation(api.receipts.completeUpload, { id }),
-        },
-        () => {},
-        () =>
-          active.current &&
-          canUpload.current &&
-          AppState.currentState === "active",
-      );
-      setQueueError("");
-    } catch {
-      if (active.current)
-        setQueueError("Kunne ikke lese kvitteringene på denne enheten.");
-    }
-  }, [convex, householdId, owner]);
+          () => {},
+          () =>
+            active.current &&
+            canUpload.current &&
+            AppState.currentState === "active",
+        );
+        setQueueError("");
+      } catch {
+        if (active.current)
+          setQueueError("Kunne ikke lese kvitteringene på denne enheten.");
+      }
+    },
+    [convex, householdId, owner],
+  );
   useEffect(() => {
     const initialUpload = setTimeout(() => void synchronize(), 0);
     const interval = setInterval(() => {
@@ -273,7 +296,11 @@ function HouseholdProvider({
       }}
     >
       {queueError ? <Notice error>{queueError}</Notice> : null}
-      <CatalogQueryProvider key={`${owner}:${household.id}`} scope={`${owner}:${household.id}`} online={online}>
+      <CatalogQueryProvider
+        key={`${owner}:${household.id}`}
+        scope={`${owner}:${household.id}`}
+        online={online}
+      >
         {children}
       </CatalogQueryProvider>
     </SessionContext.Provider>

@@ -1,3 +1,4 @@
+import { ProcessingSettings } from "@/features/processing-settings";
 import { useState } from "react";
 import { Alert, Share } from "react-native";
 import { router } from "expo-router";
@@ -100,6 +101,7 @@ export default function Settings() {
         />
         {!!message && <Copy>{message}</Copy>}
       </Panel>
+      <ProcessingSettings />
       <NotificationSettings />
       <Panel>
         <Copy size={20} weight="600">

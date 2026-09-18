@@ -145,3 +145,49 @@ describe("durable receipt upload", () => {
     expect(rows()[0].uploaded).toEqual([false, false]);
   });
 });
+
+it("retains the chosen local engine and successful local output after a failed server commit", async () => {
+  const { run, rows, store } = fixture();
+  store.update({ ...rows()[0], processingEngine: "foundation" });
+  let recognitions = 0;
+  let commits = 0;
+  const transport: UploadTransport = {
+    reserve: async (entry) => {
+      expect(entry.processingEngine).toBe("foundation");
+      return receiptId;
+    },
+    upload: async () => {},
+    prepare: async (entry) => {
+      if (!entry.foundationResult) {
+        recognitions++;
+        entry.foundationResult = {
+          extraction: "{}",
+          classifications: [],
+          durationMs: 100,
+          systemVersion: "27",
+        };
+      }
+    },
+    complete: async (_id, entry) => {
+      expect(entry.foundationResult?.extraction).toBe("{}");
+      if (++commits === 1) throw new Error("Offline");
+    },
+  };
+  const resume = () =>
+    run(
+      "user",
+      household,
+      transport,
+      () => {},
+      () => true,
+    );
+  await resume();
+  expect(rows()[0].foundationResult).toBeDefined();
+  await resume();
+  expect(commits).toBe(1);
+  store.update({ ...rows()[0], error: undefined });
+  await resume();
+  expect(recognitions).toBe(1);
+  expect(commits).toBe(2);
+  expect(rows()).toEqual([]);
+});

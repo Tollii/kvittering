@@ -1,3 +1,7 @@
+import { useProcessingEngine } from "@/lib/processing-preferences";
+import { processingEngineName } from "@/lib/domain/processing-engine";
+import { rereadWithFoundation } from "@/lib/foundation-reprocessing";
+import { ReceiptReadingHistory } from "@/features/receipt-reading-history";
 import { usePreventRemove } from "expo-router/react-navigation";
 import { useEffect, useRef, useState } from "react";
 import { Alert, Platform, View } from "react-native";
@@ -10,7 +14,7 @@ import {
 import { useConvex, useQuery } from "convex/react";
 import { randomUUID } from "expo-crypto";
 import { api } from "../../../convex/_generated/api";
-import type { Id } from "../../../convex/_generated/dataModel";
+import type { Doc, Id } from "../../../convex/_generated/dataModel";
 import {
   Button,
   Copy,
@@ -58,19 +62,30 @@ export default function ReceiptPage() {
         <Loading title="Henter kvittering …" />
       </Screen>
     );
-  return <ReceiptEditor key={id} receipt={detail.receipt} online={online} />;
+  return (
+    <ReceiptEditor
+      key={id}
+      receipt={detail.receipt}
+      readings={detail.extractions}
+      online={online}
+    />
+  );
 }
 function ReceiptEditor({
   receipt,
+  readings,
   online,
 }: {
   receipt: Receipt;
+  readings: Doc<"extractions">[];
   online: boolean;
 }) {
+  const engine = useProcessingEngine();
   const client = useConvex();
   const colors = useTheme();
   const { receipts } = useHousehold();
   const [data, setData] = useState<ReceiptData | null>(receipt.data);
+  const [loadedData, setLoadedData] = useState(receipt.data);
   const [revision, setRevision] = useState(receipt.revision);
   const [duplicateResolved, setDuplicateResolved] = useState(
     receipt.duplicateResolved,
@@ -185,6 +200,7 @@ function ReceiptEditor({
   }
   function reset(current: Receipt) {
     setData(current.data);
+    setLoadedData(current.data);
     setRevision(current.revision);
     setDuplicateResolved(current.duplicateResolved);
     setExcluded(current.excluded);
@@ -203,7 +219,12 @@ function ReceiptEditor({
     setAllLines(current.status === "reviewed");
     setGeneration((value) => value + 1);
   }
-  if (!dirty && !busy && revision !== receipt.revision) reset(receipt);
+  if (
+    !dirty &&
+    !busy &&
+    (revision !== receipt.revision || loadedData !== receipt.data)
+  )
+    reset(receipt);
   const moneyError = (key: string, value: string | null) =>
     setMoneyErrors((previous) => {
       const next = { ...previous };
@@ -294,7 +315,19 @@ function ReceiptEditor({
   }
   const retry = () =>
     void run(async () => {
-      await client.mutation(api.receipts.retry, { id: receipt._id });
+      if (engine === "foundation") {
+        const result = await rereadWithFoundation(receipt);
+        await client.mutation(api.receipts.reprocessFoundation, {
+          id: receipt._id,
+          revision: receipt.revision,
+          generation: receipt.generation,
+          result,
+        });
+      } else
+        await client.mutation(api.receipts.retry, {
+          id: receipt._id,
+          processingEngine: "gpt",
+        });
       setMessage("Kvitteringen behandles på nytt.");
     });
   return (
@@ -358,7 +391,7 @@ function ReceiptEditor({
               disabled={processing || !online || busy || dirty}
               onPress={retry}
             >
-              Les bildene på nytt
+              Les bildene på nytt ({processingEngineName(engine)})
             </Stack.Toolbar.MenuAction>
             <Stack.Toolbar.MenuAction
               icon="trash"
@@ -474,6 +507,13 @@ function ReceiptEditor({
             onPress={() => setFields(true)}
           />
         </View>
+        <Copy size={12} muted>
+          Seneste lesing: {receipt.provider}
+        </Copy>
+        {readings.length > 0 && <ReceiptReadingHistory readings={readings} />}
+        {busy && engine === "foundation" && (
+          <Notice>Leser med Foundation Models. Hold appen åpen …</Notice>
+        )}
         {excluded && <Notice>Utelatt fra forbruk.</Notice>}
         {data && !processing && receipt.catalogStatus === "pending" && (
           <Copy size={13} muted>

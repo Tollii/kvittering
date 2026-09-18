@@ -37,12 +37,15 @@ export const processReceipt = workflow
         args,
       );
       if (!storageIds) return null;
-      const extraction: { data: ReceiptData; provider: string } =
-        await step.runAction(
-          internal.providers.extract,
-          { storageIds },
-          { retry: { maxAttempts: 3, initialBackoffMs: 2000, base: 2 } },
-        );
+      const extraction: {
+        data: ReceiptData;
+        provider: string;
+        durationMs: number;
+      } = await step.runAction(
+        internal.providers.extract,
+        { storageIds },
+        { retry: { maxAttempts: 3, initialBackoffMs: 2000, base: 2 } },
+      );
       const prepared = await step.runQuery(internal.processing.applyAliases, {
         id: args.id,
         data: extraction.data,
@@ -70,6 +73,7 @@ export const processReceipt = workflow
       });
       await step.runMutation(internal.processing.finish, {
         matches,
+        durationMs: extraction.durationMs + classification.durationMs,
         ...args,
         data: prepared,
         original: extraction.data,
@@ -138,6 +142,7 @@ export const finish = internalMutation({
     original: receiptDataValidator,
     matches: v.optional(v.array(productDecision)),
     provider: v.string(),
+    durationMs: v.optional(v.number()),
   },
   returns: v.null(),
   handler: async (ctx, args) => {
@@ -160,6 +165,8 @@ export const finish = internalMutation({
       generation: args.generation,
       data: args.original,
       provider: args.provider,
+      classifiedData: args.data,
+      ...(args.durationMs !== undefined ? { durationMs: args.durationMs } : {}),
     });
     let duplicateOf = receipt.duplicateOf;
     if (
@@ -271,7 +278,10 @@ export const finish = internalMutation({
       catalogWorkflowId: undefined,
     });
     if (env.KASSALAPP_API_KEY)
-      await ctx.scheduler.runAfter(0, internal.catalogMatching.start, { id: args.id, generation: args.generation });
+      await ctx.scheduler.runAfter(0, internal.catalogMatching.start, {
+        id: args.id,
+        generation: args.generation,
+      });
     if (!receipt.receiptReadyNotified) {
       await ctx.db.patch("receipts", args.id, { receiptReadyNotified: true });
       const subscriptions = await ctx.db
