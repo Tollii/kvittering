@@ -101,6 +101,24 @@ export const join = mutation({
     return household._id;
   },
 });
+export const setBudget = mutation({
+  args: { monthlyBudgetOre: v.union(v.number(), v.null()) },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    const member = await requireMember(ctx);
+    if (
+      args.monthlyBudgetOre !== null &&
+      (!Number.isSafeInteger(args.monthlyBudgetOre) ||
+        args.monthlyBudgetOre <= 0 ||
+        args.monthlyBudgetOre > 100_000_000)
+    )
+      throw new Error("Ugyldig budsjett.");
+    await ctx.db.patch("households", member.householdId, {
+      monthlyBudgetOre: args.monthlyBudgetOre ?? undefined,
+    });
+    return null;
+  },
+});
 export const rotateInvitation = mutation({
   args: { invitation: v.string() },
   returns: v.null(),

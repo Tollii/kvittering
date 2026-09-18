@@ -17,6 +17,7 @@ import {
   SectionTitle,
 } from "@/components/ui";
 import { useHousehold } from "@/features/session";
+import { BudgetSettings } from "@/features/budget-settings";
 import {
   disableNotifications,
   NotificationSettings,
@@ -168,6 +169,8 @@ export default function Settings() {
           </Panel>
         </>
       )}
+      <SectionTitle title="Budsjett" />
+      <BudgetSettings />
       <SectionTitle title="Varsler" />
       <NotificationSettings />
       <SectionTitle title="På denne enheten" />

@@ -132,7 +132,13 @@ export function NotificationRouting() {
       )
         return;
       lastIdentifier = response.notification.request.identifier;
-      const id: unknown = response.notification.request.content.data?.receiptId;
+      const data = response.notification.request.content.data ?? {};
+      if (data.route === "/spending") {
+        router.navigate("/spending");
+        await Notifications.clearLastNotificationResponseAsync();
+        return;
+      }
+      const id: unknown = data.receiptId;
       if (typeof id !== "string") return;
       try {
         const result = await client.query(api.receipts.detail, {

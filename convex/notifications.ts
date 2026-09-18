@@ -147,6 +147,12 @@ export const delivery = internalQuery({
   },
 });
 
+export const subscription = internalQuery({
+  args: { id: v.id("deviceSubscriptions") },
+  returns: v.union(schema.doc("deviceSubscriptions"), v.null()),
+  handler: (ctx, { id }) => ctx.db.get("deviceSubscriptions", id),
+});
+
 export const removeExpired = internalMutation({
   args: { id: v.id("deviceSubscriptions") },
   returns: v.null(),

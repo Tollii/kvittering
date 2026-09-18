@@ -148,10 +148,12 @@ export default defineSchema({
     "by_name",
     ["name"],
   ),
-  households: defineTable({ name: v.string(), invitation: v.string() }).index(
-    "by_invitation",
-    ["invitation"],
-  ),
+  households: defineTable({
+    name: v.string(),
+    invitation: v.string(),
+    /** Monthly product-spending budget in øre; unset means no budget. */
+    monthlyBudgetOre: v.optional(v.number()),
+  }).index("by_invitation", ["invitation"]),
   members: defineTable({
     householdId: v.id("households"),
     identity: v.string(),

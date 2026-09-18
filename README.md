@@ -79,6 +79,7 @@ For a release from your computer, use `npm run testflight`.
 - Receipt review as a checklist: one action chip per open question, one-tap confirmation of suggested categories, and swipe-to-approve in the inbox when categories are all that remain. Confirmed categories are remembered per store and settle the same item on later receipts, approving them automatically when nothing else is open. Every approved receipt also teaches a looser memory keyed by store and receipt name (`categoryMemory`): after two agreeing approvals, or one explicit "husk", an uncertain reading of that item is settled without asking.
 - Receipt review, correction, category memory, product matching, duplicate checks, exclusion, reprocessing, and deletion.
 - Spending by month, category, store, and purchase type; daily purchase calendar; receipt and product history.
+- Optional monthly budget (Settings → Budsjett). Forbruk shows pace against the elapsed share of the month; a Sunday-evening push (`convex/crons.ts` → `digest.sendAll`) summarises the week and the budget position for subscribed devices.
 - Native tabs, SF Symbols, native date selection, light and dark themes, and system sharing.
 
 Capture works offline after the account and household have been loaded once. Receipt images stay on the device until the server confirms the upload. The queue is separate for each account and household. Server receipt history and edits need a connection; the app does not promise background uploads after iOS suspends it, but processing never depends on the phone once the images are in storage.

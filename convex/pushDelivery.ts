@@ -65,6 +65,47 @@ export const send = internalAction({
   },
 });
 
+/** A plain notification that is not about one receipt, such as the weekly digest. */
+export const sendMessage = internalAction({
+  args: {
+    subscriptionId: v.id("deviceSubscriptions"),
+    title: v.string(),
+    body: v.string(),
+  },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    const subscription = await ctx.runQuery(
+      internal.notifications.subscription,
+      {
+        id: args.subscriptionId,
+      },
+    );
+    if (!subscription) return null;
+    try {
+      const response = await fetch("https://exp.host/--/api/v2/push/send", {
+        method: "POST",
+        headers: headers(),
+        body: JSON.stringify({
+          to: subscription.token,
+          sound: "default",
+          title: args.title,
+          body: args.body,
+          data: { route: "/spending" },
+        }),
+      });
+      if (!response.ok) throw new Error(`Push service: ${response.status}`);
+      const result = (await response.json()) as { data?: PushResult };
+      if (result.data?.details?.error === "DeviceNotRegistered")
+        await ctx.runMutation(internal.notifications.removeExpired, {
+          id: args.subscriptionId,
+        });
+    } catch {
+      console.warn("Digest notification delivery failed.");
+    }
+    return null;
+  },
+});
+
 export const checkReceipt = internalAction({
   args: { ticketId: v.string(), subscriptionId: v.id("deviceSubscriptions") },
   returns: v.null(),

@@ -17,6 +17,8 @@ import type * as catalogLinks from "../catalogLinks.js";
 import type * as catalogMatching from "../catalogMatching.js";
 import type * as catalogQueue from "../catalogQueue.js";
 import type * as catalogWorker from "../catalogWorker.js";
+import type * as crons from "../crons.js";
+import type * as digest from "../digest.js";
 import type * as households from "../households.js";
 import type * as http from "../http.js";
 import type * as kassalapp_generated_client from "../kassalapp/generated/client.js";
@@ -100,6 +102,8 @@ declare const fullApi: ApiFromModules<{
   catalogMatching: typeof catalogMatching;
   catalogQueue: typeof catalogQueue;
   catalogWorker: typeof catalogWorker;
+  crons: typeof crons;
+  digest: typeof digest;
   households: typeof households;
   http: typeof http;
   "kassalapp/generated/client": typeof kassalapp_generated_client;

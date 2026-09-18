@@ -31,13 +31,14 @@ import {
 import { formatMoney, osloDate } from "@/lib/domain/receipt";
 import { categoryById } from "@/lib/domain/categories";
 import { openReceipt, receiptNeeds } from "@/components/receipt-card";
-import { useTheme } from "@/constants/theme";
+import { mosaicHighlight, useTheme } from "@/constants/theme";
+import { budgetPace, paceLabel } from "@/lib/domain/budget";
 import { formatDate } from "@/lib/format-date";
 import { catalogInsights } from "@/lib/catalog/insights";
 import { router } from "expo-router";
 
 export default function Spending() {
-  const { receipts, loadingReceipts, completeReceipts, online } =
+  const { receipts, loadingReceipts, completeReceipts, online, details } =
     useHousehold();
   const colors = useTheme();
   const currentMonth = osloDate().slice(0, 7);
@@ -129,6 +130,11 @@ export default function Spending() {
   }).format(new Date(`${month}-01T12:00:00Z`));
   const monthLabel =
     rawMonth.charAt(0).toLocaleUpperCase("nb-NO") + rawMonth.slice(1);
+  const budgetOre = details?.household.monthlyBudgetOre ?? null;
+  const pace =
+    budgetOre && budgetOre > 0
+      ? budgetPace(budgetOre, totals.products, month)
+      : null;
   const [whole, fraction] = formatMoney(totals.products)
     .replace(/\s?kr$/, "")
     .split(",");
@@ -239,6 +245,47 @@ export default function Spending() {
                     }`
                   : ""}
               </Copy>
+              {pace && (
+                <View style={{ gap: 6, paddingTop: 6 }}>
+                  <View
+                    style={{
+                      height: 6,
+                      borderRadius: 3,
+                      backgroundColor: "#FFFFFF33",
+                      overflow: "hidden",
+                    }}
+                  >
+                    <View
+                      style={{
+                        height: 6,
+                        borderRadius: 3,
+                        width: `${Math.min(100, pace.spentShare * 100)}%`,
+                        backgroundColor:
+                          pace.status === "over" ? mosaicHighlight : "#FFFFFF",
+                      }}
+                    />
+                    {pace.elapsedShare > 0 && pace.elapsedShare < 1 && (
+                      <View
+                        style={{
+                          position: "absolute",
+                          left: `${pace.elapsedShare * 100}%`,
+                          top: -2,
+                          width: 2,
+                          height: 10,
+                          backgroundColor: "#FFFFFFAA",
+                        }}
+                      />
+                    )}
+                  </View>
+                  <Copy
+                    size={13}
+                    weight="600"
+                    style={{ color: colors.onHero, opacity: 0.9 }}
+                  >
+                    {paceLabel(pace)}
+                  </Copy>
+                </View>
+              )}
             </View>
           </Panel>
           {!completeReceipts && <Notice>Henter kvitteringer …</Notice>}
