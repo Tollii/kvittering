@@ -19,7 +19,7 @@ import {
 } from "@/components/ui";
 import { Mosaic } from "@/components/mosaic";
 import { SpendingBars, SpendingDetails } from "@/components/spending-details";
-import { FamilyPurchases } from "@/components/family-purchases";
+import { FamilyPurchases, familySummary } from "@/components/family-purchases";
 import { SpendingCalendar } from "@/components/spending-calendar";
 import { useHousehold } from "@/features/session";
 import {
@@ -44,7 +44,7 @@ export default function Spending() {
   const [month, setMonth] = useState(currentMonth);
   const [filters, setFilters] = useState(false);
   const [report, setReport] = useState<
-    "catalog" | "calendar" | "meat" | "changes" | "coverage" | null
+    "catalog" | "families" | "calendar" | "meat" | "changes" | "coverage" | null
   >(null);
   const [showAllGroups, setShowAllGroups] = useState(false);
   const [reviewedOnly, setReviewedOnly] = useState(false);
@@ -417,7 +417,6 @@ export default function Spending() {
               </View>
             ))}
           </Panel>
-          <FamilyPurchases receipts={totals.selected} />
           <SectionTitle title="Utforsk forbruket" />
           <Panel style={{ gap: 0, paddingVertical: 4 }}>
             {[
@@ -426,6 +425,12 @@ export default function Spending() {
                 title: "Produkter og merker",
                 icon: "barcode" as const,
                 value: `${catalog.linked} av ${catalog.total} koblet`,
+              },
+              {
+                id: "families" as const,
+                title: "Mengder kjøpt",
+                icon: "scalemass" as const,
+                value: familySummary(totals.selected),
               },
               {
                 id: "calendar" as const,
@@ -481,13 +486,15 @@ export default function Spending() {
         title={
           report === "catalog"
             ? "Produkter og merker"
-            : report === "calendar"
-              ? "Handlekalender"
-              : report === "meat"
-                ? "Kjøtt og fisk"
-                : report === "changes"
-                  ? "Endringer fra forrige måned"
-                  : "Om tallene"
+            : report === "families"
+              ? "Mengder kjøpt"
+              : report === "calendar"
+                ? "Handlekalender"
+                : report === "meat"
+                  ? "Kjøtt og fisk"
+                  : report === "changes"
+                    ? "Endringer fra forrige måned"
+                    : "Om tallene"
         }
         visible={report !== null}
         onClose={() => setReport(null)}
@@ -521,6 +528,12 @@ export default function Spending() {
               </>
             )}
           </>
+        )}
+        {report === "families" && (
+          <FamilyPurchases
+            receipts={totals.selected}
+            onClose={() => setReport(null)}
+          />
         )}
         {report === "calendar" && (
           <SpendingCalendar

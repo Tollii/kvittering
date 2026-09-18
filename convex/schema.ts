@@ -1,4 +1,3 @@
-import { processingEngineValidator } from "../src/lib/domain/processing-engine";
 import { catalogDecision } from "../src/lib/catalog/decisions";
 import { defineSchema, defineTable } from "convex/server";
 import { v } from "convex/values";
@@ -10,7 +9,6 @@ import {
   physicalStoreValidator,
 } from "../src/lib/catalog/model";
 import { vEventId, vWorkflowId } from "@convex-dev/workflow";
-import { searchRepairValidator } from "../src/lib/catalog/search-repair";
 import {
   packageProfileValidator,
   productAnalysisValidator,
@@ -34,7 +32,6 @@ export const receiptFields = {
   generation: v.number(),
   data: v.union(receiptDataValidator, v.null()),
   provider: v.string(),
-  processingEngine: v.optional(processingEngineValidator),
   error: v.union(v.string(), v.null()),
   duplicateOf: v.union(v.id("receipts"), v.null()),
   duplicateResolved: v.boolean(),
@@ -46,7 +43,6 @@ export const receiptFields = {
   ),
   catalogWorkflowId: v.optional(vWorkflowId),
   catalogDecisions: v.optional(v.array(catalogDecision)),
-  catalogSearchRepairs: v.optional(v.array(searchRepairValidator)),
   productAnalysis: v.optional(productAnalysisValidator),
 };
 export default defineSchema({
@@ -79,11 +75,6 @@ export default defineSchema({
         confidence: v.number(),
       }),
     ),
-  }).index("by_householdId_and_key", ["householdId", "key"]),
-  catalogSearchSuggestions: defineTable({
-    householdId: v.id("households"),
-    key: v.string(),
-    search: v.union(v.string(), v.null()),
   }).index("by_householdId_and_key", ["householdId", "key"]),
   catalogRequests: defineTable({
     key: v.string(),

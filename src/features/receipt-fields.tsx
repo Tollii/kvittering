@@ -100,7 +100,7 @@ export function ReceiptFields({
           icon="calendar"
           onPress={() => setShowDate(!showDate)}
         />
-        {showDate && Platform.OS !== "web" && (
+        {showDate && (
           <DateTimePicker
             value={
               new Date(
@@ -119,15 +119,6 @@ export function ReceiptFields({
                   purchaseDate: `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`,
                 });
             }}
-          />
-        )}
-        {Platform.OS === "web" && (
-          <Field
-            label="Kjøpsdato (ÅÅÅÅ-MM-DD)"
-            value={data.purchaseDate ?? ""}
-            onChangeText={(purchaseDate) =>
-              onChange({ ...data, purchaseDate: purchaseDate || null })
-            }
           />
         )}
       </Panel>

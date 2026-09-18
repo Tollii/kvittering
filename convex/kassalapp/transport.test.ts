@@ -1,8 +1,9 @@
 import { afterEach, expect, it, vi } from "vitest";
+import { kassalappFetch, CatalogRequestError } from "./transport";
+// vi.mock is hoisted, so the import above still sees the mocked module.
 vi.mock("../_generated/server", () => ({
   env: { KASSALAPP_API_KEY: "test-key" },
 }));
-import { kassalappFetch, CatalogRequestError } from "./transport";
 afterEach(() => vi.unstubAllGlobals());
 it("adapts OpenAPI boolean query values to Kassalapp's accepted encoding", async () => {
   const fetch = vi

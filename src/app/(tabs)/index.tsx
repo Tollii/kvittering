@@ -10,7 +10,6 @@ import {
   AppState,
   Image,
   Linking,
-  Platform,
   Pressable,
   StyleSheet,
   View,
@@ -29,7 +28,6 @@ import {
   IconButton,
   Notice,
   Panel,
-  Screen,
   Sheet,
   Toggle,
   pressed,
@@ -199,14 +197,6 @@ export default function Capture() {
       {children}
     </View>
   );
-  if (Platform.OS === "web")
-    return (
-      <Screen title="Ny kvittering" subtitle={household.name} settings>
-        <Notice>
-          Åpne Kvitto på iPhone for å ta og lagre kvitteringsbilder.
-        </Notice>
-      </Screen>
-    );
   return (
     <View style={{ flex: 1, backgroundColor: cameraBackground }}>
       {live && (

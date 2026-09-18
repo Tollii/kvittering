@@ -32,7 +32,6 @@ import { canAcceptReceipt } from "../src/lib/domain/receipt-review";
 import { categoryById } from "../src/lib/domain/categories";
 import { lineValidator } from "../src/lib/domain/receipt";
 import type { Id } from "./_generated/dataModel";
-import { savedSearchRepair } from "../src/lib/catalog/search-repair";
 
 import { catalogDecision } from "../src/lib/catalog/decisions";
 export { catalogDecision } from "../src/lib/catalog/decisions";
@@ -206,9 +205,7 @@ export const inputs = internalQuery({
         : null;
       result.push({
         line,
-        search:
-          savedSearchRepair(receipt.catalogSearchRepairs, line)?.search ??
-          productSearch(line.name).slice(0, 120),
+        search: productSearch(line.name).slice(0, 120),
         product:
           record &&
           compatibleCatalogProduct(line, record.product, !!mapping?.confirmedBy)

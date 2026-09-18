@@ -103,7 +103,6 @@ export const reserve = mutation({
       generation: 0,
       data: null,
       provider: "pending",
-      processingEngine: "gpt",
       error: null,
       duplicateOf: null,
       duplicateResolved: false,
@@ -139,7 +138,6 @@ export const retry = mutation({
     const generation = receipt.generation + 1;
     await ctx.db.patch("receipts", id, {
       status: "uploaded",
-      processingEngine: "gpt",
       generation,
       error: null,
     });

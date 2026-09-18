@@ -1,5 +1,5 @@
 import { expect, it } from "vitest";
-import { batteryFixture, reconcile } from "./receipt";
+import { batteryFixture, reconcile, weeklyShopFixture } from "./receipt";
 import {
   balanceWithAdjustment,
   canAcceptReceipt,
@@ -168,4 +168,25 @@ it("quick-approves only when suggested categories are the last open question", (
   unclear.lines[0].categoryId = "fallback.unclear";
   unclear.lines[0].issues = ["Kategorien er usikker."];
   expect(quickApproveData(unclear, false)).toBeNull();
+});
+
+it("walks a weekly shop from reading to approval", () => {
+  const data = weeklyShopFixture();
+  // 239+399+1499+429+949+35 = 3550 products, -300 -122 discounts, +200 -430 deposits = 2898; unknown coffee line
+  expect(reviewTasks(data, false).map((task) => task.kind)).toEqual([
+    "categories",
+    "amounts",
+  ]);
+  expect(reviewSummary(data, false)).toEqual(["1 kategori", "1 beløp mangler"]);
+  data.lines.find((line) => line.id === "unknown")!.amountOre = 13000;
+  // Now the lines sum to 41980 minus nothing missing: check reconcile agrees with the printed total.
+  expect(reconcile(data).difference).toBe(0);
+  expect(
+    quickApproveData(data, false)?.lines.find((line) => line.id === "cheez")
+      ?.issues,
+  ).toEqual([]);
+  expect(canAcceptReceipt(confirmSuggestedCategories(data), false)).toBe(true);
+  const balanced = balanceWithAdjustment({ ...data, totalOre: 42000 }, "adj");
+  expect(reconcile(balanced).difference).toBe(0);
+  expect(balanced.lines.at(-1)?.amountOre).toBe(20);
 });

@@ -83,7 +83,7 @@ For a release from your computer, use `npm run testflight`.
 
 Capture works offline after the account and household have been loaded once. Receipt images stay on the device until the server confirms the upload. The queue is separate for each account and household. Server receipt history and edits need a connection; the app does not promise background uploads after iOS suspends it, but processing never depends on the phone once the images are in storage.
 
-The browser command is for layout inspection. Native capture and persistent offline storage require iOS or Android. The old PWA in `sveltemo/` is a reference and is excluded from Metro, TypeScript, lint, and tests. The active backend is `convex/` at the root; do not run the old backend at the same time.
+iOS is the only target. The old PWA in `sveltemo/` is a reference and is excluded from Metro, TypeScript, lint, and tests. The active backend is `convex/` at the root; do not run the old backend at the same time.
 
 ## Convex configuration
 
@@ -136,20 +136,11 @@ full match, or the only compatible product that contains every receipt word and 
 size, pack, packaging or ordinary-variant words (`BATTERY WHIRL` → `Battery Whirl Sugar 0,5l boks`).
 **Finn produkter på nytt** in the receipt menu re-runs matching for an existing receipt.
 
-After a completed catalog search returns no products, the iOS app can use the on-device
-Foundation Model to suggest a repaired query. This runs while the app is open and online;
-it does not delay receipt processing. It requires the native `suggestProductSearch` method
-and an available Apple Intelligence model. Unsupported devices keep the normal lookup path.
-Convex validates the suggestion, stores it within the household, and runs catalog matching
-again using the original receipt evidence. A suggestion does not establish product identity.
-Unchanged or rejected suggestions are recorded to avoid repeated model calls. Service errors
-are retried separately and are never treated as empty catalog results. Manual product choices
-and edits made during generation take priority. This improves product links for aggregation;
-it does not infer missing quantities. Product-family analysis runs separately after catalog matching.
+Product-family analysis runs after catalog matching.
 
 ### Product families and purchased quantities
 
-**Forbruk → Mengder kjøpt** groups the same product across package sizes and stores.
+**Forbruk → Utforsk forbruket → Mengder kjøpt** groups the same product across package sizes and stores.
 Jev selects a family using receipt and cached catalog evidence. It keeps different brands,
 flavours and variants such as Original and Zero separate. Exact catalog links and receipt
 text remain unchanged. Fresh products can have a family without a catalog match.

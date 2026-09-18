@@ -90,7 +90,6 @@ export function saveLocalReceipts(
           owner,
           householdId,
           createdAt: Date.now(),
-          processingEngine: "gpt",
           images,
           uploaded: images.map(() => false),
         } satisfies LocalReceipt;

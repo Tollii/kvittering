@@ -8,7 +8,7 @@ import {
   useSyncExternalStore,
   type ReactNode,
 } from "react";
-import { AppState, Platform } from "react-native";
+import { AppState } from "react-native";
 import {
   ConvexProviderWithAuth,
   ConvexReactClient,
@@ -40,7 +40,6 @@ import { createQueueRunner, type LocalReceipt } from "@/lib/upload-queue";
 import { Loading, Notice, Screen } from "@/components/ui";
 import { CatalogQueryProvider } from "./catalog-query-provider";
 import { ProductAnalysisSync } from "./product-analysis-sync";
-import { CatalogSearchRepair } from "./catalog-search-repair";
 import { SignIn, HouseholdSetup } from "./sign-in";
 
 type Household = NonNullable<FunctionReturnType<typeof api.households.current>>;
@@ -182,7 +181,7 @@ function HouseholdProvider({
   const householdId = household?.id;
   const synchronize = useCallback(
     async (retryFailed = false) => {
-      if (!householdId || Platform.OS === "web") return;
+      if (!householdId) return;
 
       try {
         if (!canUpload.current) return;
@@ -290,10 +289,6 @@ function HouseholdProvider({
         online={online}
       >
         <ProductAnalysisSync
-          receipts={page.results}
-          enabled={online && auth.isAuthenticated && !!details}
-        />
-        <CatalogSearchRepair
           receipts={page.results}
           enabled={online && auth.isAuthenticated && !!details}
         />

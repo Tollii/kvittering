@@ -1,4 +1,3 @@
-import type { ProcessingEngine } from "./domain/processing-engine";
 import type { Id } from "../../convex/_generated/dataModel";
 
 export type LocalReceipt = {
@@ -10,7 +9,6 @@ export type LocalReceipt = {
   uploaded: boolean[];
   receiptId?: Id<"receipts">;
   error?: string;
-  processingEngine?: ProcessingEngine;
 };
 export interface QueueStore {
   list(owner: string, householdId: Id<"households">): LocalReceipt[];

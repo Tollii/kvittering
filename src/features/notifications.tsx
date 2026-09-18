@@ -21,7 +21,6 @@ Notifications.setNotificationHandler({
   }),
 });
 export async function disableNotifications(client: ConvexReactClient) {
-  if (Platform.OS === "web") return;
   const token = await SecureStore.getItemAsync(tokenKey);
   if (token) {
     await client.mutation(api.notifications.unsubscribe, { token });
@@ -42,12 +41,8 @@ export function NotificationSettings() {
     Constants.expoConfig?.extra?.eas?.projectId ??
     Constants.easConfig?.projectId;
   const available =
-    Device.isDevice &&
-    Platform.OS !== "web" &&
-    !!projectId &&
-    Constants.appOwnership !== "expo";
+    Device.isDevice && !!projectId && Constants.appOwnership !== "expo";
   useEffect(() => {
-    if (Platform.OS === "web") return;
     const refresh = async () => {
       try {
         setToken(await SecureStore.getItemAsync(tokenKey));
@@ -128,7 +123,6 @@ export function NotificationRouting() {
   const { household } = useHousehold();
   const [error, setError] = useState("");
   useEffect(() => {
-    if (Platform.OS === "web") return;
     let active = true;
     let lastIdentifier: string | undefined;
     async function open(response: Notifications.NotificationResponse | null) {

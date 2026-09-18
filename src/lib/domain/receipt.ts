@@ -305,6 +305,106 @@ export function batteryFixture(): ReceiptData {
   };
 }
 
+/**
+ * A weekly shop as the reader typically returns it: several products, one
+ * uncertain category, an item discount tied to a product, a receipt-level
+ * discount, a deposit and its return, and an unread amount on one line.
+ */
+export function weeklyShopFixture(): ReceiptData {
+  const product = (
+    id: string,
+    name: string,
+    amountOre: number | null,
+    categoryId: string,
+    extra: Partial<ReceiptLine> = {},
+  ): ReceiptLine => ({
+    ...emptyLine(id),
+    name,
+    originalText:
+      `${name} ${amountOre === null ? "" : (amountOre / 100).toFixed(2).replace(".", ",")}`.trim(),
+    amountOre,
+    categoryId,
+    confidence: 0.9,
+    manual: false,
+    ...extra,
+  });
+  return {
+    store: "REMA 1000",
+    branch: "Kanalveien",
+    purchaseDate: "2026-09-12",
+    purchaseTime: "17:42",
+    receiptNumber: "4711",
+    currency: "NOK",
+    totalOre: 41980,
+    originalText: "",
+    issues: [],
+    lines: [
+      product("milk", "TINE LETTMELK 1L", 2390, "dairy.milk"),
+      product("bread", "KNEIPP", 3990, "bakery.bread"),
+      product("chicken", "KYLLINGFILET 900G", 14990, "meat-fish.poultry", {
+        packageSize: 900,
+        packageUnit: "g",
+      }),
+      product("cheez", "CHEEZ DOODLES XL", 4290, "snacks.crisps", {
+        confidence: 0.4,
+        issues: ["Kategorien er usikker."],
+      }),
+      product("cola", "COCA-COLA10PK BX", 9490, "drinks.soft-drinks", {
+        packageSize: 10,
+        packageUnit: "pk",
+      }),
+      product("bag", "BÆREPOSE", 350, "other-purchases.bags"),
+      product("unknown", "KAFFE EVERGOOD", null, "drinks.coffee"),
+      {
+        ...emptyLine("chicken-discount"),
+        kind: "item_discount",
+        name: "Rabatt kyllingfilet",
+        originalText: "RABATT -30,00",
+        amountOre: -3000,
+        relatedLineId: "chicken",
+        categoryId: null,
+        manual: false,
+      },
+      {
+        ...emptyLine("member-discount"),
+        kind: "receipt_discount",
+        name: "Æ-rabatt",
+        originalText: "Æ RABATT -12,20",
+        amountOre: -1220,
+        categoryId: null,
+        manual: false,
+      },
+      {
+        ...emptyLine("deposit"),
+        kind: "deposit",
+        name: "Pant",
+        originalText: "PANT 20,00",
+        amountOre: 2000,
+        categoryId: null,
+        manual: false,
+      },
+      {
+        ...emptyLine("deposit-return"),
+        kind: "deposit_return",
+        name: "Pantretur",
+        originalText: "PANTRETUR -43,00",
+        amountOre: -4300,
+        categoryId: null,
+        manual: false,
+      },
+      {
+        ...emptyLine("vat"),
+        kind: "vat",
+        name: "MVA 15 %",
+        originalText: "MVA 15% 40,12",
+        amountOre: 4012,
+        categoryId: null,
+        manual: false,
+      },
+    ],
+  };
+}
+
 /** Send only product evidence to the classifier, including a linked offer's product description. */
 export function classificationInputs(data: ReceiptData) {
   return data.lines

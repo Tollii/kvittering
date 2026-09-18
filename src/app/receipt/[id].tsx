@@ -1,4 +1,3 @@
-import { ReceiptReadingHistory } from "@/features/receipt-reading-history";
 import { usePreventRemove } from "expo-router/react-navigation";
 import { useEffect, useRef, useState } from "react";
 import {
@@ -1013,9 +1012,6 @@ function ReceiptEditor({
                           })
                   }
                 />
-              )}
-              {readings.length > 0 && (
-                <ReceiptReadingHistory readings={readings} />
               )}
             </Disclosure>
             <ReceiptFields

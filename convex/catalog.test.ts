@@ -1,6 +1,6 @@
 /// <reference types="vite/client" />
 import { convexTest } from "convex-test";
-import workpool from "@convex-dev/workpool/test";
+import { register as registerWorkpool } from "@convex-dev/workpool/test";
 import { afterEach, expect, it, vi } from "vitest";
 import { api, internal } from "./_generated/api";
 import schema from "./schema";
@@ -13,7 +13,7 @@ afterEach(() => vi.useRealTimers());
 async function setup() {
   vi.useFakeTimers();
   const t = convexTest(schema, modules);
-  workpool.register(t, "catalogWorkpool");
+  registerWorkpool(t, "catalogWorkpool");
   const first = t.withIdentity({
     subject: "first",
     issuer: "https://test.local",

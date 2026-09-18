@@ -1,5 +1,4 @@
 import { useEffect } from "react";
-import { Platform } from "react-native";
 import { router } from "expo-router";
 import { ShareIntentProvider, useShareIntentContext } from "expo-share-intent";
 import { offerImportedFiles } from "@/lib/pending-import";
@@ -28,7 +27,6 @@ export function ShareIntentRouting() {
 }
 
 export function ShareIntentRoot({ children }: { children: React.ReactNode }) {
-  if (Platform.OS === "web") return <>{children}</>;
   return (
     <ShareIntentProvider options={{ resetOnBackground: false }}>
       {children}
