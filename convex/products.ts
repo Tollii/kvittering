@@ -219,7 +219,8 @@ export async function correctProducts(
       ? await createProduct(ctx, householdId, retailer, line)
       : change.productId;
     await linkProduct(ctx, householdId, retailer, line, id);
-    line.productMatchManual = true;
+  line.productMatchManual = true;
+    line.catalogProduct = null;
     await saveMapping(ctx, householdId, retailer, line, id, editor);
   }
 }

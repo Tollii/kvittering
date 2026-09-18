@@ -1,4 +1,5 @@
 import { router } from "expo-router";
+import { View } from "react-native";
 import {
   Button,
   Copy,
@@ -23,7 +24,11 @@ export default function Inbox() {
   return (
     <Screen
       title="Innboks"
-      subtitle="Kvitteringer som venter på kontroll."
+      subtitle={
+        pending.length
+          ? `${pending.length} ${pending.length === 1 ? "kvittering" : "kvitteringer"} venter`
+          : undefined
+      }
       settings
     >
       {!online && (
@@ -33,18 +38,18 @@ export default function Inbox() {
       )}
       {queue.length > 0 && (
         <Panel>
-          <Copy size={20} weight="600">
+          <Copy size={16} weight="600">
             På denne enheten
           </Copy>
           {queue.map((entry) => (
-            <Panel key={entry.id}>
+            <View key={entry.id} style={{ gap: 4 }}>
               <Copy weight="600">{entry.images.length} bilde(r) lagret</Copy>
               <Copy muted>
                 {entry.uploaded.filter(Boolean).length} av {entry.images.length}{" "}
                 lastet opp
               </Copy>
               {!!entry.error && <Notice error>{entry.error}</Notice>}
-            </Panel>
+            </View>
           ))}
           <Button
             title="Prøv opplasting"

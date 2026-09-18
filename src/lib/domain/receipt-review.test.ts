@@ -1,6 +1,10 @@
 import { expect, it } from "vitest";
 import { batteryFixture } from "./receipt";
-import { canAcceptReceipt, lineReviewIssues } from "./receipt-review";
+import {
+  canAcceptReceipt,
+  confirmLineCategory,
+  lineReviewIssues,
+} from "./receipt-review";
 
 it("accepts balanced receipts without optional package details or product links", () => {
   const data = batteryFixture();
@@ -42,4 +46,22 @@ it("keeps a missing amount visible after a general warning is acknowledged", () 
   const line = batteryFixture().lines[0];
   line.amountOre = null;
   expect(lineReviewIssues(line)).toEqual(["Beløpet mangler."]);
+});
+
+it("resolves category uncertainty without dismissing other review requirements", () => {
+  const line = batteryFixture().lines[0];
+  line.issues = ["Kategorien er usikker.", "Mulig overlapp."];
+  line.amountOre = null;
+  const corrected = confirmLineCategory(line, "drinks.energy-drinks");
+  expect(corrected.categoryId).toBe("drinks.energy-drinks");
+  expect(corrected.manual).toBe(true);
+  expect(lineReviewIssues(corrected)).toEqual([
+    "Mulig overlapp.",
+    "Beløpet mangler.",
+  ]);
+  expect(line.issues).toContain("Kategorien er usikker.");
+  expect(confirmLineCategory(line, "fallback.unclear").issues).toContain(
+    "Kategorien er usikker.",
+  );
+  expect(() => confirmLineCategory(line, "not-a-category")).toThrow();
 });

@@ -1,0 +1,38 @@
+import { afterEach, expect, it, vi } from "vitest";
+vi.mock("../_generated/server", () => ({
+  env: { KASSALAPP_API_KEY: "test-key" },
+}));
+import { kassalappFetch, CatalogRequestError } from "./transport";
+afterEach(() => vi.unstubAllGlobals());
+it("adapts OpenAPI boolean query values to Kassalapp's accepted encoding", async () => {
+  const fetch = vi
+    .fn()
+    .mockResolvedValue(new Response('{"data":[]}', { status: 200 }));
+  vi.stubGlobal("fetch", fetch);
+  await kassalappFetch("/products?search=Stratos&unique=true");
+  expect(String(fetch.mock.calls[0][0])).toBe(
+    "https://kassal.app/api/v1/products?search=Stratos&unique=1",
+  );
+  expect(fetch.mock.calls[0][1].headers.Authorization).toBe("Bearer test-key");
+});
+it("retains the rate-limit status and Retry-After delay", async () => {
+  vi.stubGlobal(
+    "fetch",
+    vi
+      .fn()
+      .mockResolvedValue(
+        new Response("", { status: 429, headers: { "Retry-After": "120" } }),
+      ),
+  );
+  await expect(kassalappFetch("/products")).rejects.toMatchObject({
+    status: 429,
+    retryAfterMs: 120000,
+  });
+  vi.stubGlobal(
+    "fetch",
+    vi.fn().mockResolvedValue(new Response("", { status: 401 })),
+  );
+  await expect(kassalappFetch("/products")).rejects.toBeInstanceOf(
+    CatalogRequestError,
+  );
+});

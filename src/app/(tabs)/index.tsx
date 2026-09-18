@@ -11,7 +11,7 @@ import {
 import { CameraView, useCameraPermissions } from "expo-camera";
 import { ImageManipulator, SaveFormat } from "expo-image-manipulator";
 import * as ImagePicker from "expo-image-picker";
-import { useIsFocused } from "expo-router";
+import { router, useIsFocused } from "expo-router";
 import {
   Button,
   Copy,
@@ -131,8 +131,8 @@ export default function Capture() {
       ) : (
         <View
           style={{
-            height: 390,
-            borderRadius: 28,
+            height: 330,
+            borderRadius: 20,
             overflow: "hidden",
             backgroundColor: "#14271F",
             justifyContent: "center",
@@ -250,6 +250,11 @@ export default function Capture() {
             Hold appen åpen mens bildene lastes opp. Resultatet kommer i
             innboksen.
           </Copy>
+          <Button
+            title="Se i innboksen"
+            secondary
+            onPress={() => router.navigate("/inbox")}
+          />
         </Panel>
       )}
       {!!error && !review && <Notice error>{error}</Notice>}
@@ -263,6 +268,21 @@ export default function Capture() {
         onClose={() => {
           if (!busy) setReview(false);
         }}
+        footer={
+          <>
+            {!!error && <Notice error>{error}</Notice>}
+            <Button
+              title={
+                combined || photos.length === 1
+                  ? "Lagre kvittering"
+                  : `Lagre ${photos.length} kvitteringer`
+              }
+              disabled={!photos.length}
+              busy={busy}
+              onPress={() => void save()}
+            />
+          </>
+        }
       >
         <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 12 }}>
           {photos.map((uri, index) => (
@@ -300,17 +320,6 @@ export default function Capture() {
             ? "Bildene leses i rekkefølgen over."
             : "Hvert bilde lagres som en egen kvittering."}
         </Copy>
-        {!!error && <Notice error>{error}</Notice>}
-        <Button
-          title={
-            combined || photos.length === 1
-              ? "Lagre kvittering"
-              : `Lagre ${photos.length} kvitteringer`
-          }
-          disabled={!photos.length}
-          busy={busy}
-          onPress={() => void save()}
-        />
         <Button
           title="Ta flere bilder"
           secondary

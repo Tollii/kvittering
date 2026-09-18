@@ -12,6 +12,7 @@ import {
   extractionSchema,
   extractionInstructions,
   overlapInstructions,
+  uncertaintyInstructions,
   prepareExtraction,
 } from "../src/lib/domain/receipt-extraction";
 import { categories } from "../src/lib/domain/categories";
@@ -51,7 +52,7 @@ export const extract = internalAction({
       input: [
         {
           role: "system",
-          content: `${extractionInstructions}\n\n${overlapInstructions}`,
+          content: `${extractionInstructions}\n\n${overlapInstructions}\n\n${uncertaintyInstructions}`,
         },
         {
           role: "user",

@@ -1,6 +1,26 @@
 import { reconcile, type ReceiptData, type ReceiptLine } from "./receipt";
+import { categoryById } from "./categories";
 
 export const categoryReviewThreshold = 0.5;
+
+/** A category decision resolves category uncertainty, not reading or amount errors. */
+export function confirmLineCategory(
+  line: ReceiptLine,
+  categoryId: string,
+): ReceiptLine {
+  if (line.kind !== "product" || !categoryById.has(categoryId))
+    throw new Error("Velg en gyldig varekategori.");
+  return {
+    ...line,
+    categoryId,
+    manual: true,
+    confidence: 1,
+    issues:
+      categoryId === "fallback.unclear"
+        ? line.issues
+        : line.issues.filter((issue) => issue !== "Kategorien er usikker."),
+  };
+}
 
 export function lineReviewIssues(line: ReceiptLine): string[] {
   const issues = [...line.issues];

@@ -21,6 +21,7 @@ import {
   productPrices,
 } from "@/lib/domain/insights";
 import { formatMoney } from "@/lib/domain/receipt";
+import { formatDate } from "@/lib/format-date";
 export default function History() {
   const { receipts, loadingReceipts, completeReceipts } = useHousehold();
   const [search, setSearch] = useState("");
@@ -48,7 +49,7 @@ export default function History() {
   const selected = allProducts.find((product) => product.key === selectedKey);
   const prices = selected ? productPrices(selected.contributions) : null;
   return (
-    <Screen title="Historikk" subtitle="Det dere har handlet" settings>
+    <Screen title="Historikk" settings>
       <Field
         label="Søk i historikk"
         placeholder="Butikk, vare eller etikett"
@@ -135,7 +136,9 @@ export default function History() {
             <SpendingBars
               rows={prices.observations.map((observation, index) => ({
                 id: String(index),
-                name: observation.contribution.receipt.data!.purchaseDate!,
+                name: formatDate(
+                  observation.contribution.receipt.data!.purchaseDate,
+                ),
                 amountOre: observation.ore,
                 contributions: [observation.contribution],
               }))}
@@ -153,7 +156,7 @@ export default function History() {
             {selected.contributions.map((contribution, index) => (
               <Row
                 key={index}
-                title={contribution.receipt.data?.purchaseDate ?? "Dato ukjent"}
+                title={formatDate(contribution.receipt.data?.purchaseDate)}
                 detail={`${contribution.receipt.data?.store} · ${contribution.line ? matchLabel(contribution.line) : ""}`}
                 value={formatMoney(contribution.amountOre)}
                 onPress={() => {

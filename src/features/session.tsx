@@ -38,6 +38,7 @@ import {
 } from "@/lib/receipt-storage";
 import { createQueueRunner, type LocalReceipt } from "@/lib/upload-queue";
 import { Loading, Notice, Screen } from "@/components/ui";
+import { CatalogQueryProvider } from "./catalog-query-provider";
 import { SignIn, HouseholdSetup } from "./sign-in";
 
 type Household = NonNullable<FunctionReturnType<typeof api.households.current>>;
@@ -272,7 +273,9 @@ function HouseholdProvider({
       }}
     >
       {queueError ? <Notice error>{queueError}</Notice> : null}
-      {children}
+      <CatalogQueryProvider key={`${owner}:${household.id}`} scope={`${owner}:${household.id}`} online={online}>
+        {children}
+      </CatalogQueryProvider>
     </SessionContext.Provider>
   );
 }

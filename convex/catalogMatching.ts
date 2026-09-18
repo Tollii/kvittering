@@ -1,0 +1,377 @@
+import { v } from "convex/values";
+import {
+  WorkflowManager,
+  start as startWorkflow,
+  vWorkflowId,
+} from "@convex-dev/workflow";
+import { components, internal } from "./_generated/api";
+import {
+  internalMutation,
+  internalQuery,
+  mutation,
+  env,
+} from "./_generated/server";
+import { requireReceipt } from "./access";
+import schema from "./schema";
+import { findMapping } from "./products";
+import { linkCatalogProduct } from "./catalogLinks";
+import {
+  catalogProductValidator,
+  type CatalogRequest,
+} from "../src/lib/catalog/model";
+import {
+  productSearch,
+  compatibleCatalogProduct,
+  retailerCode,
+  lineEvidenceKey,
+  exactPhysicalStore,
+} from "../src/lib/catalog/matching";
+import { normalizeSearch } from "../src/lib/catalog/policy";
+import { matchingKey } from "../src/lib/domain/product-matching";
+import { canAcceptReceipt } from "../src/lib/domain/receipt-review";
+import { categoryById } from "../src/lib/domain/categories";
+import { lineValidator } from "../src/lib/domain/receipt";
+import type { Id } from "./_generated/dataModel";
+
+export const catalogDecision = v.object({
+  lineId: v.string(),
+  evidenceKey: v.string(),
+  productKey: v.union(v.string(), v.null()),
+  categoryId: v.union(v.string(), v.null()),
+  categoryConfidence: v.number(),
+});
+const workflow = new WorkflowManager(components.workflow);
+export const process = workflow
+  .define({
+    args: { id: v.id("receipts"), generation: v.number() },
+    returns: v.null(),
+  })
+  .handler(async (step, args): Promise<null> => {
+    try {
+      const receipt = await step.runQuery(
+        internal.catalogMatching.receipt,
+        args,
+      );
+      if (!receipt?.data) return null;
+      const inputs = await step.runQuery(internal.catalogMatching.inputs, args);
+      const requests = new Map<string, CatalogRequest>();
+      for (const item of inputs)
+        if (!item.product && item.search.length >= 3)
+          requests.set(item.search, { kind: "products", search: item.search });
+      const branch = receipt.data.branch?.trim();
+      if (
+        branch &&
+        branch.length >= 3 &&
+        !receipt.data.physicalStore &&
+        !receipt.data.physicalStoreManual
+      )
+        requests.set("physical-store", {
+          kind: "stores",
+          search: branch.slice(0, 120),
+          chain: retailerCode(receipt.data.store),
+        });
+      // Register all missing lookups before waiting; identical requests share one API call.
+      const entries = await Promise.all(
+        [...requests].map(async ([key, request]) => {
+          const result = await step.runMutation(
+            internal.catalogQueue.requestForWorkflow,
+            { request, workflowId: step.workflowId },
+          );
+          return { key, ...result };
+        }),
+      );
+      await Promise.all(
+        entries.map(({ eventId }) =>
+          eventId ? step.awaitEvent({ id: eventId }) : Promise.resolve(),
+        ),
+      );
+      for (let offset = 0; offset < inputs.length; offset += 8) {
+        const decisions = await step.runAction(
+          internal.catalogClassifier.classify,
+          {
+            items: inputs.slice(offset, offset + 8).map((item) => ({
+              ...item,
+              requestId:
+                entries.find((entry) => entry.key === item.search)?.id ?? null,
+            })),
+          },
+        );
+        await step.runMutation(internal.catalogMatching.apply, {
+          ...args,
+          store: receipt.data.store,
+          decisions,
+        });
+      }
+      await step.runMutation(internal.catalogMatching.finish, {
+        ...args,
+        workflowId: step.workflowId,
+        storeRequestId:
+          entries.find((entry) => entry.key === "physical-store")?.id ?? null,
+        requestIds: entries.map((entry) => entry.id),
+      });
+    } catch {
+      await step.runMutation(internal.catalogMatching.failed, {
+        ...args,
+        workflowId: step.workflowId,
+      });
+    }
+    return null;
+  });
+async function launch(
+  ctx: Parameters<typeof startWorkflow>[0],
+  id: Id<"receipts">,
+  generation: number,
+) {
+  return startWorkflow(ctx, internal.catalogMatching.process, {
+    id,
+    generation,
+  });
+}
+export const start = internalMutation({
+  args: { id: v.id("receipts"), generation: v.number() },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    const receipt = await ctx.db.get("receipts", args.id);
+    if (
+      !receipt?.data ||
+      receipt.generation !== args.generation ||
+      receipt.catalogStatus === "pending"
+    )
+      return null;
+    if (!env.KASSALAPP_API_KEY) return null;
+    const workflowId = await launch(ctx, args.id, args.generation);
+    await ctx.db.patch("receipts", args.id, {
+      catalogStatus: "pending",
+      catalogWorkflowId: workflowId,
+    });
+    return null;
+  },
+});
+export const enrich = mutation({
+  args: { id: v.id("receipts"), onlyIfMissing: v.optional(v.boolean()) },
+  returns: v.null(),
+  handler: async (ctx, { id, onlyIfMissing }) => {
+    const { receipt } = await requireReceipt(ctx, id);
+    if (onlyIfMissing && receipt.catalogStatus) return null;
+    if (
+      !receipt.data ||
+      ["uploading", "uploaded", "processing"].includes(receipt.status)
+    )
+      throw new Error("Vent til kvitteringen er lest.");
+    if (!env.KASSALAPP_API_KEY)
+      throw new Error("Legg til KASSALAPP_API_KEY i Convex først.");
+    if (receipt.catalogStatus === "pending") return null;
+    const workflowId = await launch(ctx, id, receipt.generation);
+    await ctx.db.patch("receipts", id, {
+      catalogStatus: "pending",
+      catalogWorkflowId: workflowId,
+    });
+    return null;
+  },
+});
+export const receipt = internalQuery({
+  args: { id: v.id("receipts"), generation: v.number() },
+  returns: v.union(schema.doc("receipts"), v.null()),
+  handler: async (ctx, args) => {
+    const receipt = await ctx.db.get("receipts", args.id);
+    return receipt?.generation === args.generation ? receipt : null;
+  },
+});
+export const matchingInput = v.object({
+  line: lineValidator,
+  search: v.string(),
+  product: v.union(catalogProductValidator, v.null()),
+});
+export const inputs = internalQuery({
+  args: { id: v.id("receipts"), generation: v.number() },
+  returns: v.array(matchingInput),
+  handler: async (ctx, args) => {
+    const receipt = await ctx.db.get("receipts", args.id);
+    if (!receipt?.data || receipt.generation !== args.generation) return [];
+    const data = receipt.data;
+    const result = [];
+    for (const line of data.lines) {
+      if (line.kind !== "product" || line.productMatchManual) continue;
+      const mapping = await findMapping(
+        ctx,
+        receipt.householdId,
+        matchingKey(data.store ?? ""),
+        line,
+      );
+      if (mapping?.confirmedBy && !mapping.productId) continue;
+      const saved = mapping?.productId
+        ? await ctx.db.get("products", mapping.productId)
+        : null;
+      if (mapping?.confirmedBy && !saved?.catalogKey) continue;
+      const key = line.catalogProduct?.key ?? saved?.catalogKey;
+      const record = key
+        ? await ctx.db
+            .query("catalogProducts")
+            .withIndex("by_key", (q) => q.eq("key", key))
+            .unique()
+        : null;
+      result.push({
+        line,
+        search: productSearch(line.name),
+        product:
+          record &&
+          compatibleCatalogProduct(line, record.product, !!mapping?.confirmedBy)
+            ? record.product
+            : null,
+      });
+    }
+    return result;
+  },
+});
+export const apply = internalMutation({
+  args: {
+    id: v.id("receipts"),
+    generation: v.number(),
+    store: v.union(v.string(), v.null()),
+    decisions: v.array(catalogDecision),
+  },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    const receipt = await ctx.db.get("receipts", args.id);
+    if (
+      !receipt?.data ||
+      receipt.generation !== args.generation ||
+      receipt.data.store !== args.store
+    )
+      return null;
+    const data = receipt.data;
+    let changed = false;
+    for (const decision of args.decisions) {
+      const line = data.lines.find((line) => line.id === decision.lineId);
+      if (
+        !line ||
+        line.kind !== "product" ||
+        lineEvidenceKey(line) !== decision.evidenceKey
+      )
+        continue;
+      if (decision.productKey && !line.productMatchManual) {
+        const product = await ctx.db
+          .query("catalogProducts")
+          .withIndex("by_key", (q) => q.eq("key", decision.productKey!))
+          .unique();
+        if (product && line.catalogProduct?.key !== product.key && data.store) {
+          await linkCatalogProduct(
+            ctx,
+            receipt.householdId,
+            data.store,
+            line,
+            product.product,
+            null,
+          );
+          changed = true;
+        }
+      }
+      if (
+        !line.manual &&
+        !line.productKey &&
+        decision.categoryId &&
+        categoryById.has(decision.categoryId) &&
+        decision.categoryId !== "fallback.unclear" &&
+        decision.categoryConfidence >= 0.85
+      ) {
+        if (
+          line.categoryId !== decision.categoryId ||
+          line.issues.includes("Kategorien er usikker.")
+        ) {
+          line.categoryId = decision.categoryId;
+          line.confidence = decision.categoryConfidence;
+          line.issues = line.issues.filter(
+            (issue) => issue !== "Kategorien er usikker.",
+          );
+          changed = true;
+        }
+      }
+    }
+    if (changed) {
+      const acceptable =
+        canAcceptReceipt(
+          data,
+          !!receipt.duplicateOf && !receipt.duplicateResolved,
+        ) && !receipt.provider.includes("mock");
+      await ctx.db.patch("receipts", receipt._id, {
+        data,
+        revision: receipt.revision + 1,
+        ...(acceptable
+          ? {
+              status: "reviewed" as const,
+              autoAccepted:
+                receipt.status !== "reviewed" || receipt.autoAccepted === true,
+            }
+          : {}),
+      });
+    }
+    return null;
+  },
+});
+export const finish = internalMutation({
+  args: {
+    id: v.id("receipts"),
+    generation: v.number(),
+    workflowId: vWorkflowId,
+    storeRequestId: v.union(v.id("catalogRequests"), v.null()),
+    requestIds: v.array(v.id("catalogRequests")),
+  },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    const receipt = await ctx.db.get("receipts", args.id);
+    if (
+      !receipt?.data ||
+      receipt.generation !== args.generation ||
+      receipt.catalogWorkflowId !== args.workflowId
+    )
+      return null;
+    const data = receipt.data;
+    let changed = false;
+    if (
+      args.storeRequestId &&
+      !data.physicalStoreManual &&
+      !data.physicalStore &&
+      data.branch
+    ) {
+      const request = await ctx.db.get("catalogRequests", args.storeRequestId);
+      const store =
+        request?.state === "ready" &&
+        request.request.kind === "stores" &&
+        request.request.chain === retailerCode(data.store) &&
+        request.request.search === normalizeSearch(data.branch)
+          ? exactPhysicalStore(data.branch, request.result.stores)
+          : null;
+      if (store) {
+        data.physicalStore = store;
+        changed = true;
+      }
+    }
+    const requests = await Promise.all(
+      args.requestIds.map((id) => ctx.db.get("catalogRequests", id)),
+    );
+    await ctx.db.patch("receipts", args.id, {
+      catalogStatus: requests.some((request) => request?.state === "error")
+        ? "error"
+        : "complete",
+      ...(changed ? { data, revision: receipt.revision + 1 } : {}),
+    });
+    return null;
+  },
+});
+export const failed = internalMutation({
+  args: {
+    id: v.id("receipts"),
+    generation: v.number(),
+    workflowId: vWorkflowId,
+  },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    const receipt = await ctx.db.get("receipts", args.id);
+    if (
+      receipt?.generation === args.generation &&
+      receipt.catalogWorkflowId === args.workflowId
+    )
+      await ctx.db.patch("receipts", args.id, { catalogStatus: "error" });
+    return null;
+  },
+});

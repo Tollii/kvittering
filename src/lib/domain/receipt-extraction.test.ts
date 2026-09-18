@@ -1,15 +1,17 @@
 import { describe, expect, it } from "vitest";
 import { extractionSchema, prepareExtraction } from "./receipt-extraction";
 import { batteryFixture, reconcile } from "./receipt";
+import { canAcceptReceipt } from "./receipt-review";
 
-const fixture = () => ({
-  ...batteryFixture(),
-  lines: batteryFixture().lines.map((line) => ({
-    ...line,
-    sourceImages: [1],
-    overlapUncertain: false,
-  })),
-});
+const fixture = () =>
+  extractionSchema.parse({
+    ...batteryFixture(),
+    lines: batteryFixture().lines.map((line) => ({
+      ...line,
+      sourceImages: [1],
+      overlapUncertain: false,
+    })),
+  });
 
 describe("receipt image evidence", () => {
   it("counts a row visible in several images once and retains the original text", () => {
@@ -56,10 +58,44 @@ describe("receipt image evidence", () => {
     extracted.lines[0].sourceImages = [0, 4];
     const data = prepareExtraction(extractionSchema.parse(extracted), 3);
     expect(data.lines[0].sourceImages).toEqual([]);
-    expect(data.lines[0].issues).toContain(
-      "Kunne ikke knytte linjen sikkert til et bilde.",
-    );
+    expect(data.lines[0].issues).toEqual([]);
     expect(data.lines[0].amountOre).toBe(2590);
+  });
+});
+
+describe("reading uncertainty", () => {
+  it("accepts minor spelling and variant differences without a separate review", () => {
+    const extracted = fixture();
+    extracted.issues = [
+      { severity: "minor", message: "Utydelig mellomrom i butikknavnet." },
+    ];
+    extracted.lines[0].issues = [
+      {
+        severity: "minor",
+        message: "En bokstav i variantsuffikset er utydelig.",
+      },
+    ];
+    const data = prepareExtraction(extracted, 1);
+    data.lines[0].categoryId = "drinks.energy-drinks";
+    expect(data.issues).toEqual([]);
+    expect(data.lines[0].issues).toEqual([]);
+    expect(canAcceptReceipt(data, false)).toBe(true);
+  });
+
+  it("requires review for unreadable identity and ambiguous amounts even when the sum matches", () => {
+    const extracted = fixture();
+    extracted.lines[0].issues = [
+      { severity: "minor", message: "Utydelig mellomrom." },
+      { severity: "blocking", message: "Kan ikke se hvilken vare dette er." },
+      { severity: "blocking", message: "Beløpet kan være 25,90 eller 26,90." },
+    ];
+    const data = prepareExtraction(extracted, 1);
+    expect(data.lines[0].issues).toEqual([
+      "Kan ikke se hvilken vare dette er.",
+      "Beløpet kan være 25,90 eller 26,90.",
+    ]);
+    expect(reconcile(data).difference).toBe(0);
+    expect(canAcceptReceipt(data, false)).toBe(false);
   });
 });
 

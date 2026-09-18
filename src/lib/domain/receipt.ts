@@ -1,5 +1,9 @@
 import { v, type Infer } from "convex/values";
 import { categoryById } from "./categories";
+import {
+  catalogIdentityValidator,
+  physicalStoreValidator,
+} from "../catalog/model";
 const nullableString = v.union(v.string(), v.null());
 const nullableNumber = v.union(v.number(), v.null());
 export const lineKinds = [
@@ -37,8 +41,11 @@ export const lineValidator = v.object({
   productId: v.optional(v.union(v.id("products"), v.null())),
   productName: v.optional(v.string()),
   productMatchManual: v.optional(v.boolean()),
+  catalogProduct: v.optional(v.union(catalogIdentityValidator, v.null())),
 });
 export const receiptDataValidator = v.object({
+  physicalStore: v.optional(v.union(physicalStoreValidator, v.null())),
+  physicalStoreManual: v.optional(v.boolean()),
   store: nullableString,
   branch: nullableString,
   purchaseDate: nullableString,

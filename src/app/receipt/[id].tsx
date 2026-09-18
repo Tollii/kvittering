@@ -1,28 +1,35 @@
 import { usePreventRemove } from "expo-router/react-navigation";
-import { useState } from "react";
-import { Alert, Platform } from "react-native";
-import { router, useLocalSearchParams, useNavigation } from "expo-router";
+import { useEffect, useRef, useState } from "react";
+import { Alert, Platform, View } from "react-native";
+import {
+  router,
+  Stack,
+  useLocalSearchParams,
+  useNavigation,
+} from "expo-router";
 import { useConvex, useQuery } from "convex/react";
-import DateTimePicker from "@react-native-community/datetimepicker";
 import { randomUUID } from "expo-crypto";
 import { api } from "../../../convex/_generated/api";
 import type { Id } from "../../../convex/_generated/dataModel";
 import {
   Button,
   Copy,
-  Field,
+  Icon,
+  IconButton,
   Loading,
   Notice,
   Panel,
   Row,
   Screen,
+  Segments,
+  Sheet,
   Toggle,
 } from "@/components/ui";
-import { MoneyField } from "@/components/money-field";
 import {
   ReceiptLineEditor,
   type ProductChoice,
 } from "@/features/receipt-line-editor";
+import { ReceiptFields } from "@/features/receipt-fields";
 import { ReceiptImages } from "@/features/receipt-images";
 import {
   formatMoney,
@@ -37,7 +44,9 @@ import {
 } from "@/lib/domain/receipt-review";
 import { useHousehold } from "@/features/session";
 import type { Receipt } from "@/lib/domain/insights";
-import { statusLabels } from "@/components/receipt-card";
+import { receiptStatusLabel } from "@/components/receipt-card";
+import { formatDate } from "@/lib/format-date";
+import { useTheme } from "@/constants/theme";
 
 export default function ReceiptPage() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -45,7 +54,7 @@ export default function ReceiptPage() {
   const detail = useQuery(api.receipts.detail, { id: id as Id<"receipts"> });
   if (!detail)
     return (
-      <Screen>
+      <Screen insetTop={false}>
         <Loading title="Henter kvittering …" />
       </Screen>
     );
@@ -59,6 +68,8 @@ function ReceiptEditor({
   online: boolean;
 }) {
   const client = useConvex();
+  const colors = useTheme();
+  const { receipts } = useHousehold();
   const [data, setData] = useState<ReceiptData | null>(receipt.data);
   const [revision, setRevision] = useState(receipt.revision);
   const [duplicateResolved, setDuplicateResolved] = useState(
@@ -69,18 +80,28 @@ function ReceiptEditor({
   const [productChanges, setProductChanges] = useState<
     Record<string, ProductChoice>
   >({});
+  const [physicalStoreId, setPhysicalStoreId] = useState<
+    number | null | undefined
+  >(undefined);
   const [moneyErrors, setMoneyErrors] = useState<Record<string, string>>({});
   const [busy, setBusy] = useState(false);
+  const operationActive = useRef(false);
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
   const [allLines, setAllLines] = useState(receipt.status === "reviewed");
-  const [summaryLines, setSummaryLines] = useState(false);
-  const [fields, setFields] = useState(
-    !data?.store || !data.purchaseDate || data.totalOre === null,
+  const [reviewLineIds, setReviewLineIds] = useState(
+    () =>
+      new Set(
+        receipt.data?.lines
+          .filter((line) => lineReviewIssues(line).length)
+          .map((line) => line.id),
+      ),
   );
+  const [summaryLines, setSummaryLines] = useState(false);
+  const [fields, setFields] = useState(false);
+  const [actions, setActions] = useState(false);
   const [generation, setGeneration] = useState(0);
   const [dirty, setDirty] = useState(false);
-  const [showDate, setShowDate] = useState(false);
   const navigation = useNavigation();
   usePreventRemove(dirty && !busy, ({ data: action }) => {
     Alert.alert("Forkaste endringene?", "Endringene er ikke lagret.", [
@@ -92,13 +113,72 @@ function ReceiptEditor({
       },
     ]);
   });
-
   const processing = ["processing", "uploaded", "uploading"].includes(
     receipt.status,
   );
+  const catalogRequested = useRef(false);
+  useEffect(() => {
+    if (
+      !online ||
+      dirty ||
+      processing ||
+      !receipt.data ||
+      receipt.catalogStatus ||
+      catalogRequested.current
+    )
+      return;
+    catalogRequested.current = true;
+    void client
+      .mutation(api.catalogMatching.enrich, {
+        id: receipt._id,
+        onlyIfMissing: true,
+      })
+      .catch(() =>
+        setError(
+          "Kunne ikke starte produktsøk. Kvitteringen kan brukes som vanlig.",
+        ),
+      );
+  }, [
+    client,
+    dirty,
+    online,
+    processing,
+    receipt._id,
+    receipt.catalogStatus,
+    receipt.data,
+  ]);
   const totals = data ? reconcile(data) : null;
   const issues = data ? receiptReviewIssues(data) : [];
+  const remaining =
+    data?.lines.filter((line) => lineReviewIssues(line).length).length ?? 0;
+  const ready =
+    !!data &&
+    canAcceptReceipt(data, !!receipt.duplicateOf && !duplicateResolved);
+  const saveDisabled =
+    !online ||
+    processing ||
+    receipt.revision !== revision ||
+    !!Object.keys(moneyErrors).length;
+  const recentCategories = receipts.flatMap(
+    (item) =>
+      item.data?.lines.flatMap((line) =>
+        line.categoryId ? [line.categoryId] : [],
+      ) ?? [],
+  );
+  const visibleLines =
+    data?.lines.filter((line) =>
+      allLines
+        ? summaryLines ||
+          !["summary", "vat"].includes(line.kind) ||
+          lineReviewIssues(line).length
+        : reviewLineIds.has(line.id) || lineReviewIssues(line).length,
+    ) ?? [];
+
   function change(next: ReceiptData) {
+    if (data && (next.store !== data.store || next.branch !== data.branch)) {
+      next = { ...next, physicalStore: null, physicalStoreManual: false };
+      setPhysicalStoreId(undefined);
+    }
     setData(next);
     setDirty(true);
     setMessage("");
@@ -110,10 +190,20 @@ function ReceiptEditor({
     setExcluded(current.excluded);
     setRemember([]);
     setProductChanges({});
+    setPhysicalStoreId(undefined);
     setMoneyErrors({});
     setDirty(false);
+    setReviewLineIds(
+      new Set(
+        current.data?.lines
+          .filter((line) => lineReviewIssues(line).length)
+          .map((line) => line.id),
+      ),
+    );
+    setAllLines(current.status === "reviewed");
     setGeneration((value) => value + 1);
   }
+  if (!dirty && !busy && revision !== receipt.revision) reset(receipt);
   const moneyError = (key: string, value: string | null) =>
     setMoneyErrors((previous) => {
       const next = { ...previous };
@@ -122,6 +212,8 @@ function ReceiptEditor({
       return next;
     });
   async function run(action: () => Promise<void>) {
+    if (operationActive.current) return;
+    operationActive.current = true;
     setBusy(true);
     setError("");
     try {
@@ -129,25 +221,37 @@ function ReceiptEditor({
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "Kunne ikke lagre.");
     } finally {
+      operationActive.current = false;
       setBusy(false);
     }
   }
-  async function save(reviewed: boolean) {
-    if (!data || Object.keys(moneyErrors).length) return;
+  async function save() {
+    if (!data || saveDisabled) return;
     await run(async () => {
       await client.mutation(api.receipts.save, {
         id: receipt._id,
         revision,
         data,
-        reviewed,
+        reviewed: ready,
         rememberLineIds: remember,
-        productChanges: Object.entries(productChanges).map(
-          ([lineId, choice]) => ({
+        productChanges: Object.entries(productChanges)
+          .filter(([, choice]) => choice.kind !== "catalog")
+          .map(([lineId, choice]) => ({
             lineId,
             productId: choice.kind === "existing" ? choice.id : null,
             createNew: choice.kind === "new",
-          }),
+          })),
+        catalogChanges: Object.entries(productChanges).flatMap<{
+          lineId: string;
+          key: string | null;
+        }>(([lineId, choice]) =>
+          choice.kind === "catalog"
+            ? [{ lineId, key: choice.product.key }]
+            : choice.kind === "separate"
+              ? [{ lineId, key: null }]
+              : [],
         ),
+        physicalStoreId,
         duplicateResolved,
         excluded,
       });
@@ -155,371 +259,490 @@ function ReceiptEditor({
         id: receipt._id,
       });
       reset(result.receipt);
-      setMessage("Endringene er lagret.");
+      setMessage(
+        ready
+          ? "Kvitteringen er kontrollert."
+          : "Lagret. Du kan fortsette kontrollen senere.",
+      );
     });
   }
-  function close() {
-    router.back();
+  function addLine() {
+    if (!data) return;
+    change({ ...data, lines: [emptyLine(randomUUID()), ...data.lines] });
+    setAllLines(true);
   }
+  function removeReceipt() {
+    Alert.alert(
+      "Slett kvitteringen?",
+      "Kvitteringen og bildene blir slettet.",
+      [
+        { text: "Avbryt", style: "cancel" },
+        {
+          text: "Slett",
+          style: "destructive",
+          onPress: () =>
+            void run(async () => {
+              await client.mutation(api.receipts.remove, {
+                id: receipt._id,
+                revision,
+              });
+              router.back();
+            }),
+        },
+      ],
+    );
+  }
+  const retry = () =>
+    void run(async () => {
+      await client.mutation(api.receipts.retry, { id: receipt._id });
+      setMessage("Kvitteringen behandles på nytt.");
+    });
   return (
-    <Screen
-      insetTop={false}
-      title={data?.store || receipt.data?.store || "Ny kvittering"}
-      subtitle={`Lastet opp av ${receipt.uploaderName}`}
-    >
-      <Copy muted>{statusLabels[receipt.status]}</Copy>
-      {!online && (
-        <Notice>Uten nett. Koble til nettet før du lagrer endringer.</Notice>
+    <>
+      <Stack.Screen
+        options={{
+          title: data?.store || receipt.data?.store || "Kvittering",
+          ...(Platform.OS !== "ios"
+            ? {
+                headerRight: () => (
+                  <IconButton
+                    name="ellipsis"
+                    label="Flere handlinger"
+                    onPress={() => setActions(true)}
+                  />
+                ),
+              }
+            : {}),
+        }}
+      />
+      {Platform.OS === "ios" && (
+        <Stack.Toolbar placement="right">
+          <Stack.Toolbar.Menu icon="ellipsis" title="Flere handlinger">
+            <Stack.Toolbar.MenuAction
+              icon="pencil"
+              disabled={!data || busy}
+              onPress={() => setFields(true)}
+            >
+              Kvitteringsdetaljer
+            </Stack.Toolbar.MenuAction>
+            <Stack.Toolbar.MenuAction
+              icon="plus"
+              disabled={!data || busy || processing}
+              onPress={addLine}
+            >
+              Legg til linje
+            </Stack.Toolbar.MenuAction>
+            <Stack.Toolbar.MenuAction
+              icon="list.bullet"
+              isOn={summaryLines}
+              onPress={() => {
+                setSummaryLines(!summaryLines);
+                setAllLines(true);
+              }}
+            >
+              Vis MVA og oppsummering
+            </Stack.Toolbar.MenuAction>
+            <Stack.Toolbar.MenuAction
+              icon="eye.slash"
+              isOn={excluded}
+              disabled={busy}
+              onPress={() => {
+                setExcluded(!excluded);
+                setDirty(true);
+              }}
+            >
+              Utelat fra forbruk
+            </Stack.Toolbar.MenuAction>
+            <Stack.Toolbar.MenuAction
+              icon="arrow.clockwise"
+              disabled={processing || !online || busy || dirty}
+              onPress={retry}
+            >
+              Les bildene på nytt
+            </Stack.Toolbar.MenuAction>
+            <Stack.Toolbar.MenuAction
+              icon="trash"
+              destructive
+              disabled={!online || busy || receipt.status === "uploading"}
+              onPress={removeReceipt}
+            >
+              Slett kvittering
+            </Stack.Toolbar.MenuAction>
+          </Stack.Toolbar.Menu>
+        </Stack.Toolbar>
       )}
-      {receipt.revision !== revision && (
-        <Panel>
-          <Notice>
-            Kvitteringen har nye endringer. Hent siste versjon før du lagrer.
-          </Notice>
-          <Button
-            title="Hent siste versjon"
-            secondary
-            onPress={() => {
-              if (dirty)
-                Alert.alert(
-                  "Hente siste versjon?",
-                  "Dine ulagrede endringer blir fjernet.",
-                  [
-                    { text: "Avbryt", style: "cancel" },
-                    { text: "Hent", onPress: () => reset(receipt) },
-                  ],
-                );
-              else reset(receipt);
-            }}
-          />
-        </Panel>
-      )}
-      <ReceiptImages receipt={receipt} />
-      {receipt.provider.includes("mock") && (
-        <Notice>
-          Demodata fra en testleverandør. Bildet er ikke lest av en modell.
-        </Notice>
-      )}
-      {!!receipt.error && <Notice error>{receipt.error}</Notice>}
-      {receipt.duplicateOf && (
-        <Panel>
-          <Copy weight="600">Mulig duplikat</Copy>
-          <Copy muted>Samme bilde eller kjøpsdetaljer finnes fra før.</Copy>
-          <Toggle
-            label="Jeg har kontrollert duplikatet"
-            value={duplicateResolved}
-            onChange={(value) => {
-              setDuplicateResolved(value);
-              setDirty(true);
-            }}
-          />
-        </Panel>
-      )}
-      {data && totals ? (
-        <>
-          <Button
-            secondary
-            title="Butikk, dato og betalingsdetaljer"
-            onPress={() => setFields(!fields)}
-          />
-          {fields && (
-            <Panel key={`fields-${generation}`}>
-              <Field
-                label="Butikk"
-                value={data.store ?? ""}
-                onChangeText={(store) =>
-                  change({ ...data, store: store || null })
-                }
-              />
-              <Field
-                label="Avdeling / sted"
-                value={data.branch ?? ""}
-                onChangeText={(branch) =>
-                  change({ ...data, branch: branch || null })
-                }
-              />
-              <Row
-                title="Kjøpsdato"
-                detail={data.purchaseDate ?? "Dato ukjent"}
-                onPress={() => setShowDate(!showDate)}
-              />
-              {showDate && Platform.OS !== "web" && (
-                <DateTimePicker
-                  value={
-                    new Date(
-                      `${data.purchaseDate || new Date().toISOString().slice(0, 10)}T12:00:00`,
-                    )
+      <Screen
+        insetTop={false}
+        footer={
+          data && !processing ? (
+            <>
+              {!!error && (
+                <Copy
+                  size={13}
+                  style={{ color: colors.danger }}
+                  accessibilityRole="alert"
+                >
+                  {error}
+                </Copy>
+              )}
+              {!!message && (
+                <Copy
+                  size={13}
+                  style={{ color: colors.primary }}
+                  accessibilityLiveRegion="polite"
+                >
+                  {message}
+                </Copy>
+              )}
+              <View
+                style={{ flexDirection: "row", alignItems: "center", gap: 8 }}
+              >
+                <Icon
+                  name={ready ? "checkmark.circle" : "exclamationmark.circle"}
+                  size={17}
+                  color={ready ? colors.primary : colors.warning}
+                />
+                <Copy size={13} muted style={{ flex: 1 }}>
+                  {remaining
+                    ? `${remaining} ${remaining === 1 ? "vare" : "varer"} må kontrolleres`
+                    : !ready
+                      ? "Kontroller kvitteringsdetaljene"
+                      : dirty
+                        ? "Endringene er klare til lagring"
+                        : receiptStatusLabel(receipt)}
+                </Copy>
+              </View>
+              {(dirty || receipt.status !== "reviewed") && (
+                <Button
+                  title={
+                    !ready && dirty
+                      ? "Lagre for senere"
+                      : dirty
+                        ? "Lagre og godkjenn"
+                        : "Godkjenn kvittering"
                   }
-                  mode="date"
-                  display={Platform.OS === "ios" ? "inline" : "default"}
-                  locale="nb-NO"
-                  onChange={(_event, date) => {
-                    if (Platform.OS !== "ios") setShowDate(false);
-                    if (date)
+                  busy={busy}
+                  disabled={saveDisabled || (!dirty && !ready)}
+                  onPress={() => void save()}
+                />
+              )}
+            </>
+          ) : undefined
+        }
+      >
+        {!online && (
+          <Notice>Uten nett. Koble til nettet før du lagrer endringer.</Notice>
+        )}
+        {receipt.revision !== revision && (
+          <Panel>
+            <Notice>
+              Kvitteringen har nye endringer. Hent siste versjon før du lagrer.
+            </Notice>
+            <Button
+              title="Hent siste versjon"
+              secondary
+              onPress={() => {
+                if (dirty)
+                  Alert.alert(
+                    "Hente siste versjon?",
+                    "Dine ulagrede endringer blir fjernet.",
+                    [
+                      { text: "Avbryt", style: "cancel" },
+                      { text: "Hent", onPress: () => reset(receipt) },
+                    ],
+                  );
+                else reset(receipt);
+              }}
+            />
+          </Panel>
+        )}
+        <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+          <View style={{ flex: 1, gap: 4 }}>
+            <Copy size={28} weight="700">
+              {formatMoney(data?.totalOre ?? null)}
+            </Copy>
+            <Copy size={13} muted>
+              {formatDate(data?.purchaseDate)}
+              {data?.branch ? ` · ${data.branch}` : ""}
+            </Copy>
+          </View>
+          <ReceiptImages receipt={receipt} compact />
+          <IconButton
+            name="pencil"
+            label="Rediger kvitteringsdetaljer"
+            disabled={!data || busy}
+            onPress={() => setFields(true)}
+          />
+        </View>
+        {excluded && <Notice>Utelatt fra forbruk.</Notice>}
+        {data && !processing && receipt.catalogStatus === "pending" && (
+          <Copy size={13} muted>
+            Henter produktinformasjon automatisk …
+          </Copy>
+        )}
+        {data && !processing && receipt.catalogStatus === "error" && (
+          <Row
+            title="Prøv produktsøk igjen"
+            detail="Produktinformasjonen kunne ikke hentes. Kvitteringen kan brukes som vanlig."
+            onPress={
+              !online || busy || dirty
+                ? undefined
+                : () =>
+                    void run(async () => {
+                      await client.mutation(api.catalogMatching.enrich, {
+                        id: receipt._id,
+                      });
+                    })
+            }
+          />
+        )}
+        {receipt.provider.includes("mock") && (
+          <Notice>Demodata. Bildet er ikke lest av en modell.</Notice>
+        )}
+        {!!receipt.error && <Notice error>{receipt.error}</Notice>}
+        {!!receipt.duplicateOf && !duplicateResolved && (
+          <Panel>
+            <Copy weight="600">Mulig duplikat</Copy>
+            <Copy muted size={13}>
+              Samme bilde eller kjøpsdetaljer finnes fra før.
+            </Copy>
+            <Button
+              title="Dette er et eget kjøp"
+              secondary
+              disabled={busy}
+              onPress={() => {
+                setDuplicateResolved(true);
+                setDirty(true);
+              }}
+            />
+          </Panel>
+        )}
+        {data && totals ? (
+          <View
+            pointerEvents={busy || processing ? "none" : "auto"}
+            style={{ gap: 10 }}
+          >
+            {issues.length > 0 && (
+              <Panel>
+                <Notice>{issues.join("\n")}</Notice>
+                <Row
+                  title="Kontroller kvitteringsdetaljer"
+                  onPress={() => setFields(true)}
+                />
+                {data.issues.length > 0 && (
+                  <Button
+                    title="Bekreft opplysningene"
+                    secondary
+                    onPress={() => change({ ...data, issues: [] })}
+                  />
+                )}
+              </Panel>
+            )}
+            <Segments
+              value={allLines ? "all" : "review"}
+              onChange={(value) => setAllLines(value === "all")}
+              options={[
+                { value: "review", label: `Til kontroll (${remaining})` },
+                {
+                  value: "all",
+                  label: `Alle (${data.lines.filter((line) => !["summary", "vat"].includes(line.kind)).length})`,
+                },
+              ]}
+            />
+            {!allLines && visibleLines.length === 0 && (
+              <Panel>
+                <Copy weight="600">Ingen varer trenger kontroll</Copy>
+                <Copy size={13} muted>
+                  Du kan se alle linjene eller godkjenne kvitteringen.
+                </Copy>
+              </Panel>
+            )}
+            {visibleLines.length > 0 && (
+              <Panel
+                style={{ gap: 0, paddingVertical: 0, paddingHorizontal: 14 }}
+              >
+                {visibleLines.map((line) => (
+                  <ReceiptLineEditor
+                    key={`${generation}-${line.id}`}
+                    line={line}
+                    lines={data.lines}
+                    receiptId={receipt._id}
+                    retailer={data.store ?? ""}
+                    recentCategories={recentCategories}
+                    remember={remember.includes(line.id)}
+                    productChoice={productChanges[line.id]}
+                    onChange={(next) =>
                       change({
                         ...data,
-                        purchaseDate: `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`,
+                        lines: data.lines.map((item) =>
+                          item.id === line.id ? next : item,
+                        ),
+                      })
+                    }
+                    onRemember={(value) => {
+                      setRemember((previous) =>
+                        value
+                          ? [...new Set([...previous, line.id])]
+                          : previous.filter((id) => id !== line.id),
+                      );
+                      setDirty(true);
+                    }}
+                    onProduct={(choice) => {
+                      setProductChanges((previous) => ({
+                        ...previous,
+                        [line.id]: choice,
+                      }));
+                      setDirty(true);
+                    }}
+                    onMoneyError={(value) => moneyError(line.id, value)}
+                    onRemove={() => {
+                      change({
+                        ...data,
+                        lines: data.lines.filter((item) => item.id !== line.id),
                       });
-                  }}
-                />
-              )}
-              {Platform.OS === "web" && (
-                <Field
-                  label="Kjøpsdato (ÅÅÅÅ-MM-DD)"
-                  value={data.purchaseDate ?? ""}
-                  onChangeText={(purchaseDate) =>
-                    change({ ...data, purchaseDate: purchaseDate || null })
-                  }
-                />
-              )}
-              <Field
-                label="Klokkeslett (TT:MM)"
-                value={data.purchaseTime ?? ""}
-                onChangeText={(purchaseTime) =>
-                  change({ ...data, purchaseTime: purchaseTime || null })
-                }
-              />
-              <MoneyField
-                label="Betalt (kr)"
-                value={data.totalOre}
-                onChange={(totalOre) => change({ ...data, totalOre })}
-                onError={(value) => moneyError("total", value)}
-              />
-              <Field
-                label="Valuta"
-                value={data.currency ?? ""}
-                autoCapitalize="characters"
-                onChangeText={(currency) =>
-                  change({ ...data, currency: currency || null })
-                }
-              />
-              <Field
-                label="Kvitteringsnummer"
-                value={data.receiptNumber ?? ""}
-                onChangeText={(receiptNumber) =>
-                  change({ ...data, receiptNumber: receiptNumber || null })
-                }
-              />
-            </Panel>
-          )}
-          {issues.length > 0 && (
-            <Panel>
-              <Notice>{issues.join("\n")}</Notice>
-              {data.issues.length > 0 && (
-                <Button
-                  title="Feltene er kontrollert"
-                  secondary
-                  onPress={() => change({ ...data, issues: [] })}
-                />
-              )}
-            </Panel>
-          )}
-          <Button
-            title={
-              allLines ? "Vis bare det som må kontrolleres" : "Vis alle linjer"
-            }
-            secondary
-            onPress={() => setAllLines(!allLines)}
-          />
-          {allLines && (
-            <Toggle
-              label="Vis betalings- og avgiftssammendrag"
-              value={summaryLines}
-              onChange={setSummaryLines}
-            />
-          )}
-          {!allLines &&
-            data.lines.every((line) => !lineReviewIssues(line).length) && (
-              <Copy muted>Ingen varelinjer trenger kontroll.</Copy>
+                      moneyError(line.id, null);
+                      setRemember((previous) =>
+                        previous.filter((id) => id !== line.id),
+                      );
+                      setProductChanges((previous) => {
+                        const next = { ...previous };
+                        delete next[line.id];
+                        return next;
+                      });
+                    }}
+                  />
+                ))}
+              </Panel>
             )}
-          {data.lines
-            .filter((line) =>
-              allLines
-                ? summaryLines ||
-                  !["summary", "vat"].includes(line.kind) ||
-                  lineReviewIssues(line).length
-                : lineReviewIssues(line).length,
-            )
-            .map((line) => (
-              <ReceiptLineEditor
-                key={`${generation}-${line.id}`}
-                line={line}
-                lines={data.lines}
-                receiptId={receipt._id}
-                retailer={data.store ?? ""}
-                remember={remember.includes(line.id)}
-                productChoice={productChanges[line.id]}
-                onChange={(next) =>
-                  change({
-                    ...data,
-                    lines: data.lines.map((item) =>
-                      item.id === line.id ? next : item,
-                    ),
-                  })
+            <Panel style={{ gap: 8 }}>
+              <Row
+                title={
+                  totals.difference === 0
+                    ? "Beløpene stemmer"
+                    : `Avvik: ${formatMoney(totals.difference)}`
                 }
-                onRemember={(value) => {
-                  setRemember((previous) =>
-                    value
-                      ? [...previous, line.id]
-                      : previous.filter((id) => id !== line.id),
-                  );
-                  setDirty(true);
-                }}
-                onProduct={(choice) => {
-                  setProductChanges((previous) => ({
-                    ...previous,
-                    [line.id]: choice,
-                  }));
-                  setDirty(true);
-                }}
-                onMoneyError={(value) => moneyError(line.id, value)}
-                onRemove={() => {
-                  change({
-                    ...data,
-                    lines: data.lines.filter((item) => item.id !== line.id),
-                  });
-                  moneyError(line.id, null);
-                  setRemember((previous) =>
-                    previous.filter((id) => id !== line.id),
-                  );
-                  setProductChanges((previous) => {
-                    const next = { ...previous };
-                    delete next[line.id];
-                    return next;
-                  });
-                }}
+                detail={`${data.lines.filter((line) => line.kind === "product").length} varer · ${receipt.uploaderName}`}
               />
+              {[
+                { label: "Varer før rabatt", amount: totals.products },
+                { label: "Rabatter", amount: totals.discounts },
+                {
+                  label: "Pant og pantretur",
+                  amount: totals.deposits + totals.returns,
+                },
+                { label: "Andre justeringer", amount: totals.adjustments },
+                { label: "Beregnet", amount: totals.calculated },
+                { label: "Betalt", amount: data.totalOre },
+              ].map((row) => (
+                <View
+                  key={row.label}
+                  style={{
+                    flexDirection: "row",
+                    justifyContent: "space-between",
+                    gap: 16,
+                    paddingVertical: 3,
+                  }}
+                >
+                  <Copy size={14} muted>
+                    {row.label}
+                  </Copy>
+                  <Copy
+                    size={14}
+                    weight={row.label === "Betalt" ? "700" : "500"}
+                  >
+                    {formatMoney(row.amount)}
+                  </Copy>
+                </View>
+              ))}
+            </Panel>
+            {Object.values(moneyErrors).map((value, index) => (
+              <Notice key={index} error>
+                {value}
+              </Notice>
             ))}
-          {allLines && (
-            <Button
-              title="Legg til manglende linje"
-              secondary
-              onPress={() =>
+            <ReceiptFields
+              key={`fields-${generation}`}
+              visible={fields}
+              receiptId={receipt._id}
+              onPhysicalStore={(store) => {
+                setPhysicalStoreId(store?.id ?? null);
                 change({
                   ...data,
-                  lines: [...data.lines, emptyLine(randomUUID())],
-                })
-              }
+                  physicalStore: store,
+                  physicalStoreManual: true,
+                });
+              }}
+              data={data}
+              onChange={change}
+              onMoneyError={(value) => moneyError("total", value)}
+              onClose={() => setFields(false)}
             />
-          )}
+          </View>
+        ) : (
           <Panel>
-            <Copy size={20} weight="600">
-              Stemmer beløpene?
-            </Copy>
-            {[
-              { label: "Varer før rabatt", amount: totals.products },
-              { label: "Rabatter", amount: totals.discounts },
-              {
-                label: "Pant og pantretur",
-                amount: totals.deposits + totals.returns,
-              },
-              { label: "Andre justeringer", amount: totals.adjustments },
-              { label: "Beregnet", amount: totals.calculated },
-              { label: "Betalt", amount: data.totalOre },
-            ].map((row) => (
-              <Row
-                key={row.label}
-                title={row.label}
-                value={formatMoney(row.amount)}
-              />
-            ))}
             <Copy weight="600">
-              {totals.difference === 0
-                ? "Beløpene stemmer"
-                : `Avvik: ${formatMoney(totals.difference)}`}
+              {processing ? "Kvitteringen behandles" : "Ingen resultater ennå"}
             </Copy>
+            {receipt.data && (
+              <Button title="Vis resultatet" onPress={() => reset(receipt)} />
+            )}
           </Panel>
-          <Toggle
-            label="Utelat fra forbruk"
-            value={excluded}
-            onChange={(value) => {
-              setExcluded(value);
-              setDirty(true);
-            }}
-          />
-          {Object.values(moneyErrors).map((value, index) => (
-            <Notice key={index} error>
-              {value}
-            </Notice>
-          ))}
-          <Button
-            title="Lagre endringer"
-            secondary
-            busy={busy}
-            disabled={
-              !online ||
-              processing ||
-              receipt.revision !== revision ||
-              !!Object.keys(moneyErrors).length
-            }
-            onPress={() => void save(false)}
-          />
-          <Button
-            title="Marker kontrollert"
-            busy={busy}
-            disabled={
-              !online ||
-              processing ||
-              receipt.revision !== revision ||
-              !!Object.keys(moneyErrors).length ||
-              !canAcceptReceipt(
-                data,
-                !!receipt.duplicateOf && !duplicateResolved,
-              )
-            }
-            onPress={() => void save(true)}
-          />
-        </>
-      ) : (
-        <Panel>
-          <Copy size={20} weight="600">
-            {processing ? "Kvitteringen behandles" : "Ingen resultater ennå"}
-          </Copy>
-          {receipt.data && (
-            <Button title="Vis resultatet" onPress={() => reset(receipt)} />
-          )}
-        </Panel>
-      )}
-      {!!error && <Notice error>{error}</Notice>}
-      {!!message && <Notice>{message}</Notice>}
-      <Button
-        title="Les bildene på nytt"
-        secondary
-        disabled={processing || !online || busy || dirty}
-        onPress={() =>
-          void run(async () => {
-            await client.mutation(api.receipts.retry, { id: receipt._id });
-            setMessage("Kvitteringen behandles på nytt.");
-          })
-        }
-      />
-      <Button
-        title="Slett kvittering"
-        danger
-        disabled={!online || busy || receipt.status === "uploading"}
-        onPress={() =>
-          Alert.alert(
-            "Slett kvitteringen?",
-            "Kvitteringen og bildene blir slettet.",
-            [
-              { text: "Avbryt", style: "cancel" },
-              {
-                text: "Slett",
-                style: "destructive",
-                onPress: () =>
-                  void run(async () => {
-                    await client.mutation(api.receipts.remove, {
-                      id: receipt._id,
-                      revision,
-                    });
-                    router.back();
-                  }),
-              },
-            ],
-          )
-        }
-      />
-      <Button title="Tilbake" secondary onPress={close} />
-    </Screen>
+        )}
+        {(!data || processing) && !!error && <Notice error>{error}</Notice>}
+        {actions && (
+          <Sheet
+            title="Flere handlinger"
+            visible
+            onClose={() => setActions(false)}
+          >
+            <Row
+              title="Kvitteringsdetaljer"
+              onPress={() => {
+                setActions(false);
+                setFields(true);
+              }}
+            />
+            <Row
+              title="Legg til linje"
+              onPress={() => {
+                setActions(false);
+                addLine();
+              }}
+            />
+            <Toggle
+              label="Vis MVA og oppsummering"
+              value={summaryLines}
+              onChange={(value) => {
+                setSummaryLines(value);
+                setAllLines(true);
+              }}
+            />
+            <Toggle
+              label="Utelat fra forbruk"
+              value={excluded}
+              onChange={(value) => {
+                setExcluded(value);
+                setDirty(true);
+              }}
+            />
+            <Button
+              title="Les bildene på nytt"
+              secondary
+              disabled={processing || !online || busy || dirty}
+              onPress={() => {
+                setActions(false);
+                retry();
+              }}
+            />
+            <Button
+              title="Slett kvittering"
+              danger
+              disabled={!online || busy || receipt.status === "uploading"}
+              onPress={removeReceipt}
+            />
+          </Sheet>
+        )}
+      </Screen>
+    </>
   );
 }

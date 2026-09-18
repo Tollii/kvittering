@@ -1,0 +1,253 @@
+import { v } from "convex/values";
+import { Workpool, vOnCompleteValidator } from "@convex-dev/workpool";
+import {
+  createEvent,
+  sendEvent,
+  vEventId,
+  vWorkflowId,
+} from "@convex-dev/workflow";
+import { components, internal } from "./_generated/api";
+import {
+  internalMutation,
+  internalQuery,
+  type MutationCtx,
+} from "./_generated/server";
+import type { Doc, Id } from "./_generated/dataModel";
+import schema from "./schema";
+import {
+  catalogRequestValidator,
+  catalogResultValidator,
+  emptyCatalogResult,
+  type CatalogRequest,
+} from "../src/lib/catalog/model";
+import {
+  catalogDetailsTtl,
+  normalizeRequest,
+  requestKey,
+  resultLifetime,
+} from "../src/lib/catalog/policy";
+
+const pool = new Workpool(components.catalogWorkpool, {
+  maxParallelism: 4,
+  retryActionsByDefault: false,
+});
+async function enqueue(
+  ctx: MutationCtx,
+  id: Id<"catalogRequests">,
+  runAt = Date.now(),
+) {
+  await ctx.db.patch("catalogRequests", id, {
+    state: "pending",
+    scheduledAt: runAt,
+  });
+  await pool.enqueueAction(
+    ctx,
+    internal.catalogWorker.execute,
+    { id },
+    {
+      runAt,
+      retry: false,
+      onComplete: internal.catalogQueue.completed,
+      onCompleteExcludeKinds: ["success"],
+      context: { id },
+    },
+  );
+}
+/** One transactional cache entry is shared by all households and simultaneous requests. */
+export async function ensureRequest(
+  ctx: MutationCtx,
+  input: CatalogRequest,
+): Promise<Doc<"catalogRequests">> {
+  const request = normalizeRequest(input);
+  const key = requestKey(request);
+  const existing = await ctx.db
+    .query("catalogRequests")
+    .withIndex("by_key", (q) => q.eq("key", key))
+    .unique();
+  if (
+    existing &&
+    (["pending", "running"].includes(existing.state) ||
+      existing.expiresAt > Date.now())
+  )
+    return existing;
+  const values = {
+    key,
+    request,
+    state: "pending" as const,
+    result: existing?.result ?? emptyCatalogResult(),
+    fetchedAt: existing?.fetchedAt ?? null,
+    expiresAt: 0,
+    attempts: 0,
+    scheduledAt: Date.now(),
+    error: null,
+  };
+  const id = existing?._id ?? (await ctx.db.insert("catalogRequests", values));
+  if (existing) await ctx.db.replace("catalogRequests", id, values);
+  await enqueue(ctx, id);
+  return (await ctx.db.get("catalogRequests", id))!;
+}
+export const request = internalMutation({
+  args: { request: catalogRequestValidator },
+  returns: v.id("catalogRequests"),
+  handler: async (ctx, { request }) => (await ensureRequest(ctx, request))._id,
+});
+export const requestForWorkflow = internalMutation({
+  args: { request: catalogRequestValidator, workflowId: vWorkflowId },
+  returns: v.object({
+    id: v.id("catalogRequests"),
+    eventId: v.union(vEventId(), v.null()),
+  }),
+  handler: async (ctx, args) => {
+    const request = await ensureRequest(ctx, args.request);
+    if (request.state === "ready" || request.state === "error")
+      return { id: request._id, eventId: null };
+    const eventId = await createEvent(ctx, components.workflow, {
+      name: "catalog-ready",
+      workflowId: args.workflowId,
+    });
+    await ctx.db.insert("catalogRequestWaiters", {
+      requestId: request._id,
+      eventId,
+    });
+    return { id: request._id, eventId };
+  },
+});
+export const read = internalQuery({
+  args: { id: v.id("catalogRequests") },
+  returns: v.union(schema.doc("catalogRequests"), v.null()),
+  handler: (ctx, { id }) => ctx.db.get("catalogRequests", id),
+});
+export const claim = internalMutation({
+  args: { id: v.id("catalogRequests") },
+  returns: v.union(catalogRequestValidator, v.null()),
+  handler: async (ctx, { id }) => {
+    const request = await ctx.db.get("catalogRequests", id);
+    if (!request || request.state !== "pending") return null;
+    await ctx.db.patch("catalogRequests", id, {
+      state: "running",
+      attempts: request.attempts + 1,
+    });
+    return request.request;
+  },
+});
+export const notify = internalMutation({
+  args: { id: v.id("catalogRequests") },
+  returns: v.null(),
+  handler: async (ctx, { id }) => {
+    const waiters = await ctx.db
+      .query("catalogRequestWaiters")
+      .withIndex("by_requestId", (q) => q.eq("requestId", id))
+      .take(50);
+    for (const waiter of waiters) {
+      await sendEvent(ctx, components.workflow, { id: waiter.eventId });
+      await ctx.db.delete("catalogRequestWaiters", waiter._id);
+    }
+    if (waiters.length === 50)
+      await ctx.scheduler.runAfter(0, internal.catalogQueue.notify, { id });
+    return null;
+  },
+});
+export const succeed = internalMutation({
+  args: { id: v.id("catalogRequests"), result: catalogResultValidator },
+  returns: v.null(),
+  handler: async (ctx, { id, result }) => {
+    const request = await ctx.db.get("catalogRequests", id);
+    if (!request || request.state !== "running") return null;
+    const now = Date.now();
+    for (const product of result.products) {
+      const existing = await ctx.db
+        .query("catalogProducts")
+        .withIndex("by_key", (q) => q.eq("key", product.key))
+        .unique();
+      // Search results do not replace recently fetched details with a poorer record.
+      if (
+        existing &&
+        request.request.kind !== "details" &&
+        existing.fetchedAt + catalogDetailsTtl > now
+      ) {
+        await ctx.db.patch("catalogProducts", existing._id, {
+          product: {
+            ...existing.product,
+            ids: [...new Set([...existing.product.ids, ...product.ids])],
+            image: existing.product.image ?? product.image,
+            ingredients: existing.product.ingredients ?? product.ingredients,
+            categories: existing.product.categories.length
+              ? existing.product.categories
+              : product.categories,
+          },
+        });
+        continue;
+      }
+      const value = { key: product.key, product, fetchedAt: now };
+      if (existing)
+        await ctx.db.replace("catalogProducts", existing._id, value);
+      else await ctx.db.insert("catalogProducts", value);
+    }
+    for (const store of result.stores) {
+      const existing = await ctx.db
+        .query("catalogStores")
+        .withIndex("by_externalId", (q) => q.eq("externalId", store.id))
+        .unique();
+      const value = { externalId: store.id, store, fetchedAt: now };
+      if (existing) await ctx.db.replace("catalogStores", existing._id, value);
+      else await ctx.db.insert("catalogStores", value);
+    }
+    await ctx.db.patch("catalogRequests", id, {
+      state: "ready",
+      result,
+      fetchedAt: now,
+      expiresAt: now + resultLifetime(request.request, result),
+      error: null,
+    });
+    await ctx.scheduler.runAfter(0, internal.catalogQueue.notify, { id });
+    return null;
+  },
+});
+async function failRequest(
+  ctx: MutationCtx,
+  id: Id<"catalogRequests">,
+  status: number,
+  retryAfterMs: number,
+) {
+  const request = await ctx.db.get("catalogRequests", id);
+  if (!request || !["running", "pending"].includes(request.state)) return;
+  const now = Date.now();
+  const transient = status === 0 || status === 429 || status >= 500;
+  const delay =
+    status === 429
+      ? Math.max(60000, retryAfterMs)
+      : Math.max(5000 * 2 ** request.attempts, retryAfterMs);
+  if (transient && request.attempts < 3) {
+    await enqueue(ctx, id, now + delay);
+    return;
+  }
+  await ctx.db.patch("catalogRequests", id, {
+    state: "error",
+    expiresAt: now + 10 * 60 * 1000,
+    error:
+      status === 401 || status === 403
+        ? "Produktkatalogen er ikke tilgjengelig. Kontroller API-nøkkelen i Convex."
+        : "Produktkatalogen er midlertidig utilgjengelig. Kvitteringen kan brukes uten produktkobling.",
+  });
+  await ctx.scheduler.runAfter(0, internal.catalogQueue.notify, { id });
+}
+export const fail = internalMutation({
+  args: {
+    id: v.id("catalogRequests"),
+    status: v.number(),
+    retryAfterMs: v.number(),
+  },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    await failRequest(ctx, args.id, args.status, args.retryAfterMs);
+    return null;
+  },
+});
+export const completed = internalMutation({
+  args: vOnCompleteValidator(v.object({ id: v.id("catalogRequests") })),
+  returns: v.null(),
+  handler: async (ctx, { context, result }) => {
+    if (result.kind !== "success") await failRequest(ctx, context.id, 0, 0);
+    return null;
+  },
+});

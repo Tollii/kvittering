@@ -181,11 +181,11 @@ export function productHistory(receipts: Receipt[]) {
       continue;
     for (const line of spendingLines(receipt.data).products) {
       // Unlinked items remain separate; similar names do not establish identity.
-      const key = line.productId ?? `${receipt._id}:${line.id}`;
+      const key = line.catalogProduct?.key ?? line.productId ?? `${receipt._id}:${line.id}`;
       const product = products.get(key) ?? {
         key,
-        name: line.productName || line.name,
-        linked: !!line.productId,
+        name: line.catalogProduct?.name ?? (line.productName || line.name),
+        linked: !!line.catalogProduct || !!line.productId,
         quantity: 0,
         purchases: new Set<string>(),
         amountOre: 0,

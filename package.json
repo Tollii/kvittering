@@ -10,6 +10,8 @@
     "@convex-dev/workpool": "^0.4.12",
     "@expo/ui": "~57.0.19",
     "@react-native-community/datetimepicker": "9.1.0",
+    "@tanstack/react-query": "^5.103.1",
+    "@tanstack/react-query-persist-client": "^5.103.1",
     "@typesafe-ai/sdk": "^0.6.0",
     "better-auth": "1.6.33",
     "convex": "^1.46.0",
@@ -56,6 +58,7 @@
     "convex-test": "^0.0.59",
     "eslint": "^9.39.5",
     "eslint-config-expo": "^57.0.2",
+    "orval": "^8.33.0",
     "prettier": "^3.9.8",
     "typescript": "~6.0.3",
     "vite": "^8.3.0",
@@ -70,7 +73,8 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "backend": "convex dev",
-    "ios:build": "expo run:ios"
+    "ios:build": "expo run:ios",
+    "generate:catalog": "orval"
   },
   "private": true,
   "overrides": {

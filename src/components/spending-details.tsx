@@ -1,9 +1,10 @@
 import { Pressable, View } from "react-native";
 import { useTheme } from "@/constants/theme";
 import { Copy, Row, Sheet } from "./ui";
-import { openReceipt } from "./receipt-card";
+import { openReceipt, receiptStatusLabel } from "./receipt-card";
 import { formatMoney } from "@/lib/domain/receipt";
 import type { SpendingGroup } from "@/lib/domain/insights";
+import { formatDate } from "@/lib/format-date";
 export function SpendingBars({
   rows,
   onSelect,
@@ -14,14 +15,19 @@ export function SpendingBars({
   const colors = useTheme();
   const maximum = Math.max(1, ...rows.map((row) => Math.abs(row.amountOre)));
   return (
-    <View style={{ gap: 18 }}>
+    <View style={{ gap: 8 }}>
       {rows.map((row) => (
         <Pressable
           key={row.id}
           accessibilityRole="button"
           accessibilityLabel={`${row.name}, ${formatMoney(row.amountOre)}`}
           onPress={() => onSelect(row)}
-          style={{ minHeight: 48, gap: 8 }}
+          style={({ pressed }) => ({
+            minHeight: 46,
+            gap: 5,
+            justifyContent: "center",
+            opacity: pressed ? 0.6 : 1,
+          })}
         >
           <View
             style={{
@@ -35,16 +41,16 @@ export function SpendingBars({
           </View>
           <View
             style={{
-              height: 7,
+              height: 4,
               backgroundColor: colors.muted,
               borderRadius: 4,
             }}
           >
             <View
               style={{
-                height: 7,
+                height: 4,
                 borderRadius: 4,
-                width: `${Math.max(1, (Math.abs(row.amountOre) / maximum) * 100)}%`,
+                width: `${(Math.abs(row.amountOre) / maximum) * 100}%`,
                 backgroundColor:
                   row.amountOre < 0 ? colors.warning : colors.primary,
               }}
@@ -77,7 +83,7 @@ export function SpendingDetails({
                 contribution.receipt.data?.store ||
                 "Kvittering"
               }
-              detail={`${contribution.receipt.data?.purchaseDate ?? "Dato ukjent"} · ${contribution.receipt.status === "reviewed" ? "Kontrollert" : "Foreløpig"}`}
+              detail={`${formatDate(contribution.receipt.data?.purchaseDate)} · ${receiptStatusLabel(contribution.receipt)}`}
               value={formatMoney(contribution.amountOre)}
               onPress={() => {
                 onClose();

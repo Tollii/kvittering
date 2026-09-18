@@ -8,6 +8,10 @@ import {
 } from "./receipt";
 const text = z.string().nullable();
 const number = z.number().nullable();
+const extractionIssue = z.object({
+  severity: z.enum(["minor", "blocking"]),
+  message: z.string(),
+});
 export const extractionSchema = z.object({
   store: text,
   branch: text,
@@ -17,7 +21,7 @@ export const extractionSchema = z.object({
   currency: text,
   totalOre: number,
   originalText: z.string(),
-  issues: z.array(z.string()),
+  issues: z.array(extractionIssue),
   lines: z.array(
     z.object({
       id: z.string(),
@@ -35,7 +39,7 @@ export const extractionSchema = z.object({
       brand: text,
       attributes: z.array(z.string()),
       relatedLineId: text,
-      issues: z.array(z.string()),
+      issues: z.array(extractionIssue),
     }),
   ),
 });
@@ -49,6 +53,17 @@ If overlap cannot be established, keep the separate occurrences, set overlapUnce
 Check the reconstructed rows against the printed total and any clearly stated item count. Treat these as checks, not permission to invent, remove or change rows. Loyalty points or bonus earned are not paid discounts. Keep an unreadable product row with its visible amount and an issue rather than inventing its name.
 Do not report successfully resolved overlap as a user issue.`;
 
+export const uncertaintyInstructions = `This app tracks household spending; exact transcription is not required. Each issue has severity minor or blocking and a Norwegian message.
+Use minor for spelling differences, missing letters, spacing, abbreviations or uncertain brand/variant wording when the general item is still identifiable. For example, a readable COLA name with a missing letter or a partially readable product suffix is usable. These issues do not require review. Prefer no issue for harmless formatting differences or normal abbreviations.
+Use blocking only when the item is so poorly read that its general identity cannot be determined, or when uncertainty can change the payable amount, purchase date, currency or whether a row is counted twice. Do not label an issue blocking merely because the exact product, brand, size or flavour is unknown. A missing or ambiguous monetary amount is blocking even when the product name is clear.
+Keep the best supported product name and originalText. Do not invent missing details or amounts.`;
+
+function blockingIssues(issues: z.infer<typeof extractionIssue>[]): string[] {
+  return issues
+    .filter((issue) => issue.severity === "blocking")
+    .map((issue) => issue.message);
+}
+
 /** Convert extraction evidence without merging product identities or changing amounts. */
 export function prepareExtraction(
   extraction: z.infer<typeof extractionSchema>,
@@ -56,7 +71,7 @@ export function prepareExtraction(
   referenceTime = Date.now(),
 ): ReceiptData {
   let purchaseDate = extraction.purchaseDate;
-  const issues = [...extraction.issues];
+  const issues = blockingIssues(extraction.issues);
   if (purchaseDate && /^--\d{2}-\d{2}$/.test(purchaseDate)) {
     const candidate =
       osloDate(referenceTime).slice(0, 4) + purchaseDate.slice(1);
@@ -92,14 +107,11 @@ export function prepareExtraction(
           sourceImages: validSources ? sources : [],
           issues: [
             ...new Set([
-              ...line.issues,
+              ...blockingIssues(line.issues),
               ...(overlapUncertain
                 ? [
                     "Mulig overlapp mellom bildene. Kontroller om varen er telt to ganger.",
                   ]
-                : []),
-              ...(!validSources
-                ? ["Kunne ikke knytte linjen sikkert til et bilde."]
                 : []),
             ]),
           ],

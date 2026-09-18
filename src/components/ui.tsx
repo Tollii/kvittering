@@ -15,7 +15,10 @@ import {
   type TextProps,
   type ViewStyle,
 } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
+import {
+  SafeAreaView,
+  useSafeAreaInsets,
+} from "react-native-safe-area-context";
 import { router } from "expo-router";
 import { SymbolView, type SymbolViewProps } from "expo-symbols";
 import { useTheme } from "@/constants/theme";
@@ -41,7 +44,7 @@ export function Copy({
           color: muted ? colors.secondary : colors.text,
           fontSize: size,
           fontWeight: weight,
-          lineHeight: size * 1.4,
+          lineHeight: size * (size >= 24 ? 1.2 : 1.3),
           fontVariant: ["tabular-nums"],
         },
         style,
@@ -63,6 +66,33 @@ export function Icon({
   const colors = useTheme();
   return (
     <SymbolView name={name} size={size} tintColor={color ?? colors.primary} />
+  );
+}
+export function IconButton({
+  name,
+  label,
+  onPress,
+  disabled = false,
+}: {
+  name: SymbolViewProps["name"];
+  label: string;
+  onPress: () => void;
+  disabled?: boolean;
+}) {
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={label}
+      accessibilityState={{ disabled }}
+      disabled={disabled}
+      onPress={onPress}
+      style={({ pressed }) => [
+        styles.iconButton,
+        { opacity: disabled ? 0.4 : pressed ? 0.6 : 1 },
+      ]}
+    >
+      <Icon name={name} size={22} />
+    </Pressable>
   );
 }
 export function Button({
@@ -97,7 +127,7 @@ export function Button({
       style={({ pressed }) => [
         {
           minHeight: 48,
-          paddingVertical: 12,
+          paddingVertical: 10,
           paddingHorizontal: 16,
           borderRadius: 14,
           backgroundColor: secondary || danger ? colors.muted : colors.primary,
@@ -133,9 +163,10 @@ export function Panel({
       style={[
         {
           backgroundColor: colors.surface,
-          borderRadius: 20,
-          padding: 18,
-          gap: 14,
+          borderRadius: 16,
+          borderCurve: "continuous",
+          padding: 14,
+          gap: 10,
           borderWidth: StyleSheet.hairlineWidth,
           borderColor: colors.line,
         },
@@ -146,20 +177,58 @@ export function Panel({
     </View>
   );
 }
+export function Disclosure({
+  title,
+  value,
+  children,
+}: {
+  title: string;
+  value?: string;
+  children: ReactNode;
+}) {
+  const [open, setOpen] = useState(false);
+  return (
+    <Panel style={{ gap: open ? 10 : 0 }}>
+      <Pressable
+        accessibilityRole="button"
+        accessibilityState={{ expanded: open }}
+        onPress={() => setOpen(!open)}
+        style={({ pressed }) => [
+          styles.row,
+          { minHeight: 44, opacity: pressed ? 0.6 : 1 },
+        ]}
+      >
+        <Copy weight="600" style={{ flex: 1 }}>
+          {title}
+        </Copy>
+        {!!value && (
+          <Copy size={13} muted>
+            {value}
+          </Copy>
+        )}
+        <Icon name={open ? "chevron.up" : "chevron.down"} size={13} />
+      </Pressable>
+      {open && children}
+    </Panel>
+  );
+}
 export function Screen({
   children,
   title,
   subtitle,
   settings = false,
   insetTop = true,
+  footer,
 }: {
   children: ReactNode;
   title?: string;
   subtitle?: string;
   settings?: boolean;
   insetTop?: boolean;
+  footer?: ReactNode;
 }) {
   const colors = useTheme();
+  const insets = useSafeAreaInsets();
   return (
     <SafeAreaView
       edges={insetTop ? ["top", "left", "right"] : ["left", "right"]}
@@ -170,13 +239,14 @@ export function Screen({
         style={{ flex: 1 }}
       >
         <ScrollView
+          style={{ flex: 1 }}
           keyboardShouldPersistTaps="handled"
           keyboardDismissMode="interactive"
           contentInsetAdjustmentBehavior="automatic"
           contentContainerStyle={{
-            padding: 20,
-            paddingBottom: 48,
-            gap: 20,
+            padding: 16,
+            paddingBottom: footer ? 16 : 32,
+            gap: 12,
             maxWidth: 760,
             width: "100%",
             alignSelf: "center",
@@ -185,10 +255,14 @@ export function Screen({
           {!!title && (
             <View style={styles.row}>
               <View style={{ flex: 1, gap: 3 }}>
-                <Copy accessibilityRole="header" size={32} weight="700">
+                <Copy accessibilityRole="header" size={26} weight="700">
                   {title}
                 </Copy>
-                {!!subtitle && <Copy muted>{subtitle}</Copy>}
+                {!!subtitle && (
+                  <Copy muted size={13}>
+                    {subtitle}
+                  </Copy>
+                )}
               </View>
               {settings && (
                 <Pressable
@@ -204,6 +278,21 @@ export function Screen({
           )}
           {children}
         </ScrollView>
+        {footer && (
+          <View
+            style={{
+              paddingHorizontal: 16,
+              paddingTop: 10,
+              paddingBottom: Math.max(insets.bottom, 12),
+              gap: 8,
+              backgroundColor: colors.surface,
+              borderTopWidth: StyleSheet.hairlineWidth,
+              borderColor: colors.line,
+            }}
+          >
+            {footer}
+          </View>
+        )}
       </KeyboardAvoidingView>
     </SafeAreaView>
   );
@@ -335,10 +424,10 @@ export function Row({
       onPress={onPress}
       style={({ pressed }) => [
         styles.row,
-        { minHeight: 54, opacity: pressed ? 0.6 : 1 },
+        { minHeight: 44, opacity: pressed ? 0.6 : 1 },
       ]}
     >
-      <View style={{ flex: 1, gap: 4 }}>
+      <View style={{ flex: 1, gap: 2 }}>
         <Copy weight="600">{title}</Copy>
         {!!detail && (
           <Copy size={13} muted>
@@ -404,11 +493,15 @@ export function Sheet({
   visible,
   onClose,
   children,
+  header,
+  footer,
 }: {
   title: string;
   visible: boolean;
   onClose: () => void;
   children: ReactNode;
+  header?: ReactNode;
+  footer?: ReactNode;
 }) {
   const colors = useTheme();
   return (
@@ -419,18 +512,49 @@ export function Sheet({
       onRequestClose={onClose}
     >
       <SafeAreaView style={{ flex: 1, backgroundColor: colors.background }}>
-        <View style={[styles.row, { padding: 20 }]}>
-          <Copy size={22} weight="700" style={{ flex: 1 }}>
+        <View
+          style={[styles.row, { paddingHorizontal: 16, paddingVertical: 8 }]}
+        >
+          <Copy size={18} weight="700" style={{ flex: 1 }}>
             {title}
           </Copy>
-          <Button title="Ferdig" onPress={onClose} secondary />
+          <IconButton name="xmark" label="Lukk" onPress={onClose} />
         </View>
-        <ScrollView
-          keyboardShouldPersistTaps="handled"
-          contentContainerStyle={{ padding: 20, gap: 16, paddingBottom: 44 }}
+        {header && (
+          <View style={{ paddingHorizontal: 16, paddingBottom: 10, gap: 10 }}>
+            {header}
+          </View>
+        )}
+        <KeyboardAvoidingView
+          style={{ flex: 1 }}
+          behavior={Platform.OS === "ios" ? "padding" : undefined}
         >
-          {children}
-        </ScrollView>
+          <ScrollView
+            keyboardShouldPersistTaps="handled"
+            keyboardDismissMode="interactive"
+            contentContainerStyle={{
+              padding: 16,
+              paddingTop: 4,
+              gap: 10,
+              paddingBottom: 24,
+            }}
+          >
+            {children}
+          </ScrollView>
+          {footer && (
+            <View
+              style={{
+                paddingHorizontal: 16,
+                paddingVertical: 10,
+                gap: 8,
+                borderTopWidth: StyleSheet.hairlineWidth,
+                borderColor: colors.line,
+              }}
+            >
+              {footer}
+            </View>
+          )}
+        </KeyboardAvoidingView>
       </SafeAreaView>
     </Modal>
   );

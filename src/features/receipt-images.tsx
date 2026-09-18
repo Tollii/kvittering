@@ -1,9 +1,15 @@
 import { useState } from "react";
 import { Image, ScrollView, View } from "react-native";
-import { Button, Notice, Sheet } from "@/components/ui";
+import { Button, IconButton, Notice, Sheet } from "@/components/ui";
 import { convexSiteUrl, fetchAccessToken } from "@/lib/auth-client";
 import type { Receipt } from "@/lib/domain/insights";
-export function ReceiptImages({ receipt }: { receipt: Receipt }) {
+export function ReceiptImages({
+  receipt,
+  compact = false,
+}: {
+  receipt: Receipt;
+  compact?: boolean;
+}) {
   const [token, setToken] = useState<string | null>(null);
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -22,12 +28,21 @@ export function ReceiptImages({ receipt }: { receipt: Receipt }) {
   }
   return (
     <>
-      <Button
-        title="Vis originalkvittering"
-        secondary
-        busy={busy}
-        onPress={() => void load()}
-      />
+      {compact ? (
+        <IconButton
+          name="doc.viewfinder"
+          label="Vis originalkvittering"
+          disabled={busy}
+          onPress={() => void load()}
+        />
+      ) : (
+        <Button
+          title="Vis originalkvittering"
+          secondary
+          busy={busy}
+          onPress={() => void load()}
+        />
+      )}
       {!!error && !open && <Notice error>{error}</Notice>}
       <Sheet
         title="Originalkvittering"

@@ -17,6 +17,11 @@ export const createAuth = (ctx: GenericCtx<DataModel>) =>
       requireEmailVerification: false,
       minPasswordLength: 12,
     },
-    trustedOrigins: ["kvitto://", ...(env.SITE_URL ? [env.SITE_URL] : [])],
+    trustedOrigins: [
+      "kvitto://",
+      ...(env.SITE_URL ? [env.SITE_URL] : []),
+      // Expo Go uses exp:// even when the app has a custom scheme.
+      ...(env.ALLOW_EXPO_GO === "true" ? ["exp://"] : []),
+    ],
     plugins: [expo(), convex({ authConfig })],
   });

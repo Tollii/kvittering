@@ -1,4 +1,6 @@
+import { lineEvidenceKey } from "../src/lib/catalog/matching";
 import { productChange, correctProducts } from "./products";
+import { correctCatalogLinks } from "./catalogLinks";
 import { v } from "convex/values";
 import {
   paginationOptsValidator,
@@ -142,6 +144,12 @@ export const save = mutation({
     reviewed: v.boolean(),
     rememberLineIds: v.array(v.string()),
     productChanges: v.optional(v.array(productChange)),
+    catalogChanges: v.optional(
+      v.array(
+        v.object({ lineId: v.string(), key: v.union(v.string(), v.null()) }),
+      ),
+    ),
+    physicalStoreId: v.optional(v.union(v.number(), v.null())),
     duplicateResolved: v.boolean(),
     excluded: v.boolean(),
   },
@@ -172,18 +180,41 @@ export const save = mutation({
       line.productId = previous?.productId ?? null;
       line.productName = previous?.productName ?? "";
       line.productMatchManual = previous?.productMatchManual ?? false;
+      line.catalogProduct =
+        previous && lineEvidenceKey(previous) === lineEvidenceKey(line)
+          ? (previous.catalogProduct ?? null)
+          : null;
       if (line.kind !== "product" || args.data.store !== receipt.data?.store) {
         line.productId = null;
         line.productName = "";
         line.productMatchManual = false;
+        line.catalogProduct = null;
       }
     }
+    args.data.physicalStore =
+      args.data.store === receipt.data?.store &&
+      args.data.branch === receipt.data?.branch
+        ? (receipt.data?.physicalStore ?? null)
+        : null;
+    args.data.physicalStoreManual =
+      args.data.store === receipt.data?.store &&
+      args.data.branch === receipt.data?.branch
+        ? (receipt.data?.physicalStoreManual ?? false)
+        : false;
     await correctProducts(
       ctx,
       member.householdId,
       member.identity,
       args.data,
       args.productChanges ?? [],
+    );
+    await correctCatalogLinks(
+      ctx,
+      member.householdId,
+      member.identity,
+      args.data,
+      args.catalogChanges ?? [],
+      args.physicalStoreId,
     );
     for (const line of args.data.lines) {
       const previous = receipt.data?.lines.find((old) => old.id === line.id);

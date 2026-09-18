@@ -1,7 +1,7 @@
 import { v } from "convex/values";
 import { WorkflowManager } from "@convex-dev/workflow";
 import { components, internal } from "./_generated/api";
-import { internalMutation, internalQuery } from "./_generated/server";
+import { internalMutation, internalQuery, env } from "./_generated/server";
 import {
   receiptDataValidator,
   aliasKey,
@@ -267,7 +267,11 @@ export const finish = internalMutation({
       status: autoAccepted ? "reviewed" : "needs_review",
       error: null,
       duplicateOf,
+      catalogStatus: undefined,
+      catalogWorkflowId: undefined,
     });
+    if (env.KASSALAPP_API_KEY)
+      await ctx.scheduler.runAfter(0, internal.catalogMatching.start, { id: args.id, generation: args.generation });
     if (!receipt.receiptReadyNotified) {
       await ctx.db.patch("receipts", args.id, { receiptReadyNotified: true });
       const subscriptions = await ctx.db
