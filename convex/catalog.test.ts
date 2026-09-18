@@ -133,7 +133,7 @@ it("uses category-only evidence but preserves manual edits, stale lines and a ch
     lineId: data.lines[0].id,
     evidenceKey: lineEvidenceKey(data.lines[0]),
     productKey: null,
-    categoryId: "drinks.energy-drinks",
+    categoryId: "drinks.soft-drinks",
     categoryConfidence: 0.95,
     reason: "below_threshold" as const,
     candidates: [],
@@ -152,16 +152,16 @@ it("uses category-only evidence but preserves manual edits, stale lines and a ch
   ).toBe(0);
   await t.mutation(internal.catalogMatching.apply, args);
   let saved = (await first.query(api.receipts.detail, { id }))!.receipt;
-  expect(saved.data?.lines[0].categoryId).toBe("drinks.energy-drinks");
+  expect(saved.data?.lines[0].categoryId).toBe("drinks.soft-drinks");
   expect(saved.data?.lines[0].catalogProduct).toBeUndefined();
   expect(saved.catalogDecisions).toEqual([decision]);
   const manual = saved.data!;
   manual.lines[0].manual = true;
-  manual.lines[0].categoryId = "drinks.soft-drinks";
+  manual.lines[0].categoryId = "drinks.sports-drinks";
   await t.run((ctx) => ctx.db.patch("receipts", id, { data: manual }));
   await t.mutation(internal.catalogMatching.apply, args);
   saved = (await first.query(api.receipts.detail, { id }))!.receipt;
-  expect(saved.data?.lines[0].categoryId).toBe("drinks.soft-drinks");
+  expect(saved.data?.lines[0].categoryId).toBe("drinks.sports-drinks");
 });
 
 it("refreshes expired searches while retaining the last usable result", async () => {

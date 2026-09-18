@@ -73,11 +73,22 @@ jobs:
           npm run lint
           npm test
 
+      - name: Deploy staging backend
+        if: inputs.operation == 'build-and-submit'
+        env:
+          CONVEX_DEPLOY_KEY: ${{ secrets.CONVEX_STAGING_DEPLOY_KEY }}
+        run: |
+          if [[ "$CONVEX_DEPLOY_KEY" != 'prod:courteous-jay-215|'* ]]; then
+            echo "::error::Set CONVEX_STAGING_DEPLOY_KEY to a deploy key for staging (courteous-jay-215)."
+            exit 1
+          fi
+          npx convex deploy
+
       - name: Build iOS app
         id: build
         if: inputs.operation == 'build-and-submit'
         run: |
-          eas build --platform ios --profile production --non-interactive --wait --json > "$RUNNER_TEMP/testflight-build.json"
+          eas build --platform ios --profile testflight --non-interactive --wait --json > "$RUNNER_TEMP/testflight-build.json"
           build_id=$(jq -er '.[0] | select(.status == "FINISHED") | .id' "$RUNNER_TEMP/testflight-build.json")
           echo "build_id=$build_id" >> "$GITHUB_OUTPUT"
 
@@ -92,6 +103,7 @@ jobs:
             .status == "FINISHED" and
             .platform == "IOS" and
             .distribution == "STORE" and
+            .buildProfile == "testflight" and
             .app.id == $project_id and
             .appIdentifier == $bundle_id
           ' "$RUNNER_TEMP/testflight-build-details.json" > /dev/null
@@ -102,5 +114,5 @@ jobs:
         env:
           BUILD_ID: ${{ steps.build.outputs.build_id || inputs.build_id }}
         run: |
-          eas submit --platform ios --profile production --id "$BUILD_ID" --non-interactive --wait
+          eas submit --platform ios --profile testflight --id "$BUILD_ID" --non-interactive --wait
           echo "Upload complete. [Check Apple processing and tester access](https://appstoreconnect.apple.com/apps/6813602733/testflight)." >> "$GITHUB_STEP_SUMMARY"

@@ -1,4 +1,9 @@
 "use node";
+import {
+  readAttributes,
+  type ProductAttributes,
+} from "../src/lib/domain/product-attributes";
+import { attributeQuestions } from "../src/lib/domain/product-attribute-classification";
 import { v } from "convex/values";
 import { TypeSafeClient, choice } from "@typesafe-ai/sdk";
 import { env, internalAction } from "./_generated/server";
@@ -55,6 +60,7 @@ export const analyze = internalAction({
     const prepared: {
       line: ReceiptLine;
       profile: PackageProfile;
+      attributes?: ProductAttributes;
       family: ProductAnalysisResult["family"];
     }[] = [];
     for (const line of receipt.data.lines.filter(
@@ -112,6 +118,7 @@ export const analyze = internalAction({
             catalogSizeConflict,
           },
           questions: {
+            ...attributeQuestions(),
             family: familyQuestion(context.families),
             count: choice(
               "How many discrete items does ONE retail package contain? Ignore how many packages were bought, percentages, model numbers, nutrients, prices and quantities of ingredients. Use the product name and catalog evidence. A bottle or bar is one, a 10-pack of cans is ten. Explicit receipt product notation takes precedence over a conflicting linked catalog pack count: COCA-COLA10PK linked to a 15-pack still means ten. Wholesale transport carton counts such as Vårløk 10x150g or Gulrot 24x150g can describe store supply, not the purchased consumer unit; use product semantics to distinguish these. Loose weighed goods have unknown count. Do not invent a count.",
@@ -153,6 +160,10 @@ export const analyze = internalAction({
           evidenceKey: purchaseEvidenceKey(line),
           family,
           package: { unitsPerPackage, measurePerPackage },
+          attributes: readAttributes(
+            response.answers,
+            context.catalog || line.catalogProduct ? "catalog" : "receipt",
+          ),
           decisions: Object.entries(response.answers).map(
             ([question, answer]) => ({
               question,
@@ -173,6 +184,7 @@ export const analyze = internalAction({
       prepared.push({
         line,
         profile: context.profile.package,
+        attributes: context.profile.attributes,
         family: family ? { id: family._id, name: family.name } : null,
       });
     }
@@ -221,6 +233,7 @@ export const analyze = internalAction({
           lineId: item.line.id,
           evidenceKey: purchaseEvidenceKey(item.line),
           family: item.family,
+          ...(item.attributes ? { attributes: item.attributes } : {}),
           quantity:
             (item.line.amountOre ?? 0) < 0
               ? emptyPurchaseQuantity()

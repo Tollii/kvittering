@@ -65,3 +65,18 @@ it("settles an uncertain line once memory is trusted, never a manual one", () =>
   ).toBe(false);
   expect(manual.categoryId).toBe("snacks.sweets");
 });
+
+it("ignores memories and approvals for categories outside the current taxonomy", () => {
+  const line = weeklyShopFixture().lines[0];
+  const before = structuredClone(line);
+  expect(
+    applyCategoryMemory(line, {
+      categoryId: "removed.category",
+      confirmations: 2,
+    }),
+  ).toBe(false);
+  expect(line).toEqual(before);
+  expect(learnableLine({ ...line, categoryId: "removed.category" })).toBe(
+    false,
+  );
+});

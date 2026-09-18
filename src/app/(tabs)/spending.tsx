@@ -17,6 +17,7 @@ import {
   Toggle,
   pressed,
 } from "@/components/ui";
+import { ProductAttributesReport } from "@/features/product-attributes-report";
 import { Mosaic } from "@/components/mosaic";
 import { SpendingBars, SpendingDetails } from "@/components/spending-details";
 import { FamilyPurchases, familySummary } from "@/components/family-purchases";
@@ -49,6 +50,7 @@ export default function Spending() {
   const [month, setMonth] = useState(currentMonth);
   const [filters, setFilters] = useState(false);
   const [report, setReport] = useState<
+    | "attributes"
     | "catalog"
     | "prices"
     | "families"
@@ -478,8 +480,22 @@ export default function Spending() {
             ))}
           </Panel>
           <SectionTitle title="Utforsk forbruket" />
+          <Row
+            title="Forbruksanalyse"
+            detail="Hva endret seg denne uken eller måneden?"
+            icon="chart.bar"
+            onPress={() =>
+              router.push({ pathname: "/analysis", params: { month } })
+            }
+          />
           <Panel style={{ gap: 0, paddingVertical: 4 }}>
             {[
+              {
+                id: "attributes" as const,
+                title: "Produktegenskaper",
+                icon: "tag" as const,
+                value: undefined,
+              },
               {
                 id: "catalog" as const,
                 title: "Produkter og merker",
@@ -554,23 +570,31 @@ export default function Spending() {
       )}
       <Sheet
         title={
-          report === "catalog"
-            ? "Produkter og merker"
-            : report === "prices"
-              ? "Prissjekk"
-              : report === "families"
-                ? "Mengder kjøpt"
-                : report === "calendar"
-                  ? "Handlekalender"
-                  : report === "meat"
-                    ? "Kjøtt og fisk"
-                    : report === "changes"
-                      ? "Endringer fra forrige måned"
-                      : "Om tallene"
+          report === "attributes"
+            ? "Produktegenskaper"
+            : report === "catalog"
+              ? "Produkter og merker"
+              : report === "prices"
+                ? "Prissjekk"
+                : report === "families"
+                  ? "Mengder kjøpt"
+                  : report === "calendar"
+                    ? "Handlekalender"
+                    : report === "meat"
+                      ? "Kjøtt og fisk"
+                      : report === "changes"
+                        ? "Endringer fra forrige måned"
+                        : "Om tallene"
         }
         visible={report !== null}
         onClose={() => setReport(null)}
       >
+        {report === "attributes" && (
+          <ProductAttributesReport
+            receipts={totals.selected}
+            onSelect={showDetails}
+          />
+        )}
         {report === "catalog" && (
           <>
             <Copy weight="600">Produkter</Copy>

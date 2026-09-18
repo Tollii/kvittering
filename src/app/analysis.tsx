@@ -1,0 +1,213 @@
+import { useState } from "react";
+import { Stack, useLocalSearchParams } from "expo-router";
+import { View } from "react-native";
+import {
+  Button,
+  Copy,
+  IconButton,
+  Notice,
+  Panel,
+  Row,
+  Screen,
+  SectionTitle,
+  Segments,
+} from "@/components/ui";
+import { SpendingDetails } from "@/components/spending-details";
+import { useHousehold } from "@/features/session";
+import {
+  analysisPeriod,
+  analysisSummary,
+  shiftDate,
+  spendingAnalysis,
+  type AnalysisFrequency,
+} from "@/lib/domain/spending-analysis";
+import { formatMoney, osloDate } from "@/lib/domain/receipt";
+import { formatDate } from "@/lib/format-date";
+import type { SpendingGroup } from "@/lib/domain/insights";
+
+export default function Analysis() {
+  const { month } = useLocalSearchParams<{ month?: string }>();
+  const { receipts, completeReceipts, synchronize } = useHousehold();
+  const [frequency, setFrequency] = useState<AnalysisFrequency>("month");
+  const [anchor, setAnchor] = useState(
+    month &&
+      /^\d{4}-(0[1-9]|1[0-2])$/.test(month) &&
+      month < osloDate().slice(0, 7)
+      ? `${month}-01`
+      : osloDate(),
+  );
+  const [today, setToday] = useState(osloDate());
+  const [selected, setSelected] = useState<SpendingGroup | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  const period = analysisPeriod(anchor, frequency, today);
+  const report = spendingAnalysis(receipts, period);
+  function move(direction: number) {
+    if (frequency === "week") setAnchor(shiftDate(period.start, direction * 7));
+    else {
+      const date = new Date(`${anchor}T12:00:00Z`);
+      setAnchor(
+        new Date(
+          Date.UTC(
+            date.getUTCFullYear(),
+            date.getUTCMonth() + direction,
+            1,
+            12,
+          ),
+        )
+          .toISOString()
+          .slice(0, 10),
+      );
+    }
+  }
+  return (
+    <Screen insetTop={false}>
+      <Stack.Screen options={{ title: "Forbruksanalyse" }} />
+      <Segments
+        value={frequency}
+        onChange={setFrequency}
+        options={[
+          { value: "week", label: "Uke" },
+          { value: "month", label: "Måned" },
+        ]}
+      />
+      <View
+        style={{
+          flexDirection: "row",
+          alignItems: "center",
+          justifyContent: "space-between",
+        }}
+      >
+        <IconButton
+          name="chevron.left"
+          label="Forrige periode"
+          onPress={() => move(-1)}
+        />
+        <Copy weight="600">
+          {formatDate(period.start)} – {formatDate(period.end)}
+        </Copy>
+        <IconButton
+          name="chevron.right"
+          label="Neste periode"
+          disabled={period.end >= today}
+          onPress={() => move(1)}
+        />
+      </View>
+      {!completeReceipts ? (
+        <Notice>Henter hele historikken før analysen vises …</Notice>
+      ) : (
+        <>
+          <Copy selectable size={34} weight="800">
+            {formatMoney(report.currentOre)}
+          </Copy>
+          <Copy selectable>{analysisSummary(report)}</Copy>
+          <Copy muted size={13}>
+            Sammenlignet med {formatDate(period.previousStart)} –{" "}
+            {formatDate(period.previousEnd)}. {report.currentReceipts} mot{" "}
+            {report.previousReceipts} kvitteringer. Gjelder registrerte kjøp,
+            ikke målt forbruk.
+          </Copy>
+          {(report.provisionalReceipts > 0 || report.missingAmounts > 0) && (
+            <Notice tone="warning">
+              {report.provisionalReceipts} kvitteringer er foreløpige.{" "}
+              {report.missingAmounts} beløp mangler.
+            </Notice>
+          )}
+          {report.previousReceipts > 0 && (
+            <>
+              <SectionTitle title="Hva forklarer forskjellen?" />
+              <Panel style={{ gap: 0, paddingVertical: 4 }}>
+                <Row
+                  title="Endret pris per mengde"
+                  value={formatMoney(report.priceOre)}
+                />
+                <Row
+                  title="Endret kjøpt mengde"
+                  value={formatMoney(report.quantityOre)}
+                />
+                <Row
+                  title="Andre varer og ukjent mengde"
+                  value={formatMoney(report.unexplainedOre)}
+                />
+              </Panel>
+              <Copy muted size={13}>
+                {report.measuredLines} av {report.productLines} varelinjer kan
+                sammenlignes som samme produktfamilie med kjent mengde. Pris
+                omfatter rabatter og ulik fordeling mellom butikker og
+                pakninger. Dette viser bidrag til endringen, ikke årsaken til
+                prisendringer.
+              </Copy>
+              <SectionTitle title="Sammenlignbare produkter" />
+              {!report.effects.length && (
+                <Copy muted>
+                  Vi trenger samme produktfamilie med kjent mengde i begge
+                  perioder.
+                </Copy>
+              )}
+              {report.effects.map((effect) => (
+                <Row
+                  key={effect.id}
+                  title={effect.name}
+                  value={formatMoney(effect.differenceOre)}
+                  detail={`${effect.previousQuantity} → ${effect.currentQuantity} ${effect.unit} · pris ${formatMoney(effect.priceOre)}, mengde ${formatMoney(effect.quantityOre)}`}
+                  onPress={() =>
+                    setSelected({
+                      id: effect.id,
+                      name: `${effect.name} · begge perioder`,
+                      amountOre: effect.currentOre + effect.previousOre,
+                      contributions: effect.contributions,
+                    })
+                  }
+                />
+              ))}
+            </>
+          )}
+          <SectionTitle
+            title={
+              report.previousReceipts ? "Kategoriendringer" : "Kjøp i perioden"
+            }
+          />
+          {report.categories.slice(0, 8).map((row) => (
+            <Row
+              key={row.id}
+              title={row.name}
+              detail={
+                report.previousReceipts
+                  ? `${formatMoney(row.previousOre)} → ${formatMoney(row.currentOre)}`
+                  : undefined
+              }
+              value={formatMoney(row.differenceOre)}
+              onPress={() =>
+                setSelected({
+                  id: row.id,
+                  name: `${row.name} · begge perioder`,
+                  amountOre: row.currentOre + row.previousOre,
+                  contributions: row.contributions,
+                })
+              }
+            />
+          ))}
+        </>
+      )}
+      <Button
+        title="Oppdater analyse"
+        secondary
+        busy={busy}
+        onPress={() => {
+          setBusy(true);
+          setError("");
+          void synchronize()
+            .then(() => setToday(osloDate()))
+            .catch(() => setError("Kunne ikke oppdatere. Prøv igjen."))
+            .finally(() => setBusy(false));
+        }}
+      />
+      <Copy muted size={12}>
+        Analysen oppdateres også når nye kvitteringer og produktopplysninger
+        kommer inn.
+      </Copy>
+      {!!error && <Notice error>{error}</Notice>}
+      <SpendingDetails selected={selected} onClose={() => setSelected(null)} />
+    </Screen>
+  );
+}

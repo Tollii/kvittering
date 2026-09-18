@@ -169,6 +169,12 @@ export default function Settings() {
           </Panel>
         </>
       )}
+      <Row
+        title="Rettelser og læring"
+        detail="Se beslutninger og test kategorisering"
+        icon="checkmark.circle"
+        onPress={() => router.push("/corrections")}
+      />
       <SectionTitle title="Budsjett" />
       <BudgetSettings />
       <SectionTitle title="Varsler" />

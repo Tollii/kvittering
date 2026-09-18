@@ -17,6 +17,8 @@ import type * as catalogLinks from "../catalogLinks.js";
 import type * as catalogMatching from "../catalogMatching.js";
 import type * as catalogQueue from "../catalogQueue.js";
 import type * as catalogWorker from "../catalogWorker.js";
+import type * as correctionEvaluation from "../correctionEvaluation.js";
+import type * as corrections from "../corrections.js";
 import type * as crons from "../crons.js";
 import type * as digest from "../digest.js";
 import type * as households from "../households.js";
@@ -102,6 +104,8 @@ declare const fullApi: ApiFromModules<{
   catalogMatching: typeof catalogMatching;
   catalogQueue: typeof catalogQueue;
   catalogWorker: typeof catalogWorker;
+  correctionEvaluation: typeof correctionEvaluation;
+  corrections: typeof corrections;
   crons: typeof crons;
   digest: typeof digest;
   households: typeof households;

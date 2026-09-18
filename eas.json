@@ -4,13 +4,13 @@
     "appVersionSource": "remote"
   },
   "build": {
-    "production": {
+    "testflight": {
       "distribution": "store",
       "autoIncrement": true,
-      "environment": "production",
+      "environment": "preview",
       "env": {
-        "EXPO_PUBLIC_CONVEX_URL": "https://agile-falcon-148.eu-west-1.convex.cloud",
-        "EXPO_PUBLIC_CONVEX_SITE_URL": "https://agile-falcon-148.eu-west-1.convex.site"
+        "EXPO_PUBLIC_CONVEX_URL": "https://courteous-jay-215.eu-west-1.convex.cloud",
+        "EXPO_PUBLIC_CONVEX_SITE_URL": "https://courteous-jay-215.eu-west-1.convex.site"
       }
     },
     "development": {
@@ -24,7 +24,7 @@
     }
   },
   "submit": {
-    "production": {
+    "testflight": {
       "ios": {
         "appleId": "tolnes@proton.me",
         "ascAppId": "6813602733",

@@ -7,6 +7,7 @@ import {
 import { internal } from "./_generated/api";
 import type { Id } from "./_generated/dataModel";
 import { aliasKey, type ReceiptData } from "../src/lib/domain/receipt";
+import { categoryById } from "../src/lib/domain/categories";
 import {
   applyCategoryMemory,
   categoryMemoryKey,
@@ -67,7 +68,7 @@ export async function applyHouseholdAliases(
           )
           .unique()
       : null;
-    if (alias && key) {
+    if (alias && key && categoryById.has(alias.categoryId)) {
       settleLineWithAlias(line, key, alias.categoryId);
       continue;
     }
@@ -146,7 +147,7 @@ export const applyToMatching = internalMutation({
         q.eq("householdId", args.householdId).eq("key", args.key),
       )
       .unique();
-    if (!alias) return null;
+    if (!alias || !categoryById.has(alias.categoryId)) return null;
     const page = await ctx.db
       .query("receipts")
       .withIndex("by_householdId", (q) => q.eq("householdId", args.householdId))

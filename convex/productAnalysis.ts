@@ -1,3 +1,4 @@
+import { productAttributesValidator } from "../src/lib/domain/product-attributes";
 import { v } from "convex/values";
 import { WorkflowManager } from "@convex-dev/workflow";
 import { components, internal } from "./_generated/api";
@@ -206,6 +207,7 @@ export const saveProfile = internalMutation({
     evidenceKey: v.string(),
     family: v.union(v.literal("new"), v.id("productFamilies"), v.null()),
     package: packageProfileValidator,
+    attributes: v.optional(productAttributesValidator),
     decisions: v.array(
       v.object({
         question: v.string(),
@@ -278,6 +280,7 @@ export const saveProfile = internalMutation({
       key,
       familyId,
       package: args.package,
+      ...(args.attributes ? { attributes: args.attributes } : {}),
       decisions: args.decisions,
     });
     return null;

@@ -4,6 +4,7 @@ import { expect, it, vi, afterEach } from "vitest";
 import schema from "./schema";
 import { api, internal } from "./_generated/api";
 import { batteryFixture } from "../src/lib/domain/receipt";
+import { readAttributes } from "../src/lib/domain/product-attributes";
 import {
   purchaseEvidenceKey,
   productAnalysisVersion,
@@ -59,6 +60,10 @@ async function setup() {
       family: "new" as const,
       package: { unitsPerPackage: 1, measurePerPackage: null },
       decisions: [],
+      attributes: readAttributes(
+        { attribute_type: { choice: "energy", confidence: 0.96 } },
+        "receipt",
+      ),
     },
   };
 }
@@ -82,6 +87,7 @@ it("persists one family and cached profile for repeated decisions", async () => 
   expect(prepared?.profile?.package.unitsPerPackage).toBe(1);
   expect(prepared?.families).toHaveLength(1);
   expect(prepared?.profile?.familyId).toBe(prepared?.families[0]._id);
+  expect(prepared?.profile?.attributes).toEqual(args.attributes);
 });
 it("discards stale results after a receipt edit and records failures separately from receipt status", async () => {
   const { t, id, args } = await setup();

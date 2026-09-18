@@ -3,6 +3,7 @@ import { openDatabaseSync } from "expo-sqlite";
 import { randomUUID } from "expo-crypto";
 import type { Id } from "../../convex/_generated/dataModel";
 import type { LocalReceipt, QueueStore } from "./upload-queue";
+import { storageSuffix } from "./deployment-storage";
 
 const listeners = new Set<() => void>();
 export function subscribeStorage(listener: () => void) {
@@ -18,14 +19,15 @@ function changed() {
 let database: ReturnType<typeof openDatabaseSync> | undefined;
 function storage() {
   if (!database) {
-    database = openDatabaseSync("kvitto.db");
+    database = openDatabaseSync(`kvitto${storageSuffix}.db`);
     database.execSync(
       "PRAGMA journal_mode = WAL; CREATE TABLE IF NOT EXISTS receipt_queue (id TEXT PRIMARY KEY, owner TEXT NOT NULL, household TEXT NOT NULL, data TEXT NOT NULL); CREATE TABLE IF NOT EXISTS household_cache (owner TEXT PRIMARY KEY, data TEXT NOT NULL);",
     );
   }
   return database;
 }
-const directory = () => new Directory(Paths.document, "receipts");
+const directory = () =>
+  new Directory(Paths.document, `receipts${storageSuffix}`);
 // Store relative names: iOS can change the application's container path after an update.
 export function imageFile(name: string) {
   return new File(directory(), name);

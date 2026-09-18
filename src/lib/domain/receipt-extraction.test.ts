@@ -76,7 +76,7 @@ describe("reading uncertainty", () => {
       },
     ];
     const data = prepareExtraction(extracted, 1);
-    data.lines[0].categoryId = "drinks.energy-drinks";
+    data.lines[0].categoryId = "drinks.soft-drinks";
     expect(data.issues).toEqual([]);
     expect(data.lines[0].issues).toEqual([]);
     expect(canAcceptReceipt(data, false)).toBe(true);

@@ -1,4 +1,5 @@
 import { openDatabaseSync } from "expo-sqlite";
+import { storageSuffix } from "./deployment-storage";
 import type {
   PersistedClient,
   Persister,
@@ -6,7 +7,7 @@ import type {
 let database: ReturnType<typeof openDatabaseSync> | undefined;
 function storage() {
   if (!database) {
-    database = openDatabaseSync("catalog-cache.db");
+    database = openDatabaseSync(`catalog-cache${storageSuffix}.db`);
     database.execSync(
       "CREATE TABLE IF NOT EXISTS query_cache (scope TEXT PRIMARY KEY, data TEXT NOT NULL)",
     );

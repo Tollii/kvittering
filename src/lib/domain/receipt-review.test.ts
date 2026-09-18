@@ -58,8 +58,8 @@ it("resolves category uncertainty without dismissing other review requirements",
   const line = batteryFixture().lines[0];
   line.issues = ["Kategorien er usikker.", "Mulig overlapp."];
   line.amountOre = null;
-  const corrected = confirmLineCategory(line, "drinks.energy-drinks");
-  expect(corrected.categoryId).toBe("drinks.energy-drinks");
+  const corrected = confirmLineCategory(line, "drinks.soft-drinks");
+  expect(corrected.categoryId).toBe("drinks.soft-drinks");
   expect(corrected.manual).toBe(true);
   expect(lineReviewIssues(corrected)).toEqual([
     "Mulig overlapp.",

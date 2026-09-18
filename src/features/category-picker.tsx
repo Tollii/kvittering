@@ -24,8 +24,12 @@ const keywords: Record<string, string> = {
   "household.laundry": "vaskemiddel skyllemiddel omo blenda",
   "household.dishwashing": "zalo oppvaskmiddel oppvasktabletter",
   "other-purchases.bags": "bærepose pose",
-  "drinks.energy-drinks": "battery monster red bull",
-  "drinks.soft-drinks": "cola pepsi solo fanta",
+  "drinks.soft-drinks":
+    "cola pepsi solo fanta energidrikk battery monster red bull burn",
+  "convenience.fresh-meals": "pizza varmmat ferdigmat fersk",
+  "convenience.sandwiches": "tacobaguette baguett sandwich wrap",
+  "personal-care.supplements":
+    "vitamin melatonin kosttilskudd tran mineral magnesium",
 };
 
 export function CategoryPicker({

@@ -61,13 +61,52 @@ The workflow summary links to the build and TestFlight.
 
 Before the first run, add an [Expo access token](https://expo.dev/accounts/atolnes/settings/access-tokens)
 as the GitHub repository secret `EXPO_TOKEN`. The token's account must have access
-to `@atolness-team/kvitto`. Apple signing and submission credentials are already
+to `@atolness-team/kvitto`. Add a deploy key for staging as `CONVEX_STAGING_DEPLOY_KEY`.
+The workflow deploys the backend to staging before building the app. Apple signing and submission credentials are already
 stored in Expo. The workflow file must be on the repository's default branch to
 show the **Run workflow** button.
 
-The `production` build profile currently connects to the existing Convex development
-deployment. Set the public Convex URLs in `eas.json` when this should change.
-For a release from your computer, use `npm run testflight`.
+The `testflight` build profile uses the EAS `preview` environment and Convex staging.
+The `development` profile and local Metro builds use the personal Convex deployment.
+The `submit-existing` operation accepts only builds made with the `testflight` profile;
+older `production` builds still point to the personal backend and must be rebuilt.
+For a release from your computer, use `npm run testflight`. This deploys staging before
+building and submitting the iOS app.
+
+## Backend environments
+
+| Use               | Convex reference     | Deployment          | Build configuration             |
+| ----------------- | -------------------- | ------------------- | ------------------------------- |
+| Local development | `dev/andreas-tolnes` | `agile-falcon-148`  | `.env.local`, EAS `development` |
+| TestFlight        | `staging`            | `courteous-jay-215` | EAS `testflight`                |
+
+Both deployments are in Ireland (`aws-eu-west-1`). Convex classifies the persistent
+staging deployment as type `prod`; it is a separate named deployment, not the local default.
+Staging began as a copy of personal data, stored files, accounts, and provider configuration.
+The two databases now change independently. Staging account references use its own auth issuer.
+Sessions, signing keys, notification registrations, and background job state were not retained.
+Sign in with the existing credentials and enable notifications again in the staging app.
+
+Run `npm run backend` for local development. Deploy staging explicitly with:
+
+```sh
+npm run backend:staging
+```
+
+This uses a staging-only deploy key in the git-ignored `.env.staging.local`, leaving
+`.env.local` unchanged. To configure another development machine:
+
+```sh
+npx convex deployment token create staging-local-deploy --deployment courteous-jay-215 --save-env .env.staging.local
+```
+
+Use a separately named staging deploy key for GitHub Actions. Do not put provider secrets
+or deploy keys in `eas.json` or `EXPO_PUBLIC_*` variables. Update each backend's API keys
+in its own Convex dashboard. Device sessions, upload queues, images, and catalog caches
+are isolated by backend address; existing personal device storage is preserved.
+
+Backend deployment does not change an installed TestFlight binary. A new TestFlight build
+is required to switch it to staging.
 
 ## App functions
 
@@ -79,6 +118,9 @@ For a release from your computer, use `npm run testflight`.
 - Receipt review as a checklist: one action chip per open question, one-tap confirmation of suggested categories, and swipe-to-approve in the inbox when categories are all that remain. Confirmed categories are remembered per store and settle the same item on later receipts, approving them automatically when nothing else is open. Every approved receipt also teaches a looser memory keyed by store and receipt name (`categoryMemory`): after two agreeing approvals, or one explicit "husk", an uncertain reading of that item is settled without asking.
 - Receipt review, correction, category memory, product matching, duplicate checks, exclusion, reprocessing, and deletion.
 - Spending by month, category, store, and purchase type; daily purchase calendar; receipt and product history.
+- **Forbruk → Utforsk → Forbruksanalyse** compares weeks or months, including partial periods. It separates changes in price per quantity and purchased quantity for comparable product families. Other purchases and unknown quantities remain separate. Tap a result to inspect its receipt lines; **Oppdater analyse** refreshes the receipt history. The existing weekly notification includes the change from the previous week when comparison data exists.
+- **Forbruk → Utforsk → Produktegenskaper** groups purchases by product type, sugar variant, or preparation. This can combine product families across brands, such as all cola. Unknown attributes and incomplete quantities remain visible.
+- **Innstillinger → Rettelser og læring** records new human category and catalog decisions. Category corrections can be previewed and applied to matching receipt names from the same store, with undo. Later manual decisions are protected. **Test Jev** checks the current classifier against the latest recorded category decision per product in one request.
 - Price signals: a linked product whose net unit price is 15 % or more off the household's median for that product (three or more earlier purchases) gets a `+30 % vs vanlig` chip on the receipt line, and the month's surprises are listed under Forbruk → Utforsk → Prissjekk.
 - Optional monthly budget (Settings → Budsjett). Forbruk shows pace against the elapsed share of the month; a Sunday-evening push (`convex/crons.ts` → `digest.sendAll`) summarises the week and the budget position for subscribed devices.
 - Native tabs, SF Symbols, native date selection, light and dark themes, and system sharing.
@@ -163,3 +205,23 @@ and `TYPESAFE_MODEL` (default `jev-latest`); it does not make extra Kassal.app r
 Run the arithmetic, ownership and stale-result checks with `npm test`. The internal
 `productAnalysisEvaluation:evaluate` action runs six fixed family cases against Jev and
 returns expected and actual choices. It calls the model but does not change receipt data.
+
+Product attributes use the same receipt and cached catalog evidence as package analysis,
+including available ingredients, nutrition, and labels. Their independent questions share
+the existing Jev request, and the product profile caches the results. Decisions below 0.80
+remain unknown. Missing or rounded nutrition alone does not establish a sugar-free variant.
+The internal `productAnalysisEvaluation:evaluateAttributes` action checks six fixed attribute
+cases in one request without changing receipts.
+
+Spending comparisons use net receipt amounts and exclude deposits and unresolved duplicates.
+Price effects can include a change in stores, discounts, or package sizes; they are not a
+measurement of inflation. Physical quantities must be known for every compared line. Counts
+are comparable only with the same package identity. The effects and remaining difference add
+up to the total change. These figures describe purchases, not measured consumption.
+
+Correction history starts when this feature is installed; it does not reconstruct older
+decisions. The screen reads the latest 50 decisions. Batch previews inspect the latest 200
+receipts and contain at most 20 matching lines. Changes require the previewed receipt revisions
+to remain current. Undo also requires unchanged revisions, so it cannot overwrite a later edit.
+Batch propagation does not create more learning or evaluation examples. The category test is
+an agreement check on those examples, not an estimate of accuracy on all purchases.

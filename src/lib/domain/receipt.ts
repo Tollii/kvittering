@@ -267,7 +267,7 @@ export function batteryFixture(): ReceiptData {
     name: "BATTERY REMIX",
     originalText: "BATTERY REMIX 25,90",
     amountOre: 2590,
-    categoryId: "drinks.energy-drinks",
+    categoryId: "drinks.soft-drinks",
     manual: false,
   };
   return {

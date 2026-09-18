@@ -1,3 +1,8 @@
+import {
+  analysisPeriod,
+  analysisSummary,
+  spendingAnalysis,
+} from "./spending-analysis";
 import { monthlyInsights, type Receipt } from "./insights";
 import { formatMoney, osloDate } from "./receipt";
 
@@ -83,36 +88,13 @@ export function weeklyDigest(
   budgetOre: number | null,
   today = osloDate(),
 ) {
-  const date = new Date(`${today}T12:00:00Z`);
-  const offset = (date.getUTCDay() + 6) % 7;
-  const monday = new Date(date);
-  monday.setUTCDate(date.getUTCDate() - offset);
-  const weekStart = monday.toISOString().slice(0, 10);
-  const week = receipts.filter(
-    (receipt) =>
-      !receipt.excluded &&
-      receipt.data?.currency === "NOK" &&
-      !!receipt.data.purchaseDate &&
-      receipt.data.purchaseDate >= weekStart &&
-      receipt.data.purchaseDate <= today,
+  const analysis = spendingAnalysis(
+    receipts,
+    analysisPeriod(today, "week", today),
   );
-  const weekSpentOre = week.reduce(
-    (sum, receipt) =>
-      sum +
-      receipt.data!.lines.reduce(
-        (lines, line) =>
-          [
-            "product",
-            "item_discount",
-            "receipt_discount",
-            "adjustment",
-          ].includes(line.kind)
-            ? lines + (line.amountOre ?? 0)
-            : lines,
-        0,
-      ),
-    0,
-  );
+  const weekStart = analysis.period.start;
+  const weekSpentOre = analysis.currentOre;
+  const weekReceipts = analysis.currentReceipts;
   const month = monthlyInsights(receipts, today.slice(0, 7));
   const pace =
     budgetOre && budgetOre > 0
@@ -120,8 +102,9 @@ export function weeklyDigest(
       : null;
   const parts = [
     `Denne uken: ${formatMoney(weekSpentOre)}`,
-    `${week.length} ${week.length === 1 ? "kvittering" : "kvitteringer"}`,
+    `${weekReceipts} ${weekReceipts === 1 ? "kvittering" : "kvitteringer"}`,
   ];
+  if (analysis.previousReceipts) parts.push(analysisSummary(analysis));
   if (pace)
     parts.push(
       `${Math.round(pace.spentShare * 100)} % av budsjettet brukt, dag ${pace.dayOfMonth} av ${pace.daysInMonth}`,
@@ -129,10 +112,10 @@ export function weeklyDigest(
   return {
     weekStart,
     weekSpentOre,
-    weekReceipts: week.length,
+    weekReceipts,
     monthSpentOre: month.products,
     pace,
-    title: week.length ? "Ukens handel" : "Ingen kvitteringer denne uken",
+    title: weekReceipts ? "Ukens handel" : "Ingen kvitteringer denne uken",
     body: parts.join(" · "),
   };
 }

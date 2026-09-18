@@ -1,5 +1,6 @@
 import { v, type Infer } from "convex/values";
 import type { ReceiptLine } from "./receipt";
+import { productAttributesValidator } from "./product-attributes";
 import { productSearch } from "../catalog/search";
 
 export const familyIdentityValidator = v.object({
@@ -27,6 +28,7 @@ export const productAnalysisResultValidator = v.object({
   evidenceKey: v.string(),
   family: v.union(familyIdentityValidator, v.null()),
   quantity: purchaseQuantityValidator,
+  attributes: v.optional(productAttributesValidator),
 });
 export const productAnalysisValidator = v.object({
   version: v.number(),
@@ -43,7 +45,7 @@ export const productAnalysisValidator = v.object({
 export type ProductAnalysisResult = Infer<
   typeof productAnalysisResultValidator
 >;
-export const productAnalysisVersion = 4;
+export const productAnalysisVersion = 6;
 
 /** A family name removes explicit package notation, while retaining the source's recipe and variant. */
 export function familyName(line: ReceiptLine) {

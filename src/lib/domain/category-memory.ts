@@ -1,5 +1,6 @@
 import { normalizeAlias, type ReceiptLine } from "./receipt";
 import { categoryUncertainIssue } from "./receipt-review";
+import { categoryById } from "./categories";
 
 /**
  * What the household has approved before, keyed only by store and receipt
@@ -35,6 +36,7 @@ export function learnableLine(line: ReceiptLine): boolean {
   return (
     line.kind === "product" &&
     !!line.categoryId &&
+    categoryById.has(line.categoryId) &&
     line.categoryId !== "fallback.unclear" &&
     !line.issues.includes(categoryUncertainIssue)
   );
@@ -48,6 +50,7 @@ export function applyCategoryMemory(
   if (
     line.kind !== "product" ||
     line.manual ||
+    !categoryById.has(memory.categoryId) ||
     memory.confirmations < categoryMemoryThreshold
   )
     return false;

@@ -1,3 +1,4 @@
+import { recordCorrections } from "./corrections";
 import { lineEvidenceKey } from "../src/lib/catalog/matching";
 import { productChange, correctProducts } from "./products";
 import { correctCatalogLinks } from "./catalogLinks";
@@ -268,6 +269,7 @@ export const save = mutation({
         });
       }
     }
+    await recordCorrections(ctx, receipt, args.data);
     if (args.reviewed)
       await learnCategories(
         ctx,
@@ -408,7 +410,12 @@ export const cleanupDeleted = internalMutation({
     if (await ctx.db.get("receipts", id))
       throw new Error("Kvitteringen er ikke slettet.");
     let remaining = false;
-    for (const table of ["images", "extractions", "revisions"] as const) {
+    for (const table of [
+      "images",
+      "extractions",
+      "revisions",
+      "corrections",
+    ] as const) {
       const rows = await ctx.db
         .query(table)
         .withIndex("by_receiptId", (q) => q.eq("receiptId", id))

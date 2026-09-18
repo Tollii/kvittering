@@ -196,7 +196,7 @@ it("applies confirmed matches while keeping item-only category corrections", asy
     data.lines[0].categoryId = "fallback.unclear";
     if (index === 2) {
       data.lines[0].manual = true;
-      data.lines[0].categoryId = "drinks.soft-drinks";
+      data.lines[0].categoryId = "drinks.sports-drinks";
     }
     await t.run(async (ctx) => {
       await ctx.db.patch("receipts", id, { status: "needs_review", data });
@@ -227,11 +227,9 @@ it("applies confirmed matches while keeping item-only category corrections", asy
   });
   const matched = (await first.query(api.receipts.detail, { id: ids[1] }))!;
   const manual = (await first.query(api.receipts.detail, { id: ids[2] }))!;
-  expect(matched.receipt.data?.lines[0].categoryId).toBe(
-    "drinks.energy-drinks",
-  );
+  expect(matched.receipt.data?.lines[0].categoryId).toBe("drinks.soft-drinks");
   expect(matched.receipt.data?.lines[0].productKey).toBe(aliases[0].key);
-  expect(manual.receipt.data?.lines[0].categoryId).toBe("drinks.soft-drinks");
+  expect(manual.receipt.data?.lines[0].categoryId).toBe("drinks.sports-drinks");
   // The remembered item was the only open question, so the receipt is approved.
   expect(matched.receipt.status).toBe("reviewed");
   expect(matched.receipt.autoAccepted).toBe(true);
@@ -279,10 +277,38 @@ it("settles remembered categories for a newly read receipt from any engine", asy
     provider: "test reader",
   });
   const detail = (await first.query(api.receipts.detail, { id }))!;
-  expect(detail.receipt.data?.lines[0].categoryId).toBe("drinks.energy-drinks");
+  expect(detail.receipt.data?.lines[0].categoryId).toBe("drinks.soft-drinks");
   expect(detail.receipt.data?.lines[0].issues).toEqual([]);
   expect(detail.receipt.status).toBe("reviewed");
   expect(detail.receipt.autoAccepted).toBe(true);
+});
+
+it("ignores an alias whose category is no longer available", async () => {
+  const { t, first, householdId } = await setup();
+  const id = await first.mutation(api.receipts.reserve, {
+    clientId: "retired-category-0001",
+    imageCount: 1,
+    householdId,
+  });
+  const data = batteryFixture();
+  await t.run(async (ctx) => {
+    await ctx.db.insert("aliases", {
+      householdId,
+      key: JSON.stringify([
+        "EKSEMPELBUTIKK",
+        "BATTERY REMIX",
+        null,
+        null,
+        null,
+        null,
+      ]),
+      categoryId: "removed.category",
+      confirmedBy: "test",
+    });
+  });
+  const result = await t.query(internal.processing.applyAliases, { id, data });
+  expect(result.lines[0].categoryId).toBe("drinks.soft-drinks");
+  expect(result.lines[0].productKey).toBeNull();
 });
 
 it("deletes a household receipt, its images and history without allowing a late processing result", async () => {

@@ -2,7 +2,7 @@ export const categoryGroups = [
   [
     "drinks",
     "Drikke",
-    "energy-drinks:Energidrikk|soft-drinks:Brus|sparkling-water:Kullsyrevann|juice:Juice|smoothies:Smoothie|coffee:Kaffe|tea:Te|sports-drinks:Sportsdrikk|beer-cider:Øl og cider|wine:Vin",
+    "soft-drinks:Brus|sparkling-water:Kullsyrevann|juice:Juice|smoothies:Smoothie|coffee:Kaffe|tea:Te|sports-drinks:Sportsdrikk|beer-cider:Øl og cider|wine:Vin",
   ],
   [
     "meat-fish",
@@ -47,7 +47,7 @@ export const categoryGroups = [
   [
     "convenience",
     "Ferdigmat",
-    "frozen-pizza:Frossenpizza|frozen-meals:Andre frosne ferdigretter|sandwiches:Ferdige sandwicher og wraps|salads:Ferdige salater|chilled-meals:Kjølte ferdigretter|instant-meals:Instantretter",
+    "frozen-pizza:Frossenpizza|frozen-meals:Andre frosne ferdigretter|sandwiches:Fylte baguetter, sandwicher og wraps|salads:Ferdige salater|fresh-meals:Ferske ferdigretter og varmmat|chilled-meals:Kjølte ferdigretter|instant-meals:Instantretter",
   ],
   [
     "breakfast",
@@ -72,7 +72,7 @@ export const categoryGroups = [
   [
     "personal-care",
     "Personlig pleie",
-    "oral:Munnhygiene|hair-body:Sjampo og dusj|deodorant:Deodorant|shaving:Barbering|menstrual:Menstruasjonsprodukter",
+    "oral:Munnhygiene|hair-body:Sjampo og dusj|deodorant:Deodorant|shaving:Barbering|menstrual:Menstruasjonsprodukter|supplements:Vitaminer og kosttilskudd",
   ],
   [
     "pets",
@@ -101,4 +101,4 @@ export const categoryById = new Map(
   categories.map((category) => [category.id, category]),
 );
 export const categoryRules =
-  "Choose one leaf. Frozen pizza is convenience.frozen-pizza. Sliced ham is toppings.sliced-meat, raw pork is meat-fish.pork, and fish spreads are toppings.fish-spreads. Frozen vegetables remain produce.vegetables. Do not infer ingredients, sugar content, package size or purpose from vague names. Use fallback.unclear when uncertain. Deposits and discounts are accounting lines, not products.";
+  "Choose one leaf. Soda and energy drinks both belong to drinks.soft-drinks. Frozen pizza is convenience.frozen-pizza; fresh ready-to-eat pizza and hot meals from the grocery counter are convenience.fresh-meals. Filled baguettes, including taco baguettes, are convenience.sandwiches; plain baguettes are bakery.rolls. Packaged Wasa crispbread sandwiches are bakery.crispbread. Prepared meal salads are convenience.salads; plain lettuce and salad leaves remain produce.vegetables. Snack carrots are vegetables, not crisps. Yoghurt ice cream is snacks.ice-cream, not dairy.yoghurt. Vitamins and supplements, including melatonin, are personal-care.supplements. Sliced ham is toppings.sliced-meat, raw pork is meat-fish.pork, and fish spreads are toppings.fish-spreads. Frozen vegetables remain produce.vegetables. Do not infer ingredients, sugar content, package size or purpose from vague names. Use fallback.unclear when uncertain. Deposits and discounts are accounting lines, not products.";

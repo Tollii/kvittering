@@ -1,3 +1,6 @@
+import { productAttributesValidator } from "../src/lib/domain/product-attributes";
+import { correctionFields } from "../src/lib/domain/corrections";
+import { lineValidator } from "../src/lib/domain/receipt";
 import { catalogDecision } from "../src/lib/catalog/decisions";
 import { defineSchema, defineTable } from "convex/server";
 import { v } from "convex/values";
@@ -46,6 +49,21 @@ export const receiptFields = {
   productAnalysis: v.optional(productAnalysisValidator),
 };
 export default defineSchema({
+  corrections: defineTable(correctionFields)
+    .index("by_householdId", ["householdId"])
+    .index("by_receiptId", ["receiptId"]),
+  correctionBatches: defineTable({
+    householdId: v.id("households"),
+    correctionId: v.id("corrections"),
+    undone: v.boolean(),
+    changes: v.array(
+      v.object({
+        receiptId: v.id("receipts"),
+        revision: v.number(),
+        before: v.array(lineValidator),
+      }),
+    ),
+  }).index("by_householdId", ["householdId"]),
   productFamilies: defineTable({
     householdId: v.id("households"),
     key: v.string(),
@@ -68,6 +86,7 @@ export default defineSchema({
     key: v.string(),
     familyId: v.union(v.id("productFamilies"), v.null()),
     package: packageProfileValidator,
+    attributes: v.optional(productAttributesValidator),
     decisions: v.array(
       v.object({
         question: v.string(),
