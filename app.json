@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "kvitto",
+    "name": "Kvitto",
     "slug": "kvitto",
     "version": "1.0.0",
     "orientation": "portrait",
@@ -8,7 +8,11 @@
     "scheme": "kvitto",
     "userInterfaceStyle": "automatic",
     "ios": {
-      "icon": "./assets/expo.icon"
+      "bundleIdentifier": "no.kvitto.app",
+      "supportsTablet": true,
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false
+      }
     },
     "android": {
       "adaptiveIcon": {
@@ -28,9 +32,27 @@
       [
         "expo-splash-screen",
         {
-          "backgroundColor": "#208AEF",
-          "image": "./assets/images/splash-icon.png",
-          "imageWidth": 76
+          "backgroundColor": "#F6F5F0",
+          "image": "./assets/images/icon.png",
+          "imageWidth": 100
+        }
+      ],
+      "expo-secure-store",
+      "expo-sqlite",
+      "expo-notifications",
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "Kvitto bruker kameraet til å ta bilder av kvitteringer.",
+          "recordAudioAndroid": false
+        }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Velg kvitteringsbilder som skal legges til i Kvitto.",
+          "cameraPermission": "Ta bilder av kvitteringer.",
+          "microphonePermission": false
         }
       ]
     ],

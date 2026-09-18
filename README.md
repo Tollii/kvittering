@@ -1,56 +1,68 @@
-# Welcome to your Expo app 👋
+# Kvitto
 
-This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
+An Expo 57 / React Native app for household grocery receipts. iOS is the primary platform. The app uses Convex for authentication, storage, receipt processing, and live updates.
 
-## Get started
+## Run on iPhone or the simulator
 
-1. Install dependencies
+Use Node.js 22.13 or later and Xcode 26.4 or later.
 
-   ```bash
-   npm install
-   ```
-
-2. Start the app
-
-   ```bash
-   npx expo start
-   ```
-
-In the output, you'll find options to open the app in a
-
-- [development build](https://docs.expo.dev/develop/development-builds/introduction/)
-- [Android emulator](https://docs.expo.dev/workflow/android-studio-emulator/)
-- [iOS simulator](https://docs.expo.dev/workflow/ios-simulator/)
-- [Expo Go](https://expo.dev/go), a limited sandbox for trying out app development with Expo
-
-You can start developing by editing the files inside the **app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
-
-## Get a fresh project
-
-When you're ready, run:
-
-```bash
-npm run reset-project
+```sh
+npm install
+cp .env.example .env.local # Only if .env.local does not exist.
 ```
 
-This command will move the starter code to the **app-example** directory and create a blank **app** directory where you can start developing.
+Set the deployment and both public Convex URLs in `.env.local`. Keep provider keys and `BETTER_AUTH_SECRET` in the Convex deployment. Do not put secrets in `EXPO_PUBLIC_*` variables.
 
-### Other setup steps
+Run the backend from the repository root:
 
-- To set up ESLint for linting, run `npx expo lint`, or follow our guide on ["Using ESLint and Prettier"](https://docs.expo.dev/guides/using-eslint/)
-- If you'd like to set up unit testing, follow our guide on ["Unit Testing with Jest"](https://docs.expo.dev/develop/unit-testing/)
-- Learn more about the TypeScript setup in this template in our guide on ["Using TypeScript"](https://docs.expo.dev/guides/typescript/)
+```sh
+npm run backend
+```
 
-## Learn more
+In a second terminal, build and open the native app:
 
-To learn more about developing your project with Expo, look at the following resources:
+```sh
+npm run ios:build
+```
 
-- [Expo documentation](https://docs.expo.dev/): Learn fundamentals, or go into advanced topics with our [guides](https://docs.expo.dev/guides).
-- [Learn Expo tutorial](https://docs.expo.dev/tutorial/introduction/): Follow a step-by-step tutorial where you'll create a project that runs on Android, iOS, and the web.
+After the first build, use `npm start` to start Metro. Press `i` to open the simulator. Rebuild with `npm run ios:build` after changes to native packages or app plugins. On a physical iPhone, configure signing in Xcode and use `npx expo run:ios --device`.
 
-## Join the community
+The simulator has no receipt camera. Import an image into its photo library, then select **Velg fra bilder**. Check camera capture on a physical iPhone.
 
-Join our community of developers creating universal apps.
+## App functions
 
-- [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
-- [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.
+- Email and password sign-in. Sessions use iOS Keychain through Expo SecureStore.
+- Shared households with two members and private invitation codes.
+- Camera and photo-library capture. Up to eight images can form one receipt or separate receipts. Images are converted to JPEG.
+- Persistent receipt images and an SQLite upload queue. Uploads resume when the app is open and connected. A failed request does not create a second receipt.
+- Receipt review, correction, category memory, product matching, duplicate checks, exclusion, reprocessing, and deletion.
+- Spending by month, category, store, and purchase type; daily purchase calendar; receipt and product history.
+- Native tabs, SF Symbols, native date selection, light and dark themes, and system sharing.
+
+Capture works offline after the account and household have been loaded once. Receipt images stay on the device until the server confirms the upload. The queue is separate for each account and household. Server receipt history and edits need a connection; the app does not promise background uploads after iOS suspends it.
+
+The browser command is for layout inspection. Native capture and persistent offline storage require iOS or Android. The old PWA in `sveltemo/` is a reference and is excluded from Metro, TypeScript, lint, and tests. The active backend is `convex/` at the root; do not run the old backend at the same time.
+
+## Convex configuration
+
+The existing receipt extraction and classification pipeline is retained. Configure `BETTER_AUTH_SECRET` and the selected provider's credentials (`OPENAI_API_KEY` or `TYPESAFE_API_KEY`) in Convex. Existing `RECEIPT_PROVIDER`, `OPENAI_RECEIPT_MODEL`, and `TYPESAFE_MODEL` settings still apply.
+
+Authentication requests go directly to `EXPO_PUBLIC_CONVEX_SITE_URL`. The server trusts the `kvitto://` application scheme. The Svelte authentication proxy is no longer required.
+
+Push notifications now use Expo push tokens instead of browser subscriptions. To use them, configure an EAS project ID in `expo.extra.eas.projectId`, configure Apple push credentials, and install a development or release build on a physical iPhone. If Expo push security is enabled, set `EXPO_ACCESS_TOKEN` on Convex. The settings screen explains when native push is unavailable. Notifications remain optional for receipt processing.
+
+Native push subscriptions use the deviceSubscriptions table. Existing browser subscriptions and IndexedDB captures are not migrated.
+
+## Checks
+
+```sh
+npm run typecheck
+npm run lint
+npm test
+npx expo install --check
+npx expo export --platform ios
+```
+
+The tests cover receipt accounting, classification, matching, household access, concurrent receipt revisions, notifications, and interrupted uploads. The npm override allows the current Vitest version with Better Auth's older optional test peer range.
+
+Expo APIs follow the [version 57 documentation](https://docs.expo.dev/versions/v57.0.0/). Authentication follows the [Convex Expo integration](https://labs.convex.dev/better-auth/framework-guides/expo).

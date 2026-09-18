@@ -1,0 +1,7 @@
+sveltemo
+node_modules
+.expo
+convex/_generated
+package-lock.json
+assets
+dist
