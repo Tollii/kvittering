@@ -25,11 +25,13 @@ export const productDecision = v.object({
   kind: v.union(v.literal("match"), v.literal("new"), v.literal("uncertain")),
   productId: v.union(v.id("products"), v.null()),
 });
+
 export const productChange = v.object({
   lineId: v.string(),
   productId: v.union(v.id("products"), v.null()),
   createNew: v.boolean(),
 });
+
 export async function findMapping(
   ctx: QueryCtx,
   householdId: Id<"households">,
@@ -46,6 +48,7 @@ export async function findMapping(
     )
     .unique();
 }
+
 async function candidates(
   ctx: QueryCtx,
   householdId: Id<"households">,
@@ -59,6 +62,7 @@ async function candidates(
         .filter((word) => word.length > 2),
     ),
   ].slice(0, 3);
+
   const results = await Promise.all(
     tokens.map((token) =>
       ctx.db
@@ -72,8 +76,10 @@ async function candidates(
         .take(8),
     ),
   );
+
   return [...new Map(results.flat().map((p) => [p._id, p])).values()];
 }
+
 export const search = query({
   args: {
     receiptId: v.id("receipts"),
@@ -84,6 +90,7 @@ export const search = query({
   handler: async (ctx, args) => {
     const { member } = await requireReceipt(ctx, args.receiptId);
     const retailer = matchingKey(args.retailer);
+
     if (args.search.trim())
       return (
         await candidates(
@@ -93,6 +100,7 @@ export const search = query({
           args.search.slice(0, 200),
         )
       ).slice(0, 20);
+
     return ctx.db
       .query("products")
       .withIndex("by_householdId_and_retailer", (q) =>
@@ -102,6 +110,7 @@ export const search = query({
       .take(20);
   },
 });
+
 export const prepare = internalQuery({
   args: { id: v.id("receipts"), retailer: v.string(), line: lineValidator },
   returns: v.object({
@@ -111,25 +120,31 @@ export const prepare = internalQuery({
   }),
   handler: async (ctx, args) => {
     const receipt = await ctx.db.get("receipts", args.id);
+
     if (!receipt) throw new Error("Kvitteringen mangler.");
     const retailer = matchingKey(args.retailer);
+
     const mapping = await findMapping(
       ctx,
       receipt.householdId,
       retailer,
       args.line,
     );
+
     if (mapping) {
       const product = mapping.productId
         ? await ctx.db.get("products", mapping.productId)
         : null;
+
       if (
         !mapping.productId ||
         (product && compatibleProduct(args.line, product))
       )
         return { saved: true, productId: mapping.productId, candidates: [] };
+
       return { saved: true, productId: null, candidates: [] };
     }
+
     return {
       saved: false,
       productId: null,
@@ -140,6 +155,7 @@ export const prepare = internalQuery({
     };
   },
 });
+
 export async function saveMapping(
   ctx: MutationCtx,
   householdId: Id<"households">,
@@ -150,18 +166,21 @@ export async function saveMapping(
   reference?: ProductReference,
 ) {
   const existing = await findMapping(ctx, householdId, retailer, line);
+
   const values = {
     revision: (existing?.revision ?? 0) + 1,
     householdId,
     retailer,
     key: matchingKey(line.receiptName ?? line.name),
     productId,
-    ...(reference ? { reference } : {}),
+    reference,
     confirmedBy,
   };
+
   if (existing) await ctx.db.replace("productMappings", existing._id, values);
   else await ctx.db.insert("productMappings", values);
 }
+
 export async function createProduct(
   ctx: MutationCtx,
   householdId: Id<"households">,
@@ -170,6 +189,7 @@ export async function createProduct(
 ) {
   if (!line.name.trim() || line.name.length > 300)
     throw new Error("Varen må ha et navn på 1–300 tegn.");
+
   return ctx.db.insert("products", {
     householdId,
     retailer,
@@ -177,6 +197,7 @@ export async function createProduct(
     name: line.name.trim(),
   });
 }
+
 export async function linkProduct(
   ctx: MutationCtx,
   householdId: Id<"households">,
@@ -186,6 +207,7 @@ export async function linkProduct(
   provenance: "manual" | "automatic" = "automatic",
 ): Promise<ReceiptLine> {
   const product = id ? await ctx.db.get("products", id) : null;
+
   if (
     id &&
     (!product ||
@@ -193,6 +215,7 @@ export async function linkProduct(
       product.retailer !== retailer)
   )
     throw new Error("Varen er ikke tilgjengelig i denne butikken.");
+
   return withProductReference(
     line,
     product

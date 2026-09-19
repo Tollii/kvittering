@@ -1,18 +1,22 @@
+import { z } from "zod";
 import { v } from "convex/values";
 import { internalAction, env } from "./_generated/server";
 import { internal } from "./_generated/api";
 
-type PushResult = {
-  status?: string;
-  id?: string;
-  details?: { error?: string };
-};
-const headers = () => ({
-  "Content-Type": "application/json",
-  ...(env.EXPO_ACCESS_TOKEN
-    ? { Authorization: `Bearer ${env.EXPO_ACCESS_TOKEN}` }
-    : {}),
+const pushResultSchema = z.object({
+  status: z.string().optional(),
+  id: z.string().optional(),
+  details: z.object({ error: z.string().optional() }).optional(),
 });
+
+function headers() {
+  const result = new Headers({ "Content-Type": "application/json" });
+
+  if (env.EXPO_ACCESS_TOKEN)
+    result.set("Authorization", `Bearer ${env.EXPO_ACCESS_TOKEN}`);
+
+  return result;
+}
 
 export const send = internalAction({
   args: {
@@ -26,7 +30,9 @@ export const send = internalAction({
       receiptId: args.receiptId,
       subscriptionId: args.subscriptionId,
     });
+
     if (!target) return null;
+
     try {
       const response = await fetch("https://exp.host/--/api/v2/push/send", {
         method: "POST",
@@ -39,8 +45,13 @@ export const send = internalAction({
           data: { receiptId: args.receiptId },
         }),
       });
+
       if (!response.ok) throw new Error(`Push service: ${response.status}`);
-      const result = (await response.json()) as { data?: PushResult };
+
+      const result = z
+        .object({ data: pushResultSchema.optional() })
+        .parse(await response.json());
+
       if (result.data?.details?.error === "DeviceNotRegistered")
         await ctx.runMutation(internal.notifications.removeExpired, {
           id: args.subscriptionId,
@@ -61,6 +72,7 @@ export const send = internalAction({
         );
       else console.warn("Receipt notification delivery failed.");
     }
+
     return null;
   },
 });
@@ -80,7 +92,9 @@ export const sendMessage = internalAction({
         id: args.subscriptionId,
       },
     );
+
     if (!subscription) return null;
+
     try {
       const response = await fetch("https://exp.host/--/api/v2/push/send", {
         method: "POST",
@@ -93,8 +107,13 @@ export const sendMessage = internalAction({
           data: { route: "/spending" },
         }),
       });
+
       if (!response.ok) throw new Error(`Push service: ${response.status}`);
-      const result = (await response.json()) as { data?: PushResult };
+
+      const result = z
+        .object({ data: pushResultSchema.optional() })
+        .parse(await response.json());
+
       if (result.data?.details?.error === "DeviceNotRegistered")
         await ctx.runMutation(internal.notifications.removeExpired, {
           id: args.subscriptionId,
@@ -102,6 +121,7 @@ export const sendMessage = internalAction({
     } catch {
       console.warn("Digest notification delivery failed.");
     }
+
     return null;
   },
 });
@@ -118,14 +138,18 @@ export const checkReceipt = internalAction({
         body: JSON.stringify({ ids: [args.ticketId] }),
       },
     );
+
     if (!response.ok) return null;
-    const result = (await response.json()) as {
-      data?: Record<string, PushResult>;
-    };
+
+    const result = z
+      .object({ data: z.record(z.string(), pushResultSchema).optional() })
+      .parse(await response.json());
+
     if (result.data?.[args.ticketId]?.details?.error === "DeviceNotRegistered")
       await ctx.runMutation(internal.notifications.removeExpired, {
         id: args.subscriptionId,
       });
+
     return null;
   },
 });

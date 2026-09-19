@@ -8,6 +8,7 @@ import type {
 import { emptyCatalogResult } from "../../src/lib/catalog/model";
 
 const nullableText = z.string().nullish();
+
 const nullableNumber = z
   .union([
     z.number(),
@@ -17,6 +18,7 @@ const nullableNumber = z
       .transform(Number),
   ])
   .nullish();
+
 const productSchema = z.object({
   id: z.number().int(),
   name: z.string(),
@@ -43,28 +45,38 @@ const productSchema = z.object({
     .nullish(),
   labels: z.array(z.object({ display_name: z.string() })).nullish(),
 });
+
 const string = (value: string | null | undefined, limit = 5000) =>
   value?.trim().slice(0, limit) || undefined;
+
 const imageUrl = (value: string | null | undefined) =>
   value?.startsWith("https://") ? value : undefined;
+
+// oxlint-disable-next-line anti-slop/no-unknown-parameters -- This boundary parser validates external input before returning a domain value.
 export function normalizeProducts(response: unknown): CatalogProduct[] {
   const rows = z
     .object({ data: z.union([z.array(productSchema), productSchema]) })
     .parse(response).data;
+
   const products = new Map<string, CatalogProduct>();
+
   for (const row of (Array.isArray(rows) ? rows : [rows]).slice(0, 24)) {
     const ean = row.ean && /^\d{8,14}$/.test(row.ean) ? row.ean : undefined;
     const key = ean ? `ean:${ean}` : `kassalapp:${row.id}`;
+
     const namedSize = parseProductEvidence({
       source: "catalog",
       name: row.name,
     }).measures[0];
+
     const namedWeight = namedSize?.rawAmount;
+
     const weightUnit =
       string(row.weight_unit, 20) ??
       (namedWeight && (!row.weight || row.weight === namedWeight)
         ? namedSize.rawUnit
         : undefined);
+
     const product: CatalogProduct = {
       key,
       ids: [row.id],
@@ -91,7 +103,9 @@ export function normalizeProducts(response: unknown): CatalogProduct[] {
         })) ?? [],
       labels: row.labels?.map((value) => value.display_name).slice(0, 30) ?? [],
     };
+
     const previous = products.get(key);
+
     if (!previous) products.set(key, product);
     else
       products.set(key, {
@@ -108,8 +122,11 @@ export function normalizeProducts(response: unknown): CatalogProduct[] {
           : product.categories,
       });
   }
+
   return [...products.values()];
 }
+
+// oxlint-disable-next-line anti-slop/no-unknown-parameters -- This boundary parser validates external input before returning a domain value.
 export function normalizeStores(response: unknown): PhysicalStore[] {
   const schema = z.object({
     data: z.array(
@@ -124,6 +141,7 @@ export function normalizeStores(response: unknown): PhysicalStore[] {
       }),
     ),
   });
+
   return schema
     .parse(response)
     .data.slice(0, 24)
@@ -136,11 +154,14 @@ export function normalizeStores(response: unknown): PhysicalStore[] {
       longitude: row.position?.lng ?? undefined,
     }));
 }
+
+// oxlint-disable-next-line anti-slop/no-unknown-parameters -- This boundary parser validates external input before returning a domain value.
 export function normalizePrices(response: unknown): CatalogResult {
   const data = z.object({ data: z.unknown() }).parse(response).data;
   const rows = z.object({ products: z.array(z.unknown()) }).safeParse(data);
   const products = rows.success ? rows.data.products : [data];
   const result = emptyCatalogResult();
+
   for (const product of products.slice(0, 24)) {
     const value = z
       .object({
@@ -152,34 +173,40 @@ export function normalizePrices(response: unknown): CatalogResult {
           .nullish(),
         current_price: z
           .union([
-            z.number(),
+            z
+              .number()
+              .transform((price) => [
+                { price, date: undefined, useUpdatedAt: true as const },
+              ]),
             z.array(z.object({ price: z.number(), date: nullableText })),
-            z.object({ price: z.number(), date: nullableText }),
+            z
+              .object({ price: z.number(), date: nullableText })
+              .transform((price) => [price]),
           ])
           .nullish(),
         updated_at: nullableText,
       })
       .parse(product);
+
     const store = Array.isArray(value.store)
       ? value.store[0]?.name
       : value.store?.name;
-    const prices =
-      typeof value.current_price === "number"
-        ? [{ price: value.current_price, date: value.updated_at }]
-        : Array.isArray(value.current_price)
-          ? value.current_price
-          : value.current_price
-            ? [value.current_price]
-            : [];
+
+    const prices = value.current_price ?? [];
+
     for (const price of prices) {
       if (price.price < 0 || !Number.isFinite(price.price)) continue;
       result.prices.push({
         store: store ?? "Ukjent butikk",
         priceOre: Math.round(price.price * 100),
-        checkedAt: price.date ?? undefined,
+        checkedAt:
+          ("useUpdatedAt" in price ? value.updated_at : price.date) ??
+          undefined,
       });
     }
   }
+
   result.prices = result.prices.slice(0, 24);
+
   return result;
 }

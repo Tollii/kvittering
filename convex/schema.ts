@@ -9,11 +9,10 @@ import {
 } from "../src/lib/releases/policy";
 import { productAttributesValidator } from "../src/lib/domain/product-attributes";
 import { correctionFields } from "../src/lib/domain/corrections";
-import { lineValidator } from "../src/lib/domain/receipt";
+import { lineValidator, receiptDataValidator } from "../src/lib/domain/receipt";
 import { catalogDecision } from "../src/lib/catalog/decisions";
 import { defineSchema, defineTable } from "convex/server";
 import { v } from "convex/values";
-import { receiptDataValidator } from "../src/lib/domain/receipt";
 import {
   catalogProductValidator,
   catalogRequestValidator,
@@ -25,6 +24,7 @@ import {
   packageProfileValidator,
   productAnalysisValidator,
 } from "../src/lib/domain/product-families";
+
 export const statusValidator = v.union(
   v.literal("uploading"),
   v.literal("uploaded"),
@@ -33,6 +33,7 @@ export const statusValidator = v.union(
   v.literal("reviewed"),
   v.literal("failed"),
 );
+
 export const receiptFields = {
   householdId: v.id("households"),
   uploadedBy: v.string(),
@@ -58,6 +59,7 @@ export const receiptFields = {
   productAnalysis: productAnalysisValidator.optional(),
   productLinkUndo: productLinkUndoValidator.optional(),
 };
+
 export default defineSchema({
   clientReleases: defineTable({
     identity: v.string(),

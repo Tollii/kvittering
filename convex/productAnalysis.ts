@@ -33,9 +33,11 @@ const snapshot = {
   revision: v.number(),
   version: v.number(),
 };
+
 const manager = new WorkflowManager(components.productAnalysisWorkflow, {
   workpoolOptions: { maxParallelism: 1 },
 });
+
 function current(
   receipt: Doc<"receipts"> | null,
   args: { generation: number; revision: number; version: number },
@@ -58,6 +60,7 @@ export const process = manager
         args,
         { retry: { maxAttempts: 3, initialBackoffMs: 2000, base: 2 } },
       );
+
       await step.runMutation(internal.productAnalysis.finish, {
         ...args,
         results,
@@ -70,6 +73,7 @@ export const process = manager
         failed: true,
       });
     }
+
     return null;
   });
 
@@ -80,6 +84,7 @@ async function launch(
 ) {
   if (!(await featureEnabled(ctx, "spendingAnalysis")))
     return "disabled" as const;
+
   if (
     !receipt.data ||
     receipt.excluded ||
@@ -89,6 +94,7 @@ async function launch(
   )
     return "ineligible" as const;
   const previous = receipt.productAnalysis;
+
   if (
     previous?.version === productAnalysisVersion &&
     previous.generation === receipt.generation &&
@@ -112,14 +118,18 @@ async function launch(
       results: [],
     },
   });
+
   return "started" as const;
 }
+
 export const start = internalMutation({
   args: { id: v.id("receipts") },
   returns: v.null(),
   handler: async (ctx, { id }) => {
     const receipt = await ctx.db.get("receipts", id);
+
     if (receipt) await launch(ctx, receipt);
+
     return null;
   },
 });
@@ -131,18 +141,22 @@ export const ensure = mutation({
   returns: v.null(),
   handler: async (ctx, { ids }) => {
     if (ids.length > 20) throw new Error("For mange kvitteringer.");
+
     for (const id of ids) {
       const { receipt } = await requireReceipt(ctx, id);
       await launch(ctx, receipt, "manual");
     }
+
     return null;
   },
 });
+
 export const read = internalQuery({
   args: snapshot,
   returns: v.union(schema.doc("receipts"), v.null()),
   handler: async (ctx, args) => {
     const receipt = await ctx.db.get("receipts", args.id);
+
     return current(receipt, args) ? receipt : null;
   },
 });
@@ -153,6 +167,7 @@ const preparedProfileValidator = v.object({
   families: v.array(schema.doc("productFamilies")),
   catalog: v.union(catalogProductValidator, v.null()),
 });
+
 export type PreparedProfile = Infer<typeof preparedProfileValidator>;
 
 async function prepareProfiles(
@@ -165,12 +180,15 @@ async function prepareProfiles(
   const categories = new Map<string, Doc<"productFamilies">[]>();
   const names = new Map<string, Doc<"productFamilies">[]>();
   const result: PreparedProfile[] = [];
+
   for (const lineId of lineIds) {
     const line = receipt.data!.lines.find(
       (item) => item.id === lineId && item.kind === "product",
     );
+
     if (!line) continue;
     const key = productProfileKey(line);
+
     if (!profiles.has(key))
       profiles.set(
         key,
@@ -184,13 +202,16 @@ async function prepareProfiles(
     const profile = profiles.get(key)!;
     let families: Doc<"productFamilies">[] = [];
     let catalog = null;
+
     if (profile) {
       const family = profile.familyId
         ? await ctx.db.get("productFamilies", profile.familyId)
         : null;
+
       if (family?.householdId === receipt.householdId) families = [family];
     } else {
       const category = line.categoryId ?? "fallback.unclear";
+
       if (!categories.has(category))
         categories.set(
           category,
@@ -204,6 +225,7 @@ async function prepareProfiles(
             .take(80),
         );
       const name = familyName(line);
+
       if (!names.has(name))
         names.set(
           name,
@@ -222,8 +244,10 @@ async function prepareProfiles(
           ]),
         ).values(),
       ];
+
       if (line.catalogProduct) {
         const key = line.catalogProduct.key;
+
         if (!catalogs.has(key))
           catalogs.set(
             key,
@@ -235,20 +259,25 @@ async function prepareProfiles(
         catalog = catalogs.get(key)?.product ?? null;
       }
     }
+
     result.push({ line, profile, families, catalog });
   }
+
   return result;
 }
+
 export const prepare = internalQuery({
   args: { ...snapshot, lineId: v.string() },
   returns: v.union(v.null(), preparedProfileValidator),
   handler: async (ctx, args) => {
     const receipt = await ctx.db.get("receipts", args.id);
+
     return current(receipt, args)
       ? ((await prepareProfiles(ctx, receipt!, [args.lineId]))[0] ?? null)
       : null;
   },
 });
+
 export const prepareBatch = internalQuery({
   args: { ...snapshot, lineIds: v.array(v.string()) },
   returns: v.union(v.null(), v.array(preparedProfileValidator)),
@@ -256,6 +285,7 @@ export const prepareBatch = internalQuery({
     if (args.lineIds.length > 12)
       throw new Error("Analysis batch exceeds 12 lines.");
     const receipt = await ctx.db.get("receipts", args.id);
+
     return current(receipt, args)
       ? prepareProfiles(ctx, receipt!, args.lineIds)
       : null;
@@ -276,42 +306,52 @@ const profileDecisionValidator = v.object({
     }),
   ),
 });
+
 const profileWriteValidator = v.object({
   ...snapshot,
   ...profileDecisionValidator.fields,
 });
+
 async function writeProfile(
   ctx: MutationCtx,
   args: Infer<typeof profileWriteValidator>,
   receipt: Doc<"receipts"> | null,
 ): Promise<Id<"productProfiles"> | null> {
   if (!current(receipt, args)) return null;
+
   const line = receipt!.data!.lines.find(
     (item) => item.id === args.lineId && item.kind === "product",
   );
+
   if (!line || purchaseEvidenceKey(line) !== args.evidenceKey) return null;
   const key = productProfileKey(line);
+
   const cached = await ctx.db
     .query("productProfiles")
     .withIndex("by_householdId_and_key", (q) =>
       q.eq("householdId", receipt!.householdId).eq("key", key),
     )
     .unique();
+
   if (cached) return cached._id;
   let familyId: Id<"productFamilies"> | null = null;
+
   if (args.family === "new") {
     const name = familyName(line);
+
     const familyKey = JSON.stringify([
       productSearch(name),
       productSearch(line.catalogProduct?.brand ?? line.brand ?? ""),
       [...line.attributes].sort(),
     ]);
+
     const existing = await ctx.db
       .query("productFamilies")
       .withIndex("by_householdId_and_key", (q) =>
         q.eq("householdId", receipt!.householdId).eq("key", familyKey),
       )
       .unique();
+
     familyId =
       existing?._id ??
       (await ctx.db.insert("productFamilies", {
@@ -327,35 +367,42 @@ async function writeProfile(
       }));
   } else if (args.family) {
     const family = await ctx.db.get("productFamilies", args.family);
+
     if (family?.householdId !== receipt!.householdId)
       throw new Error("Invalid product family.");
     familyId = family._id;
     const name = normalizeFamilyName(family.representative.name);
+
     if (name !== family.name)
       await ctx.db.patch("productFamilies", family._id, { name });
   }
+
   const count = args.package.unitsPerPackage;
   const size = args.package.measurePerPackage?.amount;
+
   if (
     (count !== null && (!Number.isInteger(count) || count <= 0)) ||
     (size !== undefined && (!Number.isFinite(size) || size <= 0))
   )
     throw new Error("Invalid package quantity.");
+
   return ctx.db.insert("productProfiles", {
     householdId: receipt!.householdId,
     key,
     familyId,
     package: args.package,
-    ...(args.attributes ? { attributes: args.attributes } : {}),
+    attributes: args.attributes,
     decisions: args.decisions,
   });
 }
+
 export const saveProfile = internalMutation({
   args: profileWriteValidator.fields,
   returns: v.union(v.id("productProfiles"), v.null()),
   handler: async (ctx, args) =>
     writeProfile(ctx, args, await ctx.db.get("receipts", args.id)),
 });
+
 export const saveProfiles = internalMutation({
   args: { ...snapshot, decisions: v.array(profileDecisionValidator) },
   returns: v.array(v.id("productProfiles")),
@@ -364,13 +411,17 @@ export const saveProfiles = internalMutation({
       throw new Error("Analysis batch exceeds 12 lines.");
     const receipt = await ctx.db.get("receipts", args.id);
     const ids: Id<"productProfiles">[] = [];
+
     for (const decision of args.decisions) {
       const id = await writeProfile(ctx, { ...args, ...decision }, receipt);
+
       if (id) ids.push(id);
     }
+
     return ids;
   },
 });
+
 export const readProfiles = internalQuery({
   args: { ...snapshot, ids: v.array(v.id("productProfiles")) },
   returns: v.array(
@@ -383,20 +434,26 @@ export const readProfiles = internalQuery({
     if (args.ids.length > 12)
       throw new Error("Analysis batch exceeds 12 profiles.");
     const receipt = await ctx.db.get("receipts", args.id);
+
     if (!current(receipt, args)) return [];
     const rows = [];
+
     for (const id of new Set(args.ids)) {
       const profile = await ctx.db.get("productProfiles", id);
+
       if (!profile || profile.householdId !== receipt!.householdId)
         throw new Error("Invalid profile.");
+
       const family = profile.familyId
         ? await ctx.db.get("productFamilies", profile.familyId)
         : null;
+
       rows.push({
         profile,
         family: family?.householdId === receipt!.householdId ? family : null,
       });
     }
+
     return rows;
   },
 });
@@ -410,7 +467,9 @@ export const finish = internalMutation({
   returns: v.null(),
   handler: async (ctx, args) => {
     const receipt = await ctx.db.get("receipts", args.id);
+
     if (!current(receipt, args)) return null;
+
     const results = args.results.filter((result) =>
       receipt!.data!.lines.some(
         (line) =>
@@ -419,6 +478,7 @@ export const finish = internalMutation({
           purchaseEvidenceKey(line) === result.evidenceKey,
       ),
     );
+
     await ctx.db.patch("receipts", args.id, {
       productAnalysis: {
         version: productAnalysisVersion,
@@ -429,14 +489,17 @@ export const finish = internalMutation({
         results,
       },
     });
+
     const fields = {
       receiptId: args.id,
       generation: args.generation,
       revision: args.revision,
       resultCount: results.length,
     };
+
     if (args.failed) console.error("product.analysis_failed", fields);
     else console.info("product.analysis_completed", fields);
+
     return null;
   },
 });
@@ -458,12 +521,15 @@ export const repair = internalMutation({
           .lte("_creationTime", args.through),
       )
       .paginate({ cursor: args.cursor, numItems: 10, maximumRowsRead: 10 });
+
     for (const receipt of page.page) await launch(ctx, receipt, "manual");
+
     if (!page.isDone)
       await ctx.scheduler.runAfter(0, internal.productAnalysis.repair, {
         ...args,
         cursor: page.continueCursor,
       });
+
     return { isDone: page.isDone, continueCursor: page.continueCursor };
   },
 });

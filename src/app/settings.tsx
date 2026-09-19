@@ -25,6 +25,7 @@ import {
   NotificationSettings,
 } from "@/features/notifications";
 import { useTheme } from "@/constants/theme";
+
 export default function Settings() {
   const colors = useTheme();
   const { details, household, queue, online } = useHousehold();
@@ -32,9 +33,11 @@ export default function Settings() {
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
   const [busy, setBusy] = useState(false);
-  async function run(action: () => Promise<unknown>) {
+
+  async function run<Result>(action: () => Promise<Result>) {
     setError("");
     setBusy(true);
+
     try {
       await action();
     } catch (cause) {
@@ -43,7 +46,9 @@ export default function Settings() {
       setBusy(false);
     }
   }
+
   const full = (details?.members.length ?? 0) >= 2;
+
   return (
     <Screen title={household.name} insetTop={false}>
       <Stack.Screen
@@ -200,6 +205,7 @@ export default function Settings() {
             void run(async () => {
               await disableNotifications(client);
               const result = await authClient.signOut();
+
               if (result.error) throw new Error(result.error.message);
             })
           }

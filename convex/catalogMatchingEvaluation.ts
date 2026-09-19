@@ -1,4 +1,5 @@
 "use node";
+
 import { v } from "convex/values";
 import { TypeSafeClient } from "@typesafe-ai/sdk";
 import { internalAction, env } from "./_generated/server";
@@ -22,6 +23,7 @@ export const evaluate = internalAction({
   handler: async () => {
     if (!env.TYPESAFE_API_KEY)
       throw new Error("Product matching is unavailable.");
+
     const cases = [
       {
         name: "SALAT CRISPI",
@@ -67,6 +69,7 @@ export const evaluate = internalAction({
         candidates: ["Coca-Cola 15pk"],
       },
     ];
+
     const results = await classifyCatalogProducts(
       cases.map((item, index) => ({
         line: {
@@ -89,12 +92,14 @@ export const evaluate = internalAction({
         retry: { maxRetries: 0 },
       }),
     );
+
     return results.map((result, index) => {
       const actual = result.productKey
         ? result.equivalentKeys
           ? "equivalent"
           : "exact"
         : "unresolved";
+
       return {
         name: cases[index].name,
         expected: cases[index].expected,

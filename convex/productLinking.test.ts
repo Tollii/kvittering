@@ -13,7 +13,9 @@ import { lineEvidenceKey } from "../src/lib/catalog/matching";
 import { matchingKey } from "../src/lib/domain/product-matching";
 import type { Doc } from "./_generated/dataModel";
 import type { FunctionReturnType } from "convex/server";
+
 const modules = import.meta.glob("./**/*.ts");
+
 afterEach(() => vi.useRealTimers());
 
 async function setup() {
@@ -21,14 +23,17 @@ async function setup() {
   const t = convexTest(schema, modules);
   const user = t.withIdentity({ subject: "member", issuer: "test" });
   const other = t.withIdentity({ subject: "other", issuer: "test" });
+
   const householdId = await user.mutation(api.households.create, {
     name: "Home",
     invitation: "12345678901234567890123456789012",
   });
+
   await other.mutation(api.households.create, {
     name: "Other",
     invitation: "98765432109876543210987654321098",
   });
+
   const product: CatalogProduct = {
     key: "ean:7037710000001",
     ean: "7037710000001",
@@ -40,6 +45,7 @@ async function setup() {
     labels: [],
     allergens: [],
   };
+
   await t.run((ctx) =>
     ctx.db.insert("catalogProducts", {
       key: product.key,
@@ -47,12 +53,14 @@ async function setup() {
       fetchedAt: Date.now(),
     }),
   );
+
   async function create(overrides: Partial<Doc<"receipts">> = {}) {
     const id = await user.mutation(api.receipts.reserve, {
       householdId,
       clientId: crypto.randomUUID(),
       imageCount: 1,
     });
+
     await t.run((ctx) =>
       ctx.db.patch("receipts", id, {
         data: batteryFixture(),
@@ -61,12 +69,15 @@ async function setup() {
         ...overrides,
       }),
     );
+
     return id;
   }
+
   const page = () =>
     user.query(api.productLinking.page, {
       paginationOpts: { cursor: null, numItems: 30 },
     });
+
   return { t, user, other, householdId, product, create, page };
 }
 
@@ -109,20 +120,25 @@ it("includes unresolved products in approved receipts and omits dismissed, linke
 it("continues across empty pages instead of treating a bounded page as the complete queue", async () => {
   const { create, user } = await setup();
   const id = await create();
+
   for (let index = 0; index < 3; index++) await create({ excluded: true });
   let cursor: string | null = null;
   const found: string[] = [];
   let pages = 0;
+
   do {
     const result: FunctionReturnType<typeof api.productLinking.page> =
       await user.query(api.productLinking.page, {
         paginationOpts: { cursor, numItems: 1 },
       });
+
     found.push(...result.page.map((receipt) => receipt.receiptId));
     pages++;
+
     if (result.isDone) break;
     cursor = result.continueCursor;
   } while (pages < 10);
+
   expect(pages).toBeGreaterThan(1);
   expect(found).toEqual([id]);
 });
@@ -133,6 +149,7 @@ it.each(["reviewed", "needs_review"] as const)(
     const { t, user, create, product, page } = await setup();
     const id = await create({ status, autoAccepted: status === "reviewed" });
     const before = (await user.query(api.receipts.detail, { id }))!.receipt;
+
     const commit = await user.mutation(api.productLinking.choose, {
       receiptId: id,
       revision: 0,
@@ -140,6 +157,7 @@ it.each(["reviewed", "needs_review"] as const)(
       lineId: "battery",
       choice: { kind: "catalog", key: product.key },
     });
+
     const saved = (await user.query(api.receipts.detail, { id }))!.receipt;
     expect(saved.status).toBe(status);
     expect(saved.autoAccepted).toBe(before.autoAccepted);
@@ -173,6 +191,7 @@ it.each(["reviewed", "needs_review"] as const)(
 it("persists a dismissal and restores a pre-existing mapping when it is undone", async () => {
   const { t, user, create, householdId, page } = await setup();
   const data = batteryFixture();
+
   const prior = {
     householdId,
     retailer: matchingKey(data.store!),
@@ -180,10 +199,13 @@ it("persists a dismissal and restores a pre-existing mapping when it is undone",
     productId: null,
     confirmedBy: "prior",
   };
+
   const mappingId = await t.run((ctx) =>
     ctx.db.insert("productMappings", prior),
   );
+
   const id = await create();
+
   const commit = await user.mutation(api.productLinking.choose, {
     receiptId: id,
     revision: 0,
@@ -191,6 +213,7 @@ it("persists a dismissal and restores a pre-existing mapping when it is undone",
     lineId: "battery",
     choice: { kind: "separate" },
   });
+
   expect((await page()).page).toEqual([]);
   const saved = (await user.query(api.receipts.detail, { id }))!.receipt;
   expect(productReference(saved.data!.lines[0])).toEqual({
@@ -208,6 +231,7 @@ it("persists a dismissal and restores a pre-existing mapping when it is undone",
 it("rejects stale selections, missing catalog products and cross-household access without writes", async () => {
   const { t, user, other, create, product } = await setup();
   const id = await create();
+
   const args = {
     receiptId: id,
     revision: 0,
@@ -215,6 +239,7 @@ it("rejects stale selections, missing catalog products and cross-household acces
     lineId: "battery",
     choice: { kind: "catalog" as const, key: product.key },
   };
+
   await expect(
     t.query(api.productLinking.page, {
       paginationOpts: { cursor: null, numItems: 30 },
@@ -261,6 +286,7 @@ it("does not undo a newer receipt edit or overwrite a newer mapping decision", a
   const { t, user, create, product } = await setup();
   const firstId = await create();
   const secondId = await create();
+
   const choose = (id: typeof firstId) =>
     user.mutation(api.productLinking.choose, {
       receiptId: id,
@@ -269,6 +295,7 @@ it("does not undo a newer receipt edit or overwrite a newer mapping decision", a
       lineId: "battery",
       choice: { kind: "catalog", key: product.key },
     });
+
   const first = await choose(firstId);
   await choose(secondId);
   await expect(user.mutation(api.productLinking.undo, first)).rejects.toThrow(
@@ -291,6 +318,7 @@ it("does not undo a newer receipt edit or overwrite a newer mapping decision", a
 
 it("returns ranked stored candidates with images only while their evidence is current", async () => {
   const { t, user, create, product } = await setup();
+
   const id = await create({
     catalogDecisions: [
       {
@@ -310,6 +338,7 @@ it("returns ranked stored candidates with images only while their evidence is cu
       },
     ],
   });
+
   expect(
     await user.query(api.productLinking.candidates, {
       receiptId: id,

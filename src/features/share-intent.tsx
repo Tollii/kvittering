@@ -7,9 +7,11 @@ import { offerImportedFiles } from "@/lib/pending-import";
 export function ShareIntentRouting() {
   const { hasShareIntent, shareIntent, resetShareIntent } =
     useShareIntentContext();
+
   useEffect(() => {
     if (!hasShareIntent) return;
     const files = shareIntent.files ?? [];
+
     if (files.length)
       offerImportedFiles(
         files.map((file) => ({
@@ -21,8 +23,10 @@ export function ShareIntentRouting() {
         })),
       );
     resetShareIntent();
+
     if (files.length) router.navigate("/");
   }, [hasShareIntent, shareIntent, resetShareIntent]);
+
   return null;
 }
 

@@ -27,6 +27,7 @@ function storeName(store: StoreSpendingGroup) {
   const name =
     store.name ||
     (store.chain ? `${store.chain} · Ukjent butikksted` : "Ukjent butikk");
+
   return name.replace(/_NO\b/g, "").replaceAll("_", " ");
 }
 
@@ -43,6 +44,7 @@ function StoreReport({
   const report = storeSpending(purchases);
   const rows = report[dimension];
   const selected = rows.find((store) => store.id === selectedId);
+
   const points = report.stores.flatMap((store) =>
     store.location
       ? [
@@ -55,11 +57,14 @@ function StoreReport({
         ]
       : [],
   );
+
   const unlocated = report.stores.filter((store) => !store.location);
+
   const unlocatedCount = unlocated.reduce(
     (sum, store) => sum + store.purchases.length,
     0,
   );
+
   const unlocatedAmount = unlocated.reduce(
     (sum, store) => sum + store.amountOre,
     0,
@@ -169,6 +174,7 @@ function StoreReport({
           const markerIndex = points.findIndex(
             (point) => point.id === store.id,
           );
+
           return (
             <View
               key={store.id}

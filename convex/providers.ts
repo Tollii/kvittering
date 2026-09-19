@@ -1,4 +1,5 @@
 "use node";
+
 import OpenAI from "openai";
 import { zodTextFormat } from "openai/helpers/zod";
 import { TypeSafeClient } from "@typesafe-ai/sdk";
@@ -21,6 +22,7 @@ import {
   classificationEvidence,
   classificationProductValidator,
 } from "../src/lib/domain/classification";
+
 export const extract = internalAction({
   args: {
     storageIds: v.array(v.id("_storage")),
@@ -34,16 +36,20 @@ export const extract = internalAction({
   }),
   handler: async (ctx, args) => {
     const started = Date.now();
+
     if (env.RECEIPT_PROVIDER === "mock" || !env.OPENAI_API_KEY)
       return {
         data: batteryFixture(),
         provider: "mock: Battery fixture; photo not read",
         durationMs: 0,
       };
+
     const images = await Promise.all(
       args.storageIds.map(async (id) => {
         const blob = await ctx.storage.get(id);
+
         if (!blob) throw new Error("Et kvitteringsbilde mangler.");
+
         return {
           type: "input_image" as const,
           image_url: `data:${blob.type};base64,${Buffer.from(await blob.arrayBuffer()).toString("base64")}`,
@@ -51,12 +57,15 @@ export const extract = internalAction({
         };
       }),
     );
+
     const model = env.OPENAI_RECEIPT_MODEL ?? "gpt-5.6-luna";
+
     const client = new OpenAI({
       apiKey: env.OPENAI_API_KEY,
       timeout: 120000,
       maxRetries: 1,
     });
+
     const response = await client.responses.parse({
       model,
       store: false,
@@ -75,6 +84,7 @@ export const extract = internalAction({
       ],
       text: { format: zodTextFormat(extractionSchema, "grocery_receipt") },
     });
+
     if (!response.output_parsed || response.status !== "completed")
       throw new Error(
         "Modellen kunne ikke lese kvitteringen. Prøv et tydeligere bilde.",
@@ -90,9 +100,11 @@ export const extract = internalAction({
       inputTokens: response.usage?.input_tokens,
       outputTokens: response.usage?.output_tokens,
     });
+
     return { data, provider: model, durationMs: Date.now() - started };
   },
 });
+
 export const classify = internalAction({
   args: {
     products: v.array(classificationProductValidator),
@@ -112,12 +124,14 @@ export const classify = internalAction({
   }),
   handler: async (_ctx, args) => {
     const started = Date.now();
+
     if (!args.products.length)
       return {
         classifications: [],
         provider: "confirmed aliases",
         durationMs: 0,
       };
+
     if (env.RECEIPT_PROVIDER === "mock" || !env.TYPESAFE_API_KEY)
       return {
         classifications: args.products.map((p) => ({
@@ -129,17 +143,22 @@ export const classify = internalAction({
         durationMs: 0,
       };
     const client = new TypeSafeClient({ apiKey: env.TYPESAFE_API_KEY });
+
     const results: { id: string; categoryId: string; confidence: number }[] =
       [];
+
     const model = env.TYPESAFE_MODEL ?? "jev-latest";
+
     for (let offset = 0; offset < args.products.length; offset += 12) {
       const batch = args.products.slice(offset, offset + 12);
+
       const questions = Object.fromEntries(
         batch.map((_, index) => [
           `item_${index}`,
           classificationQuestion(index),
         ]),
       );
+
       const response = await client.systemOne({
         model,
         state: {
@@ -147,8 +166,10 @@ export const classify = internalAction({
         },
         questions,
       });
+
       batch.forEach((product, index) => {
         const answer = response.answers[`item_${index}`];
+
         if (!answer || !categories.some((c) => c.id === answer.choice))
           throw new Error("Kategoriseringen ga et ugyldig svar.");
         results.push({
@@ -158,6 +179,7 @@ export const classify = internalAction({
         });
       });
     }
+
     console.info("receipt.classification_completed", {
       receiptId: args.receiptId,
       generation: args.generation,
@@ -166,6 +188,7 @@ export const classify = internalAction({
       itemCount: results.length,
       batchCount: Math.ceil(args.products.length / 12),
     });
+
     return {
       classifications: results,
       provider: model,

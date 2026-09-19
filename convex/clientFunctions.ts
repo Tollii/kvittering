@@ -1,5 +1,4 @@
 import { customMutation } from "convex-helpers/server/customFunctions";
-import { v } from "convex/values";
 import { mutation } from "./_generated/server";
 import { clientValidator, type Feature } from "../src/lib/releases/policy";
 import { requireCompatibleClient } from "./releasePolicy";
@@ -9,6 +8,7 @@ export const clientMutation = customMutation(mutation, {
   args: { client: clientValidator.optional() },
   input: async (ctx, { client }, options: { service?: Feature }) => {
     await requireCompatibleClient(ctx, client, options.service);
+
     return { ctx: {}, args: {} };
   },
 });

@@ -11,15 +11,18 @@ export function StoreMap({ stores, onSelect }: StoreMapProps) {
   const colors = useTheme();
   const map = useRef<MapView>(null);
   const [ready, setReady] = useState(false);
+
   // Amount updates must not reset a map that the user has moved.
   const coordinateKey = JSON.stringify(
     [...stores]
       .sort((a, b) => a.id.localeCompare(b.id))
       .map((store) => store.location),
   );
+
   useEffect(() => {
     if (!ready) return;
     const coordinates: StoreLocation[] = JSON.parse(coordinateKey);
+
     if (coordinates.length === 1) {
       map.current?.animateToRegion(
         { ...coordinates[0], latitudeDelta: 0.02, longitudeDelta: 0.02 },
@@ -33,6 +36,7 @@ export function StoreMap({ stores, onSelect }: StoreMapProps) {
     }
   }, [coordinateKey, ready]);
   const maximum = Math.max(1, ...stores.map((store) => store.amountOre));
+
   return (
     <View style={{ gap: 8 }}>
       <View style={{ height: 280, borderRadius: 20, overflow: "hidden" }}>
@@ -53,6 +57,7 @@ export function StoreMap({ stores, onSelect }: StoreMapProps) {
           {stores.map((store, index) => {
             const size =
               32 + 24 * Math.sqrt(Math.max(0, store.amountOre) / maximum);
+
             return (
               <Marker
                 key={store.id}

@@ -37,12 +37,15 @@ export function ReceiptFields({
   const [showDate, setShowDate] = useState(false);
   const [totalError, setTotalError] = useState<string | null>(null);
   const [storePicker, setStorePicker] = useState(false);
+
   const close = () => {
     if (totalError) Alert.alert("Kontroller beløpet", totalError);
     else onClose();
   };
+
   const missingStore = !data.store?.trim();
   const missingTotal = data.totalOre === null;
+
   return (
     <Sheet
       title="Kvitteringsdetaljer"
@@ -113,6 +116,7 @@ export function ReceiptFields({
             maximumDate={new Date()}
             onChange={(_event, date) => {
               if (Platform.OS !== "ios") setShowDate(false);
+
               if (date)
                 onChange({
                   ...data,

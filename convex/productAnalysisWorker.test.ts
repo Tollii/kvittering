@@ -9,6 +9,7 @@ it("scopes independent profile questions and rejects an incomplete response", ()
     families: [],
     catalog: null,
   };
+
   const before = structuredClone(context);
   const request = profileQuestions(context, "items[2].");
   expect(JSON.stringify(request.questions)).toContain("items[2].product");
@@ -16,12 +17,14 @@ it("scopes independent profile questions and rejects an incomplete response", ()
   expect(() => profileDecision(context, request.candidates, {})).toThrow(
     "Missing profile answer",
   );
+
   const answers = Object.fromEntries(
     Object.keys(request.questions).map((key) => [
       key,
       { choice: "unknown", confidence: 0.5 },
     ]),
   );
+
   expect(profileDecision(context, request.candidates, answers)).toMatchObject({
     family: null,
     package: { unitsPerPackage: null, measurePerPackage: null },

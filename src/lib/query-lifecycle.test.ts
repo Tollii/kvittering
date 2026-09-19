@@ -1,27 +1,36 @@
 import { expect, it, vi } from "vitest";
 import { observeForeground, removedAccount } from "../features/query-lifecycle";
+
+// oxlint-disable-next-line anti-slop/no-module-mocking -- Replace the native SDK or environment boundary; application behavior remains under test.
 vi.mock("react-native", () => ({ AppState: {} }));
-vi.mock("expo-network", () => ({ useNetworkState: vi.fn() }));
+
+// oxlint-disable-next-line anti-slop/no-module-mocking -- Replace the native SDK or environment boundary; application behavior remains under test.
+vi.mock("expo-network", () => ({ useNetworkState: vi.fn<typeof import("expo-network").useNetworkState>() }));
+
 it("applies initial foreground state and removes its only subscription", () => {
-  const changed = vi.fn();
-  const unsubscribe = vi.fn();
+  const changed = vi.fn<(active: boolean) => void>();
+  const unsubscribe = vi.fn<() => void>();
   let notify: (active: boolean) => void = () => {};
+
   const stop = observeForeground(
     {
       current: () => false,
       subscribe: (listener) => {
         notify = listener;
+
         return unsubscribe;
       },
     },
     changed,
   );
+
   expect(changed).toHaveBeenCalledExactlyOnceWith(false);
   notify(true);
   expect(changed).toHaveBeenCalledTimes(2);
   stop();
   expect(unsubscribe).toHaveBeenCalledOnce();
 });
+
 it("evicts only at account removal, not at provider remount", () => {
   expect(removedAccount("first", "first")).toBeNull();
   expect(removedAccount(null, "first")).toBeNull();

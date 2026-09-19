@@ -22,16 +22,20 @@ export async function resolveCatalogMatch(
   decision: CatalogDecision,
 ): Promise<CatalogProduct | null> {
   if (!decision.productKey) return null;
+
   const existing = await ctx.db
     .query("catalogProducts")
     .withIndex("by_key", (q) => q.eq("key", decision.productKey!))
     .unique();
+
   if (!decision.equivalentKeys)
     return existing && compatibleCatalogProduct(line, existing.product)
       ? existing.product
       : null;
   const keys = [...new Set(decision.equivalentKeys)];
+
   if (keys.length < 2 || keys.length > 24) return null;
+
   const records = await Promise.all(
     keys.map((key) =>
       ctx.db
@@ -40,28 +44,34 @@ export async function resolveCatalogMatch(
         .unique(),
     ),
   );
+
   if (
     records.some(
       (record) => !record || !compatibleCatalogProduct(line, record.product),
     )
   )
     return null;
+
   const group = groupCatalogProducts(
     records.map((record) => record!.product),
   ).find(
     (candidate) =>
       candidate.key === decision.productKey && candidate.equivalence,
   );
+
   if (!group) return null;
   const product = equivalentCatalogProduct(group);
+
   const values = {
     key: product.key,
     product,
     fetchedAt: Date.now(),
     detailsFetchedAt: Date.now(),
   };
+
   if (existing) await ctx.db.patch("catalogProducts", existing._id, values);
   else await ctx.db.insert("catalogProducts", values);
+
   return product;
 }
 
@@ -74,14 +84,18 @@ export async function linkCatalogProduct(
   editor: string | null,
 ) {
   const store = matchingKey(retailer);
+
   const reference = {
     kind: "catalog" as const,
     product: catalogIdentity(equivalentCatalogProduct(product)),
     provenance: editor !== null ? ("manual" as const) : ("automatic" as const),
   };
+
   await saveMapping(ctx, householdId, store, line, null, editor, reference);
+
   return withProductReference(line, reference);
 }
+
 /** Resolve one explicit selection per line inside the receipt transaction. */
 export async function resolveProductSelections(
   ctx: MutationCtx,
@@ -98,18 +112,23 @@ export async function resolveProductSelections(
     throw new Error("Velg ett produkt per varelinje.");
   const data = structuredClone(source);
   const retailer = matchingKey(data.store ?? "");
+
   for (const selection of selections) {
     const index = data.lines.findIndex(
       (line) => line.id === selection.lineId && line.kind === "product",
     );
+
     const line = data.lines[index];
+
     if (!line || !retailer || !matchingKey(line.receiptName ?? line.name))
       throw new Error("Butikk og varenavn kreves for produktkobling.");
+
     if (selection.kind === "catalog") {
       const record = await ctx.db
         .query("catalogProducts")
         .withIndex("by_key", (q) => q.eq("key", selection.key))
         .unique();
+
       if (!record)
         throw new Error("Produktet finnes ikke i katalogen. Søk på nytt.");
       data.lines[index] = await linkCatalogProduct(
@@ -127,6 +146,7 @@ export async function resolveProductSelections(
           : selection.kind === "household"
             ? selection.productId
             : null;
+
       const linked = await linkProduct(
         ctx,
         householdId,
@@ -135,6 +155,7 @@ export async function resolveProductSelections(
         id,
         "manual",
       );
+
       data.lines[index] = linked;
       await saveMapping(
         ctx,
@@ -147,6 +168,7 @@ export async function resolveProductSelections(
       );
     }
   }
+
   if (physicalStoreId !== undefined) {
     const record =
       physicalStoreId === null
@@ -157,10 +179,12 @@ export async function resolveProductSelections(
               q.eq("externalId", physicalStoreId),
             )
             .unique();
+
     if (physicalStoreId !== null && !record)
       throw new Error("Butikken finnes ikke i katalogen.");
     data.physicalStore = record?.store ?? null;
     data.physicalStoreManual = true;
   }
+
   return data;
 }

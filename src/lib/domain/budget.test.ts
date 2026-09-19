@@ -1,7 +1,7 @@
+import { receiptFixture } from "../testing/receipts";
 import { expect, it } from "vitest";
 import { budgetPace, paceLabel, weeklyDigest, daysInMonth } from "./budget";
 import { weeklyShopFixture } from "./receipt";
-import type { Receipt } from "./insights";
 
 // Intl formats money with non-breaking spaces.
 const plain = (text: string) => text.replace(/\s/g, " ");
@@ -25,6 +25,7 @@ it("measures pace against the elapsed share of the month", () => {
     "under",
   );
 });
+
 it("treats past months as complete and future months as untouched", () => {
   const past = budgetPace(600000, 650000, "2026-08", "2026-09-18");
   expect(past.dayOfMonth).toBe(31);
@@ -32,19 +33,22 @@ it("treats past months as complete and future months as untouched", () => {
   expect(plain(paceLabel(past))).toBe("108 % av budsjettet · 500,00 kr over");
   expect(budgetPace(600000, 0, "2026-10", "2026-09-18").dayOfMonth).toBe(0);
 });
+
 it("summarises the week from Monday with the budget position", () => {
   const receipt = (purchaseDate: string) =>
-    ({
+    receiptFixture({
       _id: purchaseDate,
       excluded: false,
       status: "reviewed",
       data: { ...weeklyShopFixture(), purchaseDate },
-    }) as unknown as Receipt;
+    });
+
   const receipts = [
     receipt("2026-09-14"),
     receipt("2026-09-17"),
     receipt("2026-09-12"),
   ];
+
   const digest = weeklyDigest(receipts, 600000, "2026-09-18");
   expect(digest.weekStart).toBe("2026-09-14");
   expect(digest.weekReceipts).toBe(2);

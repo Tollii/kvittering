@@ -36,6 +36,7 @@ export function Screen({
 }) {
   const colors = useTheme();
   const insets = useSafeAreaInsets();
+
   const header = !!title && (
     <View style={[styles.row, { alignItems: "flex-end", paddingBottom: 4 }]}>
       <View style={{ flex: 1, gap: 2 }}>
@@ -71,6 +72,7 @@ export function Screen({
       )}
     </View>
   );
+
   const content = (
     <View
       style={{
@@ -87,6 +89,7 @@ export function Screen({
       {children}
     </View>
   );
+
   return (
     <SafeAreaView
       edges={insetTop ? ["top", "left", "right"] : ["left", "right"]}
@@ -141,6 +144,7 @@ export function Sheet({
   footer?: ReactNode;
 }) {
   const colors = useTheme();
+
   return (
     <Modal
       visible={visible}

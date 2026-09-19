@@ -28,6 +28,7 @@ it("links interchangeable Crispi records as one group without importing package 
     "Crispi Salat 150g Flowpk",
     "Crispi Salat 150g Økologisk",
   ]);
+
   const groups = groupCatalogProducts(candidates);
   expect(groups).toHaveLength(2);
   const line = { ...emptyLine("salad"), name: "SALAT CRISPI" };
@@ -67,7 +68,9 @@ it("does not let missing size or brand connect conflicting groups", () => {
     "Crispi Salat 150g",
     "Crispi Salat 200g",
   ]);
+
   expect(groupCatalogProducts(candidates)).toHaveLength(3);
+
   const branded = candidates.map((product, index) => ({
     ...product,
     name: "Crispi Salat 150g",
@@ -75,6 +78,7 @@ it("does not let missing size or brand connect conflicting groups", () => {
     weightUnit: "g",
     brand: [undefined, "Gartner", "Bama"][index],
   }));
+
   expect(groupCatalogProducts(branded)).toHaveLength(3);
   expect(
     automaticCatalogProduct(
@@ -93,6 +97,7 @@ it("keeps recipes, organic labels and explicit pack counts separate", () => {
     "Coca-Cola 15x500ml",
     "Coca-Cola Vanilla 500ml",
   ]);
+
   expect(groupCatalogProducts(candidates)).toHaveLength(candidates.length);
   const salad = products(["Crispi Salat 150g", "Crispi Salat 150g"]);
   salad[1].labels = ["Økologisk"];
@@ -113,6 +118,7 @@ it("accepts a supported group but preserves competing sizes and missing model an
       "BigOne BBQ Chicken 700g",
     ]),
   );
+
   const line = { ...emptyLine("pizza"), name: "BigOne BBQ Chicken" };
   expect(selectCatalogMatch(line, groups, [0.9, 0.91]).productKey).toBeNull();
   expect(selectCatalogMatch(line, groups, [0.92, 0.2])).toMatchObject({

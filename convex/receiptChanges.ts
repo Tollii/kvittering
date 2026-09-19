@@ -17,10 +17,12 @@ export const receiptCommitValidator = v.object({
   receiptId: v.id("receipts"),
   revision: v.number(),
 });
+
 export type ReceiptCommitAcknowledgement = {
   receiptId: Id<"receipts">;
   revision: number;
 };
+
 export type ReceiptChangeOrigin =
   | { kind: "human"; editor: string; reviewed: boolean }
   | { kind: "alias" | "correction" | "undo"; editor: string }
@@ -31,6 +33,7 @@ export type ReceiptChangeOrigin =
       provider: string;
       next: "catalog" | "analysis" | "none";
     };
+
 export type ReceiptChangeInput = {
   previous: Pick<
     Doc<"receipts">,
@@ -55,20 +58,25 @@ export function decideReceiptChange({
       autoAccepted: previous.autoAccepted,
     };
   const acceptable = assessReceipt(data, unresolvedDuplicate).acceptable;
+
   if (origin.kind === "human" && origin.reviewed && !acceptable)
     throw new Error("Kontroller avvik og uklare felt før godkjenning.");
+
   const provider =
     origin.kind === "extraction" ? origin.provider : previous.provider;
+
   const automatic =
     acceptable &&
     !provider.includes("mock") &&
     (origin.kind !== "extraction" || previous.revision === 0) &&
     origin.kind !== "undo";
+
   const reviewed =
     acceptable &&
     ((origin.kind === "human" && origin.reviewed) ||
       automatic ||
       (origin.kind !== "extraction" && previous.status === "reviewed"));
+
   return {
     revision: previous.revision + (origin.kind === "extraction" ? 0 : 1),
     status: reviewed ? ("reviewed" as const) : ("needs_review" as const),
@@ -93,6 +101,7 @@ export async function commitReceiptChange(
   },
 ): Promise<ReceiptCommitAcknowledgement> {
   const previous = await ctx.db.get("receipts", input.receiptId);
+
   if (
     !previous ||
     previous.revision !== input.expected.revision ||
@@ -100,18 +109,23 @@ export async function commitReceiptChange(
   )
     throw new Error("Kvitteringen er endret. Hent siste versjon.");
   const parsed = parseReceipt(input.data);
+
   if (parsed.kind === "rejected") throw new Error(parsed.issue.message);
+
   const duplicateOf = input.duplicate
     ? input.duplicate.duplicateOf
     : previous.duplicateOf;
+
   const duplicateResolved =
     input.duplicate?.resolved ?? previous.duplicateResolved;
+
   const decision = decideReceiptChange({
     previous,
     data: parsed.receipt,
     unresolvedDuplicate: !!duplicateOf && !duplicateResolved,
     origin: input.origin,
   });
+
   if (previous.data && input.origin.kind !== "extraction")
     await ctx.db.insert("revisions", {
       receiptId: previous._id,
@@ -119,7 +133,8 @@ export async function commitReceiptChange(
       revision: previous.revision,
       editor: "editor" in input.origin ? input.origin.editor : "catalog",
     });
-  await ctx.db.patch("receipts", previous._id, {
+
+  const patch: Partial<Doc<"receipts">> = {
     ...decision,
     productLinkUndo: undefined,
     // Keep the installed-client representation at the storage boundary.
@@ -138,17 +153,19 @@ export async function commitReceiptChange(
     duplicateOf,
     duplicateResolved,
     excluded: input.excluded ?? previous.excluded,
-    ...(input.origin.kind === "human" || input.origin.kind === "extraction"
-      ? { error: undefined }
-      : {}),
-    ...(input.origin.kind === "extraction"
-      ? {
-          provider: input.origin.provider,
-          catalogStatus: undefined,
-          catalogWorkflowId: undefined,
-        }
-      : {}),
-  });
+  };
+
+  if (input.origin.kind === "human" || input.origin.kind === "extraction")
+    patch.error = undefined;
+
+  if (input.origin.kind === "extraction") {
+    patch.provider = input.origin.provider;
+    patch.catalogStatus = undefined;
+    patch.catalogWorkflowId = undefined;
+  }
+
+  await ctx.db.patch("receipts", previous._id, patch);
+
   if (input.origin.kind === "extraction" && input.origin.next === "catalog")
     await ctx.scheduler.runAfter(0, internal.catalogMatching.start, {
       id: previous._id,
@@ -161,5 +178,6 @@ export async function commitReceiptChange(
     await ctx.scheduler.runAfter(0, internal.productAnalysis.start, {
       id: previous._id,
     });
+
   return { receiptId: previous._id, revision: decision.revision };
 }

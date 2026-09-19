@@ -17,10 +17,12 @@ export const enabled = query({
   returns: v.boolean(),
   handler: async (ctx, { token }) => {
     const member = await requireMember(ctx);
+
     const subscription = await ctx.db
       .query("deviceSubscriptions")
       .withIndex("by_token", (q) => q.eq("token", token))
       .unique();
+
     return (
       subscription?.identity === member.identity &&
       subscription.householdId === member.householdId
@@ -33,20 +35,25 @@ export const subscribe = mutation({
   returns: v.null(),
   handler: async (ctx, { token }) => {
     const member = await requireMember(ctx);
+
     if (!validPushToken(token)) throw new Error("Ugyldig varslingsadresse.");
+
     const existing = await ctx.db
       .query("deviceSubscriptions")
       .withIndex("by_token", (q) => q.eq("token", token))
       .unique();
+
     if (existing && existing.identity !== member.identity)
       throw new Error(
         "Slå av varsler for forrige konto på denne enheten først.",
       );
+
     const values = {
       token,
       identity: member.identity,
       householdId: member.householdId,
     };
+
     if (existing)
       await ctx.db.replace("deviceSubscriptions", existing._id, values);
     else {
@@ -54,10 +61,12 @@ export const subscribe = mutation({
         .query("deviceSubscriptions")
         .withIndex("by_identity", (q) => q.eq("identity", member.identity))
         .take(10);
+
       if (subscriptions.length >= 10)
         throw new Error("Varsler er allerede aktivert på ti enheter.");
       await ctx.db.insert("deviceSubscriptions", values);
     }
+
     return null;
   },
 });
@@ -67,12 +76,15 @@ export const unsubscribe = mutation({
   returns: v.null(),
   handler: async (ctx, { token }) => {
     const member = await requireMember(ctx);
+
     const subscription = await ctx.db
       .query("deviceSubscriptions")
       .withIndex("by_token", (q) => q.eq("token", token))
       .unique();
+
     if (subscription?.identity === member.identity)
       await ctx.db.delete("deviceSubscriptions", subscription._id);
+
     return null;
   },
 });
@@ -94,10 +106,12 @@ export const delivery = internalQuery({
   ),
   handler: async (ctx, args) => {
     const receipt = await ctx.db.get("receipts", args.receiptId);
+
     const subscription = await ctx.db.get(
       "deviceSubscriptions",
       args.subscriptionId,
     );
+
     if (
       !receipt ||
       !subscription ||
@@ -108,20 +122,25 @@ export const delivery = internalQuery({
       receipt.householdId !== subscription.householdId
     )
       return null;
+
     const member = await ctx.db
       .query("members")
       .withIndex("by_identity", (q) => q.eq("identity", subscription.identity))
       .unique();
+
     if (member?.householdId !== receipt.householdId) return null;
     const autoAccepted = receipt.autoAccepted ?? false;
+
     const needs = reviewSummary(
       receipt.data,
       !!receipt.duplicateOf && !receipt.duplicateResolved,
     );
+
     const amount =
       receipt.data?.totalOre !== null && receipt.data?.totalOre !== undefined
         ? formatMoney(receipt.data.totalOre)
         : null;
+
     return {
       subscription,
       store: receipt.data?.store ?? null,
@@ -155,6 +174,7 @@ export const removeExpired = internalMutation({
   handler: async (ctx, { id }) => {
     if (await ctx.db.get("deviceSubscriptions", id))
       await ctx.db.delete("deviceSubscriptions", id);
+
     return null;
   },
 });

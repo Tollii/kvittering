@@ -30,6 +30,7 @@ export function IconButton({
   color?: string;
 }) {
   const colors = useTheme();
+
   return (
     <Pressable
       accessibilityRole="button"
@@ -41,7 +42,7 @@ export function IconButton({
       style={(state) => [
         styles.iconButton,
         !!filled && {
-          backgroundColor: typeof filled === "string" ? filled : colors.muted,
+          backgroundColor: filled === true ? colors.muted : filled,
           borderRadius: 22,
           minWidth: 40,
           minHeight: 40,
@@ -77,6 +78,7 @@ export function Button({
   icon?: SymbolViewProps["name"];
 }) {
   const colors = useTheme();
+
   const foreground = danger
     ? colors.danger
     : secondary
@@ -84,6 +86,7 @@ export function Button({
       : tint
         ? colors.primary
         : colors.onPrimary;
+
   const background = danger
     ? colors.dangerSoft
     : secondary
@@ -91,6 +94,7 @@ export function Button({
       : tint
         ? colors.primarySoft
         : colors.primary;
+
   return (
     <Pressable
       accessibilityRole="button"
@@ -147,6 +151,7 @@ export function Chip({
   trailing?: "chevron" | "none";
 }) {
   const colors = useTheme();
+
   const palette = {
     muted: { background: colors.muted, text: colors.text },
     primary: { background: colors.primarySoft, text: colors.primary },
@@ -154,6 +159,7 @@ export function Chip({
     success: { background: colors.successSoft, text: colors.success },
     accent: { background: colors.accentSoft, text: colors.accent },
   }[tone];
+
   return (
     <Pressable
       accessibilityRole={onPress ? "button" : "text"}
@@ -204,6 +210,7 @@ export function Field({
 }: TextInputProps & { label: string; hint?: string }) {
   const colors = useTheme();
   const [focused, setFocused] = useState(false);
+
   return (
     <View style={{ gap: 6 }}>
       <Copy size={13} weight="600" muted>
@@ -261,6 +268,7 @@ export function Toggle({
   disabled?: boolean;
 }) {
   const colors = useTheme();
+
   return (
     <View style={[styles.row, { minHeight: 44 }]}>
       <View style={{ flex: 1, gap: 2 }}>
@@ -292,6 +300,7 @@ export function Segments<T extends string>({
   onChange: (value: T) => void;
 }) {
   const colors = useTheme();
+
   return (
     <View
       style={{
@@ -304,6 +313,7 @@ export function Segments<T extends string>({
     >
       {options.map((option) => {
         const active = value === option.value;
+
         return (
           <Pressable
             key={option.value}

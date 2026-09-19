@@ -4,7 +4,9 @@ import { beforeEach, afterEach, expect, it, vi } from "vitest";
 import { api, internal } from "./_generated/api";
 import schema from "./schema";
 import { defaultPolicy, type ClientRelease } from "../src/lib/releases/policy";
+
 const modules = import.meta.glob("./**/*.ts");
+
 const client: ClientRelease = {
   platform: "ios",
   channel: "testflight",
@@ -14,28 +16,38 @@ const client: ClientRelease = {
   updateId: null,
   runtimeVersion: "fixture",
 };
+
 beforeEach(() => vi.stubEnv("RELEASE_CHANNEL", "testflight"));
+
 afterEach(() => vi.unstubAllEnvs());
+
 async function setup() {
   const t = convexTest(schema, modules);
+
   const user = t.withIdentity({
     subject: "first",
     issuer: "https://test.local",
     name: "First",
   });
+
   const householdId = await user.mutation(api.households.create, {
     name: "Home",
     invitation: "0123456789abcdef0123456789abcdef",
   });
+
   return { t, user, householdId };
 }
+
 const settings = () => {
   const { minimum, recommended, minimumApiVersion, features, message } =
     defaultPolicy("ios", "testflight");
+
   return { minimum, recommended, minimumApiVersion, features, message };
 };
+
 it("refuses a future or invalid API contract before changing data", async () => {
   const { user, householdId } = await setup();
+
   for (const apiVersion of [2, 0, -1, 1.5]) {
     await expect(
       user.mutation(api.receipts.reserve, {
@@ -46,11 +58,14 @@ it("refuses a future or invalid API contract before changing data", async () => 
       }),
     ).rejects.toThrow("UNSUPPORTED_API_VERSION");
   }
+
   const result = await user.query(api.receipts.list, {
     paginationOpts: { cursor: null, numItems: 10 },
   });
+
   expect(result.page).toHaveLength(0);
 });
+
 it("serves the bootstrap policy without login while keeping writes authenticated", async () => {
   const { t, householdId } = await setup();
   expect(
@@ -65,6 +80,7 @@ it("serves the bootstrap policy without login while keeping writes authenticated
     }),
   ).rejects.toThrow("Logg inn");
 });
+
 it("keeps the build 5 request contract usable until its explicit retirement", async () => {
   const { t, user, householdId } = await setup();
   const args = { householdId, imageCount: 1, clientId: "capture-request-0001" };
@@ -72,6 +88,7 @@ it("keeps the build 5 request contract usable until its explicit retirement", as
   expect(await user.mutation(api.receipts.reserve, { ...args, client })).toBe(
     id,
   );
+
   const configured = await t.mutation(internal.releasePolicy.configure, {
     platform: "ios",
     settings: { ...settings(), minimumApiVersion: 1 },
@@ -80,6 +97,7 @@ it("keeps the build 5 request contract usable until its explicit retirement", as
     reason: "Retire legacy contract",
     replacementAvailable: true,
   });
+
   expect(configured.revision).toBe(1);
   await expect(user.mutation(api.receipts.reserve, args)).rejects.toThrow(
     "UPDATE_REQUIRED",
@@ -97,13 +115,16 @@ it("keeps the build 5 request contract usable until its explicit retirement", as
     "uploading",
   );
 });
+
 it("enforces native build restrictions and service flags on the server despite stale client policy", async () => {
   const { t, user, householdId } = await setup();
+
   const policy = {
     ...settings(),
     recommended: { version: "1.0.0", build: "7" },
     minimum: { version: "1.0.0", build: "7" },
   };
+
   await t.mutation(internal.releasePolicy.configure, {
     platform: "ios",
     settings: policy,
@@ -151,8 +172,10 @@ it("enforces native build restrictions and service flags on the server despite s
     client,
   });
 });
+
 it("requires release availability, rejects stale administration, and records policy changes", async () => {
   const { t } = await setup();
+
   const args = {
     platform: "ios" as const,
     settings: { ...settings(), minimumApiVersion: 1 },
@@ -161,6 +184,7 @@ it("requires release availability, rejects stale administration, and records pol
     reason: "Compatibility",
     replacementAvailable: false,
   };
+
   await expect(
     t.mutation(internal.releasePolicy.configure, args),
   ).rejects.toThrow("available");
@@ -174,9 +198,11 @@ it("requires release availability, rejects stale administration, and records pol
       replacementAvailable: true,
     }),
   ).rejects.toThrow("Policy changed");
+
   const history = await t.run((ctx) =>
     ctx.db.query("releasePolicyHistory").take(10),
   );
+
   expect(history).toHaveLength(1);
   expect(history[0]).toMatchObject({
     previous: { revision: 0 },

@@ -4,34 +4,43 @@ import { expect, it, vi } from "vitest";
 import { api, internal } from "./_generated/api";
 import schema from "./schema";
 import { batteryFixture } from "../src/lib/domain/receipt";
+
 const modules = import.meta.glob("./**/*.ts");
+
 async function setup() {
   const t = convexTest(schema, modules);
+
   const user = t.withIdentity({
     subject: "member",
     issuer: "test",
     name: "Member",
   });
+
   const householdId = await user.mutation(api.households.create, {
     name: "Home",
     invitation: "12345678901234567890123456789012",
   });
+
   async function receipt() {
     const id = await user.mutation(api.receipts.reserve, {
       householdId,
       clientId: crypto.randomUUID(),
       imageCount: 1,
     });
+
     await t.run((ctx) =>
       ctx.db.patch("receipts", id, {
         data: batteryFixture(),
         status: "needs_review",
       }),
     );
+
     return id;
   }
+
   return { t, user, householdId, receipt };
 }
+
 it("saves a product correction, reuses the retailer mapping and preserves the original text", async () => {
   const { t, user, receipt } = await setup();
   const id = await receipt();
@@ -51,16 +60,19 @@ it("saves a product correction, reuses the retailer mapping and preserves the or
   const line = saved.data!.lines[0];
   expect(line.productId).toBeTruthy();
   expect(line.originalText).toBe(batteryFixture().lines[0].originalText);
+
   const repeated = {
     ...line,
     receiptName: "  battery   remix ",
     productId: null,
   };
+
   const prepared = await t.query(internal.products.prepare, {
     id,
     retailer: " EKSEMPELBUTIKK ",
     line: repeated,
   });
+
   expect(prepared.saved).toBe(true);
   expect(prepared.productId).toBe(line.productId);
   expect(
@@ -88,9 +100,11 @@ it("saves a product correction, reuses the retailer mapping and preserves the or
       .productId,
   ).toBe(line.productId);
 });
+
 it("keeps an explicit separation for future receipts and refuses foreign household products", async () => {
   const { t, user, receipt } = await setup();
   const id = await receipt();
+
   const args = {
     id,
     revision: 0,
@@ -100,6 +114,7 @@ it("keeps an explicit separation for future receipts and refuses foreign househo
     duplicateResolved: false,
     excluded: false,
   };
+
   await user.mutation(api.receipts.save, {
     ...args,
     productChanges: [{ lineId: "battery", productId: null, createNew: false }],
@@ -112,10 +127,12 @@ it("keeps an explicit separation for future receipts and refuses foreign househo
     }),
   ).toMatchObject({ saved: true, productId: null });
   const outsider = t.withIdentity({ subject: "other", issuer: "test" });
+
   const other = await outsider.mutation(api.households.create, {
     name: "Other",
     invitation: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
   });
+
   const productId = await t.run((ctx) =>
     ctx.db.insert("products", {
       householdId: other,
@@ -127,6 +144,7 @@ it("keeps an explicit separation for future receipts and refuses foreign househo
       attributes: [],
     }),
   );
+
   await expect(
     user.mutation(api.receipts.save, {
       ...args,
@@ -142,10 +160,12 @@ it("keeps an explicit separation for future receipts and refuses foreign househo
     }),
   ).rejects.toThrow("ikke tilgjengelig");
 });
+
 it("finishes uncertain processing and atomically reuses new product mappings on retries", async () => {
   const { t, user, receipt, householdId } = await setup();
   const first = await receipt();
   const second = await receipt();
+
   for (const id of [first, second]) {
     await t.run((ctx) =>
       ctx.db.patch("receipts", id, { status: "processing", generation: 1 }),
@@ -159,10 +179,13 @@ it("finishes uncertain processing and atomically reuses new product mappings on 
       matches: [{ lineId: "battery", kind: "new", productId: null }],
     });
   }
+
   const one = (await user.query(api.receipts.detail, { id: first }))!.receipt
     .data!.lines[0];
+
   const two = (await user.query(api.receipts.detail, { id: second }))!.receipt
     .data!.lines[0];
+
   expect(two.productId).toBe(one.productId);
   expect(
     await t.run((ctx) =>
@@ -188,8 +211,10 @@ it("finishes uncertain processing and atomically reuses new product mappings on 
     provider: "test",
     matches: [{ lineId: "battery", kind: "uncertain", productId: null }],
   });
+
   const uncertain = (await user.query(api.receipts.detail, { id: third }))!
     .receipt;
+
   expect(uncertain.status).toBe("reviewed");
   expect(uncertain.autoAccepted).toBe(true);
   expect(uncertain.data!.lines[0].productId).toBeNull();
@@ -200,13 +225,15 @@ it("continues with separate items when the matching provider fails", async () =>
   const id = await receipt();
   vi.stubEnv("TYPESAFE_API_KEY", "test-key");
   vi.stubEnv("RECEIPT_PROVIDER", "");
-  const fetch = vi.fn().mockRejectedValue(new Error("Network unavailable"));
+  const fetch = vi.fn<typeof globalThis.fetch>().mockRejectedValue(new Error("Network unavailable"));
   vi.stubGlobal("fetch", fetch);
+
   try {
     const matches = await t.action(internal.productMatching.match, {
       id,
       data: batteryFixture(),
     });
+
     expect(matches).toEqual([
       { lineId: "battery", kind: "uncertain", productId: null },
     ]);
@@ -220,6 +247,7 @@ it("continues with separate items when the matching provider fails", async () =>
 it("accepts a clear Jev candidate and refuses low confidence without creating a link", async () => {
   const { t, receipt, householdId } = await setup();
   const id = await receipt();
+
   const productId = await t.run((ctx) =>
     ctx.db.insert("products", {
       householdId,
@@ -231,6 +259,7 @@ it("accepts a clear Jev candidate and refuses low confidence without creating a 
       attributes: [],
     }),
   );
+
   vi.stubEnv("TYPESAFE_API_KEY", "test-key");
   vi.stubEnv("RECEIPT_PROVIDER", "");
   let confidence = 0.95;
@@ -259,6 +288,7 @@ it("accepts a clear Jev candidate and refuses low confidence without creating a 
         ),
     ),
   );
+
   try {
     expect(
       await t.action(internal.productMatching.match, {
@@ -295,9 +325,11 @@ it("links catalog identity without creating a second household product and reuse
     matches: [{ lineId: "battery", kind: "new", productId: null }],
   });
   const { normalizeProducts } = await import("./kassalapp/normalize");
+
   const product = normalizeProducts({
     data: [{ id: 71, name: "Battery Remix" }],
   })[0];
+
   await t.run((ctx) =>
     ctx.db.insert("catalogProducts", {
       key: product.key,
@@ -315,8 +347,10 @@ it("links catalog identity without creating a second household product and reuse
     excluded: false,
     selections: [{ kind: "catalog", lineId: "battery", key: product.key }],
   });
+
   const saved = (await user.query(api.receipts.detail, { id }))!.receipt.data!
     .lines[0];
+
   expect(saved.productReference).toMatchObject({
     kind: "catalog",
     provenance: "manual",

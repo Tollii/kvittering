@@ -5,6 +5,7 @@ import { openReceipt, receiptStatusLabel } from "./receipt-card";
 import { formatMoney } from "@/lib/domain/receipt";
 import type { SpendingGroup } from "@/lib/domain/insights";
 import { formatDate } from "@/lib/format-date";
+
 export function SpendingBars({
   rows,
   total,
@@ -17,6 +18,7 @@ export function SpendingBars({
 }) {
   const colors = useTheme();
   const maximum = Math.max(1, ...rows.map((row) => Math.abs(row.amountOre)));
+
   return (
     <View style={{ gap: 4 }}>
       {rows.map((row, index) => {
@@ -24,6 +26,7 @@ export function SpendingBars({
           total && total > 0
             ? Math.round((Math.abs(row.amountOre) / total) * 100)
             : null;
+
         return (
           <Pressable
             key={row.id}
@@ -88,6 +91,7 @@ export function SpendingBars({
     </View>
   );
 }
+
 export function SpendingDetails({
   selected,
   onClose,
@@ -96,6 +100,7 @@ export function SpendingDetails({
   onClose: () => void;
 }) {
   const colors = useTheme();
+
   return (
     <Sheet title={selected?.name ?? ""} visible={!!selected} onClose={onClose}>
       {selected && (

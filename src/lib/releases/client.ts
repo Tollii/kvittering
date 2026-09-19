@@ -1,3 +1,4 @@
+import { z } from "zod";
 import * as Application from "expo-application";
 import * as Updates from "expo-updates";
 import * as Sentry from "@sentry/react-native";
@@ -12,6 +13,7 @@ import {
 } from "./policy";
 
 const channel = Updates.channel ?? process.env.EXPO_PUBLIC_RELEASE_CHANNEL;
+
 export const installedRelease: ClientRelease = {
   version: Application.nativeApplicationVersion ?? "0.0.0",
   build: Application.nativeBuildVersion ?? "0",
@@ -24,62 +26,77 @@ export const installedRelease: ClientRelease = {
   updateId: Updates.updateId,
   runtimeVersion: Updates.runtimeVersion,
 };
+
 const listeners = new Set<(policy: ReleasePolicy) => void>();
+
 export function subscribeServerPolicy(
   listener: (policy: ReleasePolicy) => void,
 ) {
   listeners.add(listener);
+
   return () => {
     listeners.delete(listener);
   };
 }
+
+const releaseFailureSchema = z.object({
+  data: z.object({
+    code: z.enum([
+      "UNSUPPORTED_API_VERSION",
+      "UPDATE_REQUIRED",
+      "SERVICE_PAUSED",
+    ]),
+    policy: z.unknown().optional(),
+  }),
+});
+
 /** Convert backend policy errors into UI policy updates and plain user messages. */
 export function releaseError(
-  error: unknown,
+  cause: unknown,
   operation = "backend.request",
   fields: DiagnosticFields = {},
 ): Error {
-  if (error && typeof error === "object" && "data" in error) {
-    const data = error.data;
-    if (
-      data &&
-      typeof data === "object" &&
-      "code" in data &&
-      data.code === "UNSUPPORTED_API_VERSION"
-    ) {
-      reportError(error, operation, fields);
-      return new Error(
-        "Denne appversjonen støttes ikke av tjenesten ennå. Prøv igjen senere.",
-      );
-    }
-    if (
-      data &&
-      typeof data === "object" &&
-      "code" in data &&
-      (data.code === "UPDATE_REQUIRED" || data.code === "SERVICE_PAUSED") &&
-      "policy" in data
-    ) {
-      recordEvent("release.request_blocked", {
-        ...fields,
-        operation,
-        code: data.code,
-      });
-      try {
-        const policy = parsePolicy(data.policy);
-        for (const listener of listeners) listener(policy);
-      } catch {
-        /* A future policy format must not discard the last valid policy. */
-      }
-      return new Error(
-        data.code === "UPDATE_REQUIRED"
-          ? "Oppdater Kvitto for å fortsette."
-          : "Funksjonen er midlertidig satt på pause. Prøv igjen senere.",
-      );
-    }
+  const data = releaseFailureSchema.safeParse(cause).data?.data;
+
+  if (data?.code === "UNSUPPORTED_API_VERSION") {
+    reportError(cause, operation, fields);
+
+    return new Error(
+      "Denne appversjonen støttes ikke av tjenesten ennå. Prøv igjen senere.",
+    );
   }
-  reportError(error, operation, fields);
-  return error instanceof Error ? error : new Error("Handlingen mislyktes.");
+
+  if (
+    data &&
+    (data.code === "UPDATE_REQUIRED" || data.code === "SERVICE_PAUSED") &&
+    "policy" in data
+  ) {
+    recordEvent("release.request_blocked", {
+      ...fields,
+      operation,
+      code: data.code,
+    });
+
+    try {
+      const policy = parsePolicy(data.policy);
+
+      for (const listener of listeners) listener(policy);
+    } catch {
+      /* A future policy format must not discard the last valid policy. */
+    }
+
+    return new Error(
+      data.code === "UPDATE_REQUIRED"
+        ? "Oppdater Kvitto for å fortsette."
+        : "Funksjonen er midlertidig satt på pause. Prøv igjen senere.",
+    );
+  }
+
+  reportError(cause, operation, fields);
+
+  return cause instanceof Error ? cause : new Error("Handlingen mislyktes.");
 }
+
 export function setReleaseDiagnostics(policyRevision: number) {
   Sentry.setAttributes({
     release_channel: installedRelease.channel,
@@ -95,6 +112,7 @@ export function setReleaseDiagnostics(policyRevision: number) {
   Sentry.setTag("native_build", installedRelease.build);
   Sentry.setTag("ota_update_id", installedRelease.updateId ?? "embedded");
 }
+
 export function releaseDiagnostics(policyRevision: number) {
   return {
     ...installedRelease,

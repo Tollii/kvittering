@@ -10,8 +10,10 @@ export function catalogInsights(receipts: Receipt[]) {
   const products = new Map<string, SpendingGroup>();
   const brands = new Map<string, SpendingGroup>();
   const stores = new Map<string, SpendingGroup>();
+
   let linked = 0,
     total = 0;
+
   function add(
     groups: Map<string, SpendingGroup>,
     id: string,
@@ -24,10 +26,12 @@ export function catalogInsights(receipts: Receipt[]) {
       amountOre: 0,
       contributions: [],
     };
+
     group.amountOre += contribution.amountOre;
     group.contributions.push(contribution);
     groups.set(id, group);
   }
+
   for (const { receipt, data, purchases } of preparePurchases(
     receipts,
     overviewPurchasePolicy,
@@ -35,6 +39,7 @@ export function catalogInsights(receipts: Receipt[]) {
     for (const { line } of purchases) {
       total++;
       const contribution = { receipt, line, amountOre: line.netOre };
+
       if (data.physicalStore)
         add(
           stores,
@@ -43,9 +48,11 @@ export function catalogInsights(receipts: Receipt[]) {
           contribution,
         );
       const product = line.catalogProduct;
+
       if (!product) continue;
       linked++;
       add(products, product.key, product.name, contribution);
+
       if (product.brand)
         add(
           brands,
@@ -55,8 +62,10 @@ export function catalogInsights(receipts: Receipt[]) {
         );
     }
   }
+
   const sorted = (groups: Map<string, SpendingGroup>) =>
     [...groups.values()].sort((a, b) => b.amountOre - a.amountOre);
+
   return {
     linked,
     total,

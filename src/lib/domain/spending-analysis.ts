@@ -9,6 +9,7 @@ import {
   type ProductAnalysisResult,
 } from "./product-families";
 import { categoryById } from "./categories";
+
 export { currentLineAnalysis } from "./purchase-projection";
 
 export type AnalysisPeriod = {
@@ -17,13 +18,18 @@ export type AnalysisPeriod = {
   previousStart: string;
   previousEnd: string;
 };
+
 export type AnalysisFrequency = "week" | "month";
+
 const dateString = (date: Date) => date.toISOString().slice(0, 10);
+
 export function shiftDate(date: string, days: number) {
   const value = new Date(`${date}T12:00:00Z`);
   value.setUTCDate(value.getUTCDate() + days);
+
   return dateString(value);
 }
+
 /** Compare an unfinished week/month with the same elapsed part of its predecessor. */
 export function analysisPeriod(
   anchor: string,
@@ -31,9 +37,11 @@ export function analysisPeriod(
   today: string,
 ): AnalysisPeriod {
   const date = new Date(`${anchor}T12:00:00Z`);
+
   if (frequency === "week") {
     const start = shiftDate(anchor, -((date.getUTCDay() + 6) % 7));
     const end = [shiftDate(start, 6), today].sort()[0];
+
     return {
       start,
       end,
@@ -41,17 +49,23 @@ export function analysisPeriod(
       previousEnd: shiftDate(end, -7),
     };
   }
+
   const start = `${anchor.slice(0, 7)}-01`;
+
   const monthEnd = dateString(
     new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth() + 1, 0, 12)),
   );
+
   const end = [monthEnd, today].sort()[0];
+
   const previousStart = dateString(
     new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth() - 1, 1, 12)),
   );
+
   const previousLast = new Date(
     Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), 0, 12),
   );
+
   const previousEnd =
     end === monthEnd
       ? dateString(previousLast)
@@ -59,6 +73,7 @@ export function analysisPeriod(
           previousStart,
           Math.min(Number(end.slice(8)), previousLast.getUTCDate()) - 1,
         );
+
   return { start, end, previousStart, previousEnd };
 }
 
@@ -75,9 +90,11 @@ export type SpendingEffect = {
   unit: string | null;
   contributions: Contribution[];
 };
+
 type MeasuredLine = Contribution & {
   quantity: ProductAnalysisResult["quantity"] | null;
 };
+
 type Group = {
   name: string;
   current: MeasuredLine[];
@@ -93,6 +110,7 @@ export function spendingAnalysis(
     ...comparisonPurchasePolicy,
     provisional: reviewedOnly ? "exclude" : "include",
   });
+
   const within = (start: string, end: string) =>
     prepared.filter(
       ({ data }) =>
@@ -100,15 +118,19 @@ export function spendingAnalysis(
         data.purchaseDate >= start &&
         data.purchaseDate <= end,
     );
+
   const current = within(period.start, period.end),
     previous = within(period.previousStart, period.previousEnd);
+
   const groups = new Map<string, Group>();
   const categories = new Map<string, SpendingEffect>();
+
   let currentOre = 0,
     previousOre = 0,
     missingAmounts = 0,
     measuredLines = 0,
     productLines = 0;
+
   for (const [side, selected] of [
     ["current", current],
     ["previous", previous],
@@ -117,10 +139,12 @@ export function spendingAnalysis(
       if (side === "current") currentOre += total.productSpending;
       else previousOre += total.productSpending;
       missingAmounts += total.unknown;
+
       for (const { line, analysis: result } of purchases) {
         productLines++;
         const contribution = { receipt, line, amountOre: line.netOre };
         const categoryId = line.categoryId ?? "fallback.unclear";
+
         const category = categories.get(categoryId) ?? {
           id: categoryId,
           name: categoryById.get(categoryId)?.name ?? "Ukjent",
@@ -134,16 +158,20 @@ export function spendingAnalysis(
           unit: null,
           contributions: [],
         };
+
         category[side === "current" ? "currentOre" : "previousOre"] +=
           line.netOre;
         category.contributions.push(contribution);
         categories.set(categoryId, category);
+
         if (!result?.family) continue;
+
         const group = groups.get(result.family.id) ?? {
           name: result.family.name,
           current: [],
           previous: [],
         };
+
         group[side].push({
           ...contribution,
           quantity:
@@ -155,12 +183,17 @@ export function spendingAnalysis(
       }
     }
   }
+
   let priceOre = 0,
     quantityOre = 0;
+
   const effects: SpendingEffect[] = [];
+
   for (const [id, group] of groups) {
     const all = [...group.current, ...group.previous];
+
     if (!group.current.length || !group.previous.length) continue;
+
     // Physical measures allow comparison across package sizes. Package counts do not.
     const measure = (["millilitres", "grams", "units"] as const).find((key) =>
       all.every(
@@ -168,20 +201,25 @@ export function spendingAnalysis(
           line.quantity?.[key] !== null && (line.quantity?.[key] ?? 0) > 0,
       ),
     );
+
     if (
       !measure ||
       (measure === "units" &&
         new Set(all.map((item) => productProfileKey(item.line!))).size !== 1)
     )
       continue;
+
     const sum = (items: MeasuredLine[]) =>
       items.reduce((total, item) => total + item.amountOre, 0);
+
     const quantity = (items: MeasuredLine[]) =>
       items.reduce((total, item) => total + item.quantity![measure]!, 0);
+
     const c = sum(group.current),
       p = sum(group.previous),
       cq = quantity(group.current),
       pq = quantity(group.previous);
+
     // Symmetric decomposition: price and quantity effects add exactly to the change.
     const price = Math.round(((c / cq - p / pq) * (cq + pq)) / 2);
     const amount = c - p - price;
@@ -203,7 +241,9 @@ export function spendingAnalysis(
       contributions: all,
     });
   }
+
   const differenceOre = currentOre - previousOre;
+
   return {
     period,
     currentOre,
@@ -236,10 +276,13 @@ export function analysisSummary(
   report: ReturnType<typeof spendingAnalysis>,
 ): string {
   if (!report.currentReceipts) return "Ingen registrerte kjøp i perioden.";
+
   if (!report.previousReceipts)
     return "Vi trenger kjøp fra forrige periode for å forklare endringen.";
+
   if (!report.differenceOre)
     return "Registrert forbruk er likt i de to periodene.";
   const largest = report.categories[0];
+
   return `Registrert forbruk er ${formatMoney(Math.abs(report.differenceOre))} ${report.differenceOre > 0 ? "høyere" : "lavere"}.${largest?.differenceOre ? ` Største kategoriendring: ${largest.name}, ${formatMoney(largest.differenceOre)}.` : ""}`;
 }

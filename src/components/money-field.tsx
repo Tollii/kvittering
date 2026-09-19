@@ -2,6 +2,7 @@ import { useState } from "react";
 import type { TextInputProps } from "react-native";
 import { moneyInput, parseOre } from "@/lib/domain/receipt";
 import { Field } from "./ui";
+
 export function MoneyField({
   label,
   value,
@@ -15,6 +16,7 @@ export function MoneyField({
   onError: (error: string | null) => void;
 }) {
   const [text, setText] = useState(() => moneyInput(value));
+
   return (
     <Field
       label={label}
@@ -24,6 +26,7 @@ export function MoneyField({
       {...props}
       onChangeText={(next) => {
         setText(next);
+
         try {
           const amount = parseOre(next);
           onError(null);

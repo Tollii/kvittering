@@ -22,6 +22,7 @@ import type {
 } from "@/lib/domain/insights";
 import type { catalogInsights } from "@/lib/catalog/insights";
 import type { SpendingDimension } from "@/lib/spending-selection";
+
 export const reportIds = [
   "attributes",
   "catalog",
@@ -32,6 +33,7 @@ export const reportIds = [
   "changes",
   "coverage",
 ] as const;
+
 export type ReportId = (typeof reportIds)[number];
 
 type ReportProps = {
@@ -50,6 +52,7 @@ type ReportProps = {
   onAccounting: (key: string) => void;
   onClose: () => void;
 };
+
 export function useSpendingReports({
   totals,
   comparison,
@@ -68,6 +71,7 @@ export function useSpendingReports({
 }: ReportProps) {
   const colors = useTheme();
   const pricier = surprises.filter((signal) => signal.ratio > 1);
+
   const reports: Record<
     ReportId,
     {
@@ -310,9 +314,8 @@ export function useSpendingReports({
                   label: "Beløpene stemmer ikke",
                   receipts: totals.discrepancies,
                 },
-              ]
-                .filter((item) => item.receipts.length)
-                .map((item) => (
+              ].map((item) =>
+                item.receipts.length > 0 ? (
                   <View key={item.label}>
                     <Notice tone="warning">{item.label}</Notice>
                     {item.receipts.map((receipt) => (
@@ -326,12 +329,14 @@ export function useSpendingReports({
                       />
                     ))}
                   </View>
-                ))}
+                ) : null,
+              )}
             </>
           }
         </>
       ),
     },
   };
+
   return reports;
 }

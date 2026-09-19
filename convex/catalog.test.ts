@@ -14,15 +14,18 @@ import {
   packageCandidates,
 } from "../src/lib/domain/purchase-quantities";
 import { needsProductLink } from "../src/lib/domain/product-linking";
+
 const modules = import.meta.glob("./**/*.ts");
 
 it("persists equivalent matches safely across catalog reads, old editors and manual corrections", async () => {
   const { t, first, householdId } = await setup();
+
   const id = await first.mutation(api.receipts.reserve, {
     householdId,
     clientId: "equivalent-products-0001",
     imageCount: 1,
   });
+
   const data = batteryFixture();
   const line = data.lines[0];
   Object.assign(line, {
@@ -32,6 +35,7 @@ it("persists equivalent matches safely across catalog reads, old editors and man
     packageSize: null,
     packageUnit: null,
   });
+
   const products = normalizeProducts({
     data: [
       {
@@ -43,6 +47,7 @@ it("persists equivalent matches safely across catalog reads, old editors and man
       { id: 92, name: "Salat Crispi 150g pakke", ean: "7030000000092" },
     ],
   });
+
   const group = groupCatalogProducts(products)[0];
   await t.run(async (ctx) => {
     await ctx.db.patch("receipts", id, {
@@ -50,6 +55,7 @@ it("persists equivalent matches safely across catalog reads, old editors and man
       status: "reviewed",
       autoAccepted: true,
     });
+
     for (const product of products)
       await ctx.db.insert("catalogProducts", {
         key: product.key,
@@ -57,6 +63,7 @@ it("persists equivalent matches safely across catalog reads, old editors and man
         fetchedAt: Date.now(),
       });
   });
+
   const decision = {
     lineId: line.id,
     evidenceKey: lineEvidenceKey(line),
@@ -66,6 +73,7 @@ it("persists equivalent matches safely across catalog reads, old editors and man
     categoryId: null,
     categoryConfidence: 0,
   };
+
   const apply = { id, generation: 0, store: data.store, decisions: [decision] };
   await t.mutation(internal.catalogMatching.apply, apply);
   let receipt = (await first.query(api.receipts.detail, { id }))!.receipt;
@@ -84,9 +92,11 @@ it("persists equivalent matches safely across catalog reads, old editors and man
   await first.mutation(api.catalog.ensure, {
     lookup: { kind: "details", productKey: group.key },
   });
+
   const details = await first.query(api.catalog.observe, {
     lookup: { kind: "details", productKey: group.key },
   });
+
   expect(details.status).toBe("ready");
   expect(details.products[0].ids).toEqual([]);
   expect(details.products[0].weight).toBeUndefined();
@@ -109,6 +119,7 @@ it("persists equivalent matches safely across catalog reads, old editors and man
   const oldData = structuredClone(receipt.data!);
   delete oldData.lines[0].productReference;
   delete oldData.lines[0].catalogProduct!.equivalence;
+
   const save = {
     id,
     revision: receipt.revision,
@@ -118,6 +129,7 @@ it("persists equivalent matches safely across catalog reads, old editors and man
     duplicateResolved: false,
     excluded: false,
   };
+
   await first.mutation(api.receipts.save, save);
   receipt = (await first.query(api.receipts.detail, { id }))!.receipt;
   expect(receipt.data!.lines[0].catalogProduct?.equivalence).toEqual(
@@ -134,33 +146,41 @@ it("persists equivalent matches safely across catalog reads, old editors and man
   expect(receipt.data!.lines[0].catalogProduct?.key).toBe(products[1].key);
   expect(receipt.data!.lines[0].catalogProduct?.equivalence).toBeUndefined();
 });
+
 afterEach(() => {
   vi.useRealTimers();
   vi.unstubAllGlobals();
   vi.unstubAllEnvs();
 });
+
 async function setup() {
   vi.useFakeTimers();
   const t = convexTest(schema, modules);
   registerWorkpool(t, "catalogWorkpool");
+
   const first = t.withIdentity({
     subject: "first",
     issuer: "https://test.local",
   });
+
   const other = t.withIdentity({
     subject: "other",
     issuer: "https://test.local",
   });
+
   const householdId = await first.mutation(api.households.create, {
     name: "First",
     invitation: "11111111111111111111111111111111",
   });
+
   await other.mutation(api.households.create, {
     name: "Other",
     invitation: "22222222222222222222222222222222",
   });
+
   return { t, first, other, householdId };
 }
+
 it("shares normalized pending and completed lookups across households and rejects anonymous access", async () => {
   const { t, first, other } = await setup();
   await expect(
@@ -168,15 +188,19 @@ it("shares normalized pending and completed lookups across households and reject
   ).rejects.toThrow("Logg inn");
   await first.mutation(api.catalog.searchProducts, { search: " STRATOS " });
   await other.mutation(api.catalog.searchProducts, { search: "stratos" });
+
   const requests = await t.run((ctx) =>
     ctx.db.query("catalogRequests").take(10),
   );
+
   expect(requests).toHaveLength(1);
   const id = requests[0]._id;
   await t.mutation(internal.catalogQueue.claim, { id });
+
   const products = normalizeProducts({
     data: [{ id: 1, name: "Stratos", ean: "7037710000001" }],
   });
+
   await t.mutation(internal.catalogQueue.succeed, {
     id,
     result: { ...emptyCatalogResult(), products },
@@ -187,6 +211,7 @@ it("shares normalized pending and completed lookups across households and reject
   ).toEqual(products);
   expect((await t.query(internal.catalogQueue.read, { id }))?.attempts).toBe(1);
 });
+
 it("isolates retailer search results while sharing equivalent retailer names", async () => {
   const { t, first, other } = await setup();
   const lookup = { kind: "products" as const, search: "Cheez Doodles XL" };
@@ -203,24 +228,32 @@ it("isolates retailer search results while sharing equivalent retailer names", a
   await first.mutation(api.catalog.ensure, {
     lookup: { ...lookup, store: "Unknown retailer" },
   });
+
   const requests = await t.run((ctx) =>
     ctx.db.query("catalogRequests").take(10),
   );
+
   expect(requests).toHaveLength(3);
+
   const kiwi = requests.find(
     (row) => row.request.kind === "products" && row.request.store === "KIWI",
   )!;
+
   await t.mutation(internal.catalogQueue.claim, { id: kiwi._id });
+
   const products = normalizeProducts({
     data: [{ id: 1, name: "Cheez Doodles XL" }],
   });
+
   await t.mutation(internal.catalogQueue.succeed, {
     id: kiwi._id,
     result: { ...emptyCatalogResult(), products },
   });
+
   const observed = await other.query(api.catalog.observe, {
     lookup: { ...lookup, store: "KIWI" },
   });
+
   expect(observed.status).toBe("ready");
   expect(observed.products).toEqual(products);
   expect(
@@ -263,19 +296,23 @@ it("refreshes cached searches made before the retrieval rules changed", async ()
 
 it("includes the receipt retailer in matching inputs without changing line evidence", async () => {
   const { t, first, householdId } = await setup();
+
   const id = await first.mutation(api.receipts.reserve, {
     householdId,
     clientId: "catalog-retailer-0001",
     imageCount: 1,
   });
+
   const data = { ...batteryFixture(), store: "KIWI Majorstuen" };
   await t.run((ctx) =>
     ctx.db.patch("receipts", id, { data, status: "needs_review" }),
   );
+
   const inputs = await t.query(internal.catalogMatching.inputs, {
     id,
     generation: 0,
   });
+
   expect(inputs.length).toBeGreaterThan(0);
   expect(inputs.every((input) => input.store === "KIWI")).toBe(true);
   expect(inputs[0].line).toEqual(
@@ -357,6 +394,7 @@ it.each([
       "fetch",
       vi.fn(async (url: URL | string) => {
         urls.push(new URL(url));
+
         return new Response(
           JSON.stringify({ data: responses[urls.length - 1] }),
           {
@@ -371,9 +409,11 @@ it.each([
     );
     const lookup = { kind: "products" as const, search, store };
     await first.mutation(api.catalog.ensure, { lookup });
+
     const request = (await t.run((ctx) =>
       ctx.db.query("catalogRequests").first(),
     ))!;
+
     await t.action(internal.catalogWorker.execute, { id: request._id });
     expect(urls.map((url) => url.searchParams.get("search"))).toEqual(searches);
     expect(urls[0].searchParams.get("store")).toBe(
@@ -382,9 +422,11 @@ it.each([
     expect(urls.slice(1).every((url) => !url.searchParams.has("store"))).toBe(
       true,
     );
+
     const completed = await t.query(internal.catalogQueue.read, {
       id: request._id,
     });
+
     expect(completed?.state).toBe(state);
     expect(completed?.request).toEqual(request.request);
     expect(completed?.result.products).toHaveLength(count);
@@ -394,8 +436,10 @@ it.each([
 it("honors Retry-After on 429 and ends repeated failures without caching an empty success", async () => {
   const { t, first } = await setup();
   await first.mutation(api.catalog.searchProducts, { search: "Stratos" });
+
   const id = (await t.run((ctx) => ctx.db.query("catalogRequests").first()))!
     ._id;
+
   const start = Date.now();
   await t.mutation(internal.catalogQueue.claim, { id });
   await t.mutation(internal.catalogQueue.fail, {
@@ -408,6 +452,7 @@ it("honors Retry-After on 429 and ends repeated failures without caching an empt
     scheduledAt: start + 120000,
     attempts: 1,
   });
+
   for (let attempt = 0; attempt < 2; attempt++) {
     await t.mutation(internal.catalogQueue.claim, { id });
     await t.mutation(internal.catalogQueue.fail, {
@@ -416,20 +461,25 @@ it("honors Retry-After on 429 and ends repeated failures without caching an empt
       retryAfterMs: 0,
     });
   }
+
   const result = await first.mutation(api.catalog.searchProducts, {
     search: "Stratos",
   });
+
   expect(result.status).toBe("error");
   expect(result.message).toBeTruthy();
   expect((await t.query(internal.catalogQueue.read, { id }))?.attempts).toBe(3);
 });
+
 it("enforces household access for store lookup and catalog edits", async () => {
   const { first, other, householdId } = await setup();
+
   const id = await first.mutation(api.receipts.reserve, {
     householdId,
     clientId: "catalog-access-0001",
     imageCount: 1,
   });
+
   await expect(
     other.mutation(api.catalog.searchStores, {
       receiptId: id,
@@ -449,19 +499,23 @@ it("enforces household access for store lookup and catalog edits", async () => {
     }),
   ).rejects.toThrow("ikke tilgjengelig");
 });
+
 it("uses category-only evidence but preserves manual edits, stale lines and a changed retailer", async () => {
   const { t, first, householdId } = await setup();
+
   const id = await first.mutation(api.receipts.reserve, {
     householdId,
     clientId: "catalog-evidence-0001",
     imageCount: 1,
   });
+
   const data = batteryFixture();
   data.lines[0].categoryId = "fallback.unclear";
   data.lines[0].issues = ["Kategorien er usikker."];
   await t.run((ctx) =>
     ctx.db.patch("receipts", id, { data, status: "needs_review" }),
   );
+
   const decision = {
     lineId: data.lines[0].id,
     evidenceKey: lineEvidenceKey(data.lines[0]),
@@ -471,6 +525,7 @@ it("uses category-only evidence but preserves manual edits, stale lines and a ch
     reason: "below_threshold" as const,
     candidates: [],
   };
+
   const args = { id, generation: 0, store: data.store, decisions: [decision] };
   await t.mutation(internal.catalogMatching.apply, { ...args, store: "Other" });
   expect(
@@ -500,42 +555,53 @@ it("uses category-only evidence but preserves manual edits, stale lines and a ch
 it("refreshes expired searches while retaining the last usable result", async () => {
   const { t, first } = await setup();
   await first.mutation(api.catalog.searchProducts, { search: "Stratos" });
+
   const id = (await t.run((ctx) => ctx.db.query("catalogRequests").first()))!
     ._id;
+
   const products = normalizeProducts({
     data: [{ id: 1, name: "Stratos 150g", ean: "7037710000001" }],
   });
+
   await t.mutation(internal.catalogQueue.claim, { id });
   await t.mutation(internal.catalogQueue.succeed, {
     id,
     result: { ...emptyCatalogResult(), products },
   });
   vi.setSystemTime(Date.now() + 86400001);
+
   const response = await first.mutation(api.catalog.searchProducts, {
     search: "stratos",
   });
+
   expect(response.status).toBe("pending");
   expect(response.products).toEqual(products);
   expect(
     await t.run((ctx) => ctx.db.query("catalogRequests").take(10)),
   ).toHaveLength(1);
 });
+
 it("saves a selected catalog product and prevents background matching from replacing it", async () => {
   const { t, first, householdId } = await setup();
+
   const id = await first.mutation(api.receipts.reserve, {
     householdId,
     clientId: "catalog-selection-0001",
     imageCount: 1,
   });
+
   const data = batteryFixture();
+
   const products = normalizeProducts({
     data: [
       { id: 1, name: "Battery Original 500ml", ean: "7037710000001" },
       { id: 2, name: "Other drink", ean: "7037710000002" },
     ],
   });
+
   await t.run(async (ctx) => {
     await ctx.db.patch("receipts", id, { data, status: "needs_review" });
+
     for (const product of products)
       await ctx.db.insert("catalogProducts", {
         key: product.key,
@@ -570,17 +636,21 @@ it("saves a selected catalog product and prevents background matching from repla
       },
     ],
   });
+
   const current = (await first.query(api.receipts.detail, { id }))!.receipt
     .data!;
+
   expect(current.lines[0].catalogProduct?.key).toBe(products[0].key);
   expect(current.lines[0].categoryId).toBe(saved.lines[0].categoryId);
 });
 
 it("fetches details after a summary and retains detail freshness across later summaries", async () => {
   const { t, first } = await setup();
+
   const product = normalizeProducts({
     data: [{ id: 31, name: "Cola 500ml" }],
   })[0];
+
   await t.run((ctx) =>
     ctx.db.insert("catalogProducts", {
       key: product.key,
@@ -592,9 +662,11 @@ it("fetches details after a summary and retains detail freshness across later su
     (await first.mutation(api.catalog.product, { key: product.key })).status,
   ).toBe("pending");
   await first.mutation(api.catalog.product, { key: product.key });
+
   const requests = await t.run((ctx) =>
     ctx.db.query("catalogRequests").take(10),
   );
+
   expect(requests).toHaveLength(1);
   await t.mutation(internal.catalogQueue.claim, { id: requests[0]._id });
   await t.mutation(internal.catalogQueue.succeed, {
@@ -607,9 +679,11 @@ it("fetches details after a summary and retains detail freshness across later su
   const fetched = await t.run((ctx) => ctx.db.query("catalogProducts").first());
   vi.setSystemTime(Date.now() + 1000);
   await first.mutation(api.catalog.searchProducts, { search: "Cola" });
+
   const search = (
     await t.run((ctx) => ctx.db.query("catalogRequests").take(10))
   ).find((row) => row.request.kind === "products")!;
+
   await t.mutation(internal.catalogQueue.claim, { id: search._id });
   await t.mutation(internal.catalogQueue.succeed, {
     id: search._id,
@@ -622,6 +696,7 @@ it("fetches details after a summary and retains detail freshness across later su
 
 it("merges summary fields without erasing rich detail data or mutating inputs", async () => {
   const { mergeCatalogProduct } = await import("./catalogQueue");
+
   const product = normalizeProducts({
     data: [
       {
@@ -631,12 +706,14 @@ it("merges summary fields without erasing rich detail data or mutating inputs", 
       },
     ],
   })[0];
+
   const previous = {
     key: product.key,
     product,
     fetchedAt: 1,
     detailsFetchedAt: 1,
   };
+
   const before = structuredClone(previous);
   const summary = { ...product, nutrition: [] };
   expect(
@@ -655,9 +732,11 @@ it("observes delayed catalog completion without queuing more work", async () => 
   const { t, first } = await setup();
   const lookup = { kind: "products" as const, search: "Stratos" };
   await first.mutation(api.catalog.ensure, { lookup });
+
   const initial = await t.run((ctx) =>
     ctx.db.query("catalogRequests").collect(),
   );
+
   expect(await first.query(api.catalog.observe, { lookup })).toMatchObject({
     status: "pending",
   });
@@ -681,13 +760,16 @@ it("observes delayed catalog completion without queuing more work", async () => 
     "Logg inn",
   );
 });
+
 it("keeps receipt-owned store observation inside its household", async () => {
   const { first, other, householdId } = await setup();
+
   const receiptId = await first.mutation(api.receipts.reserve, {
     householdId,
     clientId: "store-observation-001",
     imageCount: 1,
   });
+
   await expect(
     other.query(api.catalog.observe, {
       lookup: { kind: "stores", receiptId, search: "Oslo" },

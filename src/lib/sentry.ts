@@ -26,12 +26,14 @@ Sentry.init({
   beforeBreadcrumb: diagnosticBreadcrumb,
   beforeSend: (event, hint) => {
     const parser = Sentry.getClient()?.getOptions().stackParser;
+
     return prepareErrorEvent(
       event,
-      hint.syntheticException?.stack && typeof parser === "function"
+      hint.syntheticException?.stack && parser && !Array.isArray(parser)
         ? parser(hint.syntheticException.stack)
         : [],
     );
   },
 });
+
 setReleaseDiagnostics(0);

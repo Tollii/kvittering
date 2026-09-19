@@ -8,22 +8,33 @@ export const familyIdentityValidator = v.object({
   id: v.id("productFamilies"),
   name: v.string(),
 });
+
 export const packageMeasureValidator = v.object({
   amount: v.number(),
   unit: v.union(v.literal("g"), v.literal("ml")),
 });
+
 export const packageProfileValidator = v.object({
   unitsPerPackage: v.union(v.number(), v.null()),
   measurePerPackage: v.union(packageMeasureValidator, v.null()),
 });
+
 export type PackageProfile = Infer<typeof packageProfileValidator>;
+
 export const purchaseQuantityValidator = v.object({
   packages: v.union(v.number(), v.null()),
   units: v.union(v.number(), v.null()),
   grams: v.union(v.number(), v.null()),
   millilitres: v.union(v.number(), v.null()),
 });
+
 export type PurchaseQuantity = Infer<typeof purchaseQuantityValidator>;
+
+// SAFETY: The validator declares exactly the persisted quantity fields.
+export const purchaseQuantityKeys = Object.keys(
+  purchaseQuantityValidator.fields,
+) as (keyof PurchaseQuantity)[];
+
 export const productAnalysisResultValidator = v.object({
   lineId: v.string(),
   evidenceKey: v.string(),
@@ -31,6 +42,7 @@ export const productAnalysisResultValidator = v.object({
   quantity: purchaseQuantityValidator,
   attributes: productAttributesValidator.optional(),
 });
+
 export const productAnalysisValidator = v.object({
   version: v.number(),
   generation: v.number(),
@@ -43,9 +55,11 @@ export const productAnalysisValidator = v.object({
   updatedAt: v.number(),
   results: v.array(productAnalysisResultValidator),
 });
+
 export type ProductAnalysisResult = Infer<
   typeof productAnalysisResultValidator
 >;
+
 export const productAnalysisVersion = 6;
 
 /** A family name removes explicit package notation, while retaining the source's recipe and variant. */

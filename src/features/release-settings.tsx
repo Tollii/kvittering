@@ -11,21 +11,27 @@ export function ReleaseSettings() {
   const [busy, setBusy] = useState(false);
   const [ready, setReady] = useState(false);
   const [message, setMessage] = useState("");
+
   async function check() {
     recordEvent("update.check_started");
     setBusy(true);
     setMessage("");
     let phase = "policy_refresh";
+
     try {
       await refresh();
+
       if (__DEV__ || !Updates.isEnabled) {
         setMessage(
           "Direkteoppdateringer er tilgjengelige i installerte utgivelsesbygg.",
         );
+
         return;
       }
+
       phase = "update_check";
       const result = await Updates.checkForUpdateAsync();
+
       if (result.isAvailable || result.isRollBackToEmbedded) {
         phase = "update_download";
         await Updates.fetchUpdateAsync();
@@ -48,6 +54,7 @@ export function ReleaseSettings() {
       setBusy(false);
     }
   }
+
   return (
     <Panel>
       <Copy>

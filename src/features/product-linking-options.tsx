@@ -22,6 +22,7 @@ import type {
 function ProductImage({ product }: { product: CatalogProduct }) {
   const [index, setIndex] = useState(0);
   const sources = catalogImageSources(product);
+
   return (
     <View
       style={{
@@ -61,26 +62,33 @@ export function ProductLinkingOptions({
 }) {
   const colors = useTheme();
   const allowed = useFeatureFlag("productLookup");
+
   const saved = useQuery(api.productLinking.candidates, {
     receiptId,
     lineId: line.id,
   });
+
   const name = line.receiptName || line.name;
+
   const search = useCatalogSearch(
     name,
     { kind: "products" },
     saved !== undefined && saved.length < 4,
   );
+
   const broadTerm = broaderProductSearch(name);
+
   const needsBroaderSearch =
     !!broadTerm &&
     search.data?.status === "ready" &&
     search.data.products.length === 0;
+
   const broader = useCatalogSearch(
     broadTerm ?? "",
     { kind: "products" },
     needsBroaderSearch,
   );
+
   const ranked = rankCatalogProducts(name, [
     ...(search.data?.products ?? []),
     ...(broader.data?.products ?? []),
@@ -91,12 +99,14 @@ export function ProductLinkingOptions({
         Number(compatibleCatalogProduct(line, a.product)),
     )
     .map(({ product }) => product);
+
   // Keep the saved ranking stable while additional search results arrive.
   const candidates = [
     ...new Map(
       [...(saved ?? []), ...ranked].map((product) => [product.key, product]),
     ).values(),
   ].slice(0, 4);
+
   const pending =
     saved === undefined ||
     (allowed &&
@@ -110,11 +120,13 @@ export function ProductLinkingOptions({
         broader.isFetching ||
         (needsBroaderSearch && !broader.data && !broader.isError) ||
         broader.data?.status === "pending"));
+
   const failed =
     search.isError ||
     broader.isError ||
     search.data?.status === "error" ||
     broader.data?.status === "error";
+
   return (
     <>
       {!allowed && (

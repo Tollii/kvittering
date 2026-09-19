@@ -2,6 +2,7 @@ import { DatabaseSync } from "node:sqlite";
 import { expect, it } from "vitest";
 import {
   migrateReceipt,
+  ReceiptMigrationError,
   migrateReceiptDatabase,
   type ReceiptDatabase,
 } from "./receipt-migrations";
@@ -16,19 +17,24 @@ const legacy = {
   receiptId: "reserved",
   error: "Offline",
 };
+
 function database() {
   const db = new DatabaseSync(":memory:");
   db.exec(
     "CREATE TABLE receipt_queue(id TEXT PRIMARY KEY, data TEXT NOT NULL)",
   );
+
   const adapter: ReceiptDatabase = {
     execSync: (sql) => db.exec(sql),
+    // SAFETY: This adapter implements the SQLite generic row contract; each caller owns its SELECT columns.
     getFirstSync: <T>(sql: string) =>
       (db.prepare(sql).get() as T | undefined) ?? null,
+    // SAFETY: Each test query selects the fields declared by its row type.
     getAllSync: <T>(sql: string) => db.prepare(sql).all() as T[],
     runSync: (sql, ...values) => db.prepare(sql).run(...values),
     withTransactionSync: (operation) => {
       db.exec("BEGIN");
+
       try {
         operation();
         db.exec("COMMIT");
@@ -38,10 +44,13 @@ function database() {
       }
     },
   };
+
   return { db, adapter };
 }
+
 it("migrates an old queued receipt without losing identity, image paths or progress", () => {
   const { db, adapter } = database();
+
   try {
     db.prepare("INSERT INTO receipt_queue VALUES (?, ?)").run(
       legacy.id,
@@ -59,8 +68,10 @@ it("migrates an old queued receipt without losing identity, image paths or progr
     db.close();
   }
 });
+
 it("rolls back the entire migration when one record is corrupt, retaining the original data", () => {
   const { db, adapter } = database();
+
   try {
     db.prepare("INSERT INTO receipt_queue VALUES (?, ?)").run(
       legacy.id,
@@ -70,7 +81,9 @@ it("rolls back the entire migration when one record is corrupt, retaining the or
       "broken",
       "{broken",
     );
-    expect(() => migrateReceiptDatabase(adapter)).toThrow();
+    expect(() => migrateReceiptDatabase(adapter)).toThrow(
+      ReceiptMigrationError,
+    );
     expect(db.prepare("PRAGMA user_version").get()?.user_version).toBe(0);
     expect(
       db.prepare("SELECT data FROM receipt_queue WHERE id = ?").get(legacy.id)
@@ -83,12 +96,16 @@ it("rolls back the entire migration when one record is corrupt, retaining the or
     db.close();
   }
 });
+
 it("refuses unknown future schemas and invalid upload progress", () => {
   expect(() => migrateReceipt({ ...legacy, schemaVersion: 2 })).toThrow(
     "nyere",
   );
-  expect(() => migrateReceipt({ ...legacy, uploaded: [] })).toThrow();
+  expect(() => migrateReceipt({ ...legacy, uploaded: [] })).toThrow(
+    "Ugyldig lokal kvittering",
+  );
   const { db, adapter } = database();
+
   try {
     db.exec("PRAGMA user_version = 2");
     expect(() => migrateReceiptDatabase(adapter)).toThrow("nyere");

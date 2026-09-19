@@ -19,6 +19,7 @@ it("accepts balanced receipts without optional package details or product links"
   expect(canAcceptReceipt(data, false)).toBe(true);
   expect(canAcceptReceipt(data, true)).toBe(false);
 });
+
 it("requires review for amounts, identity, overlap and missing receipt information", () => {
   for (const modify of [
     (data: ReturnType<typeof batteryFixture>) => {
@@ -48,6 +49,7 @@ it("requires review for amounts, identity, overlap and missing receipt informati
     expect(canAcceptReceipt(data, false)).toBe(false);
   }
 });
+
 it("keeps a missing amount visible after a general warning is acknowledged", () => {
   const line = batteryFixture().lines[0];
   line.amountOre = null;
@@ -69,13 +71,16 @@ it("resolves category uncertainty without dismissing other review requirements",
   expect(confirmLineCategory(line, "fallback.unclear").issues).toContain(
     "Kategorien er usikker.",
   );
-  expect(() => confirmLineCategory(line, "not-a-category")).toThrow();
+  expect(() => confirmLineCategory(line, "not-a-category")).toThrow(
+    "Velg en gyldig varekategori.",
+  );
 });
 
 it("lists nothing to do for an acceptable receipt", () => {
   expect(reviewTasks(batteryFixture(), false)).toEqual([]);
   expect(reviewSummary(null, false)).toEqual([]);
 });
+
 it("groups review work into receipt facts and line fixes", () => {
   const data = batteryFixture();
   data.store = null;
@@ -98,6 +103,7 @@ it("groups review work into receipt facts and line fixes", () => {
     "1 beløp mangler",
   ]);
 });
+
 it("hides the total difference while amounts are still missing", () => {
   const data = batteryFixture();
   data.lines[1].amountOre = null;
@@ -109,6 +115,7 @@ it("hides the total difference while amounts are still missing", () => {
     { kind: "difference", amountOre: 159 },
   ]);
 });
+
 it("balances a receipt with an explicit adjustment line", () => {
   const data = batteryFixture();
   data.totalOre = 2500;
@@ -124,6 +131,7 @@ it("balances a receipt with an explicit adjustment line", () => {
   expect(canAcceptReceipt(balanced, false)).toBe(true);
   expect(balanceWithAdjustment(batteryFixture(), "noop").lines).toHaveLength(3);
 });
+
 it("confirms suggested categories in bulk without touching unclear or other issues", () => {
   const data = batteryFixture();
   data.lines[0].issues = ["Kategorien er usikker."];
@@ -200,6 +208,7 @@ it("uses stable codes and preserves reader text independently of category confir
   const before = structuredClone(data);
   const parsed = parseReceipt(data);
   expect(parsed.kind).toBe("parsed");
+
   if (parsed.kind !== "parsed") throw new Error("Fixture must parse");
   expect(assessReceipt(parsed.receipt, false)).toMatchObject({
     acceptable: false,

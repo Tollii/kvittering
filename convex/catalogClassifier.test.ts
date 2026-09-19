@@ -10,6 +10,7 @@ const products = normalizeProducts({
     { id: 1, name: "BigOne Bbq Chicken Deluxe 560g", ean: "7039010576581" },
   ],
 });
+
 const item = (index: number) => ({
   line: {
     ...emptyLine(`pizza_${index}`),
@@ -19,23 +20,28 @@ const item = (index: number) => ({
   candidates: products,
   product: null,
 });
+
 const client = () =>
   new TypeSafeClient({ apiKey: "test-key", retry: { maxRetries: 0 } });
+
 afterEach(() => vi.unstubAllGlobals());
+
 it("sends all receipt matches and category questions in one model request", async () => {
   const requests: {
     state: { products: unknown[] };
     questions: Record<string, { type: string }>;
   }[] = [];
+
   vi.stubGlobal(
     "fetch",
     vi.fn(async (_url, init) => {
-      const request = JSON.parse(init.body);
+      const request: (typeof requests)[number] = JSON.parse(init.body);
       requests.push(request);
+
       const answers = Object.fromEntries(
         Object.entries(request.questions).map(([key, question]) => [
           key,
-          (question as { type: string }).type === "noul"
+          question.type === "noul"
             ? { type: "noul", noul: 0.86 }
             : {
                 type: "choice",
@@ -45,6 +51,7 @@ it("sends all receipt matches and category questions in one model request", asyn
               },
         ]),
       );
+
       return new Response(
         JSON.stringify({
           model: "jev-latest",
@@ -55,10 +62,12 @@ it("sends all receipt matches and category questions in one model request", asyn
       );
     }),
   );
+
   const result = await classifyCatalogProducts(
     Array.from({ length: 12 }, (_, index) => item(index)),
     client(),
   );
+
   expect(requests).toHaveLength(1);
   expect(requests[0].state.products).toHaveLength(12);
   expect(Object.keys(requests[0].questions)).toHaveLength(24);
@@ -72,6 +81,7 @@ it("sends all receipt matches and category questions in one model request", asyn
   ).toBe(true);
   expect(result[0].candidates?.[0].probability).toBe(0.86);
 });
+
 it("retains the reason for a provider failure and keeps exact links usable", async () => {
   vi.stubGlobal(
     "fetch",
@@ -79,10 +89,12 @@ it("retains the reason for a provider failure and keeps exact links usable", asy
       throw new Error("Network failure");
     }),
   );
+
   const result = await classifyCatalogProducts(
     [item(0), { ...item(1), product: products[0] }],
     client(),
   );
+
   expect(result[0]).toMatchObject({
     productKey: null,
     reason: "provider_error",
@@ -104,6 +116,7 @@ it("scores duplicate catalog records together and keeps their individual diagnos
       },
     ],
   });
+
   let questionCount = 0;
   vi.stubGlobal(
     "fetch",
@@ -114,6 +127,7 @@ it("scores duplicate catalog records together and keeps their individual diagnos
       expect(
         request.state.products[0].catalogCandidates[0].alternativeNames,
       ).toHaveLength(2);
+
       return new Response(
         JSON.stringify({
           model: "jev-latest",
@@ -126,10 +140,12 @@ it("scores duplicate catalog records together and keeps their individual diagnos
       );
     }),
   );
+
   const [result] = await classifyCatalogProducts(
     [{ ...item(0), line: { ...item(0).line, manual: true }, candidates }],
     client(),
   );
+
   expect(questionCount).toBe(1);
   expect(result.reason).toBe("equivalent_match");
   expect(result.equivalentKeys).toEqual(
@@ -155,16 +171,19 @@ it("does not treat an unanswered competing group as a negative answer", async ()
         ),
     ),
   );
+
   const candidates = normalizeProducts({
     data: [
       { id: 1, name: "BigOne Bbq Chicken Deluxe 560g" },
       { id: 2, name: "BigOne Bbq Chicken Deluxe 700g" },
     ],
   });
+
   const [result] = await classifyCatalogProducts(
     [{ ...item(0), candidates }],
     client(),
   );
+
   expect(result).toMatchObject({ productKey: null, reason: "provider_error" });
   expect(result.equivalentKeys).toBeUndefined();
 });

@@ -25,8 +25,10 @@ export function parseReceiptIssue(value: string): ReceiptIssue {
     ? { code: "category_uncertain" }
     : { code: "reader_issue", message: value };
 }
+
 export const isCategoryUncertain = (value: string) =>
   parseReceiptIssue(value).code === "category_uncertain";
+
 export function receiptIssueText(issue: ReceiptIssue): string {
   switch (issue.code) {
     case "category_uncertain":

@@ -5,30 +5,40 @@ import { api, internal } from "./_generated/api";
 import schema from "./schema";
 import { batteryFixture } from "../src/lib/domain/receipt";
 import { validPushToken } from "./notifications";
+
 const modules = import.meta.glob("./**/*.ts");
+
 afterEach(() => vi.unstubAllEnvs());
+
 const subscription = {
   token: "ExpoPushToken[abcdefghijklmnop]",
 };
+
 async function setup() {
   const t = convexTest(schema, modules);
+
   const uploader = t.withIdentity({
     subject: "uploader",
     issuer: "https://test.local",
   });
+
   const partner = t.withIdentity({
     subject: "partner",
     issuer: "https://test.local",
   });
+
   const householdId = await uploader.mutation(api.households.create, {
     name: "Home",
     invitation: "0123456789abcdef0123456789abcdef",
   });
+
   await partner.mutation(api.households.join, {
     invitation: "0123456789abcdef0123456789abcdef",
   });
+
   return { t, uploader, partner, householdId };
 }
+
 it("keeps each device subscription private to its account and supports disabling it", async () => {
   const { t, uploader, partner } = await setup();
   await expect(
@@ -66,6 +76,7 @@ it("keeps each device subscription private to its account and supports disabling
     }),
   ).toBe(false);
 });
+
 it("schedules only the uploader once, and skips delivery after review, unsubscribe or deletion", async () => {
   const { t, uploader, partner, householdId } = await setup();
   await uploader.mutation(api.notifications.subscribe, subscription);
@@ -73,11 +84,13 @@ it("schedules only the uploader once, and skips delivery after review, unsubscri
     ...subscription,
     token: "ExpoPushToken[partnerabcdefghijk]",
   });
+
   const id = await uploader.mutation(api.receipts.reserve, {
     clientId: "notification-receipt-001",
     imageCount: 1,
     householdId,
   });
+
   await t.run((ctx) =>
     ctx.db.patch("receipts", id, { status: "processing", generation: 1 }),
   );
@@ -88,16 +101,20 @@ it("schedules only the uploader once, and skips delivery after review, unsubscri
     (await uploader.query(api.receipts.detail, { id }))!.receipt.autoAccepted,
   ).toBe(true);
   await t.mutation(internal.processing.finish, args);
+
   const deliveries = await t.run((ctx) =>
     ctx.db.system.query("_scheduled_functions").take(10),
   );
+
   expect(deliveries).toHaveLength(1);
   const sendArgs = deliveries[0].args[0];
   expect(sendArgs.receiptId).toBe(id);
+
   const target = await t.query(internal.notifications.delivery, {
     receiptId: id,
     subscriptionId: sendArgs.subscriptionId,
   });
+
   expect(target?.subscription.token).toBe(subscription.token);
   expect(target?.title).toBe("Eksempelbutikk");
   expect(target?.body).toContain("25,31");
@@ -143,6 +160,7 @@ it("schedules only the uploader once, and skips delivery after review, unsubscri
     }),
   ).toBeNull();
 });
+
 it("accepts only Expo push tokens", () => {
   for (const token of [
     "",

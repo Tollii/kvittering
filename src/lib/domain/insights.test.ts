@@ -1,3 +1,4 @@
+import { receiptFixture, testId } from "../testing/receipts";
 import { expect, it } from "vitest";
 import { batteryFixture, emptyLine } from "./receipt";
 import {
@@ -9,13 +10,21 @@ import {
   type Receipt,
   type Contribution,
 } from "./insights";
+
 function receipt(date: string, ore = 1000): Receipt {
   const data = batteryFixture();
   data.purchaseDate = date;
   data.lines = [{ ...emptyLine("item"), amountOre: ore }];
   data.totalOre = ore;
-  return { _id: date, _creationTime: 0, status: "reviewed", data } as Receipt;
+
+  return receiptFixture({
+    _id: date,
+    _creationTime: 0,
+    status: "reviewed",
+    data,
+  });
 }
+
 it("compares the same part of the current month and excludes later purchases", () => {
   const result = comparisonInsights(
     [
@@ -28,10 +37,12 @@ it("compares the same part of the current month and excludes later purchases", (
     false,
     "2026-09-17",
   );
+
   expect(result.current.products).toBe(1000);
   expect(result.previous.products).toBe(500);
   expect(result.changes[0].difference).toBe(500);
 });
+
 it("handles year boundaries, leap days and completed months", () => {
   expect(
     comparisonInsights([], "2026-01", false, "2026-01-17").previousEnd,
@@ -39,15 +50,18 @@ it("handles year boundaries, leap days and completed months", () => {
   expect(
     comparisonInsights([], "2024-03", false, "2024-03-31").previousEnd,
   ).toBe("2024-02-29");
+
   const result = comparisonInsights(
     [receipt("2026-08-31")],
     "2026-08",
     false,
     "2026-09-17",
   );
+
   expect(result.current.products).toBe(1000);
   expect(result.partial).toBe(false);
 });
+
 function contribution(
   date: string,
   ore: number,
@@ -64,32 +78,36 @@ function contribution(
     amountOre: ore,
   };
 }
+
 it("calculates purchase totals and median amounts in øre", () => {
   const result = productPrices([
     contribution("2026-09-03", 6000, null),
     contribution("2026-09-02", 3000, 500),
     contribution("2026-09-01", 2000, 500),
   ]);
+
   expect(result.latest).toBe(6000);
   expect(result.typical).toBe(3000);
   expect(result.lowest).toBe(2000);
   expect(result.omitted).toBe(0);
 });
+
 it("does not graph returns", () => {
   const result = productPrices([
     contribution("2026-09-01", 2000, null),
     contribution("2026-09-02", -1000, null),
   ]);
+
   expect(result.latest).toBe(2000);
   expect(result.omitted).toBe(1);
 });
+
 it("distinguishes automatic links from user confirmation and excludes duplicate coverage", () => {
   const line = {
     ...emptyLine(),
-    productId: "product" as NonNullable<
-      ReturnType<typeof emptyLine>["productId"]
-    >,
+    productId: testId<"products">("product"),
   };
+
   expect(matchLabel(line)).toBe("Automatisk koblet");
   expect(matchLabel({ ...line, productMatchManual: true })).toBe(
     "Bekreftet av deg",
@@ -104,21 +122,26 @@ it("aggregates calendar dates with discounts, excludes pant, and applies receipt
   const data = batteryFixture();
   data.purchaseDate = "2026-09-07";
   const purchase = { ...receipt("2026-09-07"), data };
-  const second = {
+
+  const second = receiptFixture({
     ...receipt("2026-09-07", 1000),
     status: "needs_review",
-  } as Receipt;
+  });
+
   const excluded = { ...receipt("2026-09-07", 9000), excluded: true };
+
   const foreign = {
     ...receipt("2026-09-07"),
     data: { ...data, currency: "EUR" },
   };
+
   const calendar = spendingCalendar(
     [purchase, second, excluded, foreign, receipt("2026-10-01")],
     2026,
     false,
     "2026-09-17",
   );
+
   const day = calendar.find((d) => d.date === "2026-09-07")!;
   expect(day.amountOre).toBe(3331);
   expect(day.contributions).toHaveLength(2);
@@ -131,6 +154,7 @@ it("aggregates calendar dates with discounts, excludes pant, and applies receipt
     )?.amountOre,
   ).toBe(2331);
 });
+
 it("keeps leap days, empty dates and negative totals without colouring refunds as spending", () => {
   const calendar = spendingCalendar(
     [receipt("2024-02-29", -1000)],
@@ -138,6 +162,7 @@ it("keeps leap days, empty dates and negative totals without colouring refunds a
     false,
     "2025-01-01",
   );
+
   expect(calendar).toHaveLength(366);
   expect(calendar.find((d) => d.date === "2024-02-29")).toMatchObject({
     amountOre: -1000,
@@ -149,6 +174,7 @@ it("keeps leap days, empty dates and negative totals without colouring refunds a
     contributions: [],
   });
 });
+
 it("uses stronger calendar colours for larger daily amounts", () => {
   const days = spendingCalendar(
     [
@@ -161,5 +187,6 @@ it("uses stronger calendar colours for larger daily amounts", () => {
     false,
     "2026-09-17",
   );
+
   expect(days.slice(0, 4).map((day) => day.level)).toEqual([1, 1, 2, 4]);
 });

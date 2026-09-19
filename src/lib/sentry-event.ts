@@ -1,4 +1,11 @@
+import { z } from "zod";
 import type { Breadcrumb, ErrorEvent, StackFrame } from "@sentry/react-native";
+
+const httpBreadcrumbSchema = z.object({
+  url: z.string().optional().catch(undefined),
+  method: z.string().optional().catch(undefined),
+  status_code: z.number().optional().catch(undefined),
+});
 
 /** Keep the failure explanation, but remove credentials, URL parameters and payload dumps. */
 export function diagnosticText(value: string) {
@@ -6,6 +13,7 @@ export function diagnosticText(value: string) {
     .replace(/https?:\/\/[^\s<>"')]+/gi, (url) => {
       try {
         const parsed = new URL(url);
+
         return `${parsed.origin}${parsed.pathname}`;
       } catch {
         return "[invalid URL]";
@@ -33,23 +41,20 @@ export function diagnosticBreadcrumb(
   breadcrumb: Breadcrumb,
 ): Breadcrumb | null {
   if (breadcrumb.category === "kvitto") return breadcrumb;
+
   if (!["http", "fetch", "xhr"].includes(breadcrumb.category ?? ""))
     return null;
   const data = breadcrumb.data ?? {};
+  const safeData = httpBreadcrumbSchema.parse(data);
+
+  if (safeData.url) safeData.url = diagnosticText(safeData.url);
+
   return {
     timestamp: breadcrumb.timestamp,
     category: "http",
     type: "http",
     level: breadcrumb.level,
-    data: {
-      ...(typeof data.url === "string"
-        ? { url: diagnosticText(data.url) }
-        : {}),
-      ...(typeof data.method === "string" ? { method: data.method } : {}),
-      ...(typeof data.status_code === "number"
-        ? { status_code: data.status_code }
-        : {}),
-    },
+    data: safeData,
   };
 }
 
@@ -59,8 +64,10 @@ export function prepareErrorEvent(
   captureFrames: StackFrame[] = [],
 ) {
   const primary = event.exception?.values?.[0];
+
   if (primary) {
     const originalStack = !!primary.stacktrace?.frames?.length;
+
     if (!originalStack && captureFrames.length)
       primary.stacktrace = { frames: captureFrames };
     event.contexts = {
@@ -74,19 +81,24 @@ export function prepareErrorEvent(
       },
     };
   }
+
   for (const exception of event.exception?.values ?? []) {
     if (exception.value) exception.value = diagnosticText(exception.value);
   }
+
   event.breadcrumbs = event.breadcrumbs
     ?.map(diagnosticBreadcrumb)
     .filter((breadcrumb): breadcrumb is Breadcrumb => breadcrumb !== null);
+
   // Unhandled non-Error rejections can otherwise serialize an entire response or request.
   if (event.extra) delete event.extra.__serialized__;
+
   if (event.request) {
     event.request = {
       method: event.request.method,
       url: event.request.url ? diagnosticText(event.request.url) : undefined,
     };
   }
+
   return event;
 }

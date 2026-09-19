@@ -21,6 +21,7 @@ export function Copy({
   weight?: "400" | "500" | "600" | "700" | "800";
 }) {
   const colors = useTheme();
+
   return (
     <Text
       {...props}
@@ -55,6 +56,7 @@ export function Icon({
   weight?: SymbolViewProps["weight"];
 }) {
   const colors = useTheme();
+
   return (
     <SymbolView
       name={name}

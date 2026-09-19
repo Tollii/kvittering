@@ -17,6 +17,7 @@ const client: ClientRelease = {
   updateId: null,
   runtimeVersion: null,
 };
+
 describe("release compatibility", () => {
   it("compares numeric components, with app version preceding build number", () => {
     expect(
@@ -45,6 +46,7 @@ describe("release compatibility", () => {
       ...defaultPolicy("ios", "development"),
       minimumApiVersion: 2,
     };
+
     expect(
       updateRequirement(policy, { ...client, channel: "development" }),
     ).toBe("required");
@@ -55,6 +57,7 @@ describe("release compatibility", () => {
       minimumApiVersion: 2,
       revision: 5,
     };
+
     expect(
       updateRequirement(
         parsePolicy(JSON.parse(JSON.stringify(policy))),
@@ -77,16 +80,16 @@ describe("release compatibility", () => {
         features: { ...policy.features, futureFlag: true },
       }),
     ).toEqual(policy);
-    expect(() => parsePolicy({ ...policy, schemaVersion: 2 })).toThrow();
+    expect(() => parsePolicy({ ...policy, schemaVersion: 2 })).toThrow(Error);
     expect(() =>
       validateSettings({ ...policy, minimumApiVersion: NaN }),
-    ).toThrow();
+    ).toThrow(Error);
     expect(() =>
       validateSettings({
         ...policy,
         minimum: { version: "1.0.0", build: "11" },
       }),
-    ).toThrow();
+    ).toThrow(Error);
     expect(
       updateRequirement(policy, { ...client, channel: "production" }),
     ).toBe("required");

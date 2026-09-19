@@ -21,6 +21,7 @@ export function Panel({
   tone?: "surface" | "primary" | "soft" | "plain";
 }) {
   const colors = useTheme();
+
   return (
     <View
       style={[
@@ -64,6 +65,7 @@ export function SectionTitle({
   onAction?: () => void;
 }) {
   const colors = useTheme();
+
   return (
     <View style={[styles.row, { paddingTop: 10, paddingBottom: 2 }]}>
       <View style={{ flex: 1, gap: 1 }}>
@@ -108,6 +110,7 @@ export function Disclosure({
 }) {
   const [open, setOpen] = useState(initiallyOpen);
   const colors = useTheme();
+
   return (
     <Panel style={{ gap: open ? 10 : 0 }}>
       <Pressable
@@ -151,6 +154,7 @@ export function Notice({
 }) {
   const colors = useTheme();
   const kind = tone ?? (error ? "error" : "info");
+
   const palette = {
     info: {
       background: colors.primarySoft,
@@ -177,6 +181,7 @@ export function Notice({
       icon: "checkmark.circle" as const,
     },
   }[kind];
+
   return (
     <View
       style={{
@@ -225,6 +230,7 @@ export function Empty({
   children?: ReactNode;
 }) {
   const colors = useTheme();
+
   return (
     <Panel style={{ paddingVertical: 32, alignItems: "center", gap: 8 }}>
       <View
@@ -269,6 +275,7 @@ export function Row({
   selected?: boolean;
 }) {
   const colors = useTheme();
+
   return (
     <Pressable
       accessibilityRole={onPress ? "button" : undefined}

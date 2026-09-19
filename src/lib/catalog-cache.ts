@@ -1,10 +1,13 @@
+import { catalogCacheSchema } from "./catalog-cache-schema";
 import { openDatabaseSync } from "expo-sqlite";
 import { storageSuffix } from "./deployment-storage";
 import type {
   PersistedClient,
   Persister,
 } from "@tanstack/react-query-persist-client";
+
 let database: ReturnType<typeof openDatabaseSync> | undefined;
+
 function storage() {
   if (!database) {
     database = openDatabaseSync(`catalog-cache${storageSuffix}.db`);
@@ -12,8 +15,10 @@ function storage() {
       "CREATE TABLE IF NOT EXISTS query_cache (scope TEXT PRIMARY KEY, data TEXT NOT NULL)",
     );
   }
+
   return database;
 }
+
 export function catalogPersister(scope: string): Persister {
   return {
     persistClient: (client: PersistedClient) => {
@@ -33,7 +38,8 @@ export function catalogPersister(scope: string): Persister {
           "SELECT data FROM query_cache WHERE scope = ?",
           scope,
         );
-        return row ? (JSON.parse(row.data) as PersistedClient) : undefined;
+
+        return row ? catalogCacheSchema.parse(JSON.parse(row.data)) : undefined;
       } catch {
         return undefined;
       }

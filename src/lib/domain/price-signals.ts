@@ -26,19 +26,23 @@ export type PriceSignal = {
 
 /** Enough history to call a price unusual, and how far off it must be. */
 export const priceSignalMinimumObservations = 3;
+
 export const priceSignalThreshold = 0.15;
 
 /** Linked identity only: the same catalog product or the same saved product. */
 function identity(line: ReceiptLine) {
   const reference = productReference(line);
+
   if (reference.kind === "catalog" && reference.product.equivalence)
     return null;
+
   return productIdentityKey(line);
 }
 
 function median(values: number[]) {
   const sorted = [...values].sort((a, b) => a - b);
   const middle = Math.floor(sorted.length / 2);
+
   return sorted.length % 2
     ? sorted[middle]
     : Math.round((sorted[middle - 1] + sorted[middle]) / 2);
@@ -51,10 +55,13 @@ type Observation = {
   quantity: number;
   ore: number;
 };
+
 const bases = ["packages", "units", "grams", "millilitres"] as const;
+
 function observations(purchases: PreparedPurchase[]) {
   return purchases.flatMap((purchase) => {
     const key = identity(purchase.line);
+
     if (
       !key ||
       purchase.amountOre <= 0 ||
@@ -62,8 +69,10 @@ function observations(purchases: PreparedPurchase[]) {
       !purchase.analysis
     )
       return [];
+
     return bases.flatMap((basis) => {
       const quantity = purchase.analysis!.quantity[basis];
+
       return quantity !== null && Number.isFinite(quantity) && quantity > 0
         ? [
             {
@@ -78,21 +87,26 @@ function observations(purchases: PreparedPurchase[]) {
     });
   });
 }
+
 function priceHistory(purchases: PreparedPurchase[]) {
   const history = new Map<string, Observation[]>();
+
   for (const observation of observations(purchases)) {
     const key = `${observation.key}:${observation.basis}`;
     const values = history.get(key) ?? [];
     values.push(observation);
     history.set(key, values);
   }
+
   return history;
 }
+
 function comparePrices(
   history: Map<string, Observation[]>,
   purchases: PreparedPurchase[],
 ) {
   const result = new Map<string, PriceSignal>();
+
   for (const observation of observations(purchases)) {
     const {
       purchase: { receipt, line },
@@ -101,14 +115,19 @@ function comparePrices(
       quantity,
       ore,
     } = observation;
+
     if (result.has(line.id)) continue;
+
     const others = (history.get(`${key}:${basis}`) ?? []).filter(
       (item) => item.purchase.receipt._id !== receipt._id,
     );
+
     if (others.length < priceSignalMinimumObservations) continue;
     const typicalOre = median(others.map((item) => item.ore));
+
     if (typicalOre <= 0) continue;
     const ratio = ore / typicalOre;
+
     if (Math.abs(ratio - 1) < priceSignalThreshold) continue;
     result.set(line.id, {
       key,
@@ -123,6 +142,7 @@ function comparePrices(
       line,
     });
   }
+
   return result;
 }
 
@@ -136,6 +156,7 @@ export function priceSignals(
       (item) => item.purchases,
     ),
   );
+
   return comparePrices(
     history,
     preparePurchases([receipt], comparisonPurchasePolicy).flatMap(
@@ -148,6 +169,7 @@ export function priceSignals(
 export function monthPriceSignals(receipts: Receipt[], month: string) {
   const prepared = preparePurchases(receipts, comparisonPurchasePolicy);
   const history = priceHistory(prepared.flatMap((item) => item.purchases));
+
   return prepared
     .filter((item) => receiptMonth(item.receipt) === month)
     .flatMap((item) => [...comparePrices(history, item.purchases).values()])
@@ -160,6 +182,7 @@ export function monthPriceSignals(receipts: Receipt[], month: string) {
 
 export function priceSignalLabel(signal: PriceSignal) {
   const percent = Math.round(Math.abs(signal.ratio - 1) * 100);
+
   return signal.ratio > 1
     ? `+${percent} % vs vanlig`
     : `−${percent} % vs vanlig`;

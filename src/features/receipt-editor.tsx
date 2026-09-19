@@ -73,16 +73,20 @@ export function ReceiptEditor({
 }) {
   const client = useConvex();
   const colors = useTheme();
+
   const history = useCompleteReceipts({
     kind: "priceHistory",
     receiptId: receipt._id,
   });
+
   const context = useQuery(api.receipts.editorContext, { id: receipt._id });
+
   const [draft, dispatch] = useReducer(
     reduceReceiptDraft,
     receipt,
     createReceiptDraft,
   );
+
   const {
     data,
     duplicateResolved,
@@ -91,18 +95,23 @@ export function ReceiptEditor({
     productChanges,
     physicalStoreId,
   } = draft.values;
+
   const { moneyErrors, dirty, generation } = draft;
   const revision = draft.baseline.revision;
+
   const busy = ["saving", "awaiting-snapshot", "working", "deleting"].includes(
     draft.operation.kind,
   );
+
   const approved = draft.operation.kind === "saved" && draft.operation.approved;
   const error = draft.operation.kind === "failed" ? draft.operation.error : "";
   const [message, setMessage] = useState("");
   const operationActive = useRef(false);
+
   if (draft.remote !== receipt) dispatch({ type: "remote", receipt });
   const [allLinesSelected, setAllLines] = useState(false);
   const allLines = receipt.status === "reviewed" || allLinesSelected;
+
   const [reviewLineIds, setReviewLineIds] = useState(
     () =>
       new Set(
@@ -111,6 +120,7 @@ export function ReceiptEditor({
           .map((line) => line.id),
       ),
   );
+
   const [summaryLines, setSummaryLines] = useState(false);
   const [fields, setFields] = useState(false);
   const [actions, setActions] = useState(false);
@@ -125,29 +135,39 @@ export function ReceiptEditor({
       },
     ]);
   });
+
   const processing = ["processing", "uploaded", "uploading"].includes(
     receipt.status,
   );
+
   const totals = data ? reconcile(data) : null;
   const unresolvedDuplicate = !!receipt.duplicateOf && !duplicateResolved;
   const tasks = data ? reviewTasks(data, unresolvedDuplicate) : [];
+
   const remaining =
     data?.lines.filter((line) => lineReviewIssues(line).length).length ?? 0;
+
   const confirmable =
     data?.lines.filter(canConfirmSuggestedCategory).length ?? 0;
+
   const ready = !!data && canAcceptReceipt(data, unresolvedDuplicate);
+
   const saveDisabled =
     !online ||
     processing ||
     receipt.revision !== revision ||
     !!Object.keys(moneyErrors).length;
+
   const signals = priceSignals(
     history.completeReceipts ? history.receipts : [],
     receipt,
   );
+
   const recentCategories = context?.recentCategories ?? [];
+
   const productLines =
     data?.lines.filter((line) => !["summary", "vat"].includes(line.kind)) ?? [];
+
   const visibleLines =
     data?.lines.filter((line) =>
       allLines
@@ -156,6 +176,7 @@ export function ReceiptEditor({
           lineReviewIssues(line).length
         : reviewLineIds.has(line.id) || lineReviewIssues(line).length,
     ) ?? [];
+
   const nextPending = context?.nextPendingId
     ? { _id: context.nextPendingId }
     : undefined;
@@ -164,10 +185,12 @@ export function ReceiptEditor({
     dispatch({ type: "data", data: next });
     setMessage("");
   }
+
   function rememberLines(ids: string[], value = true) {
     dispatch({ type: "remember", ids, value });
     setMessage("");
   }
+
   function reset(current: Receipt) {
     dispatch({ type: "remote", receipt: current });
     dispatch({ type: "discard" });
@@ -181,8 +204,10 @@ export function ReceiptEditor({
     setAllLines(current.status === "reviewed");
     setMessage("");
   }
+
   const moneyError = (key: string, error: string | null) =>
     dispatch({ type: "money-error", key, error });
+
   async function run(
     action: () => Promise<void>,
     operation: "saving" | "deleting" | "working" = "working",
@@ -191,6 +216,7 @@ export function ReceiptEditor({
     operationActive.current = true;
     dispatch({ type: "start", operation });
     setMessage("");
+
     try {
       await action();
     } catch (cause) {
@@ -204,6 +230,7 @@ export function ReceiptEditor({
       dispatch({ type: "finished" });
     }
   }
+
   async function save() {
     if (!data || saveDisabled) return;
     await run(async () => {
@@ -215,6 +242,7 @@ export function ReceiptEditor({
         // The server needs a store and a name to build a memory key.
         rememberLineIds: remember.filter((id) => {
           const line = data.lines.find((item) => item.id === id);
+
           return (
             line &&
             line.kind === "product" &&
@@ -232,11 +260,13 @@ export function ReceiptEditor({
         duplicateResolved,
         excluded,
       });
+
       dispatch({
         type: "saved",
         revision: acknowledgement.revision,
         approved: ready,
       });
+
       if (ready) successFeedback();
     }, "saving");
   }
@@ -246,6 +276,7 @@ export function ReceiptEditor({
     change({ ...data, lines: [emptyLine(randomUUID()), ...data.lines] });
     setAllLines(true);
   }
+
   function removeReceipt() {
     Alert.alert(
       "Slett kvitteringen?",
@@ -258,6 +289,7 @@ export function ReceiptEditor({
           onPress: () =>
             void run(async () => {
               onDeletionChange("deleting");
+
               try {
                 await releaseMutation(client, api.receipts.remove, {
                   id: receipt._id,
@@ -274,20 +306,25 @@ export function ReceiptEditor({
       ],
     );
   }
+
   const retry = () =>
     void run(async () => {
       await releaseMutation(client, api.receipts.retry, { id: receipt._id });
       setMessage("Leser på nytt …");
     });
+
   function confirmAllCategories() {
     if (!data) return;
     tapFeedback();
+
     const ids = data.lines
       .filter(canConfirmSuggestedCategory)
       .map((line) => line.id);
+
     change(confirmSuggestedCategories(data));
     rememberLines(ids);
   }
+
   /** One compact chip per open question. Tapping it jumps straight to the fix. */
   function taskChip(task: ReviewTask) {
     const chip = (
@@ -304,7 +341,9 @@ export function ReceiptEditor({
         onPress={onPress}
       />
     );
+
     const toLines = () => setAllLines(false);
+
     switch (task.kind) {
       case "duplicate":
         return chip("Mulig duplikat", "doc.on.doc", () =>
@@ -400,6 +439,7 @@ export function ReceiptEditor({
         );
     }
   }
+
   const footerLabel = processing
     ? receiptStatusLabel(receipt)
     : approved
@@ -413,24 +453,23 @@ export function ReceiptEditor({
         : tasks.length === 1
           ? "Én ting igjen"
           : `${tasks.length} ting igjen`;
+
+  const screenOptions: React.ComponentProps<typeof Stack.Screen>["options"] = {
+    title: data?.store || receipt.data?.store || "Kvittering",
+  };
+
+  if (Platform.OS !== "ios")
+    screenOptions.headerRight = () => (
+      <IconButton
+        name="ellipsis"
+        label="Flere handlinger"
+        onPress={() => setActions(true)}
+      />
+    );
+
   return (
     <>
-      <Stack.Screen
-        options={{
-          title: data?.store || receipt.data?.store || "Kvittering",
-          ...(Platform.OS !== "ios"
-            ? {
-                headerRight: () => (
-                  <IconButton
-                    name="ellipsis"
-                    label="Flere handlinger"
-                    onPress={() => setActions(true)}
-                  />
-                ),
-              }
-            : {}),
-        }}
-      />
+      <Stack.Screen options={screenOptions} />
       <ReceiptToolbar>
         <Stack.Toolbar.Menu icon="ellipsis" title="Flere handlinger">
           <Stack.Toolbar.MenuAction
@@ -691,13 +730,9 @@ export function ReceiptEditor({
                 { label: "Andre justeringer", amount: totals.adjustments },
                 { label: "Sum av linjene", amount: totals.calculated },
                 { label: "Betalt", amount: data.totalOre },
-              ]
-                .filter(
-                  (row) =>
-                    row.amount !== 0 ||
-                    ["Sum av linjene", "Betalt"].includes(row.label),
-                )
-                .map((row) => (
+              ].map((row) =>
+                row.amount !== 0 ||
+                ["Sum av linjene", "Betalt"].includes(row.label) ? (
                   <View
                     key={row.label}
                     style={{
@@ -717,7 +752,8 @@ export function ReceiptEditor({
                       {formatMoney(row.amount)}
                     </Copy>
                   </View>
-                ))}
+                ) : null,
+              )}
             </Panel>
             {receipt.status !== "reviewed" && productLines.length > 0 && (
               <Segments
@@ -790,11 +826,13 @@ export function ReceiptEditor({
                         item.id === line.id ? next : item,
                       ),
                     });
+
                     const categoryDecided =
                       next.kind === "product" &&
                       (next.categoryId !== line.categoryId ||
                         (line.issues.some(isCategoryUncertain) &&
                           !next.issues.some(isCategoryUncertain)));
+
                     if (categoryDecided) rememberLines([line.id]);
                   }}
                   onRemember={(value) => rememberLines([line.id], value)}
@@ -963,6 +1001,7 @@ function ReceiptFooter({
   onSave: () => void;
 }) {
   const colors = useTheme();
+
   return (
     <>
       {!!error && (

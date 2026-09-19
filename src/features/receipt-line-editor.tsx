@@ -47,14 +47,17 @@ export const lineLabels: Record<ReceiptLine["kind"], string> = {
   summary: "Oppsummering (telles ikke)",
   vat: "MVA (telles ikke)",
 };
+
 type SelectionChoice<T> = T extends { lineId: string }
   ? Omit<T, "lineId">
   : never;
+
 export type ProductChoice =
   | Exclude<SelectionChoice<ProductSelection>, { kind: "catalog" }>
   | (SelectionChoice<Extract<ProductSelection, { kind: "catalog" }>> & {
       product: CatalogProduct;
     });
+
 type Props = {
   line: ReceiptLine;
   lines: ReceiptLine[];
@@ -73,6 +76,7 @@ type Props = {
   onRemove: () => void;
   onMoneyError: (error: string | null) => void;
 };
+
 export function ReceiptLineEditor({
   line,
   lines,
@@ -93,16 +97,20 @@ export function ReceiptLineEditor({
   const issues = lineReviewIssues(line);
   const categoryUncertain = line.issues.some(isCategoryUncertain);
   const otherIssues = issues.filter((issue) => !isCategoryUncertain(issue));
+
   const missingAmount =
     line.amountOre === null && !["summary", "vat"].includes(line.kind);
+
   const missingName = line.kind === "product" && !line.name.trim();
   const [expanded, setExpanded] = useState(false);
   const [categoryOpen, setCategoryOpen] = useState(false);
   const [productOpen, setProductOpen] = useState(false);
   const [details, setDetails] = useState(false);
+
   const [catalogScreen, setCatalogScreen] = useState<
     "search" | "details" | null
   >(null);
+
   const catalogProduct =
     productChoice?.kind === "catalog"
       ? productChoice.product
@@ -111,17 +119,21 @@ export function ReceiptLineEditor({
           productChoice?.kind === "household"
         ? null
         : line.catalogProduct;
+
   const patch = (value: Partial<ReceiptLine>) =>
     onChange({ ...line, ...value, manual: true });
+
   const category = categoryById.get(line.categoryId ?? "");
   const categoryLabel = category?.name ?? "Velg kategori";
   const showEditor = expanded || (review && (missingAmount || missingName));
+
   const kindLabel =
     line.kind === "product" ||
     lineLabels[line.kind].toLocaleLowerCase("nb-NO") ===
       line.name.trim().toLocaleLowerCase("nb-NO")
       ? null
       : lineLabels[line.kind];
+
   return (
     <View
       style={{
@@ -191,13 +203,13 @@ export function ReceiptLineEditor({
             <>
               <Chip
                 label={
-                  typeof line.confidence === "number" && line.confidence < 1
+                  line.confidence != null && line.confidence < 1
                     ? `${categoryLabel} · ${Math.round(line.confidence * 100)} %`
                     : categoryLabel
                 }
                 icon="tag"
                 tone="warning"
-                accessibilityLabel={`Forslag: ${categoryLabel}${typeof line.confidence === "number" ? `, ${Math.round(line.confidence * 100)} prosent sikker` : ""}. Trykk for å velge en annen kategori`}
+                accessibilityLabel={`Forslag: ${categoryLabel}${line.confidence != null ? `, ${Math.round(line.confidence * 100)} prosent sikker` : ""}. Trykk for å velge en annen kategori`}
                 onPress={() => setCategoryOpen(true)}
               />
               <Pressable
@@ -454,7 +466,7 @@ export function ReceiptLineEditor({
               }))}
               onChange={(kind) =>
                 patch({
-                  kind: kind as ReceiptLine["kind"],
+                  kind,
                   categoryId: kind === "product" ? "fallback.unclear" : null,
                   issues: line.issues.filter(
                     (issue) => !isCategoryUncertain(issue),
@@ -520,6 +532,7 @@ export function ReceiptLineEditor({
     </View>
   );
 }
+
 function ProductSelector({
   receiptId,
   retailer,
@@ -535,11 +548,13 @@ function ProductSelector({
 }) {
   const [search, setSearch] = useState("");
   const term = useDebouncedSearch(productSearch(search));
+
   const products = useQuery(api.products.search, {
     receiptId,
     retailer,
     search: term,
   });
+
   return (
     <Panel tone="plain">
       <Field

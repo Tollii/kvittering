@@ -1,21 +1,22 @@
 import { query, type QueryCtx } from "./_generated/server";
 import { requireCompatibleClient } from "./releasePolicy";
 import { clientValidator } from "../src/lib/releases/policy";
-import { normalizeRequest, requestKey } from "../src/lib/catalog/policy";
+import {
+  normalizeRequest,
+  requestKey,
+  catalogDetailsTtl,
+} from "../src/lib/catalog/policy";
 import {
   catalogLookupValidator,
   type CatalogLookup,
+  catalogResponseValidator,
+  emptyCatalogResult,
+  type CatalogResponse,
 } from "../src/lib/catalog/model";
 import { clientMutation as mutation } from "./clientFunctions";
 import { v } from "convex/values";
 import { requireMember, requireReceipt } from "./access";
 import { ensureRequest } from "./catalogQueue";
-import {
-  catalogResponseValidator,
-  emptyCatalogResult,
-  type CatalogResponse,
-} from "../src/lib/catalog/model";
-import { catalogDetailsTtl } from "../src/lib/catalog/policy";
 import type { Doc } from "./_generated/dataModel";
 import { retailerCode } from "../src/lib/catalog/matching";
 
@@ -59,23 +60,27 @@ export function requestResponse(
     message: request.error,
   };
 }
+
 export const searchProducts = mutation({
   service: "productLookup",
   args: { search: v.string() },
   returns: catalogResponseValidator,
   handler: async (ctx, args) => {
     await requireMember(ctx);
+
     return requestResponse(
       await ensureRequest(ctx, { kind: "products", search: args.search }),
     );
   },
 });
+
 export const searchStores = mutation({
   service: "productLookup",
   args: { receiptId: v.id("receipts"), search: v.string() },
   returns: catalogResponseValidator,
   handler: async (ctx, args) => {
     const { receipt } = await requireReceipt(ctx, args.receiptId);
+
     return requestResponse(
       await ensureRequest(ctx, {
         kind: "stores",
@@ -85,24 +90,30 @@ export const searchStores = mutation({
     );
   },
 });
+
 export const prices = mutation({
   service: "productLookup",
   args: { productKey: v.string() },
   returns: catalogResponseValidator,
   handler: async (ctx, args) => {
     await requireMember(ctx);
+
     const record = await ctx.db
       .query("catalogProducts")
       .withIndex("by_key", (q) => q.eq("key", args.productKey))
       .unique();
+
     const equivalent = equivalentResponse(record, "prices");
+
     if (equivalent) return equivalent;
+
     if (!record)
       return {
         ...emptyCatalogResult(),
         status: "error" as const,
         message: "Produktet finnes ikke i den lagrede katalogen.",
       };
+
     return requestResponse(
       await ensureRequest(ctx, {
         kind: "prices",
@@ -113,24 +124,30 @@ export const prices = mutation({
     );
   },
 });
+
 export const product = mutation({
   service: "productLookup",
   args: { key: v.string() },
   returns: catalogResponseValidator,
   handler: async (ctx, { key }) => {
     await requireMember(ctx);
+
     const record = await ctx.db
       .query("catalogProducts")
       .withIndex("by_key", (q) => q.eq("key", key))
       .unique();
+
     const equivalent = equivalentResponse(record, "details");
+
     if (equivalent) return equivalent;
+
     if (!record)
       return {
         ...emptyCatalogResult(),
         status: "error" as const,
         message: "Produktet finnes ikke i den lagrede katalogen.",
       };
+
     if (
       record.detailsFetchedAt !== undefined &&
       record.detailsFetchedAt + catalogDetailsTtl > Date.now()
@@ -141,6 +158,7 @@ export const product = mutation({
         status: "ready" as const,
         fetchedAt: record.detailsFetchedAt,
       };
+
     const response = requestResponse(
       await ensureRequest(ctx, {
         kind: "details",
@@ -148,6 +166,7 @@ export const product = mutation({
         id: record.product.ids[0],
       }),
     );
+
     return {
       ...response,
       products: response.products.length ? response.products : [record.product],
@@ -158,6 +177,7 @@ export const product = mutation({
 async function lookupContext(ctx: QueryCtx, lookup: CatalogLookup) {
   if (lookup.kind === "stores") {
     const { receipt } = await requireReceipt(ctx, lookup.receiptId);
+
     return {
       request: {
         kind: "stores" as const,
@@ -167,7 +187,9 @@ async function lookupContext(ctx: QueryCtx, lookup: CatalogLookup) {
       record: null,
     };
   }
+
   await requireMember(ctx);
+
   if (lookup.kind === "products")
     return {
       request: normalizeRequest({
@@ -176,29 +198,32 @@ async function lookupContext(ctx: QueryCtx, lookup: CatalogLookup) {
       }),
       record: null,
     };
+
   const record = await ctx.db
     .query("catalogProducts")
     .withIndex("by_key", (q) => q.eq("key", lookup.productKey))
     .unique();
+
   return {
     request:
       record && !record.product.equivalence
-        ? {
-            ...lookup,
-            id: record.product.ids[0],
-            ...(lookup.kind === "prices" ? { ean: record.product.ean } : {}),
-          }
+        ? lookup.kind === "prices"
+          ? { ...lookup, id: record.product.ids[0], ean: record.product.ean }
+          : { ...lookup, id: record.product.ids[0] }
         : null,
     record,
   };
 }
+
 export const ensure = mutation({
   service: "productLookup",
   args: { lookup: catalogLookupValidator },
   returns: v.null(),
   handler: async (ctx, { lookup }) => {
     const { request, record } = await lookupContext(ctx, lookup);
+
     if (!request) return null;
+
     if (
       lookup.kind === "details" &&
       record?.detailsFetchedAt !== undefined &&
@@ -206,9 +231,11 @@ export const ensure = mutation({
     )
       return null;
     await ensureRequest(ctx, request);
+
     return null;
   },
 });
+
 export const observe = query({
   args: { lookup: catalogLookupValidator, client: clientValidator.optional() },
   returns: catalogResponseValidator,
@@ -216,13 +243,16 @@ export const observe = query({
     await requireCompatibleClient(ctx, client, "productLookup");
     const { request, record } = await lookupContext(ctx, lookup);
     const equivalent = equivalentResponse(record, lookup.kind);
+
     if (equivalent) return equivalent;
+
     if (!request)
       return {
         ...emptyCatalogResult(),
         status: "error" as const,
         message: "Produktet finnes ikke i den lagrede katalogen.",
       };
+
     if (
       lookup.kind === "details" &&
       record?.detailsFetchedAt !== undefined &&
@@ -234,10 +264,12 @@ export const observe = query({
         status: "ready" as const,
         fetchedAt: record.detailsFetchedAt,
       };
+
     let row = await ctx.db
       .query("catalogRequests")
       .withIndex("by_key", (q) => q.eq("key", requestKey(request)))
       .unique();
+
     // An installed client may still be observing a search started before deployment.
     if (!row && request.kind === "products")
       row = await ctx.db
@@ -253,6 +285,7 @@ export const observe = query({
           ),
         )
         .unique();
+
     const response: CatalogResponse = row
       ? requestResponse(row)
       : {
@@ -260,6 +293,7 @@ export const observe = query({
           status: "error",
           message: "Søket er ikke startet. Prøv igjen.",
         };
+
     return lookup.kind === "details" && record && !response.products.length
       ? { ...response, products: [record.product] }
       : response;

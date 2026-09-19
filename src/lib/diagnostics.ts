@@ -1,3 +1,5 @@
+import { z } from "zod";
+
 /** Diagnostic fields contain identifiers and measurements, never receipt contents. */
 export type DiagnosticFields = {
   receiptId?: string;
@@ -18,31 +20,39 @@ export type DiagnosticFields = {
   development?: boolean;
 };
 
+const errorCodeSchema = z
+  .string()
+  .regex(/^[A-Z][A-Z0-9_]{0,59}$/)
+  .optional()
+  .catch(undefined);
+
+const errorMetadataSchema = z.object({
+  name: z
+    .string()
+    .regex(/^[A-Za-z][A-Za-z0-9_]{0,60}$/)
+    .catch("Error"),
+  status: z.number().optional().catch(undefined),
+  code: errorCodeSchema,
+  data: z.object({ code: errorCodeSchema }).optional().catch(undefined),
+});
+
+type ErrorDetails = {
+  errorType: string;
+  expected: boolean;
+  status?: number;
+  code?: string;
+  requestId?: string;
+};
+
 /** Inspect only known error metadata. Provider messages can contain input data. */
-export function errorDetails(error: unknown) {
-  const value = error && typeof error === "object" ? error : {};
-  const name = "name" in value ? value.name : undefined;
-  const errorType =
-    typeof name === "string" && /^[A-Za-z][A-Za-z0-9_]{0,60}$/.test(name)
-      ? name
-      : "Error";
-  const status =
-    "status" in value && typeof value.status === "number"
-      ? value.status
-      : undefined;
-  const data = "data" in value ? value.data : undefined;
-  const errorCode =
-    data && typeof data === "object" && "code" in data
-      ? data.code
-      : "code" in value
-        ? value.code
-        : undefined;
-  const code =
-    typeof errorCode === "string" && /^[A-Z][A-Z0-9_]{0,59}$/.test(errorCode)
-      ? errorCode
-      : undefined;
-  const message = error instanceof Error ? error.message : "";
+export function errorDetails(cause: unknown): ErrorDetails {
+  const metadata = errorMetadataSchema.safeParse(cause).data;
+  const errorType = metadata?.name ?? "Error";
+  const status = metadata?.status;
+  const code = metadata?.data?.code ?? metadata?.code;
+  const message = cause instanceof Error ? cause.message : "";
   const requestId = message.match(/\[Request ID: ([a-f0-9]{16,64})\]/i)?.[1];
+
   const expected =
     code === "UPDATE_REQUIRED" ||
     code === "SERVICE_PAUSED" ||
@@ -50,11 +60,14 @@ export function errorDetails(error: unknown) {
     errorType === "TimeoutError" ||
     status === 429 ||
     /^(Network request failed|Failed to fetch|Load failed)$/.test(message);
-  return {
-    errorType,
-    ...(status !== undefined ? { status } : {}),
-    ...(code ? { code } : {}),
-    ...(requestId ? { requestId } : {}),
-    expected,
-  };
+
+  const details: ErrorDetails = { errorType, expected };
+
+  if (status !== undefined) details.status = status;
+
+  if (code) details.code = code;
+
+  if (requestId) details.requestId = requestId;
+
+  return details;
 }

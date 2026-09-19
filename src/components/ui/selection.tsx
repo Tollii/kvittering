@@ -3,19 +3,20 @@ import { Field } from "./controls";
 import { Panel, Row } from "./surfaces";
 import { Sheet } from "./layout";
 
-export function Select({
+export function Select<Value extends string>({
   label,
   value,
   options,
   onChange,
 }: {
   label: string;
-  value: string | null;
-  options: { value: string; label: string }[];
-  onChange: (value: string) => void;
+  value: Value | null;
+  options: { value: Value; label: string }[];
+  onChange: (value: Value) => void;
 }) {
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState("");
+
   return (
     <>
       <Row

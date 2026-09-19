@@ -1,0 +1,26 @@
+{
+  "$schema": "./node_modules/oxlint/configuration_schema.json",
+  "plugins": ["typescript", "unicorn", "oxc", "vitest"],
+  "categories": { "correctness": "error" },
+  "jsPlugins": [{ "name": "kvitto", "specifier": "./tools/eslint/index.cjs" }],
+  "rules": {
+    "kvitto/no-undefined-record": "error",
+    "vitest/no-focused-tests": "error",
+    "oxc/no-accumulating-spread": "error"
+  },
+  "ignorePatterns": [
+    "convex/_generated/**",
+    "convex/kassalapp/generated/**",
+    "tools/oxlint/anti-slop/**",
+    ".agents/**",
+    ".codex/**",
+    "node_modules/**",
+    "ios/**",
+    "android/**",
+    ".expo/**",
+    "dist/**",
+    "coverage/**",
+    "sveltemo/**",
+    "plans/**"
+  ]
+}

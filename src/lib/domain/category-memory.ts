@@ -17,6 +17,7 @@ export function categoryMemoryKey(
   name: string,
 ): string | null {
   if (!store?.trim() || !name.trim()) return null;
+
   return JSON.stringify([normalizeAlias(store), normalizeAlias(name)]);
 }
 
@@ -55,12 +56,15 @@ export function applyCategoryMemory(
   )
     return false;
   const issues = line.issues.filter((issue) => !isCategoryUncertain(issue));
+
   const changed =
     line.categoryId !== memory.categoryId ||
     issues.length !== line.issues.length ||
     line.confidence !== 1;
+
   line.categoryId = memory.categoryId;
   line.issues = issues;
   line.confidence = 1;
+
   return changed;
 }

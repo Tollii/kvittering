@@ -6,6 +6,7 @@ export type StoreMapPoint = {
   location: StoreLocation;
   amountOre: number;
 };
+
 export type StoreMapProps = {
   stores: StoreMapPoint[];
   onSelect: (id: string) => void;

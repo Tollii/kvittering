@@ -19,6 +19,7 @@ import { useTheme } from "@/constants/theme";
 
 function Brand({ tagline }: { tagline: string }) {
   const colors = useTheme();
+
   return (
     <View style={{ paddingTop: 20, gap: 14 }}>
       <View style={{ flexDirection: "row", alignItems: "center", gap: 10 }}>
@@ -57,9 +58,11 @@ export function SignIn() {
   const [password, setPassword] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+
   async function submit() {
     setBusy(true);
     setError("");
+
     try {
       const result = register
         ? await authClient.signUp.email({
@@ -68,6 +71,7 @@ export function SignIn() {
             password,
           })
         : await authClient.signIn.email({ email: email.trim(), password });
+
       if (result.error)
         throw new Error(result.error.message ?? "Innlogging mislyktes.");
       setPassword("");
@@ -79,6 +83,7 @@ export function SignIn() {
       setBusy(false);
     }
   }
+
   return (
     <Screen>
       <Brand tagline="Handle. Ta et bilde. Ferdig." />
@@ -140,6 +145,7 @@ export function SignIn() {
     </Screen>
   );
 }
+
 export function HouseholdSetup() {
   const [join, setJoin] = useState(false);
   const [name, setName] = useState("Hjemme");
@@ -148,9 +154,11 @@ export function HouseholdSetup() {
   const [busy, setBusy] = useState(false);
   const create = useReleaseMutation(api.households.create);
   const joinHousehold = useReleaseMutation(api.households.join);
+
   async function submit() {
     setBusy(true);
     setError("");
+
     try {
       if (join) await joinHousehold({ invitation: invitation.trim() });
       else
@@ -166,6 +174,7 @@ export function HouseholdSetup() {
       setBusy(false);
     }
   }
+
   return (
     <Screen title={join ? "Bli med hjem." : "En husstand for to."}>
       <Panel style={{ gap: 12 }}>

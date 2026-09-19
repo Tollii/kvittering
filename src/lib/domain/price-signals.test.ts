@@ -1,3 +1,4 @@
+import { receiptFixture } from "../testing/receipts";
 import {
   productAnalysisVersion,
   purchaseEvidenceKey,
@@ -9,7 +10,6 @@ import {
   priceSignals,
 } from "./price-signals";
 import { weeklyShopFixture } from "./receipt";
-import type { Receipt } from "./insights";
 
 const receipt = (id: string, purchaseDate: string, colaOre: number) => {
   const data = weeklyShopFixture();
@@ -23,7 +23,8 @@ const receipt = (id: string, purchaseDate: string, colaOre: number) => {
     weight: 330,
     weightUnit: "ml",
   };
-  return {
+
+  return receiptFixture({
     _id: id,
     _creationTime: 0,
     excluded: false,
@@ -46,7 +47,7 @@ const receipt = (id: string, purchaseDate: string, colaOre: number) => {
         },
       ],
     },
-  } as unknown as Receipt;
+  });
 };
 
 it("flags a linked product priced well above what the household usually pays", () => {
@@ -55,6 +56,7 @@ it("flags a linked product priced well above what the household usually pays", (
     receipt("b", "2026-07-16", 9490),
     receipt("c", "2026-08-03", 8990),
   ];
+
   const today = receipt("d", "2026-09-12", 12900);
   const signals = priceSignals([...history, today], today);
   const cola = signals.get("cola")!;
@@ -71,11 +73,13 @@ it("flags a linked product priced well above what the household usually pays", (
       .size,
   ).toBe(0);
 });
+
 it("needs three other observations before it speaks", () => {
   const few = [
     receipt("a", "2026-07-02", 9490),
     receipt("b", "2026-07-16", 9490),
   ];
+
   const today = receipt("d", "2026-09-12", 12900);
   expect(priceSignals([...few, today], today).size).toBe(0);
 });
@@ -86,7 +90,9 @@ it("does not report exact-product price changes for equivalent catalog matches",
     receipt("b", "2026-07-16", 9490),
     receipt("c", "2026-08-03", 8990),
   ];
+
   const today = receipt("d", "2026-09-12", 12900);
+
   for (const purchase of [...history, today]) {
     const line = purchase.data!.lines.find((item) => item.id === "cola")!;
     line.catalogProduct = {
@@ -100,14 +106,17 @@ it("does not report exact-product price changes for equivalent catalog matches",
     purchase.productAnalysis!.results[0].evidenceKey =
       purchaseEvidenceKey(line);
   }
+
   expect(priceSignals([...history, today], today).size).toBe(0);
 });
+
 it("lists a month's surprises, largest overspend first", () => {
   const history = [
     receipt("a", "2026-07-02", 9490),
     receipt("b", "2026-07-16", 9490),
     receipt("c", "2026-08-03", 9490),
   ];
+
   const cheap = receipt("cheap", "2026-09-02", 6990);
   const dear = receipt("dear", "2026-09-20", 12900);
   const month = monthPriceSignals([...history, cheap, dear], "2026-09");
@@ -121,6 +130,7 @@ it("omits excluded warning targets", () => {
     receipt("b", "2026-07-02", 9490),
     receipt("c", "2026-07-03", 9490),
   ];
+
   const target = { ...receipt("d", "2026-09-01", 20000), excluded: true };
   expect(monthPriceSignals([...history, target], "2026-09")).toEqual([]);
 });
@@ -131,6 +141,7 @@ it("uses interpreted packages for equivalent raw unit quantities", () => {
     receipt("b", "2026-07-02", 9490),
     receipt("c", "2026-07-03", 9490),
   ];
+
   const target = receipt("d", "2026-09-01", 9490);
   target.data!.lines.find((line) => line.id === "cola")!.quantity = 10;
   target.productAnalysis!.results[0].evidenceKey = purchaseEvidenceKey(
@@ -145,6 +156,7 @@ it("does not invent a denominator for missing or stale analysis", () => {
     receipt("b", "2026-07-02", 9490),
     receipt("c", "2026-07-03", 9490),
   ];
+
   const target = receipt("d", "2026-09-01", 20000);
   target.revision++;
   expect(priceSignals(history, target).size).toBe(0);

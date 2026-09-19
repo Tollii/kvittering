@@ -15,7 +15,9 @@ export const matchingLineValidator = lineValidator.pick(
   "attributes",
   "amountOre",
 );
+
 export type MatchingLine = Infer<typeof matchingLineValidator>;
+
 export const matchingReceiptValidator = v.object({
   receiptId: v.id("receipts"),
   revision: v.number(),
@@ -24,6 +26,7 @@ export const matchingReceiptValidator = v.object({
   date: v.union(v.string(), v.null()),
   lines: v.array(matchingLineValidator),
 });
+
 export type MatchingReceipt = Infer<typeof matchingReceiptValidator>;
 
 export const productLinkUndoValidator = v.object({
@@ -65,6 +68,7 @@ export function matchingLine(line: ReceiptLine): MatchingLine {
     attributes,
     amountOre,
   } = line;
+
   return {
     id,
     name,

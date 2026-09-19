@@ -53,7 +53,9 @@ import { nextImport, type ImportOutcome } from "@/features/capture-import";
 import { useTheme } from "@/constants/theme";
 
 const cameraBackground = "#1B1543";
+
 const onCamera = "#F1EDFB";
+
 const onCameraMuted = "#C9C0EA";
 
 export default function Capture() {
@@ -63,9 +65,11 @@ export default function Capture() {
   const [permission, requestPermission] = useCameraPermissions();
   const camera = useRef<CameraView>(null);
   const focused = useIsFocused();
+
   const [foreground, setForeground] = useState(
     AppState.currentState === "active",
   );
+
   const [ready, setReady] = useState(false);
   const [photos, setPhotos] = useState<string[]>([]);
   const [combined, setCombined] = useState(false);
@@ -75,6 +79,7 @@ export default function Capture() {
   const mounted = useRef(true);
   useEffect(() => {
     mounted.current = true;
+
     return () => {
       mounted.current = false;
     };
@@ -86,12 +91,16 @@ export default function Capture() {
     const listener = AppState.addEventListener("change", (state) =>
       setForeground(state === "active"),
     );
+
     return () => listener.remove();
   }, []);
+
   const attachCamera = useCallback((value: CameraView | null) => {
     camera.current = value;
+
     if (!value) setReady(false);
   }, []);
+
   const run = useCallback(
     async (action: () => Promise<void>): Promise<ImportOutcome> => {
       if (busyRef.current) return "busy";
@@ -99,13 +108,16 @@ export default function Capture() {
       setOperation("working");
       setError("");
       setSaved(0);
+
       try {
         await action();
+
         return "completed";
       } catch (cause) {
         setError(
           cause instanceof Error ? cause.message : "Bildet kunne ikke åpnes.",
         );
+
         return "failed";
       } finally {
         busyRef.current = false;
@@ -114,36 +126,45 @@ export default function Capture() {
     },
     [],
   );
+
   /** Shared images and PDFs arrive here from the share sheet and the file picker. */
   const addFiles = useCallback(
     (files: ImportedFile[]) =>
       run(async () => {
         const room = maxReceiptImages - photos.length;
+
         if (room <= 0) throw new Error(`Maks ${maxReceiptImages} bilder`);
         const imported = await importReceiptFiles(files, room);
+
         if (!mounted.current || !imported.uris.length)
           throw new Error("Importen ble avbrutt. Prøv igjen.");
         setPhotos((current) => [...current, ...imported.uris]);
+
         if (imported.singleDocument && photos.length === 0) setCombined(true);
         setReview(true);
       }),
     [photos.length, run],
   );
+
   const takePhoto = () =>
     run(async () => {
       if (!ready || !camera.current) return;
+
       if (photos.length >= maxReceiptImages)
         throw new Error(`Maks ${maxReceiptImages} bilder`);
       const result = await camera.current.takePictureAsync({ quality: 0.9 });
+
       if (!result) throw new Error("Kameraet kunne ikke ta et bilde.");
       const uri = await prepareImage(result.uri, result.width, result.height);
       setPhotos((current) => [...current, uri]);
       setReview(true);
     });
+
   const choosePhotos = () =>
     run(async () => {
       if (photos.length >= maxReceiptImages)
         throw new Error(`Maks ${maxReceiptImages} bilder`);
+
       const result = await ImagePicker.launchImageLibraryAsync({
         mediaTypes: ["images"],
         allowsMultipleSelection: true,
@@ -151,21 +172,26 @@ export default function Capture() {
         orderedSelection: true,
         quality: 1,
       });
+
       if (result.canceled) return;
+
       if (result.assets.length + photos.length > maxReceiptImages)
         throw new Error(`Maks ${maxReceiptImages} bilder`);
       const selected: string[] = [];
+
       for (const asset of result.assets)
         selected.push(await prepareImage(asset.uri, asset.width, asset.height));
       setPhotos((current) => [...current, ...selected]);
       setReview(true);
     });
+
   const chooseFiles = async () => {
     const result = await DocumentPicker.getDocumentAsync({
       type: ["application/pdf", "image/*"],
       multiple: true,
       copyToCacheDirectory: true,
     });
+
     if (result.canceled) return;
     offerImportedFiles(
       result.assets.map((asset) => ({
@@ -175,20 +201,25 @@ export default function Capture() {
       })),
     );
   };
+
   // Files shared from other apps wait until this screen is on show.
   const pendingImports = usePendingImports();
   useEffect(() => {
     const next = nextImport(pendingImports, focused, busy);
+
     if (!next || busyRef.current) return;
     const batch = claimImportedFiles(next.id);
+
     if (!batch) return;
     void addFiles(batch.files).then((outcome) =>
       finishImportedFiles(batch.id, outcome),
     );
   }, [addFiles, busy, focused, pendingImports]);
+
   const failedImports = pendingImports.filter(
     (batch) => batch.state === "failed",
   );
+
   const importRecovery = failedImports.map((batch) => (
     <Panel key={batch.id}>
       <Notice error>
@@ -207,6 +238,7 @@ export default function Capture() {
       />
     </Panel>
   ));
+
   const save = () =>
     run(async () => {
       const count = combined ? 1 : photos.length;
@@ -217,6 +249,7 @@ export default function Capture() {
       setSaved(count);
       void synchronize();
     });
+
   const live = permission?.granted && focused && foreground && !review;
   const uploading = queue.some((entry) => !entry.error);
   const failed = queue.some((entry) => !!entry.error);
@@ -224,10 +257,12 @@ export default function Capture() {
   useEffect(() => {
     if (!saved || uploading || failed) return;
     const timeout = setTimeout(() => setSaved(0), 8000);
+
     return () => clearTimeout(timeout);
   }, [saved, uploading, failed]);
   // Two tiles per row inside the sheet's 16pt padding and 10pt gap.
   const tile = Math.floor((width - 32 - 10) / 2);
+
   const overlay = (children: ReactNode, style?: ViewStyle) => (
     <View
       style={[
@@ -247,6 +282,7 @@ export default function Capture() {
       {children}
     </View>
   );
+
   return (
     <View style={{ flex: 1, backgroundColor: cameraBackground }}>
       {live && (
@@ -610,6 +646,7 @@ export default function Capture() {
                   setPhotos((current) =>
                     current.filter((photo) => photo !== uri),
                   );
+
                   if (photos.length <= 2) setCombined(false);
                 }}
                 style={(state) => [

@@ -1,3 +1,4 @@
+import { receiptFixture } from "../testing/receipts";
 import { describe, it, expect } from "vitest";
 import {
   batteryFixture,
@@ -10,7 +11,8 @@ import {
   aliasKey,
   classificationInputs,
 } from "./receipt";
-import { monthlyInsights, type Receipt } from "./insights";
+import { monthlyInsights } from "./insights";
+
 describe("receipt accounting", () => {
   it("separates the Battery purchase, discount and deposit", () => {
     const result = reconcile(batteryFixture());
@@ -62,7 +64,7 @@ describe("receipt accounting", () => {
     expect(parseOre("−2,59")).toBe(-259);
     expect(parseOre("1 250,10")).toBe(125010);
     expect(parseOre("")).toBeNull();
-    expect(() => parseOre("1,234")).toThrow();
+    expect(() => parseOre("1,234")).toThrow(Error);
   });
   it("allocates receipt discounts without losing øre and retains unlinked discounts", () => {
     const receipt = batteryFixture();
@@ -94,16 +96,17 @@ describe("receipt accounting", () => {
   it("rejects fractional øre and duplicate line IDs", () => {
     const receipt = batteryFixture();
     receipt.lines[0].amountOre = 1.1;
-    expect(() => validateReceipt(receipt)).toThrow();
+    expect(() => validateReceipt(receipt)).toThrow(/hele øre|ulike ID-er/);
     receipt.lines[0].amountOre = 2590;
     receipt.lines.push(receipt.lines[0]);
-    expect(() => validateReceipt(receipt)).toThrow();
+    expect(() => validateReceipt(receipt)).toThrow(/hele øre|ulike ID-er/);
   });
   it("accepts the retired energy-drink category without changing the source receipt", () => {
     const receipt = batteryFixture();
     receipt.lines[0].categoryId = "drinks.energy-drinks";
     const parsed = parseReceipt(receipt);
     expect(parsed.kind).toBe("parsed");
+
     if (parsed.kind !== "parsed") throw new Error(parsed.issue.message);
     expect(parsed.receipt.lines[0].categoryId).toBe("drinks.soft-drinks");
     expect(parsed.receipt.totalOre).toBe(receipt.totalOre);
@@ -112,19 +115,26 @@ describe("receipt accounting", () => {
     expect(parseReceipt(receipt).kind).toBe("rejected");
   });
   it("keeps undated receipts visible and excluded receipts out of spending", () => {
-    const base = {
+    const base = receiptFixture({
       _id: "receipt",
       _creationTime: 0,
       data: batteryFixture(),
       status: "needs_review",
       excluded: false,
-    } as Receipt;
-    const undated = {
+    });
+
+    const undated = receiptFixture({
       ...base,
       _id: "undated",
       data: { ...batteryFixture(), purchaseDate: null },
-    } as Receipt;
-    const excluded = { ...base, _id: "excluded", excluded: true } as Receipt;
+    });
+
+    const excluded = receiptFixture({
+      ...base,
+      _id: "excluded",
+      excluded: true,
+    });
+
     const totals = monthlyInsights([base, undated, excluded], "2026-09");
     expect(totals.products).toBe(2331);
     expect(totals.undated).toHaveLength(1);
@@ -140,6 +150,7 @@ it("uses linked product evidence without sending prices or payment details to Je
   expect(JSON.stringify(input[0].evidence)).not.toContain("2590");
   expect(JSON.stringify(input[0].evidence)).not.toContain("25,90");
 });
+
 it("flags repeated discount lines instead of subtracting them silently", () => {
   const data = batteryFixture();
   data.lines.push({ ...data.lines[1], id: "repeated" });
@@ -149,12 +160,13 @@ it("flags repeated discount lines instead of subtracting them silently", () => {
 });
 
 it("keeps unknown and foreign currencies out of NOK totals", () => {
-  const receipt = {
+  const receipt = receiptFixture({
     _id: "foreign",
     data: { ...batteryFixture(), currency: "SEK" },
     status: "needs_review",
     excluded: false,
-  } as Receipt;
+  });
+
   const totals = monthlyInsights([receipt], "2026-09");
   expect(totals.paid).toBe(0);
   expect(totals.products).toBe(0);

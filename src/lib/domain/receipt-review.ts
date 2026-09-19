@@ -12,6 +12,7 @@ import {
   type ReceiptLine,
 } from "./receipt";
 import { categoryById } from "./categories";
+
 export { categoryUncertainIssue, isCategoryUncertain } from "./receipt-issues";
 
 export const categoryReviewThreshold = 0.5;
@@ -23,6 +24,7 @@ export function confirmLineCategory(
 ): ReceiptLine {
   if (line.kind !== "product" || !categoryById.has(categoryId))
     throw new Error("Velg en gyldig varekategori.");
+
   return {
     ...line,
     categoryId,
@@ -62,10 +64,13 @@ export function lineReviewIssues(line: ReceiptLine): string[] {
   const issues = line.issues.map((issue) =>
     receiptIssueText(parseReceiptIssue(issue)),
   );
+
   if (!["summary", "vat"].includes(line.kind) && line.amountOre === null)
     issues.push("Beløpet mangler.");
+
   if (line.kind === "product" && !line.name.trim())
     issues.push("Varenavnet mangler.");
+
   return [...new Set(issues)];
 }
 
@@ -92,6 +97,7 @@ export function quickApproveData(
 ): ReceiptData | null {
   if (!data) return null;
   const confirmed = confirmSuggestedCategories(data);
+
   return canAcceptReceipt(confirmed, unresolvedDuplicate) ? confirmed : null;
 }
 
@@ -104,7 +110,9 @@ export function balanceWithAdjustment(
   id: string,
 ): ReceiptData {
   const { difference } = reconcile(data);
+
   if (difference === null || difference === 0) return data;
+
   return {
     ...data,
     lines: [
@@ -126,6 +134,7 @@ export function canAcceptReceipt(
   unresolvedDuplicate: boolean,
 ): boolean {
   const parsed = parseReceipt(data);
+
   return (
     parsed.kind === "parsed" &&
     assessReceipt(parsed.receipt, unresolvedDuplicate).acceptable
@@ -153,22 +162,30 @@ export type ReviewTask =
 export function assessReceipt(
   data: ParsedReceipt,
   unresolvedDuplicate: boolean,
-): { acceptable: boolean; tasks: ReviewTask[] } {
+) {
   const tasks: ReviewTask[] = [];
+
   if (unresolvedDuplicate) tasks.push({ kind: "duplicate" });
+
   if (!data.store?.trim()) tasks.push({ kind: "store" });
+
   if (data.totalOre === null) tasks.push({ kind: "total" });
+
   if (!data.purchaseDate) tasks.push({ kind: "date" });
+
   if (data.currency !== "NOK") tasks.push({ kind: "currency" });
   const totals = reconcile(data);
+
   if (
     totals.difference !== null &&
     totals.difference !== 0 &&
     totals.unknown === 0
   )
     tasks.push({ kind: "difference", amountOre: totals.difference });
+
   if (!data.lines.some((line) => line.kind === "product"))
     tasks.push({ kind: "no-lines" });
+
   const receiptIssues = [
     ...new Set([
       ...data.issues,
@@ -183,30 +200,41 @@ export function assessReceipt(
         .map(receiptIssueText),
     ]),
   ];
+
   if (receiptIssues.length)
     tasks.push({ kind: "receipt-issues", issues: receiptIssues });
+
   const counted = (predicate: (line: ReceiptLine) => boolean) =>
     data.lines.filter(predicate).length;
+
   const categories = counted(canConfirmSuggestedCategory);
+
   const unclear = counted(
     (line) =>
       line.kind === "product" &&
       line.issues.some(isCategoryUncertain) &&
       !canConfirmSuggestedCategory(line),
   );
+
   if (categories + unclear)
     tasks.push({ kind: "categories", count: categories + unclear });
+
   const amounts = counted(
     (line) =>
       !["summary", "vat"].includes(line.kind) && line.amountOre === null,
   );
+
   if (amounts) tasks.push({ kind: "amounts", count: amounts });
   const names = counted((line) => line.kind === "product" && !line.name.trim());
+
   if (names) tasks.push({ kind: "names", count: names });
+
   const other = counted((line) =>
     line.issues.some((issue) => !isCategoryUncertain(issue)),
   );
+
   if (other) tasks.push({ kind: "line-issues", count: other });
+
   return { acceptable: tasks.length === 0, tasks };
 }
 
@@ -215,6 +243,7 @@ export function reviewTasks(
   unresolvedDuplicate: boolean,
 ): ReviewTask[] {
   const parsed = parseReceipt(data);
+
   return parsed.kind === "parsed"
     ? assessReceipt(parsed.receipt, unresolvedDuplicate).tasks
     : [{ kind: "receipt-issues", issues: [parsed.issue.message] }];
@@ -226,8 +255,10 @@ export function reviewSummary(
   unresolvedDuplicate: boolean,
 ): string[] {
   if (!data) return [];
+
   const plural = (count: number, one: string, many: string) =>
     `${count} ${count === 1 ? one : many}`;
+
   return reviewTasks(data, unresolvedDuplicate).map((task) => {
     switch (task.kind) {
       case "duplicate":

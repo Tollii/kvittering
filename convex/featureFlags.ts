@@ -28,6 +28,7 @@ export const snapshotValidator = v.object({
   revision: v.number(),
   values: v.record(v.string(), v.boolean()),
 });
+
 /** Until a scope is transferred, its existing release settings are the authoritative fallback. */
 export async function readFeatureFlags(
   ctx: Pick<QueryCtx, "db">,
@@ -40,6 +41,7 @@ export async function readFeatureFlags(
       q.eq("platform", platform).eq("channel", channel),
     )
     .unique();
+
   if (row)
     return {
       platform,
@@ -47,12 +49,14 @@ export async function readFeatureFlags(
       revision: row.revision,
       values: parseFeatureFlags(row.values),
     };
+
   const legacy = await ctx.db
     .query("releasePolicies")
     .withIndex("by_platform_and_channel", (q) =>
       q.eq("platform", platform).eq("channel", channel),
     )
     .unique();
+
   return {
     platform,
     channel,
@@ -60,6 +64,7 @@ export async function readFeatureFlags(
     values: parseFeatureFlags(legacy?.features ?? {}),
   };
 }
+
 /** Transactional storage shared by the single-flag operation and the old operator adapter. */
 export async function writeFeatureFlags(
   ctx: MutationCtx,
@@ -70,13 +75,16 @@ export async function writeFeatureFlags(
 ) {
   const { platform, channel } = previous;
   const revision = previous.revision + 1;
+
   const row = await ctx.db
     .query("featureFlags")
     .withIndex("by_platform_and_channel", (q) =>
       q.eq("platform", platform).eq("channel", channel),
     )
     .unique();
+
   const next = { platform, channel, revision, values };
+
   if (row) await ctx.db.replace("featureFlags", row._id, next);
   else await ctx.db.insert("featureFlags", next);
   await ctx.db.insert("featureFlagHistory", {
@@ -88,30 +96,37 @@ export async function writeFeatureFlags(
     operator: operator.slice(0, 120),
     reason: reason.slice(0, 500),
   });
+
   return revision;
 }
+
 export const get = query({
   args: { platform: platformValidator },
   returns: snapshotValidator,
   handler: (ctx, { platform }) =>
     readFeatureFlags(ctx, platform, deploymentChannel()),
 });
+
 export async function featureEnabled(
   ctx: Pick<QueryCtx, "db">,
   name: FeatureName,
 ): Promise<boolean> {
   const channel = deploymentChannel();
+
   const snapshots = await Promise.all([
     readFeatureFlags(ctx, "ios", channel),
     readFeatureFlags(ctx, "android", channel),
   ]);
+
   return snapshots.every((snapshot) => snapshot.values[name]);
 }
+
 export const enabled = internalQuery({
   args: { name: featureNameValidator },
   returns: v.boolean(),
   handler: (ctx, { name }) => featureEnabled(ctx, name),
 });
+
 export const set = internalMutation({
   args: {
     platform: platformValidator,
@@ -127,8 +142,10 @@ export const set = internalMutation({
       throw new Error("Operator and reason are required.");
     const channel = deploymentChannel();
     const previous = await readFeatureFlags(ctx, args.platform, channel);
+
     if (previous.revision !== args.expectedRevision)
       throw new Error("Flags changed. Read them again before editing.");
+
     const revision = await writeFeatureFlags(
       ctx,
       previous,
@@ -136,6 +153,7 @@ export const set = internalMutation({
       args.operator,
       args.reason,
     );
+
     // Retire the legacy copy and advance the old read adapter's revision atomically.
     const row = await ctx.db
       .query("releasePolicies")
@@ -143,6 +161,7 @@ export const set = internalMutation({
         q.eq("platform", args.platform).eq("channel", channel),
       )
       .unique();
+
     if (row)
       await ctx.db.patch("releasePolicies", row._id, {
         features: undefined,
@@ -153,9 +172,11 @@ export const set = internalMutation({
         args.platform,
         channel,
       );
+
       void _features;
       await ctx.db.insert("releasePolicies", { ...policy, revision: 1 });
     }
+
     return { revision };
   },
 });

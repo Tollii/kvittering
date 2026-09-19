@@ -1,4 +1,5 @@
 "use node";
+
 import { v } from "convex/values";
 import { internalAction } from "./_generated/server";
 import { internal } from "./_generated/api";
@@ -19,7 +20,7 @@ import {
   type CatalogRequest,
   type CatalogResult,
 } from "../src/lib/catalog/model";
-import type { SearchPhysicalStoresParams } from "./kassalapp/generated/models";
+import { SearchPhysicalStoresGroup } from "./kassalapp/generated/models";
 import { broaderProductSearch } from "../src/lib/catalog/search";
 import { compatibleCatalogProduct } from "../src/lib/catalog/matching";
 
@@ -31,10 +32,13 @@ export const execute = internalAction({
       internal.catalogQueue.claim,
       { id },
     );
+
     if (!request) return null;
     const started = Date.now();
+
     try {
       let result: CatalogResult = emptyCatalogResult();
+
       if (request.kind === "products") {
         const search = async (term: string, store?: string) =>
           normalizeProducts(
@@ -45,7 +49,9 @@ export const execute = internalAction({
               unique: true,
             }),
           );
+
         result.products = await search(request.search, request.store);
+
         const evidence = {
           name: request.search,
           brand: null,
@@ -53,6 +59,7 @@ export const execute = internalAction({
           packageUnit: null,
           attributes: [],
         };
+
         // Retailer coverage is incomplete. Do not let it hide an otherwise valid product.
         if (
           request.store &&
@@ -62,19 +69,23 @@ export const execute = internalAction({
         )
           result.products = await search(request.search);
         const broaderSearch = broaderProductSearch(request.search);
+
         if (!result.products.length && broaderSearch)
           result.products = await search(broaderSearch);
-      } else if (request.kind === "stores")
+      } else if (request.kind === "stores") {
+        const group = Object.values(SearchPhysicalStoresGroup).find(
+          (value) => value === request.chain,
+        );
+
+        if (request.chain && !group) throw new Error("Unknown store group");
         result.stores = normalizeStores(
           await searchPhysicalStores({
             search: request.search,
             size: 20,
-            ...(request.chain
-              ? { group: request.chain as SearchPhysicalStoresParams["group"] }
-              : {}),
+            group,
           }),
         );
-      else if (request.kind === "details")
+      } else if (request.kind === "details")
         result.products = normalizeProducts(await findProductById(request.id));
       else
         result = normalizePrices(
@@ -107,6 +118,7 @@ export const execute = internalAction({
           error instanceof CatalogRequestError ? error.retryAfterMs : 0,
       });
     }
+
     return null;
   },
 });

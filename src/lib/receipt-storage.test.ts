@@ -1,14 +1,21 @@
+import { testId } from "./testing/receipts";
 import { expect, it, vi } from "vitest";
-import type { Id } from "../../convex/_generated/dataModel";
 import {
   receiptStorage,
   subscribeStorage,
   saveLocalReceipts,
   parseCachedHousehold,
 } from "./receipt-storage";
+
 const control = vi.hoisted(() => ({ fail: false }));
+
+// oxlint-disable-next-line anti-slop/no-module-mocking -- Replace the native SDK or environment boundary; application behavior remains under test.
 vi.mock("./deployment-storage", () => ({ storageSuffix: "-test" }));
+
+// oxlint-disable-next-line anti-slop/no-module-mocking -- Replace the native SDK or environment boundary; application behavior remains under test.
 vi.mock("expo-crypto", () => ({ randomUUID: () => "capture" }));
+
+// oxlint-disable-next-line anti-slop/no-module-mocking -- Replace the native SDK or environment boundary; application behavior remains under test.
 vi.mock("expo-file-system", () => ({
   Paths: { document: "test" },
   Directory: class {
@@ -20,9 +27,12 @@ vi.mock("expo-file-system", () => ({
     delete() {}
   },
 }));
+
+// oxlint-disable-next-line anti-slop/no-module-mocking -- Replace the native SDK or environment boundary; application behavior remains under test.
 vi.mock("expo-sqlite", async () => {
   const { DatabaseSync } = await import("node:sqlite");
   const db = new DatabaseSync(":memory:");
+
   return {
     openDatabaseSync: () => ({
       execSync: (sql: string) => db.exec(sql),
@@ -32,10 +42,12 @@ vi.mock("expo-sqlite", async () => {
         db.prepare(sql).all(...args),
       runSync: (sql: string, ...args: string[]) => {
         if (control.fail) throw new Error("Disk full");
+
         return db.prepare(sql).run(...args);
       },
       withTransactionSync: (operation: () => void) => {
         db.exec("BEGIN");
+
         try {
           operation();
           db.exec("COMMIT");
@@ -47,11 +59,12 @@ vi.mock("expo-sqlite", async () => {
     }),
   };
 });
+
 it("publishes immutable scoped snapshots only after committed writes", () => {
-  const household = "household" as Id<"households">;
+  const household = testId<"households">("household");
   const empty = receiptStorage.list("owner", household);
   expect(receiptStorage.list("owner", household)).toBe(empty);
-  const notified = vi.fn(() => receiptStorage.list("owner", household));
+  const notified = vi.fn<() => ReturnType<typeof receiptStorage.list>>(() => receiptStorage.list("owner", household));
   const unsubscribe = subscribeStorage(notified);
   control.fail = true;
   expect(() => saveLocalReceipts("owner", household, ["image"], true)).toThrow(
@@ -69,6 +82,7 @@ it("publishes immutable scoped snapshots only after committed writes", () => {
   expect(receiptStorage.list("another", household)).toEqual([]);
   unsubscribe();
 });
+
 it("rejects malformed disposable household cache data", () => {
   expect(parseCachedHousehold({ id: 4, name: "Home" })).toBeNull();
   expect(parseCachedHousehold({ id: "household", name: "Home" })).toEqual({

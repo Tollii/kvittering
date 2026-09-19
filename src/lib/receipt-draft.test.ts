@@ -1,16 +1,16 @@
+import { receiptFixture } from "./testing/receipts";
 import { describe, expect, it } from "vitest";
 import {
   createReceiptDraft,
   reduceReceiptDraft,
 } from "../features/receipt-draft";
-import type { Receipt } from "./domain/insights";
 
-const receipt = {
+const receipt = receiptFixture({
   revision: 1,
   data: null,
   excluded: false,
   duplicateResolved: false,
-} as Receipt;
+});
 
 describe("receipt draft", () => {
   it.each(["excluded", "product"] as const)(
@@ -46,10 +46,12 @@ describe("receipt draft", () => {
         type: "start",
         operation: "saving",
       });
+
       const remote = {
         type: "remote",
         receipt: { ...receipt, revision: 2 },
       } as const;
+
       const saved = { type: "saved", revision: 2, approved: true } as const;
       state = reduceReceiptDraft(state, queryFirst ? remote : saved);
       expect(state.baseline.revision).toBe(1);
@@ -64,6 +66,7 @@ describe("receipt draft", () => {
       type: "start",
       operation: "saving",
     });
+
     state = reduceReceiptDraft(state, {
       type: "edit",
       values: { excluded: true },
@@ -85,10 +88,12 @@ describe("receipt draft", () => {
 
   it("preserves a dirty draft until discard", () => {
     const initial = createReceiptDraft(receipt);
+
     let state = reduceReceiptDraft(initial, {
       type: "edit",
       values: { excluded: true },
     });
+
     state = reduceReceiptDraft(state, {
       type: "remote",
       receipt: { ...receipt, revision: 4 },
@@ -105,6 +110,7 @@ describe("receipt draft", () => {
       type: "edit",
       values: { excluded: true },
     });
+
     state = reduceReceiptDraft(state, { type: "start", operation: "saving" });
     state = reduceReceiptDraft(state, { type: "failed", error: "Conflict" });
     expect(state.dirty).toBe(true);

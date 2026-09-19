@@ -3,6 +3,7 @@ import { Image, ScrollView, View } from "react-native";
 import { Button, IconButton, Notice, Sheet } from "@/components/ui";
 import { convexSiteUrl, fetchAccessToken } from "@/lib/auth-client";
 import type { Receipt } from "@/lib/domain/insights";
+
 export function ReceiptImages({
   receipt,
   compact = false,
@@ -18,9 +19,11 @@ export function ReceiptImages({
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+
   async function load() {
     setBusy(true);
     setError("");
+
     try {
       setToken(await fetchAccessToken());
       setOpen(true);
@@ -30,6 +33,7 @@ export function ReceiptImages({
       setBusy(false);
     }
   }
+
   return (
     <>
       {compact ? (

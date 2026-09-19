@@ -41,6 +41,7 @@ export function useCompleteReceipts(
     loadingReceipts: active && status !== "Exhausted",
   };
 }
+
 export function useReceiptHistory(search: string, enabled: boolean) {
   const focused = useIsFocused();
   const { isAuthenticated } = useConvexAuth();
@@ -52,6 +53,7 @@ export function useReceiptHistory(search: string, enabled: boolean) {
     active ? { search } : "skip",
     { initialNumItems: 30 },
   );
+
   const { status, loadMore } = page;
   // Global substring search scans all pages; the ordinary list loads on demand.
   useEffect(() => {

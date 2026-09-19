@@ -5,22 +5,27 @@ import { parseVersionPolicy, type VersionPolicy } from "./policy";
 import { legacyFeatures, type FeatureFlags } from "../featureFlags";
 
 const prefix = `release-policy-v1${storageSuffix}:${installedRelease.channel}:${installedRelease.platform}`;
+
 export function readCachedPolicy():
   { policy: VersionPolicy; fetchedAt: number } | undefined {
   try {
     const raw = JSON.parse(Storage.getItemSync(prefix) ?? "null");
+
     if (!raw || !Number.isFinite(raw.fetchedAt) || raw.fetchedAt < 0) return;
     const policy = parseVersionPolicy(raw.policy);
+
     if (
       policy.channel !== installedRelease.channel ||
       policy.platform !== installedRelease.platform
     )
       return;
+
     return { policy, fetchedAt: Math.min(raw.fetchedAt, Date.now()) };
   } catch {
     return;
   }
 }
+
 export function cachePolicy(
   policy: VersionPolicy,
   fetchedAt: number,
@@ -39,6 +44,7 @@ export function cachePolicy(
     /* Memory remains available when storage is full. */
   }
 }
+
 export function dismissedUntil(release: string): number {
   try {
     return Number(Storage.getItemSync(`${prefix}:reminder:${release}`)) || 0;
@@ -46,6 +52,7 @@ export function dismissedUntil(release: string): number {
     return 0;
   }
 }
+
 export function dismissUpdate(release: string, until: number) {
   try {
     Storage.setItemSync(`${prefix}:reminder:${release}`, String(until));

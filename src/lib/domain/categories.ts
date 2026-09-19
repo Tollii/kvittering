@@ -18,9 +18,12 @@ export const categoryGroups = [
   ["other-purchases", "Andre kjøp"],
   ["fallback", "Uavklart"],
 ] as const;
+
 type CategoryGroup = (typeof categoryGroups)[number][0];
+
 export type PurchaseType =
   "food" | "household" | "personal-care" | "pets" | "other" | "unknown";
+
 type CategoryDefinition = {
   id: string;
   name: string;
@@ -28,6 +31,7 @@ type CategoryDefinition = {
   purchaseType: PurchaseType;
   classifierDescription?: string;
 };
+
 const entries = [
   {
     id: "drinks.soft-drinks",
@@ -648,18 +652,24 @@ const entries = [
     purchaseType: "unknown",
   },
 ] as const satisfies readonly CategoryDefinition[];
+
 export type CategoryId = (typeof entries)[number]["id"];
+
 export type Category = CategoryDefinition & {
   id: CategoryId;
   groupName: string;
 };
+
 const groupNames = new Map<string, string>(categoryGroups);
+
 export const categories: Category[] = entries.map((entry) => ({
   ...entry,
   groupName: groupNames.get(entry.group)!,
 }));
+
 export const categoryById = new Map<string, Category>(
   categories.map((category) => [category.id, category]),
 );
+
 export const categoryRules =
   "Choose one leaf. Soda and energy drinks both belong to drinks.soft-drinks. Frozen pizza is convenience.frozen-pizza; fresh ready-to-eat pizza and hot meals from the grocery counter are convenience.fresh-meals. Filled baguettes, including taco baguettes, are convenience.sandwiches; plain baguettes are bakery.rolls. Packaged Wasa crispbread sandwiches are bakery.crispbread. Prepared meal salads are convenience.salads; plain lettuce and salad leaves remain produce.vegetables. Snack carrots are vegetables, not crisps. Yoghurt ice cream is snacks.ice-cream, not dairy.yoghurt. Vitamins and supplements, including melatonin, are personal-care.supplements. Sliced ham is toppings.sliced-meat, raw pork is meat-fish.pork, and fish spreads are toppings.fish-spreads. Frozen vegetables remain produce.vegetables. Do not infer ingredients, sugar content, package size or purpose from vague names. Use fallback.unclear when uncertain. Deposits and discounts are accounting lines, not products.";

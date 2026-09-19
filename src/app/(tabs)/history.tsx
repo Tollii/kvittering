@@ -29,50 +29,65 @@ import {
 import { formatMoney } from "@/lib/domain/receipt";
 import { formatDate } from "@/lib/format-date";
 import { useTheme } from "@/constants/theme";
+
 export default function History() {
   const colors = useTheme();
   const [search, setSearch] = useState("");
   const [tab, setTab] = useState<"receipts" | "products">("receipts");
   const [selectedKey, setSelectedKey] = useState<string | null>(null);
+
   const matches = (value: string) =>
     value
       .toLocaleLowerCase("nb-NO")
       .includes(search.trim().toLocaleLowerCase("nb-NO"));
+
   const term = useDebouncedSearch(search.trim());
   const history = useReceiptHistory(term, tab === "receipts");
+
   const { receipts, completeReceipts: completeProducts } = useCompleteReceipts(
     { kind: "allProducts" },
     tab === "products",
   );
+
   const filtered = history.results;
+
   const completeReceipts =
     tab === "products" ? completeProducts : history.status === "Exhausted";
+
   const loadingReceipts =
     tab === "products"
       ? !completeProducts
       : history.status === "LoadingFirstPage";
+
   const sorted = [...filtered].sort(
     (a, b) =>
       (b.purchaseDate ?? "").localeCompare(a.purchaseDate ?? "") ||
       b._creationTime - a._creationTime,
   );
+
   const months = new Map<string, typeof sorted>();
+
   for (const receipt of sorted) {
     const key = receipt.purchaseDate?.slice(0, 7) ?? "unknown";
     months.set(key, [...(months.get(key) ?? []), receipt]);
   }
+
   const monthTitle = (key: string) => {
     if (key === "unknown") return "Uten dato";
+
     const label = new Intl.DateTimeFormat("nb-NO", {
       month: "long",
       year: "numeric",
     }).format(new Date(`${key}-01T12:00:00Z`));
+
     return label.charAt(0).toLocaleUpperCase("nb-NO") + label.slice(1);
   };
+
   const allProducts = productHistory(receipts);
   const products = allProducts.filter((product) => matches(product.name));
   const selected = allProducts.find((product) => product.key === selectedKey);
   const prices = selected ? productPrices(selected.contributions) : null;
+
   return (
     <Screen title="Historikk" settings>
       <Field
@@ -108,6 +123,7 @@ export default function History() {
                 (sum, receipt) => sum + receipt.spendingOre,
                 0,
               );
+
               return (
                 <View key={key} style={{ gap: 8 }}>
                   <View

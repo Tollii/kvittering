@@ -19,25 +19,31 @@ import { useHousehold } from "@/features/session";
 import { useTheme } from "@/constants/theme";
 import { quickApproveData } from "@/lib/domain/receipt-review";
 import { useProductLinkingQueue } from "@/features/product-linking-queue";
+
 export default function Inbox() {
   const colors = useTheme();
   const productQueue = useProductLinkingQueue();
   const { queue, online, synchronize } = useHousehold();
   const { receipts, loadingReceipts } = useCompleteReceipts({ kind: "inbox" });
   const reserved = new Set(queue.map((entry) => entry.receiptId));
+
   const open = receipts.filter(
     (receipt) =>
       receipt.status !== "reviewed" &&
       !receipt.excluded &&
       !reserved.has(receipt._id),
   );
+
   const attention = open.filter((receipt) =>
     ["needs_review", "failed"].includes(receipt.status),
   );
+
   const working = open.filter(
     (receipt) => !["needs_review", "failed"].includes(receipt.status),
   );
+
   const empty = !loadingReceipts && open.length === 0 && queue.length === 0;
+
   return (
     <Screen
       title="Innboks"
@@ -101,6 +107,7 @@ export default function Inbox() {
           <SectionTitle title="Under behandling" />
           {queue.map((entry) => {
             const uploaded = entry.uploaded.filter(Boolean).length;
+
             return (
               <Panel key={entry.id} style={{ gap: 8 }}>
                 <View

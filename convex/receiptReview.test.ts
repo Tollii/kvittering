@@ -10,34 +10,43 @@ import { api, internal } from "./_generated/api";
 import schema from "./schema";
 import type { Id } from "./_generated/dataModel";
 import { batteryFixture, validateReceipt } from "../src/lib/domain/receipt";
+
 const modules = import.meta.glob("./**/*.ts");
+
 it("keeps unresolved extraction issues, mismatches, duplicates and mock results in review", async () => {
   const t = convexTest(schema, modules);
+
   const user = t.withIdentity({
     subject: "reviewer",
     issuer: "https://test.local",
   });
+
   const householdId = await user.mutation(api.households.create, {
     name: "Home",
     invitation: "0123456789abcdef0123456789abcdef",
   });
+
   let previousId: Id<"receipts"> | undefined;
+
   for (const scenario of ["issue", "mismatch", "duplicate", "mock", "clean"]) {
     const id = await user.mutation(api.receipts.reserve, {
       clientId: `review-policy-${scenario}`,
       imageCount: 1,
       householdId,
     });
+
     await t.run((ctx) =>
       ctx.db.patch("receipts", id, {
         status: "processing",
         generation: 1,
-        ...(scenario === "duplicate" ? { duplicateOf: previousId } : {}),
+        duplicateOf: scenario === "duplicate" ? previousId : undefined,
       }),
     );
     const data = batteryFixture();
+
     if (scenario === "issue")
       data.lines[0].issues.push("Varenavnet er usikkert.");
+
     if (scenario === "mismatch") data.totalOre! += 100;
     await t.mutation(internal.processing.finish, {
       id,
@@ -51,6 +60,7 @@ it("keeps unresolved extraction issues, mismatches, duplicates and mock results 
       scenario === "clean" ? "reviewed" : "needs_review",
     );
     expect(receipt.autoAccepted).toBe(scenario === "clean");
+
     if (scenario === "issue") {
       data.lines[0].issues = [];
       await user.mutation(api.receipts.save, {
@@ -62,10 +72,11 @@ it("keeps unresolved extraction issues, mismatches, duplicates and mock results 
         duplicateResolved: false,
         excluded: false,
       });
-      expect(
-        (await user.query(api.receipts.detail, { id }))!.receipt.status,
-      ).toBe("reviewed");
     }
+
+    expect((await user.query(api.receipts.detail, { id }))!.receipt.status).toBe(
+      scenario === "issue" || scenario === "clean" ? "reviewed" : "needs_review",
+    );
     previousId = id;
   }
 });
@@ -86,19 +97,23 @@ it.each([
         : kind === "catalog"
           ? { kind }
           : { kind, editor: "person" };
+
   const previous = {
     revision: 0,
     status: "needs_review" as const,
     provider: "reader",
   };
+
   const data = validateReceipt(batteryFixture());
   const before = structuredClone(data);
+
   const result = decideReceiptChange({
     previous,
     data,
     unresolvedDuplicate: false,
     origin,
   });
+
   expect(result.revision).toBe(kind === "extraction" ? 0 : 1);
   expect(result.status).toBe(kind === "undo" ? "needs_review" : "reviewed");
   expect(data).toEqual(before);
@@ -106,23 +121,28 @@ it.each([
 
 it("rejects stale commits without data or history changes and returns a small save acknowledgement", async () => {
   const t = convexTest(schema, modules);
+
   const user = t.withIdentity({
     subject: "person",
     issuer: "https://test.local",
   });
+
   const householdId = await user.mutation(api.households.create, {
     name: "Home",
     invitation: "0123456789abcdef0123456789abcdef",
   });
+
   const id = await user.mutation(api.receipts.reserve, {
     householdId,
     clientId: "policy-test-0001",
     imageCount: 1,
   });
+
   const data = batteryFixture();
   await t.run((ctx) =>
     ctx.db.patch("receipts", id, { data, status: "needs_review" }),
   );
+
   const acknowledgement = await user.mutation(api.receipts.save, {
     id,
     revision: 0,
@@ -132,6 +152,7 @@ it("rejects stale commits without data or history changes and returns a small sa
     duplicateResolved: false,
     excluded: false,
   });
+
   expect(acknowledgement).toEqual({ receiptId: id, revision: 1 });
   await expect(
     t.run((ctx) =>
@@ -154,15 +175,18 @@ it("rejects stale commits without data or history changes and returns a small sa
 it("persists category uncertainty in the representation understood by installed editors", async () => {
   const t = convexTest(schema, modules);
   const user = t.withIdentity({ subject: "legacy-reviewer", issuer: "test" });
+
   const householdId = await user.mutation(api.households.create, {
     name: "Home",
     invitation: "0123456789abcdef0123456789abcdef",
   });
+
   const id = await user.mutation(api.receipts.reserve, {
     householdId,
     clientId: "legacy-category-001",
     imageCount: 1,
   });
+
   const data = batteryFixture();
   data.lines[0].issues = ["category_uncertain"];
   await t.run((ctx) =>

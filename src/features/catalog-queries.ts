@@ -34,10 +34,12 @@ function useCatalogLookup(
   const allowed = enabled && !blocked && productLookup;
   const encoded = JSON.stringify(lookup);
   const queryKey = useMemo(() => ["catalog", "lookup", encoded], [encoded]);
+
   const result = useQuery({
     queryKey,
     queryFn: async () => {
       await releaseMutation(convex, api.catalog.ensure, { lookup });
+
       return convex.query(api.catalog.observe, {
         lookup,
         client: installedRelease,
@@ -51,17 +53,21 @@ function useCatalogLookup(
           ? 60000
           : lifetime,
   });
+
   const observed = useConvexQuery(
     api.catalog.observe,
     allowed && result.data?.status === "pending"
       ? { lookup, client: installedRelease }
       : "skip",
   );
+
   useEffect(() => {
     if (observed) cache.setQueryData(queryKey, observed);
   }, [cache, queryKey, observed]);
+
   return result;
 }
+
 export function useCatalogSearch(
   search: string,
   scope:
@@ -72,12 +78,14 @@ export function useCatalogSearch(
   const term = useDebouncedSearch(
     scope.kind === "stores" ? normalizeSearch(search) : productSearch(search),
   );
+
   return useCatalogLookup(
     { ...scope, search: term },
     enabled && term.length >= 3 && term.length <= 120,
     day,
   );
 }
+
 export function useCatalogProduct(key: string) {
   return useCatalogLookup(
     { kind: "details", productKey: key },
@@ -85,6 +93,7 @@ export function useCatalogProduct(key: string) {
     catalogDetailsTtl,
   );
 }
+
 export function useCatalogPrices(key: string, enabled: boolean) {
   return useCatalogLookup(
     { kind: "prices", productKey: key },

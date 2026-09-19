@@ -1,3 +1,4 @@
+import { z } from "zod";
 import { useCallback } from "react";
 import { useConvex, type ConvexReactClient } from "convex/react";
 import type {
@@ -8,6 +9,7 @@ import type {
 import { installedRelease, releaseError } from "./client";
 import { getFunctionName } from "convex/server";
 import { recordEvent } from "../observability";
+import type { DiagnosticFields } from "../diagnostics";
 
 export async function releaseMutation<
   M extends FunctionReference<"mutation", "public">,
@@ -18,17 +20,21 @@ export async function releaseMutation<
 ): Promise<FunctionReturnType<M>> {
   const operation = getFunctionName(mutation);
   const started = Date.now();
-  const fields = {
-    operation,
-    ...(operation.startsWith("receipts:") && typeof args.id === "string"
-      ? { receiptId: args.id }
-      : {}),
-  };
+
+  const fields: DiagnosticFields = { operation };
+
+  if (operation.startsWith("receipts:")) {
+    const id = z.string().safeParse(args.id).data;
+
+    if (id !== undefined) fields.receiptId = id;
+  }
+
   try {
     const result = await convex.mutation(mutation, {
       ...args,
       client: installedRelease,
     });
+
     if (
       operation !== "productAnalysis:ensure" &&
       operation !== "catalogMatching:enrich"
@@ -37,6 +43,7 @@ export async function releaseMutation<
         ...fields,
         durationMs: Date.now() - started,
       });
+
     return result;
   } catch (error) {
     throw releaseError(error, operation, {
@@ -45,10 +52,12 @@ export async function releaseMutation<
     });
   }
 }
+
 export function useReleaseMutation<
   M extends FunctionReference<"mutation", "public">,
 >(mutation: M) {
   const convex = useConvex();
+
   return useCallback(
     (args: FunctionArgs<M>) => releaseMutation(convex, mutation, args),
     [convex, mutation],

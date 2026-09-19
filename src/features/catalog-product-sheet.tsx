@@ -41,12 +41,15 @@ export function CatalogProductPicker({
   const productLookup = useFeatureFlag("productLookup");
   const query = useCatalogSearch(search, { kind: "products", store });
   const [showWithoutBarcode, setShowWithoutBarcode] = useState(false);
+
   const products = rankCatalogProducts(search, query.data?.products ?? []).map(
     ({ product }) => product,
   );
+
   const hasBarcode = products.some((product) => product.ean);
   const withoutBarcode = products.filter((product) => !product.ean).length;
   const { online } = useHousehold();
+
   return (
     <Sheet
       title="Finn produkt"
@@ -151,19 +154,23 @@ export function CatalogProductSheet({
   const [showPrices, setShowPrices] = useState(false);
   const prices = useCatalogPrices(product.key, showPrices);
   const full = query.data?.products[0];
+
   const imageSources = [
     ...new Set([
       ...catalogImageSources(full ?? product),
       ...catalogImageSources(product),
     ]),
   ];
+
   const { receipts, completeReceipts } = useCompleteReceipts({
     kind: "product",
     key: product.key,
   });
+
   const purchases = catalogInsights(receipts).products.find(
     (item) => item.id === product.key,
   );
+
   return (
     <Sheet title="Produktinformasjon" visible onClose={onClose}>
       {product.equivalence && (
@@ -230,13 +237,11 @@ export function CatalogProductSheet({
               key={item.name}
               title={item.name}
               value={
-                (
-                  {
-                    YES: "Inneholder",
-                    NO: "Nei",
-                    CAN_CONTAIN_TRACES: "Kan inneholde spor",
-                  } as Record<string, string>
-                )[item.status] ?? item.status
+                new Map([
+                  ["YES", "Inneholder"],
+                  ["NO", "Nei"],
+                  ["CAN_CONTAIN_TRACES", "Kan inneholde spor"],
+                ]).get(item.status) ?? item.status
               }
             />
           ))}
@@ -323,7 +328,9 @@ function CatalogImage({
 }) {
   const [sourceIndex, setSourceIndex] = useState(0);
   const uri = sources[sourceIndex];
+
   if (!uri) return null;
+
   return (
     <Image
       source={{ uri }}

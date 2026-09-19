@@ -13,17 +13,20 @@ export type PurchasePolicy = {
   period?: { start: string; end: string };
   undated: "include" | "exclude";
 };
+
 export const overviewPurchasePolicy: PurchasePolicy = {
   currency: "NOK",
   provisional: "include",
   duplicates: "include",
   undated: "include",
 };
+
 export const comparisonPurchasePolicy: PurchasePolicy = {
   ...overviewPurchasePolicy,
   duplicates: "exclude",
   undated: "exclude",
 };
+
 export type PreparedPurchase = {
   receipt: Receipt;
   line: ReceiptLine & { netOre: number };
@@ -33,18 +36,22 @@ export type PreparedPurchase = {
 
 export function currentAnalysis(receipt: Receipt) {
   const analysis = receipt.productAnalysis;
+
   return analysis?.version === productAnalysisVersion &&
     analysis.generation === receipt.generation &&
     analysis.revision === receipt.revision
     ? analysis
     : undefined;
 }
+
 export function currentLineAnalysis(
   receipt: Receipt,
   line: ReceiptLine,
 ): ProductAnalysisResult | undefined {
   const analysis = currentAnalysis(receipt);
+
   if (analysis?.state !== "complete") return;
+
   return analysis.results.find(
     (result) =>
       result.lineId === line.id &&
@@ -59,6 +66,7 @@ export function preparePurchases(
 ) {
   return receipts.flatMap((receipt) => {
     const data = receipt.data;
+
     if (
       !data ||
       receipt.excluded ||
@@ -75,14 +83,18 @@ export function preparePurchases(
     )
       return [];
     const analysis = currentAnalysis(receipt);
+
     const byLine = new Map(
       analysis?.state === "complete"
         ? analysis.results.map((result) => [result.lineId, result])
         : [],
     );
+
     const spending = spendingLines(data);
+
     const purchases: PreparedPurchase[] = spending.products.map((line) => {
       const result = byLine.get(line.id);
+
       return {
         receipt,
         line,
@@ -93,6 +105,7 @@ export function preparePurchases(
             : undefined,
       };
     });
+
     return [
       {
         receipt,

@@ -1,4 +1,5 @@
 "use node";
+
 import { v } from "convex/values";
 import { attributeQuestions } from "../src/lib/domain/product-attribute-classification";
 import {
@@ -8,6 +9,7 @@ import {
 import { TypeSafeClient, type Questions } from "@typesafe-ai/sdk";
 import { internalAction, env } from "./_generated/server";
 import { familyQuestion } from "./productAnalysisWorker";
+
 export const evaluate = internalAction({
   args: {},
   returns: v.array(
@@ -24,12 +26,14 @@ export const evaluate = internalAction({
       timeout: 20000,
       retry: { maxRetries: 0 },
     });
+
     const candidates = [
       { name: "Coca-Cola 500ml" },
       { name: "Coca-Cola Zero 500ml" },
       { name: "Stratos Helt Sprøtt 150g" },
       { name: "Battery Peachberry 500ml" },
     ];
+
     const cases = [
       { name: "COCA-COLA10PK BX", expected: "family_0" },
       { name: "Coca-Cola Zero 10x330ml", expected: "family_1" },
@@ -38,7 +42,9 @@ export const evaluate = internalAction({
       { name: "STRATOS SPRØTT", expected: "family_2" },
       { name: "BATTERY WHIRL", expected: "new" },
     ];
+
     const results = [];
+
     for (const item of cases) {
       const result = await client.systemOne({
         model: env.TYPESAFE_MODEL ?? "jev-latest",
@@ -53,12 +59,14 @@ export const evaluate = internalAction({
         },
         questions: { family: familyQuestion(candidates) },
       });
+
       results.push({
         ...item,
         choice: result.answers.family.choice,
         confidence: result.answers.family.confidence,
       });
     }
+
     return results;
   },
 });
@@ -77,6 +85,7 @@ export const evaluateAttributes = internalAction({
   handler: async () => {
     if (!env.TYPESAFE_API_KEY)
       throw new Error("Product analysis is unavailable.");
+
     const cases = [
       {
         name: "Coca-Cola Zero 500ml",
@@ -105,6 +114,7 @@ export const evaluateAttributes = internalAction({
       },
       { name: "VARE", expectedType: "unknown", expectedSugar: "unknown" },
     ];
+
     const questions: Questions = {};
     cases.forEach((_, index) => {
       for (const [key, question] of Object.entries(
@@ -112,22 +122,26 @@ export const evaluateAttributes = internalAction({
       ))
         questions[`${key}_${index}`] = question;
     });
+
     const client = new TypeSafeClient({
       apiKey: env.TYPESAFE_API_KEY,
       timeout: 30000,
       retry: { maxRetries: 0 },
     });
+
     const response = await client.systemOne({
       model: env.TYPESAFE_MODEL ?? "jev-latest",
       state: { products: cases.map(({ name }) => ({ name })) },
       questions,
     });
+
     return cases.map((item, index) => ({
       ...item,
       attributes: readAttributes(
         Object.fromEntries(
           Object.keys(attributeQuestions()).map((key) => {
             const answer = response.answers[`${key}_${index}`];
+
             return [key, answer?.type === "choice" ? answer : {}];
           }),
         ),

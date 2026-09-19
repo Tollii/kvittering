@@ -1,6 +1,7 @@
 import { classificationEvidenceValidator } from "./classification";
 import { v } from "convex/values";
 import { lineValidator } from "./receipt";
+
 export const correctionFields = {
   householdId: v.id("households"),
   receiptId: v.id("receipts"),
@@ -15,6 +16,7 @@ export const correctionFields = {
   classificationEvidence: classificationEvidenceValidator.optional(),
   evidence: lineValidator,
 };
+
 export const correctionTarget = v.object({
   receiptId: v.id("receipts"),
   lineId: v.string(),

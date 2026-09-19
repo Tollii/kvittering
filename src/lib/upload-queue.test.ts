@@ -1,3 +1,4 @@
+import { testId } from "./testing/receipts";
 import { describe, expect, it } from "vitest";
 import {
   createQueueRunner,
@@ -5,9 +6,11 @@ import {
   type QueueStore,
   type UploadTransport,
 } from "./upload-queue";
-import type { Id } from "../../convex/_generated/dataModel";
-const household = "household" as Id<"households">;
-const receiptId = "receipt" as Id<"receipts">;
+
+const household = testId<"households">("household");
+
+const receiptId = testId<"receipts">("receipt");
+
 function fixture() {
   let rows: LocalReceipt[] = [
     {
@@ -20,6 +23,7 @@ function fixture() {
       uploaded: [false, false],
     },
   ];
+
   const store: QueueStore = {
     list: (owner, id) =>
       structuredClone(
@@ -34,18 +38,24 @@ function fixture() {
       rows = rows.filter((row) => row.id !== entry.id);
     },
   };
+
   return { store, rows: () => rows, run: createQueueRunner(store) };
 }
+
 describe("durable receipt upload", () => {
   it("resumes after a failed image without reserving or uploading completed images again", async () => {
     const { run, rows } = fixture();
+
     let reservations = 0,
       completions = 0,
       fail = true;
+
     const uploaded: number[] = [];
+
     const transport: UploadTransport = {
       reserve: async () => {
         reservations++;
+
         return receiptId;
       },
       upload: async (_id, position) => {
@@ -56,6 +66,7 @@ describe("durable receipt upload", () => {
         completions++;
       },
     };
+
     await run("user", household, transport, () => true);
     expect(rows()[0].uploaded).toEqual([true, false]);
     expect(rows()[0].error).toBe("Connection lost");
@@ -68,8 +79,10 @@ describe("durable receipt upload", () => {
   });
   it("keeps images when the final commit fails and retries only that commit", async () => {
     const { run, rows } = fixture();
+
     let uploads = 0,
       fail = true;
+
     const transport: UploadTransport = {
       reserve: async () => receiptId,
       upload: async () => {
@@ -79,6 +92,7 @@ describe("durable receipt upload", () => {
         if (fail) throw new Error("Offline");
       },
     };
+
     await run("user", household, transport, () => true);
     expect(rows()).toHaveLength(1);
     fail = false;
@@ -88,12 +102,15 @@ describe("durable receipt upload", () => {
   });
   it("does not upload another account’s queue and stops when the session ends", async () => {
     const { run, rows } = fixture();
+
     let calls = 0,
       active = true;
+
     const transport: UploadTransport = {
       reserve: async () => {
         calls++;
         active = false;
+
         return receiptId;
       },
       upload: async () => {
@@ -103,6 +120,7 @@ describe("durable receipt upload", () => {
         calls++;
       },
     };
+
     await run("other-user", household, transport, () => true);
     expect(calls).toBe(0);
     await run("user", household, transport, () => active);

@@ -7,6 +7,7 @@ import {
   type AttributeDimension,
 } from "@/lib/domain/attribute-insights";
 import type { Receipt, SpendingGroup } from "@/lib/domain/insights";
+
 export function ProductAttributesReport({
   receipts,
   onSelect,
@@ -16,6 +17,7 @@ export function ProductAttributesReport({
 }) {
   const [dimension, setDimension] = useState<AttributeDimension>("type");
   const report = attributeInsights(receipts, dimension);
+
   return (
     <>
       <Segments

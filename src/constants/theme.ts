@@ -33,6 +33,7 @@ const light = {
   shadow: "rgba(38, 35, 90, 0.08)",
   scrim: "rgba(38, 35, 90, 0.55)",
 };
+
 const dark: typeof light = {
   background: "#14122A",
   surface: "#1E1B3A",
@@ -59,10 +60,13 @@ const dark: typeof light = {
   shadow: "rgba(0, 0, 0, 0)",
   scrim: "rgba(0, 0, 0, 0.6)",
 };
+
 export type Theme = typeof light;
+
 export function useTheme(): Theme {
   return useColorScheme() === "dark" ? dark : light;
 }
+
 export const themes = { light, dark };
 
 /** Colour bands from the note's pixel mosaic, ordered dark to light. */
@@ -76,6 +80,7 @@ export const mosaicPalette = [
   "#C1B9EC",
   "#DAD5F2",
 ] as const;
+
 /** Rare olive-yellow flecks, like the small squares beside the numerals. */
 export const mosaicHighlight = "#B7B35C";
 
@@ -89,10 +94,16 @@ export const radius = {
 
 export function tracking(size: number) {
   if (size >= 40) return -1.2;
+
   if (size >= 28) return -0.7;
+
   if (size >= 22) return -0.4;
+
   if (size >= 17) return -0.15;
+
   if (size <= 12) return 0.15;
+
   if (size <= 13) return 0.05;
+
   return 0;
 }

@@ -24,7 +24,9 @@ export function FamilyPurchases({
   const report = familyInsights(receipts);
   const [selection, setSelection] = useState<string | null>(null);
   const selected = report.families.find((family) => family.id === selection);
+
   if (!report.total) return <Copy muted>Ingen varer i perioden</Copy>;
+
   if (selected)
     return (
       <>
@@ -80,6 +82,7 @@ export function FamilyPurchases({
         </Panel>
       </>
     );
+
   return (
     <>
       <Panel style={{ gap: 0, paddingVertical: 4 }}>
@@ -112,5 +115,6 @@ export function FamilyPurchases({
 
 export function familySummary(receipts: Receipt[]) {
   const report = familyInsights(receipts);
+
   return report.total ? `${report.families.length} produkter` : undefined;
 }

@@ -5,8 +5,11 @@ import { api, internal } from "./_generated/api";
 import schema from "./schema";
 import { defaultPolicy } from "../src/lib/releases/policy";
 import type { FeatureName } from "../src/lib/featureFlags";
+
 const modules = import.meta.glob("./**/*.ts");
+
 afterEach(() => vi.unstubAllEnvs());
+
 it("transfers legacy values once and keeps version gates and old reads consistent", async () => {
   vi.stubEnv("RELEASE_CHANNEL", "testflight");
   const t = convexTest(schema, modules);
@@ -59,13 +62,14 @@ it("transfers legacy values once and keeps version gates and old reads consisten
   await expect(
     t.mutation(internal.featureFlags.set, {
       platform: "ios",
+      // SAFETY: Deliberately invalid input verifies that the mutation rejects unknown flag names.
       name: "unknown" as FeatureName,
       enabled: true,
       expectedRevision: 1,
       operator: "test",
       reason: "Unknown",
     }),
-  ).rejects.toThrow();
+  ).rejects.toThrow(Error);
   expect(
     (await t.query(api.featureFlags.get, { platform: "android" })).values
       .productLookup,
@@ -79,6 +83,7 @@ it("transfers legacy values once and keeps version gates and old reads consisten
       .productLookup,
   ).toBe(true);
 });
+
 it("routes old operator writes into the one flag store", async () => {
   const t = convexTest(schema, modules);
   const original = await t.query(api.releasePolicy.get, { platform: "ios" });
@@ -107,8 +112,10 @@ it("routes old operator writes into the one flag store", async () => {
     }),
   ).rejects.toThrow("Policy changed");
   const current = await t.query(api.releasePolicy.get, { platform: "ios" });
+
   const { minimum, recommended, minimumApiVersion, message, features } =
     current;
+
   await t.mutation(internal.releasePolicy.configure, {
     platform: "ios",
     settings: {

@@ -1,4 +1,5 @@
 "use node";
+
 import { v } from "convex/values";
 import { TypeSafeClient, noul, type Questions } from "@typesafe-ai/sdk";
 import { internalAction, env } from "./_generated/server";
@@ -54,6 +55,7 @@ export async function classifyCatalogProducts(
     )
       .slice(0, 8)
       .map(({ product }) => product);
+
     return {
       ...item,
       originals: item.candidates,
@@ -61,6 +63,7 @@ export async function classifyCatalogProducts(
       match: item.product ?? automaticCatalogProduct(item.line, candidates),
     };
   });
+
   const results: CatalogDecision[] = prepared.map((item) => ({
     lineId: item.line.id,
     evidenceKey: lineEvidenceKey(item.line),
@@ -84,6 +87,7 @@ export async function classifyCatalogProducts(
           ? "unavailable"
           : "no_candidates",
   }));
+
   // Keep individual keys for the manual picker, with one score per group.
   const decisions = () =>
     results.map((result, index) => ({
@@ -94,20 +98,25 @@ export async function classifyCatalogProducts(
             candidate.key === product.key ||
             candidate.equivalence?.candidateKeys.includes(product.key),
         );
+
         const score = result.candidates?.find(
           (candidate) => candidate.key === group?.key,
         );
+
         return score
           ? [{ ...score, key: product.key, name: product.name }]
           : [];
       }),
     }));
+
   if (!client) return decisions();
   const questions: Questions = {};
   prepared.forEach((item, index) => {
     if (!item.candidates.length) return;
+
     if (!item.line.manual && !item.line.productKey)
       questions[`category_${index}`] = classificationQuestion(index);
+
     if (!item.match)
       item.candidates.forEach((_, candidate) => {
         questions[`product_${index}_${candidate}`] = catalogMatchQuestion(
@@ -116,7 +125,9 @@ export async function classifyCatalogProducts(
         );
       });
   });
+
   if (!Object.keys(questions).length) return decisions();
+
   try {
     const response = await client.systemOne({
       model: env.TYPESAFE_MODEL ?? "jev-latest",
@@ -143,15 +154,20 @@ export async function classifyCatalogProducts(
       },
       questions,
     });
+
     prepared.forEach((item, index) => {
       const category = response.answers[`category_${index}`];
+
       if (category?.type === "choice" && category.confidence >= 0.85) {
         results[index].categoryId = category.choice;
         results[index].categoryConfidence = category.confidence;
       }
+
       if (item.match || !item.candidates.length) return;
+
       const probabilities = item.candidates.map((_, candidate) => {
         const answer = response.answers[`product_${index}_${candidate}`];
+
         return answer?.type === "noul" &&
           Number.isFinite(answer.noul) &&
           answer.noul >= 0 &&
@@ -159,10 +175,12 @@ export async function classifyCatalogProducts(
           ? answer.noul
           : null;
       });
+
       Object.assign(
         results[index],
         selectCatalogMatch(item.line, item.candidates, probabilities),
       );
+
       if (probabilities.some((probability) => probability === null)) {
         results[index].productKey = null;
         results[index].equivalentKeys = undefined;
@@ -176,6 +194,7 @@ export async function classifyCatalogProducts(
         results[index].reason = "provider_error";
     });
   }
+
   return decisions();
 }
 
@@ -199,9 +218,12 @@ export const classify = internalAction({
           [id, await ctx.runQuery(internal.catalogQueue.read, { id })] as const,
       ),
     );
+
     const byId = new Map(requests);
+
     const prepared = items.map((item) => {
       const request = item.requestId ? byId.get(item.requestId) : null;
+
       const candidates = item.product
         ? [item.product]
         : request?.state === "ready"
@@ -210,8 +232,10 @@ export const classify = internalAction({
               request.result.products,
             ).map(({ product }) => product)
           : [];
+
       return { line: item.line, product: item.product, candidates };
     });
+
     const client = env.TYPESAFE_API_KEY
       ? new TypeSafeClient({
           apiKey: env.TYPESAFE_API_KEY,
@@ -219,6 +243,7 @@ export const classify = internalAction({
           retry: { maxRetries: 0 },
         })
       : null;
+
     return classifyCatalogProducts(prepared, client);
   },
 });

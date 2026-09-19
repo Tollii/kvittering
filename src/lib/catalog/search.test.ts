@@ -13,6 +13,7 @@ it("uses the same identity and cached request for receipt spacing and Unicode va
     "ＣＯＣＡ–ＣＯＬＡ１０ＰＫ\u00a0BX",
     "COCA-CO\u200BLA10PK BX",
   ];
+
   expect(names.map(productSearch)).toEqual(
     names.map(() => "coca-cola 10pk bx"),
   );
@@ -32,6 +33,7 @@ it("recognizes glued multipack evidence and keeps missing counts unknown", () =>
       { id: 2, name: "Coca-Cola 330ml" },
     ],
   });
+
   const line = { ...emptyLine(), name: "COCA-COLA10PK BX" };
   expect(compatibleCatalogProduct(line, pack)).toBe(true);
   expect(compatibleCatalogProduct(line, bottle)).toBe(true);

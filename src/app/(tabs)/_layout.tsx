@@ -4,13 +4,16 @@ import { NativeTabs } from "expo-router/unstable-native-tabs";
 import { useTheme } from "@/constants/theme";
 import { useHousehold } from "@/features/session";
 import { NotificationRouting } from "@/features/notifications";
+
 export default function TabLayout() {
   const colors = useTheme();
   const { queue } = useHousehold();
   const attention = useQuery(api.receipts.attentionCount);
+
   // Badge only what needs a person; processing receipts resolve on their own.
   const pending =
     (attention?.count ?? 0) + queue.filter((entry) => entry.error).length;
+
   return (
     <>
       <NotificationRouting />

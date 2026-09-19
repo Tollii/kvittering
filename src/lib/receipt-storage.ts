@@ -9,17 +9,21 @@ import type { LocalReceipt, QueueStore } from "./upload-queue";
 import { storageSuffix } from "./deployment-storage";
 
 const listeners = new Set<() => void>();
+
 export function subscribeStorage(listener: () => void) {
   listeners.add(listener);
+
   return () => {
     listeners.delete(listener);
   };
 }
+
 function changed() {
   for (const listener of listeners) listener();
 }
 
 let database: ReturnType<typeof openDatabaseSync> | undefined;
+
 function storage() {
   if (!database) {
     const opened = openDatabaseSync(`kvitto${storageSuffix}.db`);
@@ -29,17 +33,24 @@ function storage() {
     migrateReceiptDatabase(opened);
     database = opened;
   }
+
   return database;
 }
+
 const queueSnapshots = new Map<string, LocalReceipt[]>();
+
 const householdSnapshots = new Map<string, CachedHousehold | null>();
+
 const scopeKey = (owner: string, household: string) =>
   JSON.stringify([owner, household]);
+
 function freezeReceipt(entry: LocalReceipt): LocalReceipt {
   Object.freeze(entry.images);
   Object.freeze(entry.uploaded);
+
   return Object.freeze(entry);
 }
+
 function writeEntry(entry: LocalReceipt) {
   storage().runSync(
     "INSERT OR REPLACE INTO receipt_queue (id, owner, household, data) VALUES (?, ?, ?, ?)",
@@ -49,20 +60,25 @@ function writeEntry(entry: LocalReceipt) {
     JSON.stringify(entry),
   );
 }
+
 function publishQueue(owner: string, household: Id<"households">) {
   queueSnapshots.delete(scopeKey(owner, household));
   receiptStorage.list(owner, household);
   changed();
 }
+
 const directory = () =>
   new Directory(Paths.document, `receipts${storageSuffix}`);
+
 // Store relative names: iOS can change the application's container path after an update.
 export function imageFile(name: string) {
   return new File(directory(), name);
 }
+
 export const receiptStorage: QueueStore = {
   list(owner, householdId) {
     const key = scopeKey(owner, householdId);
+
     if (!queueSnapshots.has(key)) {
       const entries = storage()
         .getAllSync<{ data: string }>(
@@ -71,9 +87,11 @@ export const receiptStorage: QueueStore = {
           householdId,
         )
         .map((row) => freezeReceipt(migrateReceipt(JSON.parse(row.data))));
+
       Object.freeze(entries);
       queueSnapshots.set(key, entries);
     }
+
     return queueSnapshots.get(key)!;
   },
   update(entry) {
@@ -84,9 +102,11 @@ export const receiptStorage: QueueStore = {
     // Remove the durable record only after the server has accepted every image.
     storage().runSync("DELETE FROM receipt_queue WHERE id = ?", entry.id);
     publishQueue(entry.owner, entry.householdId);
+
     for (const name of entry.images) {
       try {
         const file = imageFile(name);
+
         if (file.exists) file.delete();
       } catch {
         /* A stale file does not prevent the next upload. */
@@ -94,6 +114,7 @@ export const receiptStorage: QueueStore = {
     }
   },
 };
+
 export function saveLocalReceipts(
   owner: string,
   householdId: Id<"households">,
@@ -104,17 +125,21 @@ export function saveLocalReceipts(
     throw new Error("Velg mellom ett og åtte bilder.");
   directory().create({ intermediates: true, idempotent: true });
   const files: File[] = [];
+
   try {
     const entries = (combined ? [uris] : uris.map((uri) => [uri])).map(
       (group) => {
         const id = randomUUID();
+
         const images = group.map((uri, position) => {
           const name = `${id}-${position}.jpg`;
           const file = imageFile(name);
           files.push(file);
           new File(uri).copy(file);
+
           return name;
         });
+
         return {
           schemaVersion: 1,
           id,
@@ -126,6 +151,7 @@ export function saveLocalReceipts(
         } satisfies LocalReceipt;
       },
     );
+
     storage().withTransactionSync(() => {
       for (const entry of entries) writeEntry(entry);
     });
@@ -133,11 +159,16 @@ export function saveLocalReceipts(
     for (const file of files) {
       if (file.exists) file.delete();
     }
+
     throw error;
   }
+
   publishQueue(owner, householdId);
 }
+
 export type CachedHousehold = { id: Id<"households">; name: string };
+
+// oxlint-disable-next-line anti-slop/no-unknown-parameters -- This boundary parser validates external input before returning a domain value.
 export function parseCachedHousehold(value: unknown): CachedHousehold | null {
   try {
     return Object.freeze(
@@ -147,22 +178,28 @@ export function parseCachedHousehold(value: unknown): CachedHousehold | null {
     return null;
   }
 }
+
 export function cachedHousehold(owner: string): CachedHousehold | null {
   if (!householdSnapshots.has(owner)) {
     const row = storage().getFirstSync<{ data: string }>(
       "SELECT data FROM household_cache WHERE owner = ?",
       owner,
     );
+
     let value: CachedHousehold | null = null;
+
     try {
       value = row ? parseCachedHousehold(JSON.parse(row.data)) : null;
     } catch {
       /* Disposable cache only. */
     }
+
     householdSnapshots.set(owner, value);
   }
+
   return householdSnapshots.get(owner)!;
 }
+
 export function cacheHousehold(owner: string, value: CachedHousehold | null) {
   if (value)
     storage().runSync(

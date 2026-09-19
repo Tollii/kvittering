@@ -32,18 +32,24 @@ export function SwipeToApprove({
   const client = useConvex();
   const swipeable = useRef<SwipeableMethods>(null);
   const [busy, setBusy] = useState(false);
+
   const unresolvedDuplicate =
     !!receipt.duplicateOf && !receipt.duplicateResolved;
+
   const approvable =
     enabled &&
     receipt.status === "needs_review" &&
     !!quickApproveData(receipt.data, unresolvedDuplicate);
+
   if (!approvable) return <>{children}</>;
+
   async function approve() {
     if (busy) return;
     const data = quickApproveData(receipt.data, unresolvedDuplicate);
+
     if (!data) return;
     setBusy(true);
+
     try {
       await releaseMutation(client, api.receipts.save, {
         id: receipt._id,
@@ -69,6 +75,7 @@ export function SwipeToApprove({
       setBusy(false);
     }
   }
+
   return (
     <ReanimatedSwipeable
       ref={swipeable}

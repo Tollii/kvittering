@@ -5,6 +5,7 @@ import { createAuth } from "./auth";
 import schema from "./schema";
 
 const modules = import.meta.glob("./**/*.ts");
+
 beforeEach(() => {
   // Convex's runtime does not use the local Metro development mode.
   vi.stubEnv("NODE_ENV", "production");
@@ -15,6 +16,7 @@ beforeEach(() => {
   );
   vi.stubEnv("SITE_URL", "https://kvitto.example");
 });
+
 afterEach(() => vi.unstubAllEnvs());
 
 it.each([undefined, "false", "true"])(
@@ -24,6 +26,7 @@ it.each([undefined, "false", "true"])(
     const t = convexTest(schema, modules);
     await t.run(async (ctx) => {
       const auth = await createAuth(ctx).$context;
+
       for (const origin of [
         "exp://192.168.1.20:8081/--/",
         "exp://10.0.0.5:8082",
@@ -32,8 +35,10 @@ it.each([undefined, "false", "true"])(
       ]) {
         expect(auth.isTrustedOrigin(origin)).toBe(setting === "true");
       }
+
       expect(auth.isTrustedOrigin("kvitto://")).toBe(true);
       expect(auth.isTrustedOrigin("https://kvitto.example")).toBe(true);
+
       for (const origin of [
         "https://untrusted.example",
         "http://192.168.1.20:8081",

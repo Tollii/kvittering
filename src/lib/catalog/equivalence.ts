@@ -29,9 +29,11 @@ function descriptor(product: CatalogProduct) {
     packageSize: product.weight,
     packageUnit: product.weightUnit,
   });
+
   const sizes = [
     ...new Set(evidence.measures.map(({ amount, unit }) => `${amount}${unit}`)),
   ];
+
   const words = [
     ...new Set(
       normalizeSearch(equivalentName(product.name))
@@ -39,6 +41,7 @@ function descriptor(product: CatalogProduct) {
         .filter(Boolean),
     ),
   ].sort();
+
   return {
     product,
     // Conflicting size evidence and generic single words cannot establish equivalence.
@@ -54,7 +57,9 @@ function descriptor(product: CatalogProduct) {
     size: sizes.length === 1 ? sizes[0] : "",
   };
 }
+
 type Descriptor = ReturnType<typeof descriptor>;
+
 const includesEvidence = (specific: Descriptor, general: Descriptor) =>
   specific.family === general.family &&
   (!general.brand || specific.brand === general.brand) &&
@@ -71,14 +76,18 @@ export function groupCatalogProducts(
   const unique = [
     ...new Map(products.map((product) => [product.key, product])).values(),
   ];
-  const descriptors = unique
-    .filter((product) => !product.equivalence)
-    .map(descriptor);
+
+  const descriptors = unique.flatMap((product) =>
+    product.equivalence ? [] : [descriptor(product)],
+  );
+
   const groups = new Map<string, CatalogProduct[]>();
+
   for (const item of descriptors) {
     const possible = descriptors.filter((other) =>
       includesEvidence(other, item),
     );
+
     const specific = possible.filter(
       (candidate) =>
         !possible.some(
@@ -87,30 +96,37 @@ export function groupCatalogProducts(
             (other.brand !== candidate.brand || other.size !== candidate.size),
         ),
     );
+
     const signatures = new Map(
       specific.map((candidate) => [
         JSON.stringify([candidate.family, candidate.brand, candidate.size]),
         candidate,
       ]),
     );
+
     const key =
       signatures.size === 1
         ? signatures.keys().next().value!
         : JSON.stringify([item.family, item.brand, item.size]);
+
     groups.set(key, [...(groups.get(key) ?? []), item.product]);
   }
+
   const completeness = (product: CatalogProduct) =>
     Number(!!product.image) * 4 +
     Number(!!product.brand) * 2 +
     Number(!!product.weight && !!product.weightUnit);
+
   return [
     ...unique.filter((product) => product.equivalence),
     ...[...groups].map(([key, members]) => {
       if (members.length === 1) return members[0];
+
       const representative = [...members].sort(
         (a, b) =>
           completeness(b) - completeness(a) || a.key.localeCompare(b.key),
       )[0];
+
       const size = members.flatMap(
         (member) =>
           parseProductEvidence({
@@ -120,6 +136,7 @@ export function groupCatalogProducts(
             packageUnit: member.weightUnit,
           }).measures,
       )[0];
+
       return {
         ...representative,
         brand: members.find((member) => member.brand)?.brand,
@@ -141,6 +158,7 @@ export function equivalentCatalogProduct(
 ): CatalogProduct {
   if (!product.equivalence) return product;
   const name = equivalentName(product.name);
+
   return {
     key: product.key,
     name:

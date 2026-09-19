@@ -20,6 +20,7 @@ import {
 } from "@/components/ui";
 import { categoryById } from "@/lib/domain/categories";
 import { formatDate } from "@/lib/format-date";
+
 const categoryName = (id: string | null) =>
   id ? (categoryById.get(id)?.name ?? id) : "Ingen";
 
@@ -29,6 +30,7 @@ export default function Corrections() {
     {},
     { initialNumItems: 50 },
   );
+
   const history =
     historyPage.status === "LoadingFirstPage"
       ? undefined
@@ -36,14 +38,17 @@ export default function Corrections() {
           entries: historyPage.results,
           truncated: historyPage.status !== "Exhausted",
         };
+
   const batches = useQuery(api.corrections.batches, {});
   const [selected, setSelected] = useState<Id<"corrections"> | null>(null);
   const [targetKeys, setTargetKeys] = useState<string[]>([]);
+
   const previewPage = usePaginatedQuery(
     api.corrections.previewPage,
     selected ? { id: selected } : "skip",
     { initialNumItems: 20 },
   );
+
   const preview =
     previewPage.status === "LoadingFirstPage"
       ? undefined
@@ -51,19 +56,23 @@ export default function Corrections() {
           targets: previewPage.results.flatMap((group) => group.targets),
           truncated: previewPage.status !== "Exhausted",
         };
+
   const targets =
     preview?.targets.filter((target) =>
       targetKeys.includes(`${target.receiptId}:${target.lineId}`),
     ) ?? [];
+
   const evaluate = useAction(api.correctionEvaluation.evaluate);
   const apply = useReleaseMutation(api.corrections.apply);
   const undo = useReleaseMutation(api.corrections.undo);
   const [result, setResult] = useState<EvaluationResult | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
-  async function run(action: () => Promise<unknown>) {
+
+  async function run<Result>(action: () => Promise<Result>) {
     setBusy(true);
     setError("");
+
     try {
       await action();
     } catch (cause) {
@@ -72,11 +81,14 @@ export default function Corrections() {
       setBusy(false);
     }
   }
+
   const changes =
     history?.entries.filter((entry) => entry.previous !== entry.expected) ?? [];
+
   const selectedEntry = history?.entries.find(
     (entry) => entry._id === selected,
   );
+
   return (
     <Screen insetTop={false}>
       <Stack.Screen options={{ title: "Rettelser og læring" }} />

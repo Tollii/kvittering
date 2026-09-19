@@ -43,12 +43,15 @@ import {
 const fallback = parseVersionPolicy(
   defaultPolicy(installedRelease.platform, installedRelease.channel),
 );
+
 const PolicyContext = createContext({
   policy: fallback,
   blocked: false,
   refresh: async () => {},
 });
+
 export const useReleasePolicy = () => useContext(PolicyContext);
+
 const queryKey = [
   "release-policy",
   installedRelease.platform,
@@ -57,12 +60,14 @@ const queryKey = [
 
 export function ReleasePolicyProvider({ children }: { children: ReactNode }) {
   const [client] = useState(() => new QueryClient());
+
   return (
     <QueryClientProvider client={client}>
       <PolicyProvider client={client}>{children}</PolicyProvider>
     </QueryClientProvider>
   );
 }
+
 function PolicyProvider({
   children,
   client,
@@ -73,6 +78,7 @@ function PolicyProvider({
   const [cached] = useState(readCachedPolicy);
   const featureFlags = useFeatureFlags();
   const { active, online } = useQueryLifecycle();
+
   const http = useMemo(
     () =>
       new ConvexHttpClient(process.env.EXPO_PUBLIC_CONVEX_URL!, {
@@ -81,6 +87,7 @@ function PolicyProvider({
       }),
     [],
   );
+
   const result = useQuery({
     queryKey,
     queryFn: async () => {
@@ -90,9 +97,11 @@ function PolicyProvider({
           platform: installedRelease.platform,
         }),
       );
+
       if (policy.channel !== installedRelease.channel)
         throw new Error("Release environment mismatch.");
       const previous = client.getQueryData<VersionPolicy>(queryKey);
+
       return previous && previous.revision > policy.revision
         ? previous
         : policy;
@@ -104,6 +113,7 @@ function PolicyProvider({
     enabled: active && online,
     refetchInterval: active && online ? policyFreshnessMs : false,
   });
+
   useEffect(
     () =>
       subscribeServerPolicy((policy) => {
@@ -137,17 +147,22 @@ function PolicyProvider({
   const [error, setError] = useState("");
   const [dismissal, setDismissal] = useState(0);
   const release = JSON.stringify(policy.recommended);
+
   const recommended =
     requirement === "recommended" &&
     result.dataUpdatedAt > Math.max(dismissal, dismissedUntil(release));
+
   const refresh = async () => {
     setError("");
     const response = await result.refetch();
+
     if (response.isError)
       setError("Kunne ikke kontrollere versjonen. Prøv igjen med nett.");
   };
+
   const openUpdate = async () => {
     const url = updateUrl(policy);
+
     try {
       if (!url) throw new Error("Update destination unavailable");
       await Linking.openURL(url);
@@ -159,6 +174,7 @@ function PolicyProvider({
       );
     }
   };
+
   return (
     <PolicyContext.Provider
       value={{ policy, blocked: requirement === "required", refresh }}

@@ -1,3 +1,4 @@
+import { z } from "zod";
 import { v } from "convex/values";
 import { parse } from "convex-helpers/validators";
 import type { LocalReceipt } from "./upload-queue";
@@ -15,18 +16,26 @@ const receiptValidator = v.object({
   receiptId: v.id("receipts").optional(),
   error: v.string().optional(),
 });
+
 /** Retain reservation IDs, upload progress and relative image paths during upgrades. */
+// oxlint-disable-next-line anti-slop/no-unknown-parameters -- This boundary parser validates external input before returning a domain value.
 export function migrateReceipt(value: unknown): LocalReceipt {
-  if (!value || typeof value !== "object")
+  const input = z
+    .looseObject({ schemaVersion: z.unknown().optional() })
+    .safeParse(value);
+
+  if (!input.success)
     throw new ReceiptMigrationError(
       "Ugyldig lokal kvittering. Bildene er beholdt.",
     );
-  const version = "schemaVersion" in value ? value.schemaVersion : 0;
+  const version = "schemaVersion" in input.data ? input.data.schemaVersion : 0;
+
   if (version !== 0 && version !== 1)
     throw new ReceiptMigrationError(
       "Kvitteringen krever en nyere versjon av Kvitto. Bildene er beholdt.",
     );
-  const result = parse(receiptValidator, { ...value, schemaVersion: 1 });
+  const result = parse(receiptValidator, { ...input.data, schemaVersion: 1 });
+
   if (
     !result.id ||
     !result.owner ||
@@ -46,31 +55,39 @@ export function migrateReceipt(value: unknown): LocalReceipt {
     throw new ReceiptMigrationError(
       "Ugyldig lokal kvittering. Bildene er beholdt.",
     );
+
   return result;
 }
+
 export interface ReceiptDatabase {
   execSync(sql: string): void;
   getFirstSync<T>(sql: string): T | null;
   getAllSync<T>(sql: string): T[];
-  runSync(sql: string, ...values: string[]): unknown;
+  runSync(sql: string, ...values: string[]): void;
   withTransactionSync(operation: () => void): void;
 }
+
 export function migrateReceiptDatabase(database: ReceiptDatabase) {
   const version =
     database.getFirstSync<{ user_version: number }>("PRAGMA user_version")
       ?.user_version ?? 0;
+
   if (version > 1)
     throw new ReceiptMigrationError(
       "Lokale kvitteringer krever en nyere app. Ingen data er slettet.",
     );
+
   if (version === 1) return;
+
   try {
     database.withTransactionSync(() => {
       const rows = database.getAllSync<{ id: string; data: string }>(
         "SELECT id, data FROM receipt_queue",
       );
+
       for (const row of rows) {
         const receipt = migrateReceipt(JSON.parse(row.data));
+
         if (receipt.id !== row.id)
           throw new ReceiptMigrationError(
             "Kvitteringens ID stemmer ikke. Ingen data er slettet.",
@@ -81,6 +98,7 @@ export function migrateReceiptDatabase(database: ReceiptDatabase) {
           row.id,
         );
       }
+
       database.execSync("PRAGMA user_version = 1");
     });
   } catch (error) {

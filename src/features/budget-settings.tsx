@@ -21,16 +21,20 @@ export function BudgetSettings() {
   const [pending, setPending] = useState<number | null | undefined>(undefined);
   const [saved, setSaved] = useState(false);
   const dirty = value !== baseline || error !== null;
+
   if (pending !== undefined && pending === current) setPending(undefined);
+
   if (!dirty && !busy && pending === undefined && baseline !== current) {
     setBaseline(current);
     setValue(current);
     setSaved(false);
     setGeneration(generation + 1);
   }
+
   async function save(next: number | null) {
     setBusy(true);
     setError(null);
+
     try {
       await releaseMutation(client, api.households.setBudget, {
         monthlyBudgetOre: next,
@@ -46,6 +50,7 @@ export function BudgetSettings() {
       setBusy(false);
     }
   }
+
   return (
     <Panel>
       <MoneyField

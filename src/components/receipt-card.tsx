@@ -6,6 +6,7 @@ import { formatDate } from "@/lib/format-date";
 import { reviewSummary } from "@/lib/domain/receipt-review";
 import type { Receipt } from "@/lib/domain/insights";
 import { formatMoney } from "@/lib/domain/receipt";
+
 export const statusLabels: Record<Receipt["status"], string> = {
   uploading: "Laster opp",
   uploaded: "Venter på lesing",
@@ -14,21 +15,26 @@ export const statusLabels: Record<Receipt["status"], string> = {
   reviewed: "Kontrollert",
   failed: "Lesingen mislyktes",
 };
+
 export function receiptStatusLabel(receipt: Receipt) {
   if (receipt.excluded) return "Utelatt fra forbruk";
+
   return receipt.status === "reviewed" && receipt.autoAccepted
     ? "Godkjent automatisk"
     : statusLabels[receipt.status];
 }
+
 export function receiptNeeds(receipt: Receipt) {
   return reviewSummary(
     receipt.data,
     !!receipt.duplicateOf && !receipt.duplicateResolved,
   );
 }
+
 export function openReceipt(receipt: Receipt) {
   router.push({ pathname: "/receipt/[id]", params: { id: receipt._id } });
 }
+
 export function ReceiptCard({
   receipt,
   compact = false,
@@ -39,6 +45,7 @@ export function ReceiptCard({
   const colors = useTheme();
   const busy = ["uploading", "uploaded", "processing"].includes(receipt.status);
   const needs = receipt.status === "needs_review" ? receiptNeeds(receipt) : [];
+
   return (
     <Pressable
       accessibilityRole="button"

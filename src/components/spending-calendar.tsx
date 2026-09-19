@@ -7,6 +7,7 @@ import {
   type SpendingGroup,
 } from "@/lib/domain/insights";
 import { formatMoney } from "@/lib/domain/receipt";
+
 export function SpendingCalendar({
   receipts,
   month,
@@ -19,15 +20,19 @@ export function SpendingCalendar({
   onSelect: (group: SpendingGroup) => void;
 }) {
   const colors = useTheme();
+
   const days = spendingCalendar(
     receipts,
     Number(month.slice(0, 4)),
     reviewedOnly,
   ).filter((day) => day.date.startsWith(month));
+
   const offset = (new Date(`${month}-01T12:00:00Z`).getUTCDay() + 6) % 7;
+
   // Deeper violet for heavier shopping days, like the mosaic bands on the note.
   const shade = (level: number) =>
     level <= 0 ? colors.muted : mosaicPalette[Math.max(0, 4 - level)];
+
   return (
     <View style={{ gap: 10 }}>
       <View style={{ flexDirection: "row" }}>

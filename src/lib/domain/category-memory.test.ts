@@ -15,6 +15,7 @@ it("keys memory on store and receipt name only", () => {
   expect(categoryMemoryKey(null, "Melk")).toBeNull();
   expect(categoryMemoryKey("REMA 1000", " ")).toBeNull();
 });
+
 it("counts agreeing approvals and restarts on a correction", () => {
   const first = recordCategoryDecision(null, "dairy.milk");
   expect(first).toEqual({ categoryId: "dairy.milk", confirmations: 1 });
@@ -28,6 +29,7 @@ it("counts agreeing approvals and restarts on a correction", () => {
   });
   expect(recordCategoryDecision(null, "dairy.milk", 3).confirmations).toBe(3);
 });
+
 it("learns only from settled product lines", () => {
   const data = weeklyShopFixture();
   const byId = (id: string) => data.lines.find((line) => line.id === id)!;
@@ -38,6 +40,7 @@ it("learns only from settled product lines", () => {
     learnableLine({ ...byId("milk"), categoryId: "fallback.unclear" }),
   ).toBe(false);
 });
+
 it("settles an uncertain line once memory is trusted, never a manual one", () => {
   const data = weeklyShopFixture();
   const cheez = data.lines.find((line) => line.id === "cheez")!;

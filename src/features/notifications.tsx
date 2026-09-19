@@ -1,3 +1,4 @@
+import { z } from "zod";
 import { releaseMutation } from "@/lib/releases/requests";
 import { useEffect, useState } from "react";
 import { AppState, Linking, Platform } from "react-native";
@@ -8,11 +9,11 @@ import * as Device from "expo-device";
 import { router } from "expo-router";
 import { useConvex, useQuery, type ConvexReactClient } from "convex/react";
 import { api } from "../../convex/_generated/api";
-import type { Id } from "../../convex/_generated/dataModel";
 import { Button, Copy, Notice, Panel } from "@/components/ui";
 import { useHousehold } from "./session";
 
 const tokenKey = "kvitto.push-token";
+
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
     shouldPlaySound: false,
@@ -21,28 +22,35 @@ Notifications.setNotificationHandler({
     shouldShowList: true,
   }),
 });
+
 export async function disableNotifications(client: ConvexReactClient) {
   const token = await SecureStore.getItemAsync(tokenKey);
+
   if (token) {
     await releaseMutation(client, api.notifications.unsubscribe, { token });
     await SecureStore.deleteItemAsync(tokenKey);
   }
 }
+
 export function NotificationSettings() {
   const client = useConvex();
   const [token, setToken] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [granted, setGranted] = useState(true);
+
   const enabled = useQuery(
     api.notifications.enabled,
     token ? { token } : "skip",
   );
+
   const projectId =
     Constants.expoConfig?.extra?.eas?.projectId ??
     Constants.easConfig?.projectId;
+
   const available =
     Device.isDevice && !!projectId && Constants.appOwnership !== "expo";
+
   useEffect(() => {
     const refresh = async () => {
       try {
@@ -52,15 +60,20 @@ export function NotificationSettings() {
         setError("Kunne ikke hente varslingsinnstillingene.");
       }
     };
+
     void refresh();
+
     const subscription = AppState.addEventListener("change", (state) => {
       if (state === "active") void refresh();
     });
+
     return () => subscription.remove();
   }, []);
+
   async function change() {
     setBusy(true);
     setError("");
+
     try {
       if (enabled) {
         await disableNotifications(client);
@@ -68,8 +81,10 @@ export function NotificationSettings() {
       } else {
         const permission = await Notifications.requestPermissionsAsync();
         setGranted(permission.granted);
+
         if (!permission.granted)
           throw new Error("Tillat varsler i iPhone-innstillingene.");
+
         if (Platform.OS === "android")
           await Notifications.setNotificationChannelAsync("default", {
             name: "Kvitteringer",
@@ -91,6 +106,7 @@ export function NotificationSettings() {
       setBusy(false);
     }
   }
+
   return (
     <Panel>
       {!available && (
@@ -119,6 +135,7 @@ export function NotificationSettings() {
     </Panel>
   );
 }
+
 export function NotificationRouting() {
   const client = useConvex();
   const { household } = useHousehold();
@@ -126,6 +143,7 @@ export function NotificationRouting() {
   useEffect(() => {
     let active = true;
     let lastIdentifier: string | undefined;
+
     async function open(response: Notifications.NotificationResponse | null) {
       if (
         !response ||
@@ -134,18 +152,25 @@ export function NotificationRouting() {
         return;
       lastIdentifier = response.notification.request.identifier;
       const data = response.notification.request.content.data ?? {};
+
       if (data.route === "/spending") {
         router.navigate("/spending");
         await Notifications.clearLastNotificationResponseAsync();
+
         return;
       }
-      const id: unknown = data.receiptId;
-      if (typeof id !== "string") return;
+
+      const id = z.string().safeParse(data.receiptId).data;
+
+      if (!id) return;
+
       try {
         const result = await client.query(api.receipts.detail, {
-          id: id as Id<"receipts">,
+          id: id,
         });
+
         if (!result) throw new Error("Receipt unavailable");
+
         if (active && result.receipt.householdId === household.id)
           router.push({ pathname: "/receipt/[id]", params: { id } });
       } catch {
@@ -157,16 +182,20 @@ export function NotificationRouting() {
         await Notifications.clearLastNotificationResponseAsync();
       }
     }
+
     void Notifications.getLastNotificationResponseAsync()
       .then(open)
       .catch(() => {});
+
     const subscription = Notifications.addNotificationResponseReceivedListener(
       (response) => void open(response),
     );
+
     return () => {
       active = false;
       subscription.remove();
     };
   }, [client, household.id]);
+
   return error ? <Notice error>{error}</Notice> : null;
 }

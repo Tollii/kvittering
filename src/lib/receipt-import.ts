@@ -28,6 +28,7 @@ export async function prepareImage(
 ) {
   let w = width ?? 0;
   let h = height ?? 0;
+
   if (!w || !h) {
     ({ w, h } = await new Promise<{ w: number; h: number }>((resolve) =>
       Image.getSize(
@@ -37,16 +38,21 @@ export async function prepareImage(
       ),
     ));
   }
+
   const image = ImageManipulator.manipulate(uri);
+
   if (Math.max(w, h) > 2400)
     image.resize(w > h ? { width: 2400 } : { height: 2400 });
   const rendered = await image.renderAsync();
+
   const result = await rendered.saveAsync({
     compress: 0.85,
     format: SaveFormat.JPEG,
   });
+
   rendered.release();
   image.release();
+
   return result.uri;
 }
 
@@ -61,6 +67,7 @@ export async function importReceiptFiles(
 ): Promise<{ uris: string[]; singleDocument: boolean }> {
   if (!files.length) return { uris: [], singleDocument: false };
   const uris: string[] = [];
+
   for (const file of files) {
     if (isPdf(file)) {
       if (!ReceiptIntelligence?.renderPdf)
@@ -74,8 +81,10 @@ export async function importReceiptFiles(
     } else {
       throw new Error("Kvitto kan lese bilder og PDF-filer.");
     }
+
     if (uris.length > room) throw new Error(`Maks ${maxReceiptImages} bilder`);
   }
+
   return {
     uris,
     singleDocument: files.length === 1 && isPdf(files[0]) && uris.length > 1,

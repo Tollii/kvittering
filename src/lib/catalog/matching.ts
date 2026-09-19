@@ -12,6 +12,7 @@ import type { CatalogProduct, PhysicalStore } from "./model";
 import { normalizeSearch } from "./policy";
 import { productSearch } from "./search";
 import { organicProduct } from "./equivalence";
+
 export { productSearch } from "./search";
 
 export function compatibleCatalogProduct(
@@ -19,19 +20,23 @@ export function compatibleCatalogProduct(
   product: CatalogProduct,
 ) {
   const source = parseProductEvidence({ ...line, source: "receipt" });
+
   if (
     organicProduct(line.name, line.attributes) !==
     organicProduct(product.name, product.labels)
   )
     return false;
+
   const target = parseProductEvidence({
     source: "catalog",
     name: product.name,
     packageSize: product.weight,
     packageUnit: product.weightUnit,
   });
+
   const size = source.measures[0];
   const targetSize = target.measures[0];
+
   if (
     source.counts.length > 1 ||
     target.counts.length > 1 ||
@@ -40,18 +45,22 @@ export function compatibleCatalogProduct(
       source.counts[0] !== target.counts[0])
   )
     return false;
+
   const brand = (value: string | null) =>
     value ? normalizeSearch(value).replace(/[^\p{L}\p{N}]/gu, "") : null;
+
   const variant = (name: string) => [
     /\b(light|lett)\b/.test(normalizeSearch(name)),
     /\b(koffeinfri|caffeine free|zero caffeine)\b/.test(normalizeSearch(name)),
   ];
+
   if (
     variant([line.name, ...line.attributes].join(" ")).some(
       (value, index) => value !== variant(product.name)[index],
     )
   )
     return false;
+
   return compatibleProduct(
     {
       ...line,
@@ -82,10 +91,12 @@ function productWords(name: string) {
 /** Rank the entire result set before limiting candidates sent to the classifier. */
 export function rankCatalogProducts(name: string, products: CatalogProduct[]) {
   const source = productWords(name);
+
   return products
     .map((product) => {
       const target = productWords(product.name);
       const common = [...source].filter((word) => target.has(word)).length;
+
       return { product, score: common / Math.max(source.size, target.size, 1) };
     })
     .sort(
@@ -133,10 +144,13 @@ export function automaticCatalogProduct(
 ) {
   const name = line.receiptName || line.name;
   const source = productWords(name);
+
   // Single generic words such as “Agurk” do not establish a retail product.
   if (source.size < 2) return null;
+
   const unique = (items: CatalogProduct[]) => {
     const barcoded = items.filter((product) => product.ean);
+
     return [
       ...new Map(
         (barcoded.length ? barcoded : items).map((product) => [
@@ -146,9 +160,12 @@ export function automaticCatalogProduct(
       ).values(),
     ];
   };
+
   const ranked = rankCatalogProducts(name, products);
+
   const sourceCount = parseProductEvidence({ ...line, source: "receipt" })
     .counts[0];
+
   // Missing counts keep candidates eligible for the model, but do not prove pack identity.
   const hasUnresolvedCount = (product: CatalogProduct) =>
     sourceCount !==
@@ -158,10 +175,12 @@ export function automaticCatalogProduct(
       packageSize: product.weight,
       packageUnit: product.weightUnit,
     }).counts[0];
+
   const contained = unique(
     ranked
       .filter(({ product }) => {
         const target = productWords(product.name);
+
         return (
           [...source].every((word) => target.has(word)) &&
           [...target].every((word) => source.has(word) || neutralWord(word)) &&
@@ -170,14 +189,17 @@ export function automaticCatalogProduct(
       })
       .map(({ product }) => product),
   );
+
   if (contained.length)
     return contained.length === 1 && !hasUnresolvedCount(contained[0])
       ? contained[0]
       : null;
+
   const candidates = unique(
     ranked
       .filter(({ product }) => {
         const target = productWords(product.name);
+
         return (
           [...source].every((word) => target.has(word)) &&
           compatibleCatalogProduct(line, product)
@@ -185,19 +207,24 @@ export function automaticCatalogProduct(
       })
       .map(({ product }) => product),
   );
+
   if (candidates.length !== 1) return null;
   const candidate = candidates[0];
+
   if (!candidate.ean || !candidate.brand || hasUnresolvedCount(candidate))
     return null;
   const brandWords = productWords(candidate.brand);
+
   return brandWords.size > 0 &&
     [...brandWords].every((word) => source.has(word)) &&
     [...source].some((word) => !brandWords.has(word) && !neutralWord(word))
     ? candidate
     : null;
 }
+
 export function retailerCode(store: string | null): string | null {
   const name = normalizeSearch(store ?? "");
+
   const known: [RegExp, string][] = [
     [/re ma|rema/, "REMA_1000"],
     [/kiwi/, "KIWI"],
@@ -212,21 +239,28 @@ export function retailerCode(store: string | null): string | null {
     [/coop/, "COOP_NO"],
     [/europris/, "EUROPRIS_NO"],
   ];
+
   return known.find(([pattern]) => pattern.test(name))?.[1] ?? null;
 }
+
 export function exactPhysicalStore(
   branch: string,
   candidates: PhysicalStore[],
 ) {
   const words = (value: string) =>
     matchingKey(value).replace(/[^\p{L}\p{N}]/gu, "");
+
   const name = words(branch);
+
   if (name.length < 4) return null;
+
   const matches = candidates.filter((store) =>
     words(store.name).includes(name),
   );
+
   return matches.length === 1 ? matches[0] : null;
 }
+
 export function lineEvidenceKey(line: ReceiptLine) {
   return JSON.stringify([
     line.receiptName ?? line.name,

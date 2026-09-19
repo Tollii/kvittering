@@ -30,16 +30,19 @@ export function settleLineWithAlias(
 ): boolean {
   const nextCategory = line.manual ? line.categoryId : categoryId;
   const issues = line.issues.filter((issue) => !isCategoryUncertain(issue));
+
   const changed =
     line.productKey !== key ||
     line.categoryId !== nextCategory ||
     issues.length !== line.issues.length ||
     line.confidence !== 1;
+
   line.categoryAliasKey = key;
   line.productKey = key;
   line.categoryId = nextCategory;
   line.issues = issues;
   line.confidence = 1;
+
   return changed;
 }
 
@@ -57,6 +60,7 @@ export async function applyHouseholdAliases(
   for (const line of data.lines) {
     if (line.kind !== "product") continue;
     const key = aliasKey(data, line);
+
     const alias = key
       ? await ctx.db
           .query("aliases")
@@ -65,11 +69,14 @@ export async function applyHouseholdAliases(
           )
           .unique()
       : null;
+
     if (alias && key && categoryById.has(alias.categoryId)) {
       settleLineWithAlias(line, key, alias.categoryId);
       continue;
     }
+
     const memoryKey = categoryMemoryKey(data.store, line.name);
+
     const memory = memoryKey
       ? await ctx.db
           .query("categoryMemory")
@@ -78,8 +85,10 @@ export async function applyHouseholdAliases(
           )
           .unique()
       : null;
+
     if (memory) applyCategoryMemory(line, memory);
   }
+
   return data;
 }
 
@@ -95,22 +104,27 @@ export async function learnCategories(
   rememberLineIds: string[],
 ) {
   const seen = new Set<string>();
+
   for (const line of data.lines) {
     if (!learnableLine(line)) continue;
     const key = categoryMemoryKey(data.store, line.name);
+
     if (!key || seen.has(key)) continue;
     seen.add(key);
+
     const existing = await ctx.db
       .query("categoryMemory")
       .withIndex("by_householdId_and_key", (q) =>
         q.eq("householdId", householdId).eq("key", key),
       )
       .unique();
+
     const next = recordCategoryDecision(
       existing,
       line.categoryId!,
       rememberLineIds.includes(line.id) ? categoryMemoryThreshold : 1,
     );
+
     if (existing)
       await ctx.db.patch("categoryMemory", existing._id, {
         ...next,
@@ -144,21 +158,27 @@ export const applyToMatching = internalMutation({
         q.eq("householdId", args.householdId).eq("key", args.key),
       )
       .unique();
+
     if (!alias || !categoryById.has(alias.categoryId)) return null;
+
     const page = await ctx.db
       .query("receipts")
       .withIndex("by_householdId", (q) => q.eq("householdId", args.householdId))
       .paginate({ cursor: args.cursor, numItems: 10 });
+
     for (const receipt of page.page) {
       if (!receipt.data) continue;
       let changed = false;
       const data = structuredClone(receipt.data);
+
       for (const line of data.lines) {
         if (line.kind !== "product" || aliasKey(data, line) !== args.key)
           continue;
+
         if (settleLineWithAlias(line, args.key, alias.categoryId))
           changed = true;
       }
+
       if (changed) {
         await commitReceiptChange(ctx, {
           receiptId: receipt._id,
@@ -168,11 +188,13 @@ export const applyToMatching = internalMutation({
         });
       }
     }
+
     if (!page.isDone)
       await ctx.scheduler.runAfter(0, internal.aliases.applyToMatching, {
         ...args,
         cursor: page.continueCursor,
       });
+
     return null;
   },
 });

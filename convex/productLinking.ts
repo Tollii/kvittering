@@ -39,6 +39,7 @@ export const page = query({
   returns: paginationResultValidator(matchingReceiptValidator),
   handler: async (ctx, { paginationOpts }) => {
     const member = await requireMember(ctx);
+
     const result = await ctx.db
       .query("receipts")
       .withIndex("by_householdId", (q) =>
@@ -51,13 +52,16 @@ export const page = query({
         maximumRowsRead: 30,
         maximumBytesRead: 500_000,
       });
+
     return {
       ...result,
       page: result.page.flatMap((receipt) => {
         if (!eligible(receipt)) return [];
+
         const lines = receipt
           .data!.lines.filter(needsProductLink)
           .map(matchingLine);
+
         return lines.length
           ? [
               {
@@ -82,11 +86,14 @@ export const candidates = query({
   handler: async (ctx, { receiptId, lineId }) => {
     const { receipt } = await requireReceipt(ctx, receiptId);
     const line = receipt.data?.lines.find((item) => item.id === lineId);
+
     if (!eligible(receipt) || !line || !needsProductLink(line)) return [];
+
     const decision = receipt.catalogDecisions?.find(
       (item) =>
         item.lineId === lineId && item.evidenceKey === lineEvidenceKey(line),
     );
+
     const keys = [
       ...new Set(
         [...(decision?.candidates ?? [])]
@@ -95,6 +102,7 @@ export const candidates = query({
           .map((candidate) => candidate.key),
       ),
     ].slice(0, 4);
+
     const rows = await Promise.all(
       keys.map((key) =>
         ctx.db
@@ -103,6 +111,7 @@ export const candidates = query({
           .unique(),
       ),
     );
+
     return rows.flatMap((row) => (row ? [row.product] : []));
   },
 });
@@ -121,16 +130,19 @@ export const choose = mutation({
   returns: receiptCommitValidator,
   handler: async (ctx, args) => {
     const { receipt, member } = await requireReceipt(ctx, args.receiptId);
+
     if (
       receipt.revision !== args.revision ||
       receipt.generation !== args.generation
     )
       throw new Error("Kvitteringen er endret. Prøv igjen med siste versjon.");
     const line = receipt.data?.lines.find((item) => item.id === args.lineId);
+
     if (!eligible(receipt) || !line || !needsProductLink(line))
       throw new Error("Varen er ikke lenger klar for produktkobling.");
     const retailer = matchingKey(receipt.data!.store!);
     const before = await findMapping(ctx, member.householdId, retailer, line);
+
     const data = await resolveProductSelections(
       ctx,
       member.householdId,
@@ -138,14 +150,18 @@ export const choose = mutation({
       receipt.data!,
       [{ ...args.choice, lineId: line.id }],
     );
+
     const mapping = await findMapping(ctx, member.householdId, retailer, line);
+
     if (!mapping?.revision) throw new Error("Produktvalget kunne ikke lagres.");
+
     const commit = await commitReceiptChange(ctx, {
       receiptId: receipt._id,
       expected: receipt,
       data,
       origin: { kind: "product_link", editor: member.identity },
     });
+
     await ctx.db.patch("receipts", receipt._id, {
       productLinkUndo: {
         editor: member.identity,
@@ -164,6 +180,7 @@ export const choose = mutation({
           : null,
       },
     });
+
     return commit;
   },
 });
@@ -175,6 +192,7 @@ export const undo = mutation({
   handler: async (ctx, { receiptId, revision }) => {
     const { receipt, member } = await requireReceipt(ctx, receiptId);
     const undo = receipt.productLinkUndo;
+
     if (
       !undo ||
       undo.editor !== member.identity ||
@@ -185,12 +203,14 @@ export const undo = mutation({
     )
       throw new Error("Valget kan ikke angres fordi kvitteringen er endret.");
     const mapping = await ctx.db.get("productMappings", undo.mappingId);
+
     if (
       !mapping ||
       mapping.householdId !== member.householdId ||
       mapping.revision !== undo.mappingRevision
     )
       throw new Error("Produktvalget er endret senere og kan ikke angres.");
+
     if (undo.previousMapping)
       await ctx.db.replace("productMappings", mapping._id, {
         householdId: mapping.householdId,
@@ -213,6 +233,7 @@ export const undo = mutation({
       },
       origin: { kind: "product_link", editor: member.identity },
     });
+
     return null;
   },
 });

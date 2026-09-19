@@ -4,6 +4,7 @@ import { Copy, Field, Loading, Notice, Row, Sheet } from "@/components/ui";
 import { useCatalogSearch } from "./catalog-queries";
 import type { PhysicalStore } from "@/lib/catalog/model";
 import type { Id } from "../../convex/_generated/dataModel";
+
 export function CatalogStorePicker({
   receiptId,
   name,
@@ -18,6 +19,7 @@ export function CatalogStorePicker({
   const [search, setSearch] = useState(name);
   const productLookup = useFeatureFlag("productLookup");
   const query = useCatalogSearch(search, { kind: "stores", receiptId });
+
   return (
     <Sheet
       title="Velg butikk"

@@ -15,6 +15,7 @@ export function useProductLinkingQueue() {
     active ? {} : "skip",
     { initialNumItems: 30 },
   );
+
   const items = results.flatMap(({ lines, ...receipt }) =>
     lines.map((line) => ({ ...receipt, line })),
   );

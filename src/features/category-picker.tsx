@@ -18,19 +18,22 @@ import {
 import { useTheme } from "@/constants/theme";
 
 // Common receipt words make category search useful without knowing the taxonomy.
-const keywords: Record<string, string> = {
-  "personal-care.oral": "tannbørste tannkrem tanntråd munnskyll jordan colgate",
-  "convenience.frozen-pizza": "pizza bigone grandiosa",
-  "household.laundry": "vaskemiddel skyllemiddel omo blenda",
-  "household.dishwashing": "zalo oppvaskmiddel oppvasktabletter",
-  "other-purchases.bags": "bærepose pose",
-  "drinks.soft-drinks":
-    "cola pepsi solo fanta energidrikk battery monster red bull burn",
-  "convenience.fresh-meals": "pizza varmmat ferdigmat fersk",
-  "convenience.sandwiches": "tacobaguette baguett sandwich wrap",
-  "personal-care.supplements":
-    "vitamin melatonin kosttilskudd tran mineral magnesium",
-};
+const keywords = new Map(
+  Object.entries({
+    "personal-care.oral":
+      "tannbørste tannkrem tanntråd munnskyll jordan colgate",
+    "convenience.frozen-pizza": "pizza bigone grandiosa",
+    "household.laundry": "vaskemiddel skyllemiddel omo blenda",
+    "household.dishwashing": "zalo oppvaskmiddel oppvasktabletter",
+    "other-purchases.bags": "bærepose pose",
+    "drinks.soft-drinks":
+      "cola pepsi solo fanta energidrikk battery monster red bull burn",
+    "convenience.fresh-meals": "pizza varmmat ferdigmat fersk",
+    "convenience.sandwiches": "tacobaguette baguett sandwich wrap",
+    "personal-care.supplements":
+      "vitamin melatonin kosttilskudd tran mineral magnesium",
+  }),
+);
 
 export function CategoryPicker({
   name,
@@ -62,28 +65,36 @@ export function CategoryPicker({
   const [group, setGroup] = useState<string | null>(null);
   const query = search.trim().toLocaleLowerCase("nb-NO");
   const current = categoryById.get(value ?? "");
+
   const results = categories.filter((category) =>
     query
-      ? `${category.groupName} ${category.name} ${keywords[category.id] ?? ""}`
+      ? `${category.groupName} ${category.name} ${keywords.get(category.id) ?? ""}`
           .toLocaleLowerCase("nb-NO")
           .includes(query)
       : category.group === group,
   );
+
   // Most-used first: the household's own habits are the best predictor.
   const usage = new Map<string, number>();
+
   for (const id of recent) usage.set(id, (usage.get(id) ?? 0) + 1);
+
   const recentCategories = [...usage.entries()]
     .filter(([id]) => id !== value && !id.startsWith("fallback."))
     .sort((a, b) => b[1] - a[1])
     .slice(0, 6)
     .map(([id]) => id);
+
   const choose = (id: string) => {
     onSelect(id);
     onClose();
   };
+
   const categoryRow = (id: string, showGroup = false) => {
     const category = categoryById.get(id);
+
     if (!category) return null;
+
     return (
       <Row
         key={id}
@@ -94,6 +105,7 @@ export function CategoryPicker({
       />
     );
   };
+
   const list = (ids: string[], showGroup: boolean) => (
     <Panel style={{ gap: 0, paddingVertical: 4 }}>
       {ids.map((id, index) => (
@@ -109,6 +121,7 @@ export function CategoryPicker({
       ))}
     </Panel>
   );
+
   return (
     <Sheet
       title="Velg kategori"
@@ -119,14 +132,14 @@ export function CategoryPicker({
           <Copy size={15} weight="600" numberOfLines={2}>
             {name}
           </Copy>
-          {(originalText || brand || typeof confidence === "number") && (
+          {(originalText || brand || confidence != null) && (
             <Copy size={12} muted numberOfLines={2}>
               {[
                 originalText && originalText !== name
                   ? `Lest: ${originalText}`
                   : null,
                 brand,
-                typeof confidence === "number" && confidence < 1
+                confidence != null && confidence < 1
                   ? `${Math.round(confidence * 100)} % sikker`
                   : null,
               ]
@@ -140,6 +153,7 @@ export function CategoryPicker({
             value={search}
             onChangeText={(text) => {
               setSearch(text);
+
               if (text) setGroup(null);
             }}
             autoCorrect={false}
@@ -197,7 +211,7 @@ export function CategoryPicker({
           {current && current.id !== "fallback.unclear" && (
             <>
               <Copy size={13} weight="600" muted>
-                {typeof confidence === "number" && confidence < 1
+                {confidence != null && confidence < 1
                   ? `Forslag · ${Math.round(confidence * 100)} %`
                   : "Valgt"}
               </Copy>

@@ -21,6 +21,7 @@ const line = () => ({
   unit: "stk",
   catalogProduct: null,
 });
+
 describe("product families and purchased quantities", () => {
   it("keeps variants in family names and removes package notation", () => {
     expect(familyName(line())).toBe("COCA-COLA");
@@ -37,6 +38,7 @@ describe("product families and purchased quantities", () => {
         packageUnit: "l",
       }),
     );
+
     expect(candidates.counts).toContain(10);
     expect(candidates.measures).toEqual([
       { amount: 3300, unit: "ml" },
@@ -60,6 +62,7 @@ describe("product families and purchased quantities", () => {
       quantity: 0.75,
       unit: "kg",
     });
+
     const selected = candidates.find((candidate) => candidate.kind === "g")!;
     expect(
       normalizePurchase(
@@ -73,6 +76,7 @@ describe("product families and purchased quantities", () => {
       unitsPerPackage: 10,
       measurePerPackage: { amount: 3300, unit: "ml" as const },
     };
+
     expect(normalizePurchase(profile, null).units).toBeNull();
     expect(
       normalizePurchase(profile, {
@@ -108,6 +112,7 @@ it("does not copy size from a catalog product with a conflicting pack count", ()
       weightUnit: "ml",
     },
   };
+
   const evidence = quantityEvidence(source);
   expect(evidence.catalog.kind).toBe("pack-conflict");
   expect(packageCandidates(evidence).measures).toEqual([]);
@@ -121,17 +126,20 @@ it("rejects conflicting BX package evidence without changing the source", () => 
     name: "Cola 10BX",
     catalogProduct: { key: "other", name: "Cola 15BX 330ml" },
   };
+
   expect(packageCandidates(quantityEvidence(source)).measures).toEqual([]);
   expect(source.catalogProduct.name).toBe("Cola 15BX 330ml");
 });
 
 it("retains provenance and uncertain multiplier meaning in package evidence", async () => {
   const { parseProductEvidence } = await import("./product-evidence");
+
   const input = {
     source: "receipt" as const,
     name: "Gulrot 24x150g",
     packageSize: null,
   };
+
   const before = structuredClone(input);
   const evidence = parseProductEvidence(input);
   expect(evidence.counts).toEqual([24]);

@@ -6,7 +6,9 @@ import { components } from "./_generated/api";
 import type { DataModel } from "./_generated/dataModel";
 import authConfig from "./auth.config";
 import { env } from "./_generated/server";
+
 export const authComponent = createClient<DataModel>(components.betterAuth);
+
 export const createAuth = (ctx: GenericCtx<DataModel>) =>
   betterAuth({
     baseURL: env.CONVEX_SITE_URL,

@@ -7,26 +7,33 @@ import type { Doc } from "../../../convex/_generated/dataModel";
 import { categoryById } from "./categories";
 import { type ReceiptLine } from "./receipt";
 import type { StorePurchase } from "./store-spending";
+
 export type Receipt = Doc<"receipts">;
+
 export type Contribution = {
   receipt: Receipt;
   line: ReceiptLine | null;
   amountOre: number;
 };
+
 export type SpendingGroup = {
   id: string;
   name: string;
   amountOre: number;
   contributions: Contribution[];
 };
+
 export function monthBefore(month: string) {
   const [year, number] = month.split("-").map(Number);
   const date = new Date(Date.UTC(year, number - 2, 1));
+
   return date.toISOString().slice(0, 7);
 }
+
 export function receiptMonth(receipt: Receipt) {
   return receipt.data?.purchaseDate?.slice(0, 7) ?? null;
 }
+
 export function monthlyInsights(
   receipts: Receipt[],
   month: string,
@@ -38,13 +45,16 @@ export function monthlyInsights(
     provisional: reviewedOnly ? "exclude" : "include",
     period: { start: `${month}-01`, end: `${month}-31` },
   });
+
   const unconverted = projected
     .filter((item) => item.data.currency !== "NOK")
     .map((item) => item.receipt);
+
   const prepared = projected.filter((item) => item.data.currency === "NOK");
   const selected = prepared.map((item) => item.receipt);
   const category = new Map<string, SpendingGroup>();
   const stores = new Map<string, SpendingGroup>();
+
   let paid = 0,
     products = 0,
     discounts = 0,
@@ -52,6 +62,7 @@ export function monthlyInsights(
     returns = 0,
     unknownTotals = 0,
     unknownAmounts = 0;
+
   const add = (
     map: Map<string, SpendingGroup>,
     id: string,
@@ -63,6 +74,7 @@ export function monthlyInsights(
     group.contributions.push(contribution);
     map.set(id, group);
   };
+
   for (const { receipt, data, totals, purchases, unallocated } of prepared) {
     unknownAmounts += totals.unknown;
     paid += data.totalOre ?? 0;
@@ -70,7 +82,9 @@ export function monthlyInsights(
     discounts += totals.discounts;
     deposits += totals.deposits;
     returns += totals.returns;
+
     if (data.totalOre === null) unknownTotals++;
+
     for (const { line } of purchases) {
       const found = categoryById.get(line.categoryId ?? "");
       add(
@@ -84,6 +98,7 @@ export function monthlyInsights(
         },
       );
     }
+
     if (unallocated)
       add(category, "unallocated", "Ufordelte rabatter og justeringer", {
         receipt,
@@ -96,9 +111,12 @@ export function monthlyInsights(
       amountOre: totals.productSpending,
     });
   }
+
   const groups = new Map<string, SpendingGroup>();
+
   for (const leaf of category.values()) {
     const found = categoryById.get(leaf.id);
+
     for (const contribution of leaf.contributions)
       add(
         groups,
@@ -107,11 +125,14 @@ export function monthlyInsights(
         contribution,
       );
   }
+
   const purchaseTypes = new Map<string, SpendingGroup>();
+
   for (const leaf of category.values()) {
     const found = categoryById.get(leaf.id);
     const type = found?.purchaseType ?? "unknown";
-    const names: Record<string, string> = {
+
+    const names = {
       food: "Mat og drikke",
       household: "Husholdning",
       "personal-care": "Personlig pleie",
@@ -119,9 +140,11 @@ export function monthlyInsights(
       other: "Andre varer",
       unknown: "Uavklart",
     };
+
     for (const contribution of leaf.contributions)
       add(purchaseTypes, type, names[type], contribution);
   }
+
   return {
     selected,
     storePurchases: prepared.map(
@@ -164,6 +187,7 @@ export function monthlyInsights(
     ),
   };
 }
+
 export function productHistory(receipts: Receipt[]) {
   const products = new Map<
     string,
@@ -177,6 +201,7 @@ export function productHistory(receipts: Receipt[]) {
       contributions: Contribution[];
     }
   >();
+
   for (const { receipt, purchases } of preparePurchases(
     receipts,
     overviewPurchasePolicy,
@@ -184,6 +209,7 @@ export function productHistory(receipts: Receipt[]) {
     for (const { line } of purchases) {
       // Unlinked items remain separate; similar names do not establish identity.
       const key = productIdentityKey(line) ?? `${receipt._id}:${line.id}`;
+
       const product = products.get(key) ?? {
         key,
         name: line.catalogProduct?.name ?? (line.productName || line.name),
@@ -193,6 +219,7 @@ export function productHistory(receipts: Receipt[]) {
         amountOre: 0,
         contributions: [],
       };
+
       product.amountOre += line.netOre;
       product.quantity += line.quantity ?? 0;
       product.purchases.add(receipt._id);
@@ -200,8 +227,10 @@ export function productHistory(receipts: Receipt[]) {
       products.set(key, product);
     }
   }
+
   return [...products.values()].sort((a, b) => b.amountOre - a.amountOre);
 }
+
 /** Current months compare equal calendar ranges; completed months compare in full. */
 export function comparisonInsights(
   receipts: Receipt[],
@@ -210,28 +239,35 @@ export function comparisonInsights(
   today = new Date().toLocaleDateString("sv-SE", { timeZone: "Europe/Oslo" }),
 ) {
   const priorMonth = monthBefore(month);
+
   const lastDay = (value: string) =>
     new Date(
       Date.UTC(Number(value.slice(0, 4)), Number(value.slice(5, 7)), 0),
     ).getUTCDate();
+
   const partial = month === today.slice(0, 7);
   const day = partial ? Number(today.slice(8, 10)) : lastDay(month);
   const currentEnd = `${month}-${String(day).padStart(2, "0")}`;
   const previousEnd = `${priorMonth}-${String(partial ? Math.min(day, lastDay(priorMonth)) : lastDay(priorMonth)).padStart(2, "0")}`;
+
   const through = (end: string) =>
     receipts.filter((r) => !r.data?.purchaseDate || r.data.purchaseDate <= end);
+
   const current = monthlyInsights(through(currentEnd), month, reviewedOnly);
+
   const previous = monthlyInsights(
     through(previousEnd),
     priorMonth,
     reviewedOnly,
   );
+
   const changes = [
     ...new Set([...current.groups, ...previous.groups].map((g) => g.id)),
   ]
     .map((id) => {
       const now = current.groups.find((g) => g.id === id);
       const before = previous.groups.find((g) => g.id === id);
+
       return {
         id,
         name: now?.name ?? before!.name,
@@ -243,10 +279,13 @@ export function comparisonInsights(
       };
     })
     .sort((a, b) => Math.abs(b.difference) - Math.abs(a.difference));
+
   return { current, previous, currentEnd, previousEnd, partial, changes };
 }
+
 export function receiptCoverage(receipts: Receipt[]) {
   const included = receipts.filter((r) => !r.excluded);
+
   return {
     pending: included.filter((r) => r.status !== "reviewed"),
     unlinked: included.filter((r) =>
@@ -264,19 +303,23 @@ export function receiptCoverage(receipts: Receipt[]) {
     ),
   };
 }
+
 export function matchLabel(line: ReceiptLine) {
   const reference = productReference(line);
+
   return reference.kind === "unresolved" || reference.kind === "separate"
     ? "Ikke koblet"
     : reference.provenance === "manual"
       ? "Bekreftet av deg"
       : "Automatisk koblet";
 }
+
 /** Purchase totals after item discounts. Returns and unknown dates are omitted. */
 export function productPrices(contributions: Contribution[]) {
   const purchases = contributions.filter(
     (c) => c.line && c.amountOre > 0 && c.receipt.data?.purchaseDate,
   );
+
   const observations = purchases
     .map((contribution) => ({ contribution, ore: contribution.amountOre }))
     .sort(
@@ -287,13 +330,16 @@ export function productPrices(contributions: Contribution[]) {
         a.contribution.receipt._creationTime -
           b.contribution.receipt._creationTime,
     );
+
   const sorted = observations.map((p) => p.ore).sort((a, b) => a - b);
   const middle = Math.floor(sorted.length / 2);
+
   const typical = !sorted.length
     ? null
     : sorted.length % 2
       ? sorted[middle]
       : Math.round((sorted[middle - 1] + sorted[middle]) / 2);
+
   return {
     observations,
     omitted: contributions.length - observations.length,
@@ -320,6 +366,7 @@ export function spendingCalendar(
       unknown: number;
     }
   >();
+
   for (
     let date = new Date(Date.UTC(year, 0, 1));
     date.getUTCFullYear() === year;
@@ -334,13 +381,16 @@ export function spendingCalendar(
       unknown: 0,
     });
   }
+
   for (const { receipt, data, totals } of preparePurchases(receipts, {
     ...overviewPurchasePolicy,
     provisional: reviewedOnly ? "exclude" : "include",
   })) {
     const date = data.purchaseDate;
+
     if (!date || date > today) continue;
     const day = days.get(date);
+
     if (!day) continue;
     day.amountOre += totals.productSpending;
     day.unknown += totals.unknown;
@@ -351,10 +401,12 @@ export function spendingCalendar(
       amountOre: totals.productSpending,
     });
   }
+
   const maximum = Math.max(
     0,
     ...[...days.values()].map((day) => day.amountOre),
   );
+
   return [...days.values()].map((day) => ({
     ...day,
     future: day.date > today,

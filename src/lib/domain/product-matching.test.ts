@@ -1,4 +1,4 @@
-import type { Id } from "../../../convex/_generated/dataModel";
+import { receiptFixture, testId } from "../testing/receipts";
 import { expect, it } from "vitest";
 import {
   matchingKey,
@@ -6,7 +6,7 @@ import {
   similarProducts,
 } from "./product-matching";
 import { emptyLine, batteryFixture } from "./receipt";
-import { productHistory, type Receipt } from "./insights";
+import { productHistory } from "./insights";
 
 it("normalizes formatting while preserving flavour, size and zero", () => {
   expect(matchingKey("  PEPSI   Max ZERO  0,5L ")).toBe("pepsi max zero 0.5l");
@@ -14,6 +14,7 @@ it("normalizes formatting while preserving flavour, size and zero", () => {
     matchingKey("Battery Original"),
   );
 });
+
 it("rejects conflicting sizes, brands and zero variants before semantic matching", () => {
   const product = {
     ...emptyLine(),
@@ -22,6 +23,7 @@ it("rejects conflicting sizes, brands and zero variants before semantic matching
     packageSize: 500,
     packageUnit: "ml",
   };
+
   expect(
     compatibleProduct(product, {
       ...product,
@@ -47,13 +49,15 @@ it("rejects conflicting sizes, brands and zero variants before semantic matching
     similarProducts(product, [{ ...product, packageSize: 1000 }, product]),
   ).toEqual([product]);
 });
+
 it("groups linked products across receipt descriptions and keeps unknown items separate", () => {
   const data = batteryFixture();
-  const id = "product-id" as Id<"products">;
+  const id = testId<"products">("product-id");
   data.lines[0].productId = id;
   data.lines[0].productName = "Battery Remix";
-  const first = { _id: "first", data } as Receipt;
-  const second = {
+  const first = receiptFixture({ _id: "first", data });
+
+  const second = receiptFixture({
     ...first,
     _id: "second",
     data: {
@@ -65,7 +69,8 @@ it("groups linked products across receipt descriptions and keeps unknown items s
         amountOre: l.id === "battery" ? 3190 : l.amountOre,
       })),
     },
-  } as Receipt;
+  });
+
   const history = productHistory([first, second]);
   expect(history).toHaveLength(1);
   expect(history[0].purchases.size).toBe(2);
@@ -74,6 +79,7 @@ it("groups linked products across receipt descriptions and keeps unknown items s
   expect(history[0].contributions.map((c) => c.amountOre)).toEqual([
     2331, 2931,
   ]);
+
   const separate = {
     ...second,
     data: {
@@ -81,6 +87,7 @@ it("groups linked products across receipt descriptions and keeps unknown items s
       lines: second.data!.lines.map((l) => ({ ...l, productId: null })),
     },
   };
+
   expect(productHistory([first, separate])).toHaveLength(2);
 });
 
@@ -107,6 +114,7 @@ it.each([
     packageSize: 500,
     packageUnit: "ml",
   };
+
   expect(compatibleProduct(item, { ...item, packageSize, packageUnit })).toBe(
     true,
   );

@@ -5,6 +5,7 @@ export type ImportBatch = {
   files: ImportedFile[];
   state: "pending" | "claimed" | "failed";
 };
+
 export type ImportOutcome = "completed" | "failed" | "busy" | "cancelled";
 
 /** Keep native input until capture confirms that the images entered its draft. */
@@ -12,14 +13,17 @@ export function createImportQueue() {
   let batches: ImportBatch[] = [];
   let sequence = 0;
   const listeners = new Set<() => void>();
+
   const publish = (next: ImportBatch[]) => {
     batches = next;
     listeners.forEach((listener) => listener());
   };
+
   return {
     snapshot: () => batches,
     subscribe(listener: () => void) {
       listeners.add(listener);
+
       return () => {
         listeners.delete(listener);
       };
@@ -35,12 +39,14 @@ export function createImportQueue() {
       const batch = batches.find(
         (item) => item.id === id && item.state === "pending",
       );
+
       if (!batch) return null;
       publish(
         batches.map((item) =>
           item.id === id ? { ...item, state: "claimed" } : item,
         ),
       );
+
       return batch;
     },
     finish(id: number, outcome: ImportOutcome) {

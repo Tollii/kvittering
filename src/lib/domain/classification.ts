@@ -1,3 +1,4 @@
+import { z } from "zod";
 import { choice } from "@typesafe-ai/sdk";
 import { v, type Infer } from "convex/values";
 import { parse } from "convex-helpers/validators";
@@ -18,21 +19,25 @@ export const classificationEvidenceValidator = v.object({
   attributes: v.array(v.string()).optional(),
   relatedProductDescriptions: v.array(v.string()).optional(),
 });
+
 export type ClassificationEvidence = Infer<
   typeof classificationEvidenceValidator
 >;
+
 export const classificationProductValidator = v.union(
   v.object({ id: v.string(), evidence: classificationEvidenceValidator }),
   v.object({ id: v.string(), description: v.string() }),
 );
+
 /** Compatibility reader for persisted correction records and existing workflow journals. */
 export function parseLegacyClassification(
   description: string,
   fallbackName?: string,
 ): ClassificationEvidence {
-  const input: unknown = JSON.parse(description);
-  if (!input || typeof input !== "object" || Array.isArray(input))
-    throw new Error("Invalid classification evidence.");
+  const input = z
+    .record(z.string(), z.unknown())
+    .parse(JSON.parse(description));
+
   const fields = Object.fromEntries(
     Object.entries(input).filter(
       ([key, value]) =>
@@ -41,11 +46,12 @@ export function parseLegacyClassification(
         !(Array.isArray(value) && value.length === 0),
     ),
   );
-  return parse(classificationEvidenceValidator, {
-    ...(fallbackName ? { name: fallbackName } : {}),
-    ...fields,
-  });
+
+  if (fallbackName && !("name" in fields)) fields.name = fallbackName;
+
+  return parse(classificationEvidenceValidator, fields);
 }
+
 export function classificationEvidence(
   product: Infer<typeof classificationProductValidator>,
 ): ClassificationEvidence {

@@ -13,21 +13,28 @@ interface ForegroundSource {
   current(): boolean;
   subscribe(listener: (active: boolean) => void): () => void;
 }
+
 /** Installs one foreground subscription and applies its initial state. */
 export function observeForeground(
   source: ForegroundSource,
   changed: (active: boolean) => void,
 ) {
   changed(source.current());
+
   return source.subscribe(changed);
 }
+
 const LifecycleContext = createContext({ active: true, online: true });
+
 export const useQueryLifecycle = () => useContext(LifecycleContext);
+
 export function QueryLifecycleProvider({ children }: { children: ReactNode }) {
   const [active, setActive] = useState(AppState.currentState === "active");
   const network = useNetworkState();
+
   const online =
     network.isConnected !== false && network.isInternetReachable !== false;
+
   useEffect(() => {
     onlineManager.setOnline(online);
   }, [online]);
@@ -40,6 +47,7 @@ export function QueryLifecycleProvider({ children }: { children: ReactNode }) {
             const subscription = AppState.addEventListener("change", (state) =>
               listener(state === "active"),
             );
+
             return () => subscription.remove();
           },
         },
@@ -50,6 +58,7 @@ export function QueryLifecycleProvider({ children }: { children: ReactNode }) {
       ),
     [],
   );
+
   return (
     <LifecycleContext.Provider value={{ active, online }}>
       {children}

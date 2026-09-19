@@ -35,6 +35,7 @@ export default function Analysis() {
   const { month } = useLocalSearchParams<{ month?: string }>();
   const { synchronize } = useHousehold();
   const [frequency, setFrequency] = useState<AnalysisFrequency>("month");
+
   const [anchor, setAnchor] = useState(
     month &&
       /^\d{4}-(0[1-9]|1[0-2])$/.test(month) &&
@@ -42,18 +43,22 @@ export default function Analysis() {
       ? `${month}-01`
       : osloDate(),
   );
+
   const [today, setToday] = useState(osloDate());
   const [selection, setSelection] = useState<SpendingSelection | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const period = analysisPeriod(anchor, frequency, today);
+
   const { receipts, completeReceipts } = useCompleteReceipts({
     kind: "period",
     start: period.previousStart,
     end: period.end,
   });
+
   const report = spendingAnalysis(receipts, period);
   const periodKey = JSON.stringify(period);
+
   const selected = resolveSpendingSelection(selection, periodKey, {
     effect: report.effects.map((effect) => ({
       id: effect.id,
@@ -68,6 +73,7 @@ export default function Analysis() {
       contributions: row.contributions,
     })),
   });
+
   function move(direction: number) {
     if (frequency === "week") setAnchor(shiftDate(period.start, direction * 7));
     else {
@@ -86,12 +92,14 @@ export default function Analysis() {
       );
     }
   }
+
   if (!spendingAnalysisEnabled)
     return (
       <Screen title="Forbruksanalyse">
         <Notice>Forbruksanalysen er midlertidig satt på pause.</Notice>
       </Screen>
     );
+
   return (
     <Screen insetTop={false}>
       <Stack.Screen options={{ title: "Forbruksanalyse" }} />

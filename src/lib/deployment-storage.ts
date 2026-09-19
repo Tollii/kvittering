@@ -2,6 +2,7 @@
 export function deploymentStorageSuffix(url: string | undefined) {
   if (!url) return "";
   const host = new URL(url).hostname;
+
   return host === "agile-falcon-148.eu-west-1.convex.cloud" ? "" : `-${host}`;
 }
 

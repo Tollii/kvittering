@@ -5,3 +5,7 @@ convex/_generated
 package-lock.json
 assets
 dist
+
+convex/kassalapp/generated
+tools/oxlint/anti-slop
+coverage

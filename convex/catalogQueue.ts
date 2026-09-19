@@ -32,6 +32,7 @@ const pool = new Workpool(components.catalogWorkpool, {
   maxParallelism: 4,
   retryActionsByDefault: false,
 });
+
 async function enqueue(
   ctx: MutationCtx,
   id: Id<"catalogRequests">,
@@ -54,6 +55,7 @@ async function enqueue(
     },
   );
 }
+
 /** One transactional cache entry is shared by all households and simultaneous requests. */
 export async function ensureRequest(
   ctx: MutationCtx,
@@ -63,10 +65,12 @@ export async function ensureRequest(
     throw new Error("Produktkatalogen er midlertidig satt på pause.");
   const request = normalizeRequest(input);
   const key = requestKey(request);
+
   const existing = await ctx.db
     .query("catalogRequests")
     .withIndex("by_key", (q) => q.eq("key", key))
     .unique();
+
   if (
     existing &&
     (["pending", "running"].includes(existing.state) ||
@@ -77,8 +81,10 @@ export async function ensureRequest(
       kind: request.kind,
       state: existing.state,
     });
+
     return existing;
   }
+
   const values = {
     key,
     request,
@@ -89,7 +95,9 @@ export async function ensureRequest(
     attempts: 0,
     scheduledAt: Date.now(),
   };
+
   const id = existing?._id ?? (await ctx.db.insert("catalogRequests", values));
+
   if (existing) await ctx.db.replace("catalogRequests", id, values);
   await enqueue(ctx, id);
   console.info("catalog.request_queued", {
@@ -97,13 +105,16 @@ export async function ensureRequest(
     kind: request.kind,
     refresh: !!existing,
   });
+
   return (await ctx.db.get("catalogRequests", id))!;
 }
+
 export const request = internalMutation({
   args: { request: catalogRequestValidator },
   returns: v.id("catalogRequests"),
   handler: async (ctx, { request }) => (await ensureRequest(ctx, request))._id,
 });
+
 export const requestForWorkflow = internalMutation({
   args: { request: catalogRequestValidator, workflowId: vWorkflowId },
   returns: v.object({
@@ -112,30 +123,38 @@ export const requestForWorkflow = internalMutation({
   }),
   handler: async (ctx, args) => {
     const request = await ensureRequest(ctx, args.request);
+
     if (request.state === "ready" || request.state === "error")
       return { id: request._id, eventId: null };
+
     const eventId = await createEvent(ctx, components.workflow, {
       name: "catalog-ready",
       workflowId: args.workflowId,
     });
+
     await ctx.db.insert("catalogRequestWaiters", {
       requestId: request._id,
       eventId,
     });
+
     return { id: request._id, eventId };
   },
 });
+
 export const read = internalQuery({
   args: { id: v.id("catalogRequests") },
   returns: v.union(schema.doc("catalogRequests"), v.null()),
   handler: (ctx, { id }) => ctx.db.get("catalogRequests", id),
 });
+
 export const claim = internalMutation({
   args: { id: v.id("catalogRequests") },
   returns: v.union(catalogRequestValidator, v.null()),
   handler: async (ctx, { id }) => {
     const request = await ctx.db.get("catalogRequests", id);
+
     if (!request || request.state !== "pending") return null;
+
     if (!(await featureEnabled(ctx, "productLookup"))) {
       await ctx.db.patch("catalogRequests", id, {
         state: "error",
@@ -143,15 +162,19 @@ export const claim = internalMutation({
         expiresAt: Date.now() + 60_000,
       });
       await ctx.scheduler.runAfter(0, internal.catalogQueue.notify, { id });
+
       return null;
     }
+
     await ctx.db.patch("catalogRequests", id, {
       state: "running",
       attempts: request.attempts + 1,
     });
+
     return request.request;
   },
 });
+
 export const notify = internalMutation({
   args: { id: v.id("catalogRequests") },
   returns: v.null(),
@@ -160,27 +183,34 @@ export const notify = internalMutation({
       .query("catalogRequestWaiters")
       .withIndex("by_requestId", (q) => q.eq("requestId", id))
       .take(50);
+
     for (const waiter of waiters) {
       await sendEvent(ctx, components.workflow, { id: waiter.eventId });
       await ctx.db.delete("catalogRequestWaiters", waiter._id);
     }
+
     if (waiters.length === 50)
       await ctx.scheduler.runAfter(0, internal.catalogQueue.notify, { id });
+
     return null;
   },
 });
+
 export const succeed = internalMutation({
   args: { id: v.id("catalogRequests"), result: catalogResultValidator },
   returns: v.null(),
   handler: async (ctx, { id, result }) => {
     const request = await ctx.db.get("catalogRequests", id);
+
     if (!request || request.state !== "running") return null;
     const now = Date.now();
+
     for (const product of result.products) {
       const existing = await ctx.db
         .query("catalogProducts")
         .withIndex("by_key", (q) => q.eq("key", product.key))
         .unique();
+
       const value = mergeCatalogProduct(
         existing,
         {
@@ -189,19 +219,24 @@ export const succeed = internalMutation({
         },
         now,
       );
+
       if (existing)
         await ctx.db.replace("catalogProducts", existing._id, value);
       else await ctx.db.insert("catalogProducts", value);
     }
+
     for (const store of result.stores) {
       const existing = await ctx.db
         .query("catalogStores")
         .withIndex("by_externalId", (q) => q.eq("externalId", store.id))
         .unique();
+
       const value = { externalId: store.id, store, fetchedAt: now };
+
       if (existing) await ctx.db.replace("catalogStores", existing._id, value);
       else await ctx.db.insert("catalogStores", value);
     }
+
     await ctx.db.patch("catalogRequests", id, {
       state: "ready",
       result,
@@ -210,9 +245,11 @@ export const succeed = internalMutation({
       error: undefined,
     });
     await ctx.scheduler.runAfter(0, internal.catalogQueue.notify, { id });
+
     return null;
   },
 });
+
 async function failRequest(
   ctx: MutationCtx,
   id: Id<"catalogRequests">,
@@ -220,17 +257,22 @@ async function failRequest(
   retryAfterMs: number,
 ) {
   const request = await ctx.db.get("catalogRequests", id);
+
   if (!request || !["running", "pending"].includes(request.state)) return;
   const now = Date.now();
   const transient = status === 0 || status === 429 || status >= 500;
+
   const delay =
     status === 429
       ? Math.max(60000, retryAfterMs)
       : Math.max(5000 * 2 ** request.attempts, retryAfterMs);
+
   if (transient && request.attempts < 3) {
     await enqueue(ctx, id, now + delay);
+
     return;
   }
+
   await ctx.db.patch("catalogRequests", id, {
     state: "error",
     expiresAt: now + 10 * 60 * 1000,
@@ -241,6 +283,7 @@ async function failRequest(
   });
   await ctx.scheduler.runAfter(0, internal.catalogQueue.notify, { id });
 }
+
 export const fail = internalMutation({
   args: {
     id: v.id("catalogRequests"),
@@ -250,14 +293,17 @@ export const fail = internalMutation({
   returns: v.null(),
   handler: async (ctx, args) => {
     await failRequest(ctx, args.id, args.status, args.retryAfterMs);
+
     return null;
   },
 });
+
 export const completed = internalMutation({
   args: vOnCompleteValidator(v.object({ id: v.id("catalogRequests") })),
   returns: v.null(),
   handler: async (ctx, { context, result }) => {
     if (result.kind !== "success") await failRequest(ctx, context.id, 0, 0);
+
     return null;
   },
 });
@@ -274,6 +320,7 @@ export function mergeCatalogProduct(
   fetchedAt: number,
 ): CatalogEntry {
   const product = response.product;
+
   if (response.kind === "details")
     return {
       key: product.key,
@@ -281,7 +328,9 @@ export function mergeCatalogProduct(
       fetchedAt,
       detailsFetchedAt: fetchedAt,
     };
+
   if (!previous) return { key: product.key, product, fetchedAt };
+
   return {
     ...previous,
     fetchedAt,

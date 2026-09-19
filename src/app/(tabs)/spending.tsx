@@ -54,30 +54,37 @@ export default function Spending() {
   const colors = useTheme();
   const currentMonth = osloDate().slice(0, 7);
   const [month, setMonth] = useState(currentMonth);
+
   const { receipts, loadingReceipts, completeReceipts } = useCompleteReceipts({
     kind: "period",
     start: `${monthBefore(month)}-01`,
     end: `${month}-31`,
   });
+
   const [filters, setFilters] = useState(false);
   const [storesOpen, setStoresOpen] = useState(false);
   const [report, setReport] = useState<ReportId | null>(null);
   const [showAllGroups, setShowAllGroups] = useState(false);
   const [reviewedOnly, setReviewedOnly] = useState(false);
+
   const [breakdown, setBreakdown] = useState<"category" | "store" | "type">(
     "category",
   );
+
   const [group, setGroup] = useState<string | null>(null);
   const [selection, setSelection] = useState<SpendingSelection | null>(null);
   const periodKey = JSON.stringify([month, reviewedOnly]);
+
   const undated = useCompleteReceipts(
     { kind: "undated" },
     report === "coverage" || selection?.key === "unlinked",
   );
+
   const comparison = comparisonInsights(receipts, month, reviewedOnly);
   const totals = comparison.current;
   const coverage = receiptCoverage([...receipts, ...undated.receipts]);
   const catalog = catalogInsights(totals.selected);
+
   const change = comparison.previous.products
     ? Math.round(
         ((totals.products - comparison.previous.products) /
@@ -85,6 +92,7 @@ export default function Spending() {
           100,
       )
     : null;
+
   const rows =
     breakdown === "store"
       ? totals.stores
@@ -97,6 +105,7 @@ export default function Spending() {
                 (group === "fallback" && category.id === "unallocated"),
             )
           : totals.groups;
+
   const showDetails = (
     value: SpendingGroup,
     dimension: SpendingDimension = "category",
@@ -104,10 +113,12 @@ export default function Spending() {
     setReport(null);
     setSelection({ period: periodKey, dimension, key: value.id });
   };
+
   const select = (key: string) => {
     setReport(null);
     setSelection({ period: periodKey, dimension: "accounting", key });
   };
+
   const accounting = totals.selected.flatMap((receipt) =>
     receipt.data!.lines.map((line) => ({
       receipt,
@@ -115,12 +126,14 @@ export default function Spending() {
       amountOre: line.amountOre ?? 0,
     })),
   );
+
   const receiptContributions = (items: typeof receipts) =>
     items.map((receipt) => ({
       receipt,
       line: null,
       amountOre: receipt.data?.totalOre ?? 0,
     }));
+
   function moveMonth(offset: number) {
     const [year, value] = month.split("-").map(Number);
     setMonth(
@@ -128,6 +141,7 @@ export default function Spending() {
     );
     setGroup(null);
   }
+
   const meatRows = totals.categories.filter(
     (category) =>
       [
@@ -138,6 +152,7 @@ export default function Spending() {
         "meat-fish.fish",
       ].includes(category.id) && category.amountOre !== 0,
   );
+
   const recentReceipts = [...totals.selected]
     .sort(
       (a, b) =>
@@ -146,27 +161,35 @@ export default function Spending() {
         ) || b._creationTime - a._creationTime,
     )
     .slice(0, 3);
+
   const rawMonth = new Intl.DateTimeFormat("nb-NO", {
     month: "long",
     year: "numeric",
   }).format(new Date(`${month}-01T12:00:00Z`));
+
   const monthLabel =
     rawMonth.charAt(0).toLocaleUpperCase("nb-NO") + rawMonth.slice(1);
+
   const history = useCompleteReceipts(
     { kind: "allProducts" },
     report === "prices",
   );
+
   const surprises = history.completeReceipts
     ? monthPriceSignals(history.receipts, month)
     : [];
+
   const budgetOre = details?.household.monthlyBudgetOre ?? null;
+
   const pace =
     budgetOre && budgetOre > 0
       ? budgetPace(budgetOre, totals.products, month)
       : null;
+
   const [whole, fraction] = formatMoney(totals.products)
     .replace(/\s?kr$/, "")
     .split(",");
+
   const selected = resolveSpendingSelection(selection, periodKey, {
     group: totals.groups,
     category: totals.categories,
@@ -242,6 +265,7 @@ export default function Spending() {
       },
     ],
   });
+
   const reports = useSpendingReports({
     totals: { ...totals, undated: undated.receipts },
     coverageComplete: undated.completeReceipts,
@@ -258,6 +282,7 @@ export default function Spending() {
     onAccounting: select,
     onClose: () => setReport(null),
   });
+
   return (
     <Screen
       title="Forbruk"

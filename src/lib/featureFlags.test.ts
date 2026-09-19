@@ -4,6 +4,7 @@ import {
   parseFeatureFlags,
   parseFeatureFlagSnapshot,
 } from "./featureFlags";
+
 it("defaults missing flags, ignores future keys, and preserves configured false values", () => {
   const input = { productLookup: false, futureFlag: { enabled: true } };
   const before = structuredClone(input);
@@ -12,9 +13,10 @@ it("defaults missing flags, ignores future keys, and preserves configured false 
     productLookup: false,
   });
   expect(input).toEqual(before);
-  expect(() => parseFeatureFlags({ productLookup: "false" })).toThrow();
-  expect(() => parseFeatureFlags({ productLookup: undefined })).toThrow();
+  expect(() => parseFeatureFlags({ productLookup: "false" })).toThrow(Error);
+  expect(() => parseFeatureFlags({ productLookup: undefined })).toThrow(Error);
 });
+
 it("validates deployment and platform fallback without a freshness expiry", () => {
   const scope = { platform: "ios" as const, channel: "testflight" as const };
   const snapshot = { ...scope, revision: 4, values: { productLookup: false } };
@@ -23,11 +25,11 @@ it("validates deployment and platform fallback without a freshness expiry", () =
   );
   expect(() =>
     parseFeatureFlagSnapshot(snapshot, { ...scope, platform: "android" }),
-  ).toThrow();
+  ).toThrow(Error);
   expect(() =>
     parseFeatureFlagSnapshot(snapshot, { ...scope, channel: "development" }),
-  ).toThrow();
+  ).toThrow(Error);
   expect(() =>
     parseFeatureFlagSnapshot({ ...snapshot, revision: -1 }, scope),
-  ).toThrow();
+  ).toThrow(Error);
 });

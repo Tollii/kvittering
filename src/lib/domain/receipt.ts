@@ -8,8 +8,11 @@ import {
   catalogIdentityValidator,
   physicalStoreValidator,
 } from "../catalog/model";
+
 const nullableString = v.union(v.string(), v.null());
+
 const nullableNumber = v.union(v.number(), v.null());
+
 export const lineKinds = [
   "product",
   "item_discount",
@@ -20,6 +23,7 @@ export const lineKinds = [
   "summary",
   "vat",
 ] as const;
+
 export const lineValidator = v.object({
   id: v.string(),
   kind: v.union(...lineKinds.map((kind) => v.literal(kind))),
@@ -49,6 +53,7 @@ export const lineValidator = v.object({
   productMatchManual: v.boolean().optional(),
   catalogProduct: v.union(catalogIdentityValidator, v.null()).optional(),
 });
+
 export const receiptDataValidator = v.object({
   physicalStore: v.union(physicalStoreValidator, v.null()).optional(),
   physicalStoreManual: v.boolean().optional(),
@@ -63,8 +68,11 @@ export const receiptDataValidator = v.object({
   lines: v.array(lineValidator),
   issues: v.array(v.string()),
 });
+
 export type ReceiptLine = Infer<typeof lineValidator>;
+
 export type ReceiptData = Infer<typeof receiptDataValidator>;
+
 export function emptyLine(id: string = crypto.randomUUID()): ReceiptLine {
   return {
     id,
@@ -88,23 +96,30 @@ export function emptyLine(id: string = crypto.randomUUID()): ReceiptLine {
     productKey: null,
   };
 }
+
 export function parseOre(text: string): number | null {
   const value = text
     .trim()
     .replaceAll(/\s/g, "")
     .replace("−", "-")
     .replace(",", ".");
+
   if (!value) return null;
+
   if (!/^-?\d+(\.\d{1,2})?$/.test(value))
     throw new Error("Bruk et beløp med høyst to desimaler.");
   const [whole, fraction = ""] = value.replace("-", "").split(".");
+
   const result =
     (Number(whole) * 100 + Number(fraction.padEnd(2, "0"))) *
     (value.startsWith("-") ? -1 : 1);
+
   if (!Number.isSafeInteger(result) || Math.abs(result) > 100_000_000)
     throw new Error("Beløpet er for stort.");
+
   return result;
 }
+
 export const formatMoney = (ore: number | null) =>
   ore === null
     ? "Ukjent"
@@ -112,8 +127,10 @@ export const formatMoney = (ore: number | null) =>
         style: "currency",
         currency: "NOK",
       }).format(ore / 100);
+
 export const moneyInput = (ore: number | null) =>
   ore === null ? "" : (ore / 100).toFixed(2).replace(".", ",");
+
 export const osloDate = (time = Date.now()) =>
   new Intl.DateTimeFormat("sv-SE", {
     timeZone: "Europe/Oslo",
@@ -121,10 +138,13 @@ export const osloDate = (time = Date.now()) =>
     month: "2-digit",
     day: "2-digit",
   }).format(time);
+
 export const normalizeAlias = (text: string) =>
   text.normalize("NFKC").trim().replace(/\s+/g, " ").toLocaleUpperCase("nb-NO");
+
 export function aliasKey(data: ReceiptData, line: ReceiptLine): string | null {
   if (!data.store || !line.name.trim()) return null;
+
   return JSON.stringify([
     normalizeAlias(data.store),
     normalizeAlias(line.name),
@@ -134,18 +154,25 @@ export function aliasKey(data: ReceiptData, line: ReceiptLine): string | null {
     line.unit,
   ]);
 }
+
 declare const parsedReceipt: unique symbol;
+
 export type ParsedReceipt = ReceiptData & { readonly [parsedReceipt]: true };
+
 export type ReceiptParseOutcome =
   | { kind: "parsed"; receipt: ParsedReceipt }
   | { kind: "rejected"; issue: { code: "invalid_receipt"; message: string } };
+
+// oxlint-disable-next-line anti-slop/no-unknown-parameters -- This boundary parser validates external input before returning a domain value.
 export function parseReceipt(input: unknown): ReceiptParseOutcome {
   try {
     const data = structuredClone(parseValue(receiptDataValidator, input));
+
     // Older receipts use a separate category for energy drinks, now part of soft drinks.
     for (const line of data.lines)
       if (line.categoryId === "drinks.energy-drinks")
         line.categoryId = "drinks.soft-drinks";
+
     return { kind: "parsed", receipt: validateReceipt(data) };
   } catch (cause) {
     return {
@@ -157,24 +184,30 @@ export function parseReceipt(input: unknown): ReceiptParseOutcome {
     };
   }
 }
+
 export function validateReceipt(data: ReceiptData): ParsedReceipt {
   if (data.lines.length > 300 || data.originalText.length > 60000)
     throw new Error("Kvitteringen er for stor. Del den opp.");
   const ids = new Set<string>();
+
   for (const line of data.lines) {
     if (ids.has(line.id)) throw new Error("Varelinjene må ha ulike ID-er.");
     ids.add(line.id);
+
     for (const value of [line.amountOre, line.unitPriceOre])
       if (
         value !== null &&
         (!Number.isSafeInteger(value) || Math.abs(value) > 100_000_000)
       )
         throw new Error("Beløp må være hele øre.");
+
     for (const value of [line.quantity, line.packageSize])
       if (value !== null && (!Number.isFinite(value) || value <= 0))
         throw new Error("Mengde må være større enn null.");
+
     if (line.categoryId && !categoryById.has(line.categoryId))
       throw new Error("Ukjent kategori.");
+
     if (
       line.name.length > 500 ||
       line.originalText.length > 1500 ||
@@ -182,12 +215,14 @@ export function validateReceipt(data: ReceiptData): ParsedReceipt {
     )
       throw new Error("Varelinjen er for lang.");
   }
+
   if (
     data.totalOre !== null &&
     (!Number.isSafeInteger(data.totalOre) ||
       Math.abs(data.totalOre) > 100_000_000)
   )
     throw new Error("Totalen må være hele øre.");
+
   if (
     data.purchaseDate &&
     (!/^\d{4}-\d{2}-\d{2}$/.test(data.purchaseDate) ||
@@ -195,24 +230,32 @@ export function validateReceipt(data: ReceiptData): ParsedReceipt {
         data.purchaseDate)
   )
     throw new Error("Ugyldig dato.");
+
+  // SAFETY: The checks above establish all ParsedReceipt domain invariants.
   return data as ParsedReceipt;
 }
+
 export function reconcile(data: ReceiptData) {
   const reviewIssues: ReceiptIssue[] = [];
   const discountsSeen = new Set<string>();
+
   let products = 0,
     discounts = 0,
     deposits = 0,
     returns = 0,
     adjustments = 0,
     unknown = 0;
+
   for (const line of data.lines) {
     if (line.kind === "summary" || line.kind === "vat") continue;
+
     if (line.amountOre === null) {
       unknown++;
       continue;
     }
+
     if (line.kind === "product") products += line.amountOre;
+
     if (line.kind === "item_discount" || line.kind === "receipt_discount") {
       const key = JSON.stringify([
         line.kind,
@@ -220,28 +263,41 @@ export function reconcile(data: ReceiptData) {
         line.amountOre,
         line.relatedLineId,
       ]);
+
       if (discountsSeen.has(key))
         reviewIssues.push({ code: "duplicate_discount" });
       discountsSeen.add(key);
       discounts += line.amountOre;
+
       if (line.amountOre > 0) reviewIssues.push({ code: "positive_discount" });
     }
+
     if (line.kind === "deposit") deposits += line.amountOre;
+
     if (line.kind === "deposit_return") {
       returns += line.amountOre;
+
       if (line.amountOre > 0)
         reviewIssues.push({ code: "positive_deposit_return" });
     }
+
     if (line.kind === "adjustment") adjustments += line.amountOre;
   }
+
   const calculated = products + discounts + deposits + returns + adjustments;
+
   if (unknown) reviewIssues.push({ code: "amounts_missing", count: unknown });
+
   if (data.totalOre === null) reviewIssues.push({ code: "total_missing" });
+
   if (data.currency !== "NOK") reviewIssues.push({ code: "currency" });
+
   if (!data.purchaseDate) reviewIssues.push({ code: "date_missing" });
   const difference = data.totalOre === null ? null : calculated - data.totalOre;
+
   if (difference !== null && difference !== 0)
     reviewIssues.push({ code: "difference", amountOre: difference });
+
   return {
     products,
     discounts,
@@ -256,29 +312,37 @@ export function reconcile(data: ReceiptData) {
     issues: reviewIssues.map(receiptIssueText),
   };
 }
+
 /** Allocate receipt discounts in whole øre. Keep unlinked adjustments visible. */
 export function spendingLines(data: ReceiptData) {
   const products = data.lines
     .filter((line) => line.kind === "product")
     .map((line) => ({ ...line, netOre: line.amountOre ?? 0 }));
+
   let unallocated = 0;
+
   for (const line of data.lines) {
     if (line.kind === "item_discount") {
       const product = products.find(
         (product) => product.id === line.relatedLineId,
       );
+
       if (product) product.netOre += line.amountOre ?? 0;
       else unallocated += line.amountOre ?? 0;
     }
+
     if (line.kind === "adjustment") unallocated += line.amountOre ?? 0;
   }
+
   const discount = data.lines
     .filter((line) => line.kind === "receipt_discount")
     .reduce((sum, line) => sum + (line.amountOre ?? 0), 0);
+
   const basis = products.reduce(
     (sum, line) => sum + Math.max(0, line.netOre),
     0,
   );
+
   let assigned = 0;
   products.forEach((line, index) => {
     const share =
@@ -287,12 +351,15 @@ export function spendingLines(data: ReceiptData) {
           ? discount - assigned
           : Math.trunc((discount * Math.max(0, line.netOre)) / basis)
         : 0;
+
     assigned += share;
     line.netOre += share;
   });
   unallocated += discount - assigned;
+
   return { products, unallocated };
 }
+
 export function batteryFixture(): ReceiptData {
   const product = {
     ...emptyLine("battery"),
@@ -302,6 +369,7 @@ export function batteryFixture(): ReceiptData {
     categoryId: "drinks.soft-drinks",
     manual: false,
   };
+
   return {
     store: "Eksempelbutikk",
     branch: null,
@@ -360,6 +428,7 @@ export function weeklyShopFixture(): ReceiptData {
     manual: false,
     ...extra,
   });
+
   return {
     store: "REMA 1000",
     branch: "Kanalveien",
@@ -446,22 +515,24 @@ export function classificationInputs(
       (line) =>
         line.kind === "product" && !(line.categoryAliasKey ?? line.productKey),
     )
-    .map((line) => ({
-      id: line.id,
-      evidence: {
+    .map((line) => {
+      const evidence: ClassificationEvidence = {
         name: line.name,
-        ...(line.brand !== null ? { brand: line.brand } : {}),
-        ...(line.packageSize !== null ? { packageSize: line.packageSize } : {}),
-        ...(line.packageUnit !== null ? { packageUnit: line.packageUnit } : {}),
-        ...(line.attributes.length ? { attributes: line.attributes } : {}),
-        relatedProductDescriptions: data.lines
-          .filter(
-            (other) =>
-              other.relatedLineId === line.id && other.kind === "item_discount",
-          )
-          .map((other) =>
-            other.name.replace(/\d+(?:[.,]\d+)?\s*%/g, "").trim(),
-          ),
-      },
-    }));
+        relatedProductDescriptions: data.lines.flatMap((other) =>
+          other.relatedLineId === line.id && other.kind === "item_discount"
+            ? [other.name.replace(/\d+(?:[.,]\d+)?\s*%/g, "").trim()]
+            : [],
+        ),
+      };
+
+      if (line.brand !== null) evidence.brand = line.brand;
+
+      if (line.packageSize !== null) evidence.packageSize = line.packageSize;
+
+      if (line.packageUnit !== null) evidence.packageUnit = line.packageUnit;
+
+      if (line.attributes.length) evidence.attributes = line.attributes;
+
+      return { id: line.id, evidence };
+    });
 }

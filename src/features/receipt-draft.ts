@@ -10,6 +10,7 @@ export type ReceiptDraftValues = {
   productChanges: Record<string, ProductChoice>;
   physicalStoreId: number | null | undefined;
 };
+
 type Operation =
   | { kind: "idle" }
   | { kind: "saving"; editVersion: number }
@@ -22,6 +23,7 @@ type Operation =
   | { kind: "saved"; approved: boolean }
   | { kind: "working" | "deleting" | "deleted" }
   | { kind: "failed"; error: string };
+
 export type ReceiptDraft = {
   baseline: Receipt;
   remote: Receipt;
@@ -32,6 +34,7 @@ export type ReceiptDraft = {
   generation: number;
   operation: Operation;
 };
+
 export type ReceiptDraftAction =
   | { type: "edit"; values: Partial<ReceiptDraftValues> }
   | { type: "data"; data: ReceiptData }
@@ -68,12 +71,14 @@ export function createReceiptDraft(receipt: Receipt): ReceiptDraft {
 
 function acceptSavedSnapshot(state: ReceiptDraft): ReceiptDraft {
   const operation = state.operation;
+
   if (
     operation.kind !== "awaiting-snapshot" ||
     state.remote.revision < operation.revision
   )
     return state;
   const laterEdits = state.editVersion !== operation.editVersion;
+
   return {
     ...(laterEdits ? state : createReceiptDraft(state.remote)),
     baseline: state.remote,
@@ -99,6 +104,7 @@ export function reduceReceiptDraft(
       ? state.operation
       : { kind: "idle" },
   });
+
   switch (action.type) {
     case "edit":
       return edit(action.values);
@@ -107,6 +113,7 @@ export function reduceReceiptDraft(
         state.values.data &&
         (action.data.store !== state.values.data.store ||
           action.data.branch !== state.values.data.branch);
+
       return edit(
         storeChanged
           ? {
@@ -120,6 +127,7 @@ export function reduceReceiptDraft(
           : { data: action.data },
       );
     }
+
     case "remember":
       return edit({
         remember: action.value
@@ -138,6 +146,7 @@ export function reduceReceiptDraft(
       const moneyErrors = { ...state.moneyErrors };
       delete productChanges[action.lineId];
       delete moneyErrors[action.lineId];
+
       return {
         ...edit({
           data: state.values.data
@@ -154,27 +163,35 @@ export function reduceReceiptDraft(
         moneyErrors,
       };
     }
+
     case "money-error": {
       const moneyErrors = { ...state.moneyErrors };
+
       if (action.error) moneyErrors[action.key] = action.error;
       else delete moneyErrors[action.key];
+
       return { ...edit({}), moneyErrors };
     }
+
     case "remote": {
       if (action.receipt.revision < state.remote.revision) return state;
       const next = { ...state, remote: action.receipt };
+
       if (state.operation.kind === "awaiting-snapshot")
         return acceptSavedSnapshot(next);
+
       if (
         state.dirty ||
         ["saving", "deleting", "working"].includes(state.operation.kind)
       )
         return next;
+
       return {
         ...createReceiptDraft(action.receipt),
         generation: state.generation + 1,
       };
     }
+
     case "discard":
       return {
         ...createReceiptDraft(state.remote),
@@ -190,6 +207,7 @@ export function reduceReceiptDraft(
       };
     case "saved": {
       if (state.operation.kind !== "saving") return state;
+
       return acceptSavedSnapshot({
         ...state,
         operation: {
@@ -200,6 +218,7 @@ export function reduceReceiptDraft(
         },
       });
     }
+
     case "failed":
       return { ...state, operation: { kind: "failed", error: action.error } };
     case "finished":

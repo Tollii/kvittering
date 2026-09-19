@@ -9,14 +9,18 @@ import { ReceiptEditor } from "@/features/receipt-editor";
 
 export default function ReceiptPage() {
   const { id } = useLocalSearchParams<{ id: string }>();
+
   return <ReceiptDetail key={id} id={id} />;
 }
+
 function ReceiptDetail({ id }: { id: string }) {
   const { online } = useHousehold();
   const detail = useQuery(api.receipts.detail, { id: id ?? "" });
+
   const [deletion, setDeletion] = useState<"idle" | "deleting" | "deleted">(
     "idle",
   );
+
   useEffect(() => {
     // The editor has unmounted, so its unsaved-change guard cannot block leaving.
     if (deletion === "deleted") {
@@ -24,18 +28,21 @@ function ReceiptDetail({ id }: { id: string }) {
       else router.replace("/(tabs)/history");
     }
   }, [deletion]);
+
   if (deletion === "deleted" || (deletion === "deleting" && detail === null))
     return (
       <Screen insetTop={false}>
         <Loading title="Sletter kvittering …" />
       </Screen>
     );
+
   if (detail === undefined)
     return (
       <Screen insetTop={false}>
         <Loading title="Henter kvittering …" />
       </Screen>
     );
+
   if (detail === null)
     return (
       <Screen insetTop={false}>
@@ -62,6 +69,7 @@ function ReceiptDetail({ id }: { id: string }) {
         </View>
       </Screen>
     );
+
   return (
     <ReceiptEditor
       key={id}

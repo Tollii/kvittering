@@ -32,6 +32,7 @@ export default function ProductLinking() {
   const [last, setLast] = useState<ReceiptCommitAcknowledgement>();
   const [searchKey, setSearchKey] = useState<string>();
   const item = queue.items[0];
+
   const itemKey = item
     ? `${item.receiptId}:${item.line.id}:${item.generation}:${item.revision}`
     : undefined;
@@ -44,6 +45,7 @@ export default function ProductLinking() {
     setBusy(true);
     setError(undefined);
     setSearchKey(undefined);
+
     try {
       const result = await choose({
         receiptId: item.receiptId,
@@ -52,6 +54,7 @@ export default function ProductLinking() {
         lineId: item.line.id,
         choice,
       });
+
       setLast(result);
       successFeedback();
     } catch (cause) {
@@ -72,6 +75,7 @@ export default function ProductLinking() {
     locked.current = true;
     setBusy(true);
     setError(undefined);
+
     try {
       await undo({ receiptId: last.receiptId, revision: last.revision });
       setLast(undefined);

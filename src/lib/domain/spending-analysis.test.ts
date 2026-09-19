@@ -1,5 +1,5 @@
+import { testId } from "../testing/receipts";
 import { expect, it } from "vitest";
-import type { Id } from "../../../convex/_generated/dataModel";
 import { batteryFixture, emptyLine } from "./receipt";
 import type { Receipt } from "./insights";
 import {
@@ -22,6 +22,7 @@ function receipt(date: string, ore: number, ml: number | null): Receipt {
     },
   ];
   data.totalOre = ore;
+
   const attributes = readAttributes(
     {
       attribute_type: { choice: "cola", confidence: 0.99 },
@@ -29,10 +30,11 @@ function receipt(date: string, ore: number, ml: number | null): Receipt {
     },
     "catalog",
   );
+
   return {
-    _id: date as Id<"receipts">,
+    _id: testId<"receipts">(date),
     _creationTime: 0,
-    householdId: "home" as Id<"households">,
+    householdId: testId<"households">("home"),
     uploadedBy: "test",
     uploaderName: "Test",
     clientId: date,
@@ -54,7 +56,7 @@ function receipt(date: string, ore: number, ml: number | null): Receipt {
         {
           lineId: "cola",
           evidenceKey: purchaseEvidenceKey(data.lines[0]),
-          family: { id: "cola" as Id<"productFamilies">, name: "Cola" },
+          family: { id: testId<"productFamilies">("cola"), name: "Cola" },
           quantity: { packages: 1, units: null, grams: null, millilitres: ml },
           attributes,
         },
@@ -62,12 +64,15 @@ function receipt(date: string, ore: number, ml: number | null): Receipt {
     },
   };
 }
+
 const period = analysisPeriod("2026-09-19", "month", "2026-09-19");
+
 it("separates quantity and unit-price effects and conserves every øre", () => {
   const report = spendingAnalysis(
     [receipt("2026-08-10", 1000, 1000), receipt("2026-09-10", 3000, 2000)],
     period,
   );
+
   expect(report).toMatchObject({
     currentOre: 3000,
     previousOre: 1000,
@@ -77,6 +82,7 @@ it("separates quantity and unit-price effects and conserves every øre", () => {
   });
   const changed = receipt("2026-09-12", 333, null);
   changed.productAnalysis!.results[0].family = null;
+
   const expanded = spendingAnalysis(
     [
       receipt("2026-08-10", 1000, 1000),
@@ -85,14 +91,17 @@ it("separates quantity and unit-price effects and conserves every øre", () => {
     ],
     period,
   );
+
   expect(expanded.unexplainedOre).toBe(333);
   expect(
     expanded.priceOre + expanded.quantityOre + expanded.unexplainedOre,
   ).toBe(expanded.differenceOre);
 });
+
 it("keeps deposits out, includes allocated discounts and adjustments, and excludes duplicates", () => {
   const before = receipt("2026-08-10", 1000, 1000),
     after = receipt("2026-09-10", 1500, 1000);
+
   after.data!.lines.push(
     {
       ...emptyLine("discount"),
@@ -123,6 +132,7 @@ it("keeps deposits out, includes allocated discounts and adjustments, and exclud
     currentReceipts: 1,
   });
 });
+
 it("does not assign price or quantity effects to stale, incomplete or negative measurements", () => {
   for (const changed of [
     receipt("2026-09-10", 1500, null),
@@ -133,10 +143,12 @@ it("does not assign price or quantity effects to stale, incomplete or negative m
       [receipt("2026-08-10", 1000, 1000), changed],
       period,
     );
+
     expect(report.effects).toEqual([]);
     expect(report.unexplainedOre).toBe(report.differenceOre);
   }
 });
+
 it("compares partial periods and handles Monday, year boundaries, and February", () => {
   expect(analysisPeriod("2026-01-01", "week", "2026-01-01")).toEqual({
     start: "2025-12-29",
@@ -154,9 +166,11 @@ it("compares partial periods and handles Monday, year boundaries, and February",
     previousEnd: "2026-07-31",
   });
 });
+
 it("compares counts only when the package identity is the same", () => {
   const before = receipt("2026-08-10", 1000, null);
   const after = receipt("2026-09-10", 1500, null);
+
   for (const item of [before, after])
     item.productAnalysis!.results[0].quantity.units = 1;
   expect(spendingAnalysis([before, after], period).priceOre).toBe(500);
@@ -169,11 +183,13 @@ it("compares counts only when the package identity is the same", () => {
   expect(report.effects).toEqual([]);
   expect(report.unexplainedOre).toBe(500);
 });
+
 it("groups product attributes across families and keeps weak or stale evidence unknown", () => {
   const a = receipt("2026-09-01", 1000, 1000),
     b = receipt("2026-09-02", 2000, 2000);
+
   b.productAnalysis!.results[0].family!.id =
-    "other-brand" as Id<"productFamilies">;
+    testId<"productFamilies">("other-brand");
   const report = attributeInsights([a, b], "type");
   expect(report).toMatchObject({ known: 2, total: 2 });
   expect(report.groups[0]).toMatchObject({

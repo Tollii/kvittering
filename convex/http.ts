@@ -1,14 +1,16 @@
-import { ConvexError } from "convex/values";
+import { ConvexError, v } from "convex/values";
 import { parse } from "convex-helpers/validators";
 import { clientValidator } from "../src/lib/releases/policy";
 import { httpRouter } from "convex/server";
 import { httpAction, env } from "./_generated/server";
 import { internal } from "./_generated/api";
 import { authComponent, createAuth } from "./auth";
-import type { Id } from "./_generated/dataModel";
 import { errorDetails } from "../src/lib/diagnostics";
+
 const http = httpRouter();
+
 authComponent.registerRoutes(http, createAuth);
+
 function headers(request: Request) {
   return {
     "Access-Control-Allow-Origin":
@@ -20,6 +22,7 @@ function headers(request: Request) {
     "Cache-Control": "no-store",
   };
 }
+
 http.route({
   path: "/receipt-image",
   method: "OPTIONS",
@@ -28,53 +31,64 @@ http.route({
       new Response(null, { status: 204, headers: headers(request) }),
   ),
 });
+
 http.route({
   path: "/receipt-image",
   method: "POST",
   handler: httpAction(async (ctx, request) => {
     const responseHeaders = headers(request);
     const started = Date.now();
+
     try {
       const url = new URL(request.url);
-      const id = url.searchParams.get("receipt") as Id<"receipts">;
+      const id = parse(v.id("receipts"), url.searchParams.get("receipt"));
       const position = Number(url.searchParams.get("position"));
       const metadata = request.headers.get("X-Kvitto-Client");
+
       const client = metadata
         ? parse(clientValidator, JSON.parse(metadata))
         : undefined;
+
       await ctx.runQuery(internal.releasePolicy.check, {
         client,
         feature: "receiptProcessing",
       });
+
       const access = await ctx.runQuery(internal.receipts.imageAccess, {
         id,
         position,
       });
+
       if (access.image)
         return Response.json({ uploaded: true }, { headers: responseHeaders });
+
       if (access.receipt.status !== "uploading")
         return new Response("Opplasting er avsluttet.", {
           status: 409,
           headers: responseHeaders,
         });
       const type = request.headers.get("Content-Type")?.split(";")[0];
+
       if (!type || !["image/jpeg", "image/png", "image/webp"].includes(type))
         return new Response("Bruk JPEG, PNG eller WebP.", {
           status: 415,
           headers: responseHeaders,
         });
+
       if (Number(request.headers.get("Content-Length")) > 10 * 1024 * 1024)
         return new Response("Bildet er for stort.", {
           status: 413,
           headers: responseHeaders,
         });
       const blob = await request.blob();
+
       if (blob.size > 10 * 1024 * 1024 || blob.size === 0)
         return new Response("Ugyldig bildestørrelse.", {
           status: 413,
           headers: responseHeaders,
         });
       const storageId = await ctx.storage.store(blob);
+
       try {
         await ctx.runMutation(internal.receipts.attachImage, {
           id,
@@ -86,17 +100,20 @@ http.route({
         await ctx.storage.delete(storageId);
         throw error;
       }
+
       return Response.json({ uploaded: true }, { headers: responseHeaders });
     } catch (error) {
       console.warn("receipt.image_upload_failed", {
         ...errorDetails(error),
         durationMs: Date.now() - started,
       });
+
       if (error instanceof ConvexError)
         return Response.json(error.data, {
           status: 409,
           headers: responseHeaders,
         });
+
       return new Response(
         "Bildet kunne ikke lagres. Kontroller innloggingen.",
         {
@@ -107,19 +124,23 @@ http.route({
     }
   }),
 });
+
 http.route({
   path: "/receipt-image",
   method: "GET",
   handler: httpAction(async (ctx, request) => {
     try {
       const url = new URL(request.url);
+
       const { image } = await ctx.runQuery(internal.receipts.imageAccess, {
-        id: url.searchParams.get("receipt") as Id<"receipts">,
+        id: parse(v.id("receipts"), url.searchParams.get("receipt")),
         position: Number(url.searchParams.get("position")),
       });
+
       if (!image)
         return new Response(null, { status: 404, headers: headers(request) });
       const blob = await ctx.storage.get(image.storageId);
+
       return new Response(blob, {
         headers: {
           ...headers(request),
@@ -131,4 +152,5 @@ http.route({
     }
   }),
 });
+
 export default http;

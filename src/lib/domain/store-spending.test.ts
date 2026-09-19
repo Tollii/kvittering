@@ -1,3 +1,4 @@
+import { receiptFixture, testId } from "../testing/receipts";
 import { expect, it } from "vitest";
 import { storeSpending, type StorePurchase } from "./store-spending";
 import { monthlyInsights, type Receipt } from "./insights";
@@ -12,12 +13,13 @@ const branch: PhysicalStore = {
   latitude: 59.91,
   longitude: 10.75,
 };
+
 function purchase(
   id: string,
   overrides: Partial<StorePurchase> = {},
 ): StorePurchase {
   return {
-    receiptId: id as StorePurchase["receiptId"],
+    receiptId: testId<"receipts">(id),
     date: "2026-09-01",
     retailer: "KIWI",
     branch,
@@ -39,6 +41,7 @@ it("groups stable branch IDs, keeps branches separate, and includes unlocated pu
     purchase("d", { branch: undefined, retailer: "Kiwi", amountOre: 500 }),
     purchase("e", { branch: undefined, retailer: undefined, amountOre: 100 }),
   ];
+
   const before = structuredClone(input);
   const result = storeSpending(input);
   expect(result.stores.map((store) => [store.id, store.amountOre])).toEqual([
@@ -68,6 +71,7 @@ it("preserves known coordinates while refusing invalid or incomplete positions",
     purchase("d", { branch: { ...branch, id: 30, longitude: Number.NaN } }),
     purchase("e", { branch: { ...branch, id: 40, latitude: 0, longitude: 0 } }),
   ]);
+
   expect(
     result.stores.find((store) => store.id === "branch:10")?.location,
   ).toEqual({ latitude: 59.91, longitude: 10.75 });
@@ -88,6 +92,7 @@ it("retains refunds, unknown amounts and review state without inventing spending
     purchase("a", { amountOre: -1200 }),
     purchase("b", { amountOre: 0, unknownAmounts: 2, provisional: true }),
   ]);
+
   expect(result.stores[0]).toMatchObject({
     amountOre: -1200,
     unknownAmounts: 2,
@@ -103,13 +108,15 @@ it("agrees with Forbruk accounting, period, currency, exclusion and review filte
     purchaseDate: "2026-09-07",
     physicalStore: branch,
   };
-  const receipt = {
+
+  const receipt = receiptFixture({
     _id: "a",
     _creationTime: 0,
     status: "reviewed",
     data,
-  } as Receipt;
-  const pending = {
+  });
+
+  const pending = receiptFixture({
     ...receipt,
     _id: "b",
     status: "needs_review",
@@ -118,15 +125,29 @@ it("agrees with Forbruk accounting, period, currency, exclusion and review filte
       physicalStore: null,
       lines: [{ ...emptyLine(), amountOre: 1000 }, emptyLine()],
     },
-  } as Receipt;
-  const receipts = [
+  });
+
+  const receipts: Receipt[] = [
     receipt,
     pending,
-    { ...receipt, _id: "c", excluded: true },
-    { ...receipt, _id: "d", data: { ...data, currency: "EUR" } },
-    { ...receipt, _id: "e", data: { ...data, purchaseDate: "2026-08-01" } },
-    { ...receipt, _id: "f", data: { ...data, purchaseDate: null } },
-  ] as Receipt[];
+    { ...receipt, _id: testId<"receipts">("c"), excluded: true },
+    {
+      ...receipt,
+      _id: testId<"receipts">("d"),
+      data: { ...data, currency: "EUR" },
+    },
+    {
+      ...receipt,
+      _id: testId<"receipts">("e"),
+      data: { ...data, purchaseDate: "2026-08-01" },
+    },
+    {
+      ...receipt,
+      _id: testId<"receipts">("f"),
+      data: { ...data, purchaseDate: null },
+    },
+  ];
+
   const totals = monthlyInsights(receipts, "2026-09");
   const result = storeSpending(totals.storePurchases);
   expect(totals.products).toBe(3331);
@@ -140,9 +161,11 @@ it("agrees with Forbruk accounting, period, currency, exclusion and review filte
     result.stores.reduce((sum, store) => sum + store.unknownAmounts, 0),
   ).toBe(1);
   expect(result.stores.flatMap((store) => store.purchases)).toHaveLength(2);
+
   const reviewed = storeSpending(
     monthlyInsights(receipts, "2026-09", true).storePurchases,
   );
+
   expect(reviewed.stores).toHaveLength(1);
   expect(reviewed.stores[0].amountOre).toBe(2331);
 });

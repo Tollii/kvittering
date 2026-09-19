@@ -14,8 +14,10 @@ export const report = mutation({
   returns: v.null(),
   handler: async (ctx, args) => {
     const member = await requireMember(ctx);
+
     if (!/^[\w-]{16,80}$/.test(args.installationId))
       throw new Error("Invalid installation ID.");
+
     const previous = await ctx.db
       .query("clientReleases")
       .withIndex("by_identity_and_installationId", (q) =>
@@ -24,11 +26,14 @@ export const report = mutation({
           .eq("installationId", args.installationId),
       )
       .unique();
+
+    // SAFETY: args.client is a closed object parsed by clientValidator.
     const changed =
       !previous ||
       (Object.keys(args.client) as (keyof typeof args.client)[]).some(
         (key) => previous.client[key] !== args.client[key],
       );
+
     if (
       previous &&
       !changed &&
@@ -36,11 +41,14 @@ export const report = mutation({
     )
       return null;
     const values = { ...args, identity: member.identity, lastSeen: Date.now() };
+
     if (previous) await ctx.db.replace("clientReleases", previous._id, values);
     else await ctx.db.insert("clientReleases", values);
+
     return null;
   },
 });
+
 /** Bounded operator report. No receipt contents or public device inventory. */
 export const active = internalQuery({
   args: {},
@@ -56,6 +64,7 @@ export const active = internalQuery({
       )
       .order("desc")
       .take(501);
+
     return { installations: rows.slice(0, 500), truncated: rows.length > 500 };
   },
 });

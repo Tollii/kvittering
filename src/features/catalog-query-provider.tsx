@@ -1,3 +1,4 @@
+import { shouldPersistCatalogQuery } from "@/lib/catalog-cache-schema";
 import { useState, type ReactNode } from "react";
 import { QueryClient } from "@tanstack/react-query";
 import { PersistQueryClientProvider } from "@tanstack/react-query-persist-client";
@@ -19,7 +20,9 @@ export function CatalogQueryProvider({
         },
       }),
   );
+
   const [persister] = useState(() => catalogPersister(scope));
+
   return (
     <PersistQueryClientProvider
       client={client}
@@ -28,13 +31,7 @@ export function CatalogQueryProvider({
         maxAge: 7 * day,
         buster: "catalog-v2",
         dehydrateOptions: {
-          shouldDehydrateQuery: (query) =>
-            query.state.status === "success" &&
-            query.queryKey[0] === "catalog" &&
-            (!query.state.data ||
-              typeof query.state.data !== "object" ||
-              !("status" in query.state.data) ||
-              query.state.data.status === "ready"),
+          shouldDehydrateQuery: shouldPersistCatalogQuery,
         },
       }}
     >

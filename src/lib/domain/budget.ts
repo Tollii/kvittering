@@ -36,18 +36,21 @@ export function budgetPace(
 ): BudgetPace {
   const days = daysInMonth(month);
   const currentMonth = today.slice(0, 7);
+
   const dayOfMonth =
     month < currentMonth
       ? days
       : month > currentMonth
         ? 0
         : Number(today.slice(8, 10));
+
   const elapsedShare = days ? dayOfMonth / days : 0;
   const spentShare = budgetOre > 0 ? spentOre / budgetOre : 0;
   const expectedOre = Math.round(budgetOre * elapsedShare);
   const differenceOre = spentOre - expectedOre;
   const remainingOre = budgetOre - spentOre;
   const daysLeft = days - dayOfMonth;
+
   return {
     dayOfMonth,
     daysInMonth: days,
@@ -73,12 +76,15 @@ export function budgetPace(
 /** Short pace line for the Forbruk hero. */
 export function paceLabel(pace: BudgetPace): string {
   const percent = Math.round(pace.spentShare * 100);
+
   if (pace.dayOfMonth >= pace.daysInMonth)
     return pace.remainingOre >= 0
       ? `${percent} % av budsjettet · ${formatMoney(pace.remainingOre)} igjen`
       : `${percent} % av budsjettet · ${formatMoney(-pace.remainingOre)} over`;
+
   if (pace.remainingOre < 0)
     return `Dag ${pace.dayOfMonth} av ${pace.daysInMonth} · ${formatMoney(-pace.remainingOre)} over budsjett`;
+
   return `Dag ${pace.dayOfMonth} av ${pace.daysInMonth} · ${percent} % brukt · ${formatMoney(pace.remainingOre)} igjen`;
 }
 
@@ -92,23 +98,29 @@ export function weeklyDigest(
     receipts,
     analysisPeriod(today, "week", today),
   );
+
   const weekStart = analysis.period.start;
   const weekSpentOre = analysis.currentOre;
   const weekReceipts = analysis.currentReceipts;
   const month = monthlyInsights(receipts, today.slice(0, 7));
+
   const pace =
     budgetOre && budgetOre > 0
       ? budgetPace(budgetOre, month.products, today.slice(0, 7), today)
       : null;
+
   const parts = [
     `Denne uken: ${formatMoney(weekSpentOre)}`,
     `${weekReceipts} ${weekReceipts === 1 ? "kvittering" : "kvitteringer"}`,
   ];
+
   if (analysis.previousReceipts) parts.push(analysisSummary(analysis));
+
   if (pace)
     parts.push(
       `${Math.round(pace.spentShare * 100)} % av budsjettet brukt, dag ${pace.dayOfMonth} av ${pace.daysInMonth}`,
     );
+
   return {
     weekStart,
     weekSpentOre,
@@ -121,9 +133,10 @@ export function weeklyDigest(
 }
 
 /** Required week comparison and whole calendar month, including future-dated month entries. */
-export function digestPeriod(today: string): { start: string; end: string } {
+export function digestPeriod(today: string) {
   const week = analysisPeriod(today, "week", today);
   const month = today.slice(0, 7);
+
   return {
     start: [week.previousStart, `${month}-01`].sort()[0],
     end: `${month}-${daysInMonth(month)}`,

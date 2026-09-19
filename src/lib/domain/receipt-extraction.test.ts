@@ -104,11 +104,13 @@ describe("missing purchase year", () => {
     const extracted = fixture();
     extracted.purchaseDate = "--08-20";
     const referenceTime = Date.parse("2026-12-31T23:30:00Z");
+
     const data = prepareExtraction(
       extractionSchema.parse(extracted),
       1,
       referenceTime,
     );
+
     expect(data.purchaseDate).toBe("2027-08-20");
     expect(data.issues).toEqual([]);
     extracted.purchaseDate = "2024-08-20";
@@ -124,11 +126,13 @@ describe("missing purchase year", () => {
       prepareExtraction(extractionSchema.parse(extracted), 1).purchaseDate,
     ).toBeNull();
     extracted.purchaseDate = "--02-29";
+
     const data = prepareExtraction(
       extractionSchema.parse(extracted),
       1,
       Date.parse("2026-09-17"),
     );
+
     expect(data.purchaseDate).toBeNull();
     expect(data.issues).toContain(
       "Datoen er ikke gyldig i inneværende år. Kontroller kjøpsdatoen.",

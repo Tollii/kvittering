@@ -1,7 +1,7 @@
+import { receiptFixture, testId } from "../testing/receipts";
 import { expect, it } from "vitest";
 import { batteryFixture, emptyLine } from "./receipt";
 import type { Receipt } from "./insights";
-import type { Id } from "../../../convex/_generated/dataModel";
 import {
   emptyPurchaseQuantity,
   productAnalysisVersion,
@@ -12,6 +12,7 @@ import {
   formatPurchaseQuantity,
   partialQuantity,
 } from "./family-insights";
+
 function receipt(): Receipt {
   const data = batteryFixture();
   data.lines = [
@@ -20,7 +21,8 @@ function receipt(): Receipt {
     { ...emptyLine("zero"), name: "Coca-Cola Zero 500ml", amountOre: 2500 },
     { ...emptyLine("deposit"), kind: "deposit" as const, amountOre: 2400 },
   ];
-  return {
+
+  return receiptFixture({
     _id: "receipt",
     generation: 1,
     revision: 2,
@@ -36,7 +38,7 @@ function receipt(): Receipt {
         lineId: line.id,
         evidenceKey: purchaseEvidenceKey(line),
         family: {
-          id: (index === 2 ? "zero" : "original") as Id<"productFamilies">,
+          id: testId<"productFamilies">(index === 2 ? "zero" : "original"),
           name: index === 2 ? "Coca-Cola Zero" : "Coca-Cola",
         },
         quantity: {
@@ -47,8 +49,9 @@ function receipt(): Receipt {
         },
       })),
     },
-  } as Receipt;
+  });
 }
+
 it("combines package sizes, keeps variants separate, and excludes deposits", () => {
   const report = familyInsights([receipt()]);
   expect(report.total).toBe(3);
@@ -62,6 +65,7 @@ it("combines package sizes, keeps variants separate, and excludes deposits", () 
     "21 stk · 7,1 l",
   );
 });
+
 it("marks partial quantities and ignores stale or excluded receipt analysis", () => {
   const value = receipt();
   value.productAnalysis!.results[1].quantity = emptyPurchaseQuantity();

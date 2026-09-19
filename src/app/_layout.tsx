@@ -24,6 +24,7 @@ export function ErrorBoundary({ retry, error }: ErrorBoundaryProps) {
   useEffect(() => {
     reportError(error, "navigation.render");
   }, [error]);
+
   return (
     <SafeAreaProvider>
       <Screen title="Kunne ikke åpne siden">
@@ -37,10 +38,12 @@ export function ErrorBoundary({ retry, error }: ErrorBoundaryProps) {
     </SafeAreaProvider>
   );
 }
+
 function RootLayout() {
   const colors = useTheme();
   const scheme = useColorScheme();
   const base = scheme === "dark" ? DarkTheme : DefaultTheme;
+
   const navigationTheme = {
     ...base,
     colors: {
@@ -53,6 +56,7 @@ function RootLayout() {
       notification: colors.primary,
     },
   };
+
   return (
     <ShareIntentRoot>
       <GestureHandlerRootView style={{ flex: 1 }}>

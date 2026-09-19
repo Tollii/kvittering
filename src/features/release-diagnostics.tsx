@@ -13,9 +13,11 @@ export function ReleaseDiagnostics() {
   const { policy } = useReleasePolicy();
   useEffect(() => {
     let lastReport = 0;
+
     const report = async () => {
       if (Date.now() - lastReport < 6 * 60 * 60_000) return;
       lastReport = Date.now();
+
       try {
         const key = `installation-id${storageSuffix}`;
         const installationId = Storage.getItemSync(key) ?? randomUUID();
@@ -29,11 +31,15 @@ export function ReleaseDiagnostics() {
         /* Diagnostics must not block receipts or cause recursive error reports. */
       }
     };
+
     void report();
+
     const listener = AppState.addEventListener("change", (state) => {
       if (state === "active") void report();
     });
+
     return () => listener.remove();
   }, [convex, policy.revision]);
+
   return null;
 }

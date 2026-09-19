@@ -9,35 +9,44 @@ import {
   purchaseEvidenceKey,
   productAnalysisVersion,
 } from "../src/lib/domain/product-families";
+
 const modules = import.meta.glob("./**/*.ts");
+
 afterEach(() => {
   vi.unstubAllEnvs();
   vi.useRealTimers();
 });
+
 async function setup() {
   vi.stubEnv("TYPESAFE_API_KEY", "");
   const t = convexTest(schema, modules);
+
   const first = t.withIdentity({
     subject: "first",
     issuer: "https://test.local",
   });
+
   const other = t.withIdentity({
     subject: "other",
     issuer: "https://test.local",
   });
+
   const householdId = await first.mutation(api.households.create, {
     name: "First",
     invitation: "11111111111111111111111111111111",
   });
+
   await other.mutation(api.households.create, {
     name: "Other",
     invitation: "22222222222222222222222222222222",
   });
+
   const id = await first.mutation(api.receipts.reserve, {
     householdId,
     clientId: "product-analysis-0001",
     imageCount: 1,
   });
+
   const data = batteryFixture();
   await t.run((ctx) =>
     ctx.db.patch("receipts", id, {
@@ -47,6 +56,7 @@ async function setup() {
     }),
   );
   const line = data.lines[0];
+
   return {
     t,
     first,
@@ -70,16 +80,19 @@ async function setup() {
     },
   };
 }
+
 it("rejects access from another household", async () => {
   const { other, id } = await setup();
   await expect(
     other.mutation(api.productAnalysis.ensure, { ids: [id] }),
   ).rejects.toThrow("ikke tilgjengelig");
 });
+
 it("persists one family and cached profile for repeated decisions", async () => {
   const { t, args } = await setup();
   await t.mutation(internal.productAnalysis.saveProfile, args);
   await t.mutation(internal.productAnalysis.saveProfile, args);
+
   const prepared = await t.query(internal.productAnalysis.prepare, {
     id: args.id,
     version: productAnalysisVersion,
@@ -87,11 +100,13 @@ it("persists one family and cached profile for repeated decisions", async () => 
     revision: args.revision,
     lineId: args.lineId,
   });
+
   expect(prepared?.profile?.package.unitsPerPackage).toBe(1);
   expect(prepared?.families).toHaveLength(1);
   expect(prepared?.profile?.familyId).toBe(prepared?.families[0]._id);
   expect(prepared?.profile?.attributes).toEqual(args.attributes);
 });
+
 it("discards stale results after a receipt edit and records failures separately from receipt status", async () => {
   const { t, id, args } = await setup();
   await t.run((ctx) => ctx.db.patch("receipts", id, { revision: 1 }));
@@ -124,9 +139,11 @@ it("continues to analysis when optional catalog work is disabled", async () => {
   const { t, id } = await setup();
   vi.stubEnv("KASSALAPP_API_KEY", "");
   await t.mutation(internal.catalogMatching.start, { id, generation: 0 });
+
   const scheduled = await t.run((ctx) =>
     ctx.db.system.query("_scheduled_functions").collect(),
   );
+
   expect(scheduled.some((job) => job.name === "productAnalysis:start")).toBe(
     true,
   );
@@ -179,9 +196,11 @@ it("continues past a paused catalog flag without starting catalog work", async (
   expect(
     (await t.run((ctx) => ctx.db.get("receipts", id)))?.catalogStatus,
   ).toBe("complete");
+
   const scheduled = await t.run((ctx) =>
     ctx.db.system.query("_scheduled_functions").collect(),
   );
+
   expect(scheduled.some((job) => job.name === "productAnalysis:start")).toBe(
     true,
   );
@@ -206,11 +225,13 @@ it("repairs an older analysis version through the explicit household operation",
     }),
   );
   const receipt = (await t.run((ctx) => ctx.db.get("receipts", id)))!;
+
   const result = await t.mutation(internal.productAnalysis.repair, {
     householdId: receipt.householdId,
     cursor: null,
     through: receipt._creationTime,
   });
+
   expect(result.isDone).toBe(true);
   expect(
     (await t.run((ctx) => ctx.db.get("receipts", id)))?.productAnalysis,
@@ -221,25 +242,31 @@ it("commits duplicate profile decisions once and rejects a stale batch", async (
   const { t, args } = await setup();
   const { id, generation, revision, version, ...decision } = args;
   const snapshot = { id, generation, revision, version };
+
   const ids = await t.mutation(internal.productAnalysis.saveProfiles, {
     ...snapshot,
     decisions: [decision, decision],
   });
+
   expect(ids).toHaveLength(2);
   expect(ids[0]).toBe(ids[1]);
+
   const rows = await t.query(internal.productAnalysis.readProfiles, {
     ...snapshot,
     ids,
   });
+
   expect(rows).toHaveLength(1);
   expect(rows[0].family).not.toBeNull();
   expect(
     await t.run((ctx) => ctx.db.query("productFamilies").collect()),
   ).toHaveLength(1);
+
   const prepared = await t.query(internal.productAnalysis.prepareBatch, {
     ...snapshot,
     lineIds: [decision.lineId, decision.lineId],
   });
+
   expect(prepared?.every((item) => item.profile?._id === ids[0])).toBe(true);
   await t.run((ctx) => ctx.db.patch("receipts", id, { revision: 1 }));
   expect(
@@ -263,12 +290,13 @@ it("batches independent profiles and uses only quantity questions for cached pro
     { ...product, id: "different-product", name: "Milk", originalText: "Milk" },
   ];
   await t.run((ctx) => ctx.db.patch("receipts", id, { data }));
-  const requests: { questions: Record<string, unknown> }[] = [];
+  const requests: { questions: Record<string, { type: string }> }[] = [];
   vi.stubGlobal(
     "fetch",
     vi.fn(async (_url, init) => {
       const request = JSON.parse(init.body);
       requests.push(request);
+
       return new Response(
         JSON.stringify({
           model: "jev-latest",
@@ -289,6 +317,7 @@ it("batches independent profiles and uses only quantity questions for cached pro
       );
     }),
   );
+
   try {
     const snapshot = {
       id,
@@ -296,6 +325,7 @@ it("batches independent profiles and uses only quantity questions for cached pro
       revision: args.revision,
       version: args.version,
     };
+
     expect(
       await t.action(internal.productAnalysisWorker.analyze, snapshot),
     ).toHaveLength(3);

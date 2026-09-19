@@ -1,3 +1,4 @@
+import { z } from "zod";
 import { createElement, StrictMode } from "react";
 import { act, create, type ReactTestRenderer } from "react-test-renderer";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
@@ -14,8 +15,10 @@ import { useProductLinkingQueue } from "../features/product-linking-queue";
 
 const navigation = vi.hoisted(() => ({ focused: true, authenticated: true }));
 
+// oxlint-disable-next-line anti-slop/no-module-mocking -- Replace the native SDK or environment boundary; application behavior remains under test.
 vi.mock("expo-router", () => ({ useIsFocused: () => navigation.focused }));
 
+// oxlint-disable-next-line anti-slop/no-module-mocking -- Replace the native SDK or environment boundary; application behavior remains under test.
 vi.mock("convex/react", async (original) => ({
   ...(await original<typeof import("convex/react")>()),
   useConvexAuth: () => ({ isAuthenticated: navigation.authenticated }),
@@ -24,7 +27,7 @@ vi.mock("convex/react", async (original) => ({
 type Subscription = {
   name: string;
   args: Record<string, Value>;
-  value: unknown;
+  value: Value | Error | undefined;
   listeners: Set<() => void>;
 };
 
@@ -79,7 +82,9 @@ beforeEach(() => {
 afterEach(async () => {
   await act(() => renderer?.unmount());
   renderer = undefined;
+  // oxlint-disable-next-line vitest/no-standalone-expect -- Check cleanup after every rendered scenario.
   expect(subscriptions.size).toBe(0);
+  // oxlint-disable-next-line vitest/no-standalone-expect -- Check cleanup after every rendered scenario.
   expect(vi.getTimerCount()).toBe(0);
   await client.close();
   vi.restoreAllMocks();
@@ -108,13 +113,17 @@ async function show(component: (() => null) | null, scope = "household-a") {
   });
 }
 
-async function publish(name: string, value: unknown, cursor: Value = null) {
-  const subscription = [...subscriptions.values()].find(
-    (entry) =>
+async function publish(name: string, value: Value, cursor: Value = null) {
+  const subscription = [...subscriptions.values()].find((entry) => {
+    const pagination = entry.args.paginationOpts;
+
+    return (
       entry.name === name &&
-      (!entry.args.paginationOpts ||
-        (entry.args.paginationOpts as { cursor: Value }).cursor === cursor),
-  );
+      (!pagination ||
+        z.object({ cursor: z.string().nullable() }).safeParse(pagination).data
+          ?.cursor === cursor)
+    );
+  });
 
   expect(subscription, `subscription for ${name}`).toBeDefined();
   await act(() => {

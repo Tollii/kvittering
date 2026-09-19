@@ -4,20 +4,26 @@ import { mosaicHighlight, mosaicPalette } from "@/constants/theme";
 /** Generate each pattern with a local sequence that is reset for every call. */
 function createMosaicBlocks(seed: number, columns: number, fade: boolean) {
   let state = seed >>> 0 || 1;
+
   const next = () => {
     state = (state * 1664525 + 1013904223) >>> 0;
+
     return state / 0xffffffff;
   };
+
   return Array.from({ length: columns }, (_, index) => {
     const position = index / Math.max(1, columns - 1);
     // Bias colours from dark violet on the left towards light lilac on the right.
     const centre = position * (mosaicPalette.length - 1);
     const pick = Math.round(centre + (next() - 0.5) * 3);
     const fleck = next() < 0.04;
+
     const colour = fleck
       ? mosaicHighlight
       : mosaicPalette[Math.min(mosaicPalette.length - 1, Math.max(0, pick))];
+
     const alpha = fade ? 1 - position * 0.55 : 1;
+
     return { key: index, colour, alpha: alpha * (0.7 + next() * 0.3) };
   });
 }
@@ -44,6 +50,7 @@ export function Mosaic({
   style?: ViewStyle;
 }) {
   const blocks = createMosaicBlocks(seed, columns, fade);
+
   return (
     <View
       accessibilityElementsHidden

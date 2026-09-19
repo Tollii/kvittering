@@ -10,6 +10,7 @@ it("starts waiting files after capture becomes idle", () => {
     { uri: "receipt.pdf" },
   ]);
 });
+
 it("retains failed files for an explicit retry and acknowledges only completed insertion", () => {
   const queue = createImportQueue();
   queue.offer([{ uri: "receipt.pdf" }]);

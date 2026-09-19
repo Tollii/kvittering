@@ -7,6 +7,7 @@ import { releaseMutation } from "./releases/requests";
 import { convexSiteUrl, fetchAccessToken } from "./auth-client";
 import { imageFile } from "./receipt-storage";
 import type { UploadTransport } from "./upload-queue";
+
 export function receiptUploadTransport(
   convex: ConvexReactClient,
   householdId: Id<"households">,
@@ -21,8 +22,10 @@ export function receiptUploadTransport(
       }),
     upload: async (id, position, name) => {
       const token = await fetchAccessToken();
+
       if (!active())
         throw new Error("Opplastingen fortsetter når du åpner appen med nett.");
+
       const response = await nativeFetch(
         `${convexSiteUrl}/receipt-image?receipt=${id}&position=${position}`,
         {
@@ -41,8 +44,10 @@ export function receiptUploadTransport(
           position,
         });
       });
+
       if (!response.ok) {
         const data = await response.json().catch(() => null);
+
         if (data?.code)
           throw releaseError({ data }, "receipt.image_upload", {
             receiptId: id,
@@ -56,7 +61,8 @@ export function receiptUploadTransport(
         );
       }
     },
-    complete: (id) =>
-      releaseMutation(convex, api.receipts.completeUpload, { id }),
+    complete: async (id) => {
+      await releaseMutation(convex, api.receipts.completeUpload, { id });
+    },
   };
 }
