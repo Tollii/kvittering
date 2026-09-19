@@ -4,7 +4,7 @@
 
 ## Status
 
-- Status: TODO
+- Status: DONE
 - Priority: P2
 - Effort: M
 - Risk: Medium
@@ -199,3 +199,9 @@ Required check: For repeated products in one receipt, preparation does not repea
 ## Maintenance notes
 
 Add new independent attribute questions to the existing batch; retain a separate stage only when its inputs depend on prior answers.
+
+## Implementation record
+
+Implemented bounded preparation, deduplicated evidence, one profile provider call per batch, atomic family/profile writes, and focused persisted-profile reads. Cached profiles skip candidate discovery and profile model questions. Tests cover question scope, incomplete answers, duplicate commits, and stale batches. All 183 tests pass. Live provider execution remains unverified.
+
+Validation: `npm run typecheck`, `npm run lint`, `npm test`, and `git diff --check` passed. No deployment was performed.

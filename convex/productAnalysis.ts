@@ -1,7 +1,7 @@
 import { featureEnabled } from "./releasePolicy";
 import { clientMutation as mutation } from "./clientFunctions";
 import { productAttributesValidator } from "../src/lib/domain/product-attributes";
-import { v } from "convex/values";
+import { v, type Infer } from "convex/values";
 import { WorkflowManager } from "@convex-dev/workflow";
 import { components, internal } from "./_generated/api";
 import {
@@ -9,6 +9,7 @@ import {
   internalMutation,
   internalQuery,
   type MutationCtx,
+  type QueryCtx,
 } from "./_generated/server";
 import type { Doc, Id } from "./_generated/dataModel";
 import schema from "./schema";
@@ -146,153 +147,257 @@ export const read = internalQuery({
   },
 });
 
+const preparedProfileValidator = v.object({
+  line: lineValidator,
+  profile: v.union(schema.doc("productProfiles"), v.null()),
+  families: v.array(schema.doc("productFamilies")),
+  catalog: v.union(catalogProductValidator, v.null()),
+});
+export type PreparedProfile = Infer<typeof preparedProfileValidator>;
+
+async function prepareProfiles(
+  ctx: QueryCtx,
+  receipt: Doc<"receipts">,
+  lineIds: string[],
+): Promise<PreparedProfile[]> {
+  const profiles = new Map<string, Doc<"productProfiles"> | null>();
+  const catalogs = new Map<string, Doc<"catalogProducts"> | null>();
+  const categories = new Map<string, Doc<"productFamilies">[]>();
+  const names = new Map<string, Doc<"productFamilies">[]>();
+  const result: PreparedProfile[] = [];
+  for (const lineId of lineIds) {
+    const line = receipt.data!.lines.find(
+      (item) => item.id === lineId && item.kind === "product",
+    );
+    if (!line) continue;
+    const key = productProfileKey(line);
+    if (!profiles.has(key))
+      profiles.set(
+        key,
+        await ctx.db
+          .query("productProfiles")
+          .withIndex("by_householdId_and_key", (q) =>
+            q.eq("householdId", receipt.householdId).eq("key", key),
+          )
+          .unique(),
+      );
+    const profile = profiles.get(key)!;
+    let families: Doc<"productFamilies">[] = [];
+    let catalog = null;
+    if (profile) {
+      const family = profile.familyId
+        ? await ctx.db.get("productFamilies", profile.familyId)
+        : null;
+      if (family?.householdId === receipt.householdId) families = [family];
+    } else {
+      const category = line.categoryId ?? "fallback.unclear";
+      if (!categories.has(category))
+        categories.set(
+          category,
+          await ctx.db
+            .query("productFamilies")
+            .withIndex("by_householdId_and_categoryId", (q) =>
+              q
+                .eq("householdId", receipt.householdId)
+                .eq("categoryId", category),
+            )
+            .take(80),
+        );
+      const name = familyName(line);
+      if (!names.has(name))
+        names.set(
+          name,
+          await ctx.db
+            .query("productFamilies")
+            .withSearchIndex("search_name", (q) =>
+              q.search("name", name).eq("householdId", receipt.householdId),
+            )
+            .take(20),
+        );
+      families = [
+        ...new Map(
+          [...categories.get(category)!, ...names.get(name)!].map((family) => [
+            family._id,
+            family,
+          ]),
+        ).values(),
+      ];
+      if (line.catalogProduct) {
+        const key = line.catalogProduct.key;
+        if (!catalogs.has(key))
+          catalogs.set(
+            key,
+            await ctx.db
+              .query("catalogProducts")
+              .withIndex("by_key", (q) => q.eq("key", key))
+              .unique(),
+          );
+        catalog = catalogs.get(key)?.product ?? null;
+      }
+    }
+    result.push({ line, profile, families, catalog });
+  }
+  return result;
+}
 export const prepare = internalQuery({
   args: { ...snapshot, lineId: v.string() },
-  returns: v.union(
-    v.null(),
-    v.object({
-      line: lineValidator,
-      profile: v.union(schema.doc("productProfiles"), v.null()),
-      families: v.array(schema.doc("productFamilies")),
-      catalog: v.union(catalogProductValidator, v.null()),
-    }),
-  ),
+  returns: v.union(v.null(), preparedProfileValidator),
   handler: async (ctx, args) => {
     const receipt = await ctx.db.get("receipts", args.id);
-    if (!current(receipt, args)) return null;
-    const line = receipt!.data!.lines.find(
-      (item) => item.id === args.lineId && item.kind === "product",
-    );
-    if (!line) return null;
-    const profile = await ctx.db
-      .query("productProfiles")
-      .withIndex("by_householdId_and_key", (q) =>
-        q
-          .eq("householdId", receipt!.householdId)
-          .eq("key", productProfileKey(line)),
-      )
-      .unique();
-    const families = await ctx.db
-      .query("productFamilies")
-      .withIndex("by_householdId_and_categoryId", (q) =>
-        q
-          .eq("householdId", receipt!.householdId)
-          .eq("categoryId", line.categoryId ?? "fallback.unclear"),
-      )
-      .take(80);
-    // Include name matches across categories: a previous category can be wrong.
-    const related = await ctx.db
-      .query("productFamilies")
-      .withSearchIndex("search_name", (q) =>
-        q
-          .search("name", familyName(line))
-          .eq("householdId", receipt!.householdId),
-      )
-      .take(20);
-    const familyIds = new Set(families.map((family) => family._id));
-    for (const family of related)
-      if (!familyIds.has(family._id)) {
-        families.push(family);
-        familyIds.add(family._id);
-      }
-    if (profile?.familyId && !familyIds.has(profile.familyId)) {
-      const family = await ctx.db.get("productFamilies", profile.familyId);
-      if (family?.householdId === receipt!.householdId) families.push(family);
-    }
-    const catalog = line.catalogProduct
-      ? await ctx.db
-          .query("catalogProducts")
-          .withIndex("by_key", (q) => q.eq("key", line.catalogProduct!.key))
-          .unique()
+    return current(receipt, args)
+      ? ((await prepareProfiles(ctx, receipt!, [args.lineId]))[0] ?? null)
       : null;
-    return { line, profile, families, catalog: catalog?.product ?? null };
+  },
+});
+export const prepareBatch = internalQuery({
+  args: { ...snapshot, lineIds: v.array(v.string()) },
+  returns: v.union(v.null(), v.array(preparedProfileValidator)),
+  handler: async (ctx, args) => {
+    if (args.lineIds.length > 12)
+      throw new Error("Analysis batch exceeds 12 lines.");
+    const receipt = await ctx.db.get("receipts", args.id);
+    return current(receipt, args)
+      ? prepareProfiles(ctx, receipt!, args.lineIds)
+      : null;
   },
 });
 
-export const saveProfile = internalMutation({
-  args: {
-    ...snapshot,
-    lineId: v.string(),
-    evidenceKey: v.string(),
-    family: v.union(v.literal("new"), v.id("productFamilies"), v.null()),
-    package: packageProfileValidator,
-    attributes: productAttributesValidator.optional(),
-    decisions: v.array(
-      v.object({
-        question: v.string(),
-        choice: v.string(),
-        confidence: v.number(),
-      }),
-    ),
-  },
-  returns: v.null(),
-  handler: async (ctx, args) => {
-    const receipt = await ctx.db.get("receipts", args.id);
-    if (!current(receipt, args)) return null;
-    const line = receipt!.data!.lines.find(
-      (item) => item.id === args.lineId && item.kind === "product",
-    );
-    if (!line || purchaseEvidenceKey(line) !== args.evidenceKey) return null;
-    const key = productProfileKey(line);
-    const cached = await ctx.db
-      .query("productProfiles")
+const profileDecisionValidator = v.object({
+  lineId: v.string(),
+  evidenceKey: v.string(),
+  family: v.union(v.literal("new"), v.id("productFamilies"), v.null()),
+  package: packageProfileValidator,
+  attributes: productAttributesValidator.optional(),
+  decisions: v.array(
+    v.object({
+      question: v.string(),
+      choice: v.string(),
+      confidence: v.number(),
+    }),
+  ),
+});
+const profileWriteValidator = v.object({
+  ...snapshot,
+  ...profileDecisionValidator.fields,
+});
+async function writeProfile(
+  ctx: MutationCtx,
+  args: Infer<typeof profileWriteValidator>,
+  receipt: Doc<"receipts"> | null,
+): Promise<Id<"productProfiles"> | null> {
+  if (!current(receipt, args)) return null;
+  const line = receipt!.data!.lines.find(
+    (item) => item.id === args.lineId && item.kind === "product",
+  );
+  if (!line || purchaseEvidenceKey(line) !== args.evidenceKey) return null;
+  const key = productProfileKey(line);
+  const cached = await ctx.db
+    .query("productProfiles")
+    .withIndex("by_householdId_and_key", (q) =>
+      q.eq("householdId", receipt!.householdId).eq("key", key),
+    )
+    .unique();
+  if (cached) return cached._id;
+  let familyId: Id<"productFamilies"> | null = null;
+  if (args.family === "new") {
+    const name = familyName(line);
+    const familyKey = JSON.stringify([
+      productSearch(name),
+      productSearch(line.catalogProduct?.brand ?? line.brand ?? ""),
+      [...line.attributes].sort(),
+    ]);
+    const existing = await ctx.db
+      .query("productFamilies")
       .withIndex("by_householdId_and_key", (q) =>
-        q.eq("householdId", receipt!.householdId).eq("key", key),
+        q.eq("householdId", receipt!.householdId).eq("key", familyKey),
       )
       .unique();
-    if (cached) return null;
-    let familyId: Id<"productFamilies"> | null = null;
-    if (args.family === "new") {
-      const name = familyName(line);
-      const familyKey = JSON.stringify([
-        productSearch(name),
-        productSearch(line.catalogProduct?.brand ?? line.brand ?? ""),
-        [...line.attributes].sort(),
-      ]);
-      const existing = await ctx.db
-        .query("productFamilies")
-        .withIndex("by_householdId_and_key", (q) =>
-          q.eq("householdId", receipt!.householdId).eq("key", familyKey),
-        )
-        .unique();
-      familyId =
-        existing?._id ??
-        (await ctx.db.insert("productFamilies", {
-          householdId: receipt!.householdId,
-          key: familyKey,
-          name,
-          categoryId: line.categoryId ?? "fallback.unclear",
-          representative: {
-            name: line.catalogProduct?.name ?? line.name,
-            brand: line.catalogProduct?.brand ?? line.brand,
-            attributes: line.attributes,
-          },
-        }));
-    } else if (args.family) {
-      const family = await ctx.db.get("productFamilies", args.family);
-      if (family?.householdId !== receipt!.householdId)
-        throw new Error("Invalid product family.");
-      familyId = family._id;
-      const name = normalizeFamilyName(family.representative.name);
-      if (name !== family.name)
-        await ctx.db.patch("productFamilies", family._id, { name });
+    familyId =
+      existing?._id ??
+      (await ctx.db.insert("productFamilies", {
+        householdId: receipt!.householdId,
+        key: familyKey,
+        name,
+        categoryId: line.categoryId ?? "fallback.unclear",
+        representative: {
+          name: line.catalogProduct?.name ?? line.name,
+          brand: line.catalogProduct?.brand ?? line.brand,
+          attributes: line.attributes,
+        },
+      }));
+  } else if (args.family) {
+    const family = await ctx.db.get("productFamilies", args.family);
+    if (family?.householdId !== receipt!.householdId)
+      throw new Error("Invalid product family.");
+    familyId = family._id;
+    const name = normalizeFamilyName(family.representative.name);
+    if (name !== family.name)
+      await ctx.db.patch("productFamilies", family._id, { name });
+  }
+  const count = args.package.unitsPerPackage;
+  const size = args.package.measurePerPackage?.amount;
+  if (
+    (count !== null && (!Number.isInteger(count) || count <= 0)) ||
+    (size !== undefined && (!Number.isFinite(size) || size <= 0))
+  )
+    throw new Error("Invalid package quantity.");
+  return ctx.db.insert("productProfiles", {
+    householdId: receipt!.householdId,
+    key,
+    familyId,
+    package: args.package,
+    ...(args.attributes ? { attributes: args.attributes } : {}),
+    decisions: args.decisions,
+  });
+}
+export const saveProfile = internalMutation({
+  args: profileWriteValidator.fields,
+  returns: v.union(v.id("productProfiles"), v.null()),
+  handler: async (ctx, args) =>
+    writeProfile(ctx, args, await ctx.db.get("receipts", args.id)),
+});
+export const saveProfiles = internalMutation({
+  args: { ...snapshot, decisions: v.array(profileDecisionValidator) },
+  returns: v.array(v.id("productProfiles")),
+  handler: async (ctx, args) => {
+    if (args.decisions.length > 12)
+      throw new Error("Analysis batch exceeds 12 lines.");
+    const receipt = await ctx.db.get("receipts", args.id);
+    const ids: Id<"productProfiles">[] = [];
+    for (const decision of args.decisions) {
+      const id = await writeProfile(ctx, { ...args, ...decision }, receipt);
+      if (id) ids.push(id);
     }
-    const count = args.package.unitsPerPackage;
-    const size = args.package.measurePerPackage?.amount;
-    if (
-      (count !== null && (!Number.isInteger(count) || count <= 0)) ||
-      (size !== undefined && (!Number.isFinite(size) || size <= 0))
-    )
-      throw new Error("Invalid package quantity.");
-    await ctx.db.insert("productProfiles", {
-      householdId: receipt!.householdId,
-      key,
-      familyId,
-      package: args.package,
-      ...(args.attributes ? { attributes: args.attributes } : {}),
-      decisions: args.decisions,
-    });
-    return null;
+    return ids;
+  },
+});
+export const readProfiles = internalQuery({
+  args: { ...snapshot, ids: v.array(v.id("productProfiles")) },
+  returns: v.array(
+    v.object({
+      profile: schema.doc("productProfiles"),
+      family: v.union(schema.doc("productFamilies"), v.null()),
+    }),
+  ),
+  handler: async (ctx, args) => {
+    if (args.ids.length > 12)
+      throw new Error("Analysis batch exceeds 12 profiles.");
+    const receipt = await ctx.db.get("receipts", args.id);
+    if (!current(receipt, args)) return [];
+    const rows = [];
+    for (const id of new Set(args.ids)) {
+      const profile = await ctx.db.get("productProfiles", id);
+      if (!profile || profile.householdId !== receipt!.householdId)
+        throw new Error("Invalid profile.");
+      const family = profile.familyId
+        ? await ctx.db.get("productFamilies", profile.familyId)
+        : null;
+      rows.push({
+        profile,
+        family: family?.householdId === receipt!.householdId ? family : null,
+      });
+    }
+    return rows;
   },
 });
 

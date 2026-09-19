@@ -216,3 +216,39 @@ it("repairs an older analysis version through the explicit household operation",
     (await t.run((ctx) => ctx.db.get("receipts", id)))?.productAnalysis,
   ).toMatchObject({ version: productAnalysisVersion, state: "pending" });
 });
+
+it("commits duplicate profile decisions once and rejects a stale batch", async () => {
+  const { t, args } = await setup();
+  const { id, generation, revision, version, ...decision } = args;
+  const snapshot = { id, generation, revision, version };
+  const ids = await t.mutation(internal.productAnalysis.saveProfiles, {
+    ...snapshot,
+    decisions: [decision, decision],
+  });
+  expect(ids).toHaveLength(2);
+  expect(ids[0]).toBe(ids[1]);
+  const rows = await t.query(internal.productAnalysis.readProfiles, {
+    ...snapshot,
+    ids,
+  });
+  expect(rows).toHaveLength(1);
+  expect(rows[0].family).not.toBeNull();
+  expect(
+    await t.run((ctx) => ctx.db.query("productFamilies").collect()),
+  ).toHaveLength(1);
+  const prepared = await t.query(internal.productAnalysis.prepareBatch, {
+    ...snapshot,
+    lineIds: [decision.lineId, decision.lineId],
+  });
+  expect(prepared?.every((item) => item.profile?._id === ids[0])).toBe(true);
+  await t.run((ctx) => ctx.db.patch("receipts", id, { revision: 1 }));
+  expect(
+    await t.mutation(internal.productAnalysis.saveProfiles, {
+      ...snapshot,
+      decisions: [decision],
+    }),
+  ).toEqual([]);
+  expect(
+    await t.query(internal.productAnalysis.readProfiles, { ...snapshot, ids }),
+  ).toEqual([]);
+});
