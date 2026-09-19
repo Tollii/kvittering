@@ -113,9 +113,8 @@ function neutralWord(word: string) {
 }
 
 /**
- * Link without waiting for an AI response when the text leaves no doubt: a
- * unique full match, or the only compatible product that contains every
- * receipt word and adds nothing but size, pack or packaging words.
+ * Link a unique full match, a compatible name with neutral additions, or a
+ * single compatible barcode supported by the receipt's brand and product words.
  */
 export function automaticCatalogProduct(
   line: ReceiptLine,
@@ -159,7 +158,29 @@ export function automaticCatalogProduct(
       })
       .map(({ product }) => product),
   );
-  return contained.length === 1 ? contained[0] : null;
+  if (contained.length) return contained.length === 1 ? contained[0] : null;
+  const candidates = unique(
+    ranked
+      .filter(({ product }) => {
+        const target = productWords(product.name);
+        return (
+          [...source].every((word) => target.has(word)) &&
+          compatibleCatalogProduct(line, product, true)
+        );
+      })
+      .map(({ product }) => product),
+  );
+  if (candidates.length !== 1) return null;
+  const candidate = candidates[0];
+  if (!candidate.ean || !candidate.brand) return null;
+  const brandWords = productWords(candidate.brand);
+  return (
+    brandWords.size > 0 &&
+    [...brandWords].every((word) => source.has(word)) &&
+    [...source].some((word) => !brandWords.has(word) && !neutralWord(word))
+  )
+    ? candidate
+    : null;
 }
 export function retailerCode(store: string | null): string | null {
   const name = normalizeSearch(store ?? "");

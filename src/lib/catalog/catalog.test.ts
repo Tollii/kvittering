@@ -193,6 +193,70 @@ it("keeps multipacks, flavours, generic fresh food and missing package evidence 
     ),
   ).toBe(true);
 });
+
+const stratosLine = {
+  ...emptyLine("stratos"),
+  name: "STRATOS SPRØTT",
+  receiptName: "STRATOS SPRØTT",
+  brand: "Stratos",
+};
+const stratosProducts = normalizeProducts({
+  data: [
+    {
+      id: 224863,
+      name: "Stratos Helt Sprøtt 150g Nidar",
+      brand: "Stratos",
+      ean: "7037710021424",
+      weight: 150,
+      weight_unit: "g",
+    },
+    {
+      id: 227185,
+      name: "Stratos Helt sprøtt 150 g",
+      brand: "Stratos",
+      weight: 150,
+      weight_unit: "g",
+    },
+  ],
+});
+
+it("links a single compatible barcode supported by brand and product words", () => {
+  expect(automaticCatalogProduct(stratosLine, stratosProducts)?.key).toBe(
+    "ean:7037710021424",
+  );
+  expect(
+    automaticCatalogProduct(stratosLine, [...stratosProducts].reverse())?.key,
+  ).toBe("ean:7037710021424");
+});
+
+it.each(["Stratos Helt Sprøtt 200g", "Stratos Helt Sprøtt Hvit 150g"])(
+  "keeps a second barcode unresolved: %s",
+  (name) => {
+    const alternatives = normalizeProducts({
+      data: [{ id: 3, name, brand: "Stratos", ean: "7037710000002" }],
+    });
+    expect(
+      automaticCatalogProduct(stratosLine, [...stratosProducts, ...alternatives]),
+    ).toBeNull();
+  },
+);
+
+it.each([
+  { name: "STRATOS 150G" },
+  { name: "STRATOS PEANØTT" },
+  { name: "STRATOS SPRØTT 200G" },
+  { name: "STRATOS SPRØTT 2PK" },
+  { name: "STRATOS SPRØTT ZERO" },
+  { name: "STRATOS SPRØTT", brand: "Freia" },
+])("does not infer identity from one search result: %j", (evidence) => {
+  const line = { ...stratosLine, ...evidence, receiptName: evidence.name };
+  expect(automaticCatalogProduct(line, [stratosProducts[0]])).toBeNull();
+});
+
+it("requires a barcode for a branded match with additional catalog words", () => {
+  expect(automaticCatalogProduct(stratosLine, [stratosProducts[1]])).toBeNull();
+});
+
 it("requires a unique branch match and keeps price data separate from product identity", () => {
   const stores = normalizeStores({
     data: [
