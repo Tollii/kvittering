@@ -51,3 +51,5 @@ jobs:
         env:
           UPDATE_MESSAGE: ${{ inputs.message }}
         run: eas update --channel testflight --environment preview --platform ios --message "$UPDATE_MESSAGE" --non-interactive
+      - name: Upload update source maps to Sentry
+        run: npm run sentry:sourcemaps

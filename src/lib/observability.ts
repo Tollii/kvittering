@@ -1,5 +1,6 @@
 import * as Sentry from "@sentry/react-native";
 import { errorDetails, type DiagnosticFields } from "./diagnostics";
+import { diagnosticText } from "./sentry-event";
 
 /** Record deliberate milestones; do not pass request arguments or response bodies. */
 export function recordEvent(
@@ -20,7 +21,7 @@ export function recordEvent(
 const reported = new WeakSet<object>();
 const recentFailures = new Map<string, number>();
 
-/** Keep the stack, but replace messages that may contain server arguments or OCR text. */
+/** Let Sentry retain the original stack and causes; redact text at the event boundary. */
 export function reportError(
   error: unknown,
   operation: string,
@@ -31,30 +32,44 @@ export function reportError(
     reported.add(error);
   }
   const { expected, ...details } = errorDetails(error);
-  // Background uploads retry. Report a repeated failure at most once per five minutes.
-  const key = `${operation}:${details.errorType}:${details.code ?? details.status ?? fields.status ?? ""}:${fields.receiptId ?? ""}`;
-  const now = Date.now();
-  if (now - (recentFailures.get(key) ?? -Infinity) < 5 * 60_000) return;
-  if (recentFailures.size >= 100)
-    recentFailures.delete(recentFailures.keys().next().value!);
-  recentFailures.set(key, now);
+  const message = diagnosticText(
+    typeof error === "string"
+      ? error
+      : error &&
+          typeof error === "object" &&
+          "message" in error &&
+          typeof error.message === "string"
+        ? error.message
+        : `${operation} failed (${details.code ?? details.errorType}).`,
+  );
   recordEvent(
     `${operation}.failed`,
     { ...fields, ...details, operation },
     "warning",
   );
   if (expected || fields.status === 429) return;
-  const diagnostic = new Error(
-    `${operation} failed (${details.code ?? details.errorType}).`,
-  );
-  if (error instanceof Error && error.stack) {
-    diagnostic.stack = `${diagnostic.name}: ${diagnostic.message}\n${error.stack
-      .split("\n")
-      .filter((line) => /^\s*at |^[^\s]+@/.test(line))
-      .join("\n")}`;
-  }
-  Sentry.captureException(diagnostic, {
-    tags: { operation, error_type: details.errorType },
+  // Background uploads retry. Report a repeated failure at most once per five minutes.
+  const key = `${operation}:${details.errorType}:${details.code ?? details.status ?? fields.status ?? ""}:${fields.receiptId ?? ""}:${message}`;
+  const now = Date.now();
+  if (now - (recentFailures.get(key) ?? -Infinity) < 5 * 60_000) return;
+  if (recentFailures.size >= 100)
+    recentFailures.delete(recentFailures.keys().next().value!);
+  recentFailures.set(key, now);
+  const diagnostic = error instanceof Error ? error : new Error(message);
+  const eventId = Sentry.captureException(diagnostic, {
+    tags: {
+      operation,
+      error_type: details.errorType,
+      ...(details.code ? { error_code: details.code } : {}),
+      ...(details.requestId ? { request_id: details.requestId } : {}),
+    },
     contexts: { operation: { ...fields, ...details } },
   });
+  Sentry.logger.error(message, {
+    ...fields,
+    ...details,
+    operation,
+    sentry_event_id: eventId,
+  });
+  return eventId;
 }

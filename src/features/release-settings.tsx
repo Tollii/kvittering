@@ -15,16 +15,19 @@ export function ReleaseSettings() {
     recordEvent("update.check_started");
     setBusy(true);
     setMessage("");
+    let phase = "policy_refresh";
     try {
       await refresh();
-      if (!Updates.isEnabled) {
+      if (__DEV__ || !Updates.isEnabled) {
         setMessage(
           "Direkteoppdateringer er tilgjengelige i installerte utgivelsesbygg.",
         );
         return;
       }
+      phase = "update_check";
       const result = await Updates.checkForUpdateAsync();
       if (result.isAvailable || result.isRollBackToEmbedded) {
+        phase = "update_download";
         await Updates.fetchUpdateAsync();
         setReady(true);
         recordEvent("update.download_completed", {
@@ -35,7 +38,11 @@ export function ReleaseSettings() {
         setMessage("Appen er oppdatert.");
       }
     } catch (error) {
-      reportError(error, "update.check");
+      reportError(error, "update.check", {
+        phase,
+        updatesEnabled: Updates.isEnabled,
+        development: __DEV__,
+      });
       setMessage("Kunne ikke hente oppdateringen. Prøv igjen med nett.");
     } finally {
       setBusy(false);

@@ -82,7 +82,9 @@
     "ios:build": "expo run:ios",
     "testflight": "npm run backend:staging && npx eas-cli@latest build --platform ios --profile testflight --auto-submit",
     "generate:catalog": "orval",
-    "update:testflight": "npm run backend:staging && npx eas-cli@24.7.0 update --channel testflight --environment preview --platform ios"
+    "update:testflight": "npm run backend:staging && npx eas-cli@24.7.0 update --channel testflight --environment preview --platform ios",
+    "postupdate:testflight": "npm run sentry:sourcemaps",
+    "sentry:sourcemaps": "sentry-expo-upload-sourcemaps dist"
   },
   "private": true,
   "overrides": {

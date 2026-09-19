@@ -13,6 +13,9 @@ export type DiagnosticFields = {
   code?: string;
   policyRevision?: number;
   outcome?: string;
+  phase?: string;
+  updatesEnabled?: boolean;
+  development?: boolean;
 };
 
 /** Inspect only known error metadata. Provider messages can contain input data. */
@@ -28,15 +31,18 @@ export function errorDetails(error: unknown) {
       ? value.status
       : undefined;
   const data = "data" in value ? value.data : undefined;
-  const code =
-    data &&
-    typeof data === "object" &&
-    "code" in data &&
-    typeof data.code === "string" &&
-    /^[A-Z_]{1,60}$/.test(data.code)
+  const errorCode =
+    data && typeof data === "object" && "code" in data
       ? data.code
+      : "code" in value
+        ? value.code
+        : undefined;
+  const code =
+    typeof errorCode === "string" && /^[A-Z][A-Z0-9_]{0,59}$/.test(errorCode)
+      ? errorCode
       : undefined;
   const message = error instanceof Error ? error.message : "";
+  const requestId = message.match(/\[Request ID: ([a-f0-9]{16,64})\]/i)?.[1];
   const expected =
     code === "UPDATE_REQUIRED" ||
     code === "SERVICE_PAUSED" ||
@@ -48,6 +54,7 @@ export function errorDetails(error: unknown) {
     errorType,
     ...(status !== undefined ? { status } : {}),
     ...(code ? { code } : {}),
+    ...(requestId ? { requestId } : {}),
     expected,
   };
 }

@@ -54,5 +54,6 @@ The application is built with Expo and React Native, with iOS as the primary pla
 - Use `npm run typecheck`, `npm run lint`, and `npm test` as appropriate to the change. Run affected checks after fixes; broaden testing when the change or unresolved risk warrants it.
 - For Expo or React Native changes, use the exact [Expo 57 documentation](https://docs.expo.dev/versions/v57.0.0/). For Convex changes, read [the generated guidelines](convex/_generated/ai/guidelines.md).
 - Use [README.md](README.md) for setup, environment selection, and build commands. `npm run ios:build` builds and opens the native iOS application.
+- For Sentry investigations, use the installed `sentry` CLI and its saved OAuth credentials. Follow [docs/observability.md](docs/observability.md); the source-map token in `.env.local` cannot read issues.
 - Before publishing a native build, OTA update, or backend change that can affect installed clients, use [release-review](.agents/skills/release-review/SKILL.md) and [docs/releases.md](docs/releases.md). Never raise minimum supported versions automatically during a build or deployment.
 - Use [plans/README.md](plans/README.md) when executing the simplification review. Keep individual findings and execution status there rather than expanding these instructions.
