@@ -186,10 +186,6 @@ export default defineSchema({
     "retailer",
     "key",
   ]),
-  samples: defineTable({ name: v.string(), description: v.string() }).index(
-    "by_name",
-    ["name"],
-  ),
   households: defineTable({
     name: v.string(),
     invitation: v.string(),

@@ -1,5 +1,5 @@
 import { expect, it } from "vitest";
-import { productSearch, validateSearchSuggestion } from "./search";
+import { productSearch } from "./search";
 import { requestKey } from "./policy";
 import { matchingKey } from "../domain/product-matching";
 import { compatibleCatalogProduct } from "./matching";
@@ -23,33 +23,6 @@ it("uses the same identity and cached request for receipt spacing and Unicode va
   ).toBe(1);
   expect(productSearch("Vitamin B12 100 G")).toBe("vitamin b12 100g");
   expect(productSearch("COLA0,5 L")).toBe("cola 0.5l");
-});
-
-it("retains product differences and refuses invented search evidence", () => {
-  expect(
-    validateSearchSuggestion("STRATOS HELT SPRŒTT", "stratos helt sprøtt"),
-  ).toBe("stratos helt sprøtt");
-  expect(
-    validateSearchSuggestion("BURGERBR BRIOCHE", "burgerbrød brioche"),
-  ).toBe("burgerbrød brioche");
-  expect(validateSearchSuggestion("STRATOSSPRØTT", "stratos sprøtt")).toBe(
-    "stratos sprøtt",
-  );
-  for (const search of [
-    "coca-cola 1pk bx",
-    "coca-cola zero 10pk bx",
-    "coca-cola 10pk 330ml",
-    "pepsi 10pk bx",
-    "coca-cola 10ml bx",
-  ])
-    expect(validateSearchSuggestion("COCA-COLA10PK BX", search)).toBeNull();
-  expect(
-    validateSearchSuggestion("Coca-Cola Zero 10pk", "Coca-Cola 10pk"),
-  ).toBeNull();
-  expect(
-    validateSearchSuggestion("Coca-Cola 10pk", "Coca-Cola 10pk"),
-  ).toBeNull();
-  expect(matchingKey("Coca-Cola 10pk")).not.toBe(matchingKey("Coca-Cola 6pk"));
 });
 
 it("recognizes glued multipack evidence without requiring GPT package fields", () => {

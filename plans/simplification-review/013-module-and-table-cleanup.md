@@ -4,7 +4,7 @@
 
 ## Status
 
-- Status: TODO
+- Status: DONE
 - Priority: P3
 - Effort: S–M
 - Risk: Low
@@ -195,3 +195,9 @@ Component props should expose the data and event callbacks required by that view
 ## Maintenance notes
 
 Use size thresholds as review signals, not a reason to scatter cohesive code. Avoid growing new catch-all files.
+
+## Implementation record
+
+Removed the unused sample endpoints/table and search-suggestion helper with their test-only path. Convex API declarations were regenerated with convex codegen. Split shared UI into five presentation modules behind its existing facade and extracted the report registry/views. Added docs/architecture.md and corrected stale README descriptions. All 194 remaining tests pass. Native visual checks for sheets, large text, and light/dark mode remain unverified.
+
+Validation: `npm run typecheck`, `npm run lint`, `npm test`, and `git diff --check` passed. No deployment was performed.

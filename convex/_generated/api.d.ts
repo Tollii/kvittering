@@ -87,9 +87,9 @@ import type * as productMatching from "../productMatching.js";
 import type * as products from "../products.js";
 import type * as providers from "../providers.js";
 import type * as pushDelivery from "../pushDelivery.js";
+import type * as receiptChanges from "../receiptChanges.js";
 import type * as receipts from "../receipts.js";
 import type * as releasePolicy from "../releasePolicy.js";
-import type * as samples from "../samples.js";
 
 import type {
   ApiFromModules,
@@ -177,9 +177,9 @@ declare const fullApi: ApiFromModules<{
   products: typeof products;
   providers: typeof providers;
   pushDelivery: typeof pushDelivery;
+  receiptChanges: typeof receiptChanges;
   receipts: typeof receipts;
   releasePolicy: typeof releasePolicy;
-  samples: typeof samples;
 }>;
 
 /**

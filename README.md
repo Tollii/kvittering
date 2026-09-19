@@ -127,7 +127,7 @@ is required to switch it to staging.
 
 Capture works offline after the account and household have been loaded once. Receipt images stay on the device until the server confirms the upload. The queue is separate for each account and household. Server receipt history and edits need a connection; the app does not promise background uploads after iOS suspends it, but processing never depends on the phone once the images are in storage.
 
-iOS is the only target. The old PWA in `sveltemo/` is a reference and is excluded from Metro, TypeScript, lint, and tests. The active backend is `convex/` at the root; do not run the old backend at the same time.
+iOS is the primary target. The application and Convex backend are at the repository root. See [the architecture guide](docs/architecture.md) for data ownership and the receipt flow.
 
 ## Convex configuration
 
@@ -197,7 +197,7 @@ unknown; partial totals are labelled. These are household purchases, not measure
 
 Convex stores household product profiles and reuses them on later receipts. Purchase quantities
 are calculated for each receipt line. A durable workflow runs after receipt processing,
-catalog matching and edits. Older receipts are analysed when the app is open and online.
+catalog matching and edits. Older receipts use the explicit `productAnalysis.repair` operator recovery operation.
 Generation, revision, evidence and analysis-version checks reject stale results. Provider
 failures leave the receipt usable and can retry later. This stage uses `TYPESAFE_API_KEY`
 and `TYPESAFE_MODEL` (default `jev-latest`); it does not make extra Kassal.app requests.
@@ -220,8 +220,7 @@ are comparable only with the same package identity. The effects and remaining di
 up to the total change. These figures describe purchases, not measured consumption.
 
 Correction history starts when this feature is installed; it does not reconstruct older
-decisions. The screen reads the latest 50 decisions. Batch previews inspect the latest 200
-receipts and contain at most 20 matching lines. Changes require the previewed receipt revisions
+decisions. The screen pages through decisions and receipt groups. Preview continuation retains every matching line; each apply operation accepts at most 20 selected lines. Changes require the previewed receipt revisions
 to remain current. Undo also requires unchanged revisions, so it cannot overwrite a later edit.
 Batch propagation does not create more learning or evaluation examples. The category test is
 an agreement check on those examples, not an estimate of accuracy on all purchases.
