@@ -1,0 +1,53 @@
+name: TestFlight OTA update
+
+on:
+  workflow_dispatch:
+    inputs:
+      message:
+        description: Description of the reviewed compatible update
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: testflight
+  cancel-in-progress: false
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+      SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: npm
+      - uses: expo/expo-github-action@v8
+        with:
+          eas-version: 24.7.0
+          token: ${{ secrets.EXPO_TOKEN }}
+      - run: npm ci
+      - name: Check application and compatibility tests
+        run: |
+          npm run typecheck
+          npm run lint
+          npm test
+      - name: Deploy compatible staging backend
+        env:
+          CONVEX_DEPLOY_KEY: ${{ secrets.CONVEX_STAGING_DEPLOY_KEY }}
+        run: |
+          if [[ "$CONVEX_DEPLOY_KEY" != 'prod:courteous-jay-215|'* ]]; then
+            echo "::error::Expected a deploy key for staging (courteous-jay-215)."
+            exit 1
+          fi
+          npx convex deploy
+      - name: Publish compatible iOS update
+        env:
+          UPDATE_MESSAGE: ${{ inputs.message }}
+        run: eas update --channel testflight --environment preview --platform ios --message "$UPDATE_MESSAGE" --non-interactive

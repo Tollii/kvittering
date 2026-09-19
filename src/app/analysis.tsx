@@ -1,3 +1,4 @@
+import { useReleasePolicy } from "@/features/release-policy";
 import { useState } from "react";
 import { Stack, useLocalSearchParams } from "expo-router";
 import { View } from "react-native";
@@ -26,6 +27,7 @@ import { formatDate } from "@/lib/format-date";
 import type { SpendingGroup } from "@/lib/domain/insights";
 
 export default function Analysis() {
+  const { policy } = useReleasePolicy();
   const { month } = useLocalSearchParams<{ month?: string }>();
   const { receipts, completeReceipts, synchronize } = useHousehold();
   const [frequency, setFrequency] = useState<AnalysisFrequency>("month");
@@ -60,6 +62,12 @@ export default function Analysis() {
       );
     }
   }
+  if (!policy.features.spendingAnalysis)
+    return (
+      <Screen title="Forbruksanalyse">
+        <Notice>Forbruksanalysen er midlertidig satt på pause.</Notice>
+      </Screen>
+    );
   return (
     <Screen insetTop={false}>
       <Stack.Screen options={{ title: "Forbruksanalyse" }} />

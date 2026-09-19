@@ -1,6 +1,8 @@
 import type { Id } from "../../convex/_generated/dataModel";
+import type { DiagnosticFields } from "./diagnostics";
 
 export type LocalReceipt = {
+  schemaVersion: 1;
   id: string;
   owner: string;
   householdId: Id<"households">;
@@ -22,7 +24,10 @@ export interface UploadTransport {
 }
 
 /** Persist each completed step. Repeated requests use the same server reservation. */
-export function createQueueRunner(store: QueueStore) {
+export function createQueueRunner(
+  store: QueueStore,
+  record: (event: string, fields: DiagnosticFields) => void = () => {},
+) {
   let running = false;
   return async (
     owner: string,
@@ -41,10 +46,16 @@ export function createQueueRunner(store: QueueStore) {
           if (!entry.receiptId) {
             entry.receiptId = await transport.reserve(entry);
             store.update(entry);
+            record("receipt.reserved", {
+              captureId: entry.id,
+              receiptId: entry.receiptId,
+              imageCount: entry.images.length,
+            });
           }
           for (let position = 0; position < entry.images.length; position++) {
             if (!active()) return;
             if (entry.uploaded[position]) continue;
+            const started = Date.now();
             await transport.upload(
               entry.receiptId,
               position,
@@ -52,11 +63,20 @@ export function createQueueRunner(store: QueueStore) {
             );
             entry.uploaded[position] = true;
             store.update(entry);
+            record("receipt.image_uploaded", {
+              receiptId: entry.receiptId,
+              position,
+              durationMs: Date.now() - started,
+            });
             changed();
           }
           if (!active()) return;
           await transport.complete(entry.receiptId, entry);
           store.remove(entry);
+          record("receipt.upload_completed", {
+            receiptId: entry.receiptId,
+            imageCount: entry.images.length,
+          });
         } catch (cause) {
           entry.error =
             cause instanceof Error ? cause.message : "Opplastingen mislyktes.";

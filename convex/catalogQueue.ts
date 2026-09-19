@@ -1,3 +1,4 @@
+import { featureEnabled } from "./releasePolicy";
 import { v } from "convex/values";
 import { Workpool, vOnCompleteValidator } from "@convex-dev/workpool";
 import {
@@ -58,6 +59,8 @@ export async function ensureRequest(
   ctx: MutationCtx,
   input: CatalogRequest,
 ): Promise<Doc<"catalogRequests">> {
+  if (!(await featureEnabled(ctx, "productLookup")))
+    throw new Error("Produktkatalogen er midlertidig satt på pause.");
   const request = normalizeRequest(input);
   const key = requestKey(request);
   const existing = await ctx.db
@@ -68,8 +71,14 @@ export async function ensureRequest(
     existing &&
     (["pending", "running"].includes(existing.state) ||
       existing.expiresAt > Date.now())
-  )
+  ) {
+    console.info("catalog.request_reused", {
+      requestId: existing._id,
+      kind: request.kind,
+      state: existing.state,
+    });
     return existing;
+  }
   const values = {
     key,
     request,
@@ -84,6 +93,11 @@ export async function ensureRequest(
   const id = existing?._id ?? (await ctx.db.insert("catalogRequests", values));
   if (existing) await ctx.db.replace("catalogRequests", id, values);
   await enqueue(ctx, id);
+  console.info("catalog.request_queued", {
+    requestId: id,
+    kind: request.kind,
+    refresh: !!existing,
+  });
   return (await ctx.db.get("catalogRequests", id))!;
 }
 export const request = internalMutation({
@@ -123,6 +137,15 @@ export const claim = internalMutation({
   handler: async (ctx, { id }) => {
     const request = await ctx.db.get("catalogRequests", id);
     if (!request || request.state !== "pending") return null;
+    if (!(await featureEnabled(ctx, "productLookup"))) {
+      await ctx.db.patch("catalogRequests", id, {
+        state: "error",
+        error: "Produktkatalogen er midlertidig satt på pause.",
+        expiresAt: Date.now() + 60_000,
+      });
+      await ctx.scheduler.runAfter(0, internal.catalogQueue.notify, { id });
+      return null;
+    }
     await ctx.db.patch("catalogRequests", id, {
       state: "running",
       attempts: request.attempts + 1,

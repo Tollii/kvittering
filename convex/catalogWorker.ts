@@ -30,6 +30,7 @@ export const execute = internalAction({
       { id },
     );
     if (!request) return null;
+    const started = Date.now();
     try {
       let result: CatalogResult = emptyCatalogResult();
       if (request.kind === "products")
@@ -59,8 +60,19 @@ export const execute = internalAction({
             : await findProductById(request.id),
         );
       await ctx.runMutation(internal.catalogQueue.succeed, { id, result });
+      console.info("catalog.request_completed", {
+        requestId: id,
+        kind: request.kind,
+        durationMs: Date.now() - started,
+        productCount: result.products.length,
+        storeCount: result.stores.length,
+      });
     } catch (error) {
-      console.warn("Catalog request failed", {
+      console.warn("catalog.request_failed", {
+        requestId: id,
+        durationMs: Date.now() - started,
+        retryAfterMs:
+          error instanceof CatalogRequestError ? error.retryAfterMs : 0,
         kind: request.kind,
         status: error instanceof CatalogRequestError ? error.status : null,
         errorType: error instanceof Error ? error.name : "unknown",

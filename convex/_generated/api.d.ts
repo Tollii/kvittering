@@ -17,6 +17,8 @@ import type * as catalogLinks from "../catalogLinks.js";
 import type * as catalogMatching from "../catalogMatching.js";
 import type * as catalogQueue from "../catalogQueue.js";
 import type * as catalogWorker from "../catalogWorker.js";
+import type * as clientFunctions from "../clientFunctions.js";
+import type * as clientReleases from "../clientReleases.js";
 import type * as correctionEvaluation from "../correctionEvaluation.js";
 import type * as corrections from "../corrections.js";
 import type * as crons from "../crons.js";
@@ -86,6 +88,7 @@ import type * as products from "../products.js";
 import type * as providers from "../providers.js";
 import type * as pushDelivery from "../pushDelivery.js";
 import type * as receipts from "../receipts.js";
+import type * as releasePolicy from "../releasePolicy.js";
 import type * as samples from "../samples.js";
 
 import type {
@@ -104,6 +107,8 @@ declare const fullApi: ApiFromModules<{
   catalogMatching: typeof catalogMatching;
   catalogQueue: typeof catalogQueue;
   catalogWorker: typeof catalogWorker;
+  clientFunctions: typeof clientFunctions;
+  clientReleases: typeof clientReleases;
   correctionEvaluation: typeof correctionEvaluation;
   corrections: typeof corrections;
   crons: typeof crons;
@@ -173,6 +178,7 @@ declare const fullApi: ApiFromModules<{
   providers: typeof providers;
   pushDelivery: typeof pushDelivery;
   receipts: typeof receipts;
+  releasePolicy: typeof releasePolicy;
   samples: typeof samples;
 }>;
 

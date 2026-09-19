@@ -1,4 +1,5 @@
 import { v } from "convex/values";
+import { errorDetails } from "../src/lib/diagnostics";
 import { WorkflowManager } from "@convex-dev/workflow";
 import { components, internal } from "./_generated/api";
 import { internalMutation, internalQuery, env } from "./_generated/server";
@@ -31,29 +32,44 @@ export const processReceipt = workflow
     returns: v.null(),
   })
   .handler(async (step, args): Promise<null> => {
+    let stage = "begin";
     try {
       const storageIds = await step.runMutation(
         internal.processing.begin,
         args,
       );
       if (!storageIds) return null;
+      stage = "extraction";
       const extraction: {
         data: ReceiptData;
         provider: string;
         durationMs: number;
       } = await step.runAction(
         internal.providers.extract,
-        { storageIds },
-        { retry: { maxAttempts: 3, initialBackoffMs: 2000, base: 2 } },
+        { storageIds, receiptId: args.id, generation: args.generation },
+        // Receipt IDs are diagnostic metadata; older journals do not include them.
+        {
+          unstableArgs: true,
+          retry: { maxAttempts: 3, initialBackoffMs: 2000, base: 2 },
+        },
       );
+      stage = "aliases";
       const prepared = await step.runQuery(internal.processing.applyAliases, {
         id: args.id,
         data: extraction.data,
       });
+      stage = "classification";
       const classification = await step.runAction(
         internal.providers.classify,
-        { products: classificationInputs(prepared) },
-        { retry: { maxAttempts: 3, initialBackoffMs: 2000, base: 2 } },
+        {
+          products: classificationInputs(prepared),
+          receiptId: args.id,
+          generation: args.generation,
+        },
+        {
+          unstableArgs: true,
+          retry: { maxAttempts: 3, initialBackoffMs: 2000, base: 2 },
+        },
       );
       for (const result of classification.classifications) {
         const line = prepared.lines.find((line) => line.id === result.id);
@@ -67,10 +83,12 @@ export const processReceipt = workflow
             line.issues.push("Kategorien er usikker.");
         }
       }
+      stage = "product_matching";
       const matches = await step.runAction(internal.productMatching.match, {
         id: args.id,
         data: prepared,
       });
+      stage = "finish";
       await step.runMutation(internal.processing.finish, {
         matches,
         durationMs: extraction.durationMs + classification.durationMs,
@@ -80,11 +98,17 @@ export const processReceipt = workflow
         provider: `${extraction.provider} / ${classification.provider}`,
       });
     } catch (error) {
-      await step.runMutation(internal.processing.fail, {
-        ...args,
-        error:
-          error instanceof Error ? error.message : "Behandlingen mislyktes.",
-      });
+      await step.runMutation(
+        internal.processing.fail,
+        {
+          ...args,
+          stage,
+          errorType: errorDetails(error).errorType,
+          error:
+            error instanceof Error ? error.message : "Behandlingen mislyktes.",
+        },
+        { unstableArgs: true },
+      );
     }
     return null;
   });
@@ -104,6 +128,11 @@ export const begin = internalMutation({
       .query("images")
       .withIndex("by_receiptId", (q) => q.eq("receiptId", args.id))
       .take(8);
+    console.info("receipt.processing_started", {
+      receiptId: args.id,
+      generation: args.generation,
+      imageCount: images.length,
+    });
     return images
       .sort((a, b) => a.position - b.position)
       .map((image) => image.storageId);
@@ -253,6 +282,17 @@ export const finish = internalMutation({
       canAcceptReceipt(data, !!duplicateOf && !receipt.duplicateResolved) &&
       !args.provider.includes("mock") &&
       receipt.revision === 0;
+    console.info("receipt.processing_completed", {
+      receiptId: args.id,
+      generation: args.generation,
+      provider: args.provider,
+      providerDurationMs: args.durationMs,
+      lineCount: data.lines.length,
+      uncertainLineCount: data.lines.filter((line) => line.issues.length > 0)
+        .length,
+      autoAccepted,
+      duplicate: !!duplicateOf,
+    });
     await ctx.db.patch("receipts", args.id, {
       data,
       autoAccepted,
@@ -292,7 +332,13 @@ export const finish = internalMutation({
   },
 });
 export const fail = internalMutation({
-  args: { id: v.id("receipts"), generation: v.number(), error: v.string() },
+  args: {
+    id: v.id("receipts"),
+    generation: v.number(),
+    error: v.string(),
+    stage: v.optional(v.string()),
+    errorType: v.optional(v.string()),
+  },
   returns: v.null(),
   handler: async (ctx, args) => {
     const receipt = await ctx.db.get("receipts", args.id);
@@ -300,11 +346,19 @@ export const fail = internalMutation({
       receipt &&
       receipt.generation === args.generation &&
       ["uploaded", "processing"].includes(receipt.status)
-    )
+    ) {
+      // The original failure stays on the receipt; do not duplicate OCR/provider text in logs.
+      console.error("receipt.processing_failed", {
+        receiptId: args.id,
+        generation: args.generation,
+        stage: args.stage,
+        errorType: args.errorType,
+      });
       await ctx.db.patch("receipts", args.id, {
         status: "failed",
         error: args.error.slice(0, 400),
       });
+    }
     return null;
   },
 });

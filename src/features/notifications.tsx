@@ -1,3 +1,4 @@
+import { releaseMutation } from "@/lib/releases/requests";
 import { useEffect, useState } from "react";
 import { AppState, Linking, Platform } from "react-native";
 import * as Notifications from "expo-notifications";
@@ -23,7 +24,7 @@ Notifications.setNotificationHandler({
 export async function disableNotifications(client: ConvexReactClient) {
   const token = await SecureStore.getItemAsync(tokenKey);
   if (token) {
-    await client.mutation(api.notifications.unsubscribe, { token });
+    await releaseMutation(client, api.notifications.unsubscribe, { token });
     await SecureStore.deleteItemAsync(tokenKey);
   }
 }
@@ -78,7 +79,7 @@ export function NotificationSettings() {
         // Keep the token before registering it, so sign-out can always revoke it.
         await SecureStore.setItemAsync(tokenKey, result.data);
         setToken(result.data);
-        await client.mutation(api.notifications.subscribe, {
+        await releaseMutation(client, api.notifications.subscribe, {
           token: result.data,
         });
       }

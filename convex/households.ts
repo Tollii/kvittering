@@ -1,4 +1,5 @@
-import { query, mutation } from "./_generated/server";
+import { clientMutation as mutation } from "./clientFunctions";
+import { query } from "./_generated/server";
 import { v } from "convex/values";
 import schema from "./schema";
 import { requireMember } from "./access";

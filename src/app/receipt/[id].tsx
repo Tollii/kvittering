@@ -1,3 +1,5 @@
+import { useReleasePolicy } from "@/features/release-policy";
+import { releaseMutation } from "@/lib/releases/requests";
 import { usePreventRemove } from "expo-router/react-navigation";
 import { useEffect, useRef, useState } from "react";
 import {
@@ -143,6 +145,7 @@ function ReceiptEditor({
   onDeletionChange: (state: "idle" | "deleting" | "deleted") => void;
 }) {
   const client = useConvex();
+  const { policy, blocked } = useReleasePolicy();
   const colors = useTheme();
   const { receipts } = useHousehold();
   const [data, setData] = useState<ReceiptData | null>(receipt.data);
@@ -197,6 +200,9 @@ function ReceiptEditor({
   useEffect(() => {
     if (
       !online ||
+      blocked ||
+      !policy.features.automaticProductMatching ||
+      !policy.features.productLookup ||
       dirty ||
       processing ||
       !receipt.data ||
@@ -205,14 +211,15 @@ function ReceiptEditor({
     )
       return;
     catalogRequested.current = true;
-    void client
-      .mutation(api.catalogMatching.enrich, {
-        id: receipt._id,
-        onlyIfMissing: true,
-      })
-      .catch(() => setError("Produktsøket startet ikke."));
+    void releaseMutation(client, api.catalogMatching.enrich, {
+      id: receipt._id,
+      onlyIfMissing: true,
+    }).catch(() => setError("Produktsøket startet ikke."));
   }, [
     client,
+    blocked,
+    policy.features.automaticProductMatching,
+    policy.features.productLookup,
     dirty,
     online,
     processing,
@@ -328,7 +335,7 @@ function ReceiptEditor({
   async function save() {
     if (!data || saveDisabled) return;
     await run(async () => {
-      await client.mutation(api.receipts.save, {
+      await releaseMutation(client, api.receipts.save, {
         id: receipt._id,
         revision,
         data,
@@ -393,7 +400,7 @@ function ReceiptEditor({
             void run(async () => {
               onDeletionChange("deleting");
               try {
-                await client.mutation(api.receipts.remove, {
+                await releaseMutation(client, api.receipts.remove, {
                   id: receipt._id,
                   revision,
                 });
@@ -409,7 +416,7 @@ function ReceiptEditor({
   }
   const retry = () =>
     void run(async () => {
-      await client.mutation(api.receipts.retry, { id: receipt._id });
+      await releaseMutation(client, api.receipts.retry, { id: receipt._id });
       setMessage("Leser på nytt …");
     });
   function confirmAllCategories() {
@@ -610,7 +617,7 @@ function ReceiptEditor({
               }
               onPress={() =>
                 void run(async () => {
-                  await client.mutation(api.catalogMatching.enrich, {
+                  await releaseMutation(client, api.catalogMatching.enrich, {
                     id: receipt._id,
                   });
                   setMessage("Søker etter produkter …");
@@ -1009,9 +1016,13 @@ function ReceiptEditor({
                       ? undefined
                       : () =>
                           void run(async () => {
-                            await client.mutation(api.catalogMatching.enrich, {
-                              id: receipt._id,
-                            });
+                            await releaseMutation(
+                              client,
+                              api.catalogMatching.enrich,
+                              {
+                                id: receipt._id,
+                              },
+                            );
                           })
                   }
                 />

@@ -1,3 +1,4 @@
+import { releaseMutation } from "@/lib/releases/requests";
 import { useRef, useState, type ReactNode } from "react";
 import { Alert, View } from "react-native";
 import ReanimatedSwipeable from "react-native-gesture-handler/ReanimatedSwipeable";
@@ -44,7 +45,7 @@ export function SwipeToApprove({
     if (!data) return;
     setBusy(true);
     try {
-      await client.mutation(api.receipts.save, {
+      await releaseMutation(client, api.receipts.save, {
         id: receipt._id,
         revision: receipt.revision,
         data,

@@ -1,6 +1,7 @@
+import { useReleaseMutation } from "@/lib/releases/requests";
 import { useState } from "react";
 import { View } from "react-native";
-import { useMutation } from "convex/react";
+
 import { randomUUID } from "expo-crypto";
 import { api } from "../../convex/_generated/api";
 import { authClient } from "@/lib/auth-client";
@@ -145,8 +146,8 @@ export function HouseholdSetup() {
   const [invitation, setInvitation] = useState("");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
-  const create = useMutation(api.households.create);
-  const joinHousehold = useMutation(api.households.join);
+  const create = useReleaseMutation(api.households.create);
+  const joinHousehold = useReleaseMutation(api.households.join);
   async function submit() {
     setBusy(true);
     setError("");

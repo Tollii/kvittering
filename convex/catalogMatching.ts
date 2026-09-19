@@ -1,3 +1,5 @@
+import { featureEnabled } from "./releasePolicy";
+import { clientMutation as mutation } from "./clientFunctions";
 import { v } from "convex/values";
 import {
   WorkflowManager,
@@ -5,12 +7,7 @@ import {
   vWorkflowId,
 } from "@convex-dev/workflow";
 import { components, internal } from "./_generated/api";
-import {
-  internalMutation,
-  internalQuery,
-  mutation,
-  env,
-} from "./_generated/server";
+import { internalMutation, internalQuery, env } from "./_generated/server";
 import { requireReceipt } from "./access";
 import schema from "./schema";
 import { findMapping } from "./products";
@@ -131,16 +128,26 @@ export const start = internalMutation({
       receipt.catalogStatus === "pending"
     )
       return null;
-    if (!env.KASSALAPP_API_KEY) return null;
+    if (
+      !env.KASSALAPP_API_KEY ||
+      !(await featureEnabled(ctx, "automaticProductMatching")) ||
+      !(await featureEnabled(ctx, "productLookup"))
+    )
+      return null;
     const workflowId = await launch(ctx, args.id, args.generation);
     await ctx.db.patch("receipts", args.id, {
       catalogStatus: "pending",
       catalogWorkflowId: workflowId,
     });
+    console.info("catalog.matching_started", {
+      receiptId: args.id,
+      generation: args.generation,
+    });
     return null;
   },
 });
 export const enrich = mutation({
+  service: "automaticProductMatching",
   args: { id: v.id("receipts"), onlyIfMissing: v.optional(v.boolean()) },
   returns: v.null(),
   handler: async (ctx, { id, onlyIfMissing }) => {
@@ -234,6 +241,20 @@ export const apply = internalMutation({
       return null;
     const data = receipt.data;
     let changed = false;
+    const reasons: Record<string, number> = {};
+    for (const decision of args.decisions) {
+      const reason = decision.reason ?? "unspecified";
+      reasons[reason] = (reasons[reason] ?? 0) + 1;
+    }
+    console.info("catalog.matching_evaluated", {
+      receiptId: args.id,
+      generation: args.generation,
+      itemCount: args.decisions.length,
+      selectedCount: args.decisions.filter(
+        (decision) => decision.productKey !== null,
+      ).length,
+      reasons,
+    });
     const diagnostics = new Map(
       (receipt.catalogDecisions ?? []).map((decision) => [
         decision.lineId,
@@ -397,6 +418,10 @@ export const failed = internalMutation({
       receipt?.generation === args.generation &&
       receipt.catalogWorkflowId === args.workflowId
     ) {
+      console.error("catalog.matching_failed", {
+        receiptId: args.id,
+        generation: args.generation,
+      });
       await ctx.db.patch("receipts", args.id, { catalogStatus: "error" });
       await ctx.scheduler.runAfter(0, internal.productAnalysis.start, {
         id: args.id,

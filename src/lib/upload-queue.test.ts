@@ -11,6 +11,7 @@ const receiptId = "receipt" as Id<"receipts">;
 function fixture() {
   let rows: LocalReceipt[] = [
     {
+      schemaVersion: 1,
       id: "capture",
       owner: "user",
       householdId: household,

@@ -1,3 +1,4 @@
+import { migrateReceipt, migrateReceiptDatabase } from "./receipt-migrations";
 import { Directory, File, Paths } from "expo-file-system";
 import { openDatabaseSync } from "expo-sqlite";
 import { randomUUID } from "expo-crypto";
@@ -24,6 +25,7 @@ function storage() {
       "PRAGMA journal_mode = WAL; CREATE TABLE IF NOT EXISTS receipt_queue (id TEXT PRIMARY KEY, owner TEXT NOT NULL, household TEXT NOT NULL, data TEXT NOT NULL); CREATE TABLE IF NOT EXISTS household_cache (owner TEXT PRIMARY KEY, data TEXT NOT NULL);",
     );
   }
+  migrateReceiptDatabase(database);
   return database;
 }
 const directory = () =>
@@ -40,7 +42,7 @@ export const receiptStorage: QueueStore = {
         owner,
         householdId,
       )
-      .map((row) => JSON.parse(row.data) as LocalReceipt);
+      .map((row) => migrateReceipt(JSON.parse(row.data)));
   },
   update(entry) {
     storage().runSync(
@@ -88,6 +90,7 @@ export function saveLocalReceipts(
           return name;
         });
         return {
+          schemaVersion: 1,
           id,
           owner,
           householdId,

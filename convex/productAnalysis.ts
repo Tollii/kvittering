@@ -1,3 +1,5 @@
+import { featureEnabled } from "./releasePolicy";
+import { clientMutation as mutation } from "./clientFunctions";
 import { productAttributesValidator } from "../src/lib/domain/product-attributes";
 import { v } from "convex/values";
 import { WorkflowManager } from "@convex-dev/workflow";
@@ -6,7 +8,6 @@ import {
   env,
   internalMutation,
   internalQuery,
-  mutation,
   type MutationCtx,
 } from "./_generated/server";
 import type { Doc, Id } from "./_generated/dataModel";
@@ -72,6 +73,7 @@ export const process = manager
   });
 
 async function launch(ctx: MutationCtx, receipt: Doc<"receipts">) {
+  if (!(await featureEnabled(ctx, "spendingAnalysis"))) return;
   if (
     !receipt.data ||
     receipt.excluded ||
@@ -117,6 +119,7 @@ export const start = internalMutation({
 
 /** Bring older receipts up to date when the household opens the app. */
 export const ensure = mutation({
+  service: "spendingAnalysis",
   args: { ids: v.array(v.id("receipts")) },
   returns: v.null(),
   handler: async (ctx, { ids }) => {
@@ -315,6 +318,14 @@ export const finish = internalMutation({
         results,
       },
     });
+    const fields = {
+      receiptId: args.id,
+      generation: args.generation,
+      revision: args.revision,
+      resultCount: results.length,
+    };
+    if (args.failed) console.error("product.analysis_failed", fields);
+    else console.info("product.analysis_completed", fields);
     return null;
   },
 });

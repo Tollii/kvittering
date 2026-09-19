@@ -1,8 +1,12 @@
+import { ConvexError } from "convex/values";
+import { parse } from "convex-helpers/validators";
+import { clientValidator } from "../src/lib/releases/policy";
 import { httpRouter } from "convex/server";
 import { httpAction, env } from "./_generated/server";
 import { internal } from "./_generated/api";
 import { authComponent, createAuth } from "./auth";
 import type { Id } from "./_generated/dataModel";
+import { errorDetails } from "../src/lib/diagnostics";
 const http = httpRouter();
 authComponent.registerRoutes(http, createAuth);
 function headers(request: Request) {
@@ -10,7 +14,8 @@ function headers(request: Request) {
     "Access-Control-Allow-Origin":
       request.headers.get("Origin") === env.SITE_URL ? env.SITE_URL : "",
     Vary: "Origin",
-    "Access-Control-Allow-Headers": "Authorization, Content-Type",
+    "Access-Control-Allow-Headers":
+      "Authorization, Content-Type, X-Kvitto-Client",
     "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
     "Cache-Control": "no-store",
   };
@@ -28,10 +33,19 @@ http.route({
   method: "POST",
   handler: httpAction(async (ctx, request) => {
     const responseHeaders = headers(request);
+    const started = Date.now();
     try {
       const url = new URL(request.url);
       const id = url.searchParams.get("receipt") as Id<"receipts">;
       const position = Number(url.searchParams.get("position"));
+      const metadata = request.headers.get("X-Kvitto-Client");
+      const client = metadata
+        ? parse(clientValidator, JSON.parse(metadata))
+        : undefined;
+      await ctx.runQuery(internal.releasePolicy.check, {
+        client,
+        feature: "receiptProcessing",
+      });
       const access = await ctx.runQuery(internal.receipts.imageAccess, {
         id,
         position,
@@ -66,13 +80,23 @@ http.route({
           id,
           position,
           storageId,
+          client,
         });
       } catch (error) {
         await ctx.storage.delete(storageId);
         throw error;
       }
       return Response.json({ uploaded: true }, { headers: responseHeaders });
-    } catch {
+    } catch (error) {
+      console.warn("receipt.image_upload_failed", {
+        ...errorDetails(error),
+        durationMs: Date.now() - started,
+      });
+      if (error instanceof ConvexError)
+        return Response.json(error.data, {
+          status: 409,
+          headers: responseHeaders,
+        });
       return new Response(
         "Bildet kunne ikke lagres. Kontroller innloggingen.",
         {

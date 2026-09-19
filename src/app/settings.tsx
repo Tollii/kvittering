@@ -1,3 +1,5 @@
+import { ReleaseSettings } from "@/features/release-settings";
+import { releaseMutation } from "@/lib/releases/requests";
 import { useState } from "react";
 import { Alert, Share, View } from "react-native";
 import { router, Stack } from "expo-router";
@@ -151,7 +153,8 @@ export default function Settings() {
                             text: "Lag ny kode",
                             onPress: () =>
                               void run(() =>
-                                client.mutation(
+                                releaseMutation(
+                                  client,
                                   api.households.rotateInvitation,
                                   {
                                     invitation: randomUUID().replaceAll(
@@ -179,6 +182,8 @@ export default function Settings() {
       <BudgetSettings />
       <SectionTitle title="Varsler" />
       <NotificationSettings />
+      <SectionTitle title="App og oppdateringer" />
+      <ReleaseSettings />
       <SectionTitle title="På denne enheten" />
       <Panel>
         <Copy muted size={14}>

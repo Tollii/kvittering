@@ -1,3 +1,4 @@
+import { releaseMutation } from "@/lib/releases/requests";
 import { useEffect, useRef } from "react";
 import { AppState } from "react-native";
 import { useConvex } from "convex/react";
@@ -53,7 +54,7 @@ export function ProductAnalysisSync({
       running = true;
       try {
         for (let offset = 0; offset < ids.length && !disposed; offset += 20)
-          await convex.mutation(api.productAnalysis.ensure, {
+          await releaseMutation(convex, api.productAnalysis.ensure, {
             ids: ids.slice(offset, offset + 20),
           });
       } catch {

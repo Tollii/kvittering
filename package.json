@@ -10,6 +10,7 @@
     "@convex-dev/workpool": "^0.4.12",
     "@expo/ui": "~57.0.19",
     "@react-native-community/datetimepicker": "9.1.0",
+    "@sentry/react-native": "^8.27.0",
     "@tanstack/react-query": "^5.103.1",
     "@tanstack/react-query-persist-client": "^5.103.1",
     "@typesafe-ai/sdk": "^0.6.0",
@@ -17,6 +18,7 @@
     "convex": "^1.46.0",
     "convex-helpers": "^0.1.124",
     "expo": "~57.0.24",
+    "expo-application": "~57.0.3",
     "expo-build-properties": "~57.0.21",
     "expo-camera": "~57.0.5",
     "expo-clipboard": "~57.0.2",
@@ -43,6 +45,7 @@
     "expo-status-bar": "~57.0.1",
     "expo-symbols": "~57.0.3",
     "expo-system-ui": "~57.0.4",
+    "expo-updates": "~57.0.23",
     "expo-web-browser": "~57.0.3",
     "openai": "^7.18.0",
     "react": "19.2.3",
@@ -78,7 +81,8 @@
     "backend:staging": "convex deploy --env-file .env.staging.local",
     "ios:build": "expo run:ios",
     "testflight": "npm run backend:staging && npx eas-cli@latest build --platform ios --profile testflight --auto-submit",
-    "generate:catalog": "orval"
+    "generate:catalog": "orval",
+    "update:testflight": "npm run backend:staging && npx eas-cli@24.7.0 update --channel testflight --environment preview --platform ios"
   },
   "private": true,
   "overrides": {

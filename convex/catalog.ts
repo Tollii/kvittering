@@ -1,5 +1,5 @@
+import { clientMutation as mutation } from "./clientFunctions";
 import { v } from "convex/values";
-import { mutation } from "./_generated/server";
 import { requireMember, requireReceipt } from "./access";
 import { ensureRequest } from "./catalogQueue";
 import {
@@ -33,6 +33,7 @@ export function requestResponse(
   };
 }
 export const searchProducts = mutation({
+  service: "productLookup",
   args: { search: v.string() },
   returns: catalogResponseValidator,
   handler: async (ctx, args) => {
@@ -43,6 +44,7 @@ export const searchProducts = mutation({
   },
 });
 export const searchStores = mutation({
+  service: "productLookup",
   args: { receiptId: v.id("receipts"), search: v.string() },
   returns: catalogResponseValidator,
   handler: async (ctx, args) => {
@@ -57,6 +59,7 @@ export const searchStores = mutation({
   },
 });
 export const prices = mutation({
+  service: "productLookup",
   args: { productKey: v.string() },
   returns: catalogResponseValidator,
   handler: async (ctx, args) => {
@@ -84,6 +87,7 @@ export const prices = mutation({
   },
 });
 export const product = mutation({
+  service: "productLookup",
   args: { key: v.string() },
   returns: catalogResponseValidator,
   handler: async (ctx, { key }) => {

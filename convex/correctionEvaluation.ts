@@ -1,8 +1,9 @@
 "use node";
+import { clientValidator } from "../src/lib/releases/policy";
 import { v } from "convex/values";
 import { TypeSafeClient } from "@typesafe-ai/sdk";
 import { action, env } from "./_generated/server";
-import { api } from "./_generated/api";
+import { api, internal } from "./_generated/api";
 import type { Doc } from "./_generated/dataModel";
 import {
   classificationQuestion,
@@ -25,7 +26,7 @@ export type EvaluationResult = {
 };
 /** Evaluate the latest human decision for each product against the current classifier. */
 export const evaluate = action({
-  args: {},
+  args: { client: v.optional(clientValidator) },
   returns: v.object({
     model: v.string(),
     checked: v.number(),
@@ -40,7 +41,8 @@ export const evaluate = action({
       }),
     ),
   }),
-  handler: async (ctx): Promise<EvaluationResult> => {
+  handler: async (ctx, { client: release }): Promise<EvaluationResult> => {
+    await ctx.runQuery(internal.releasePolicy.check, { client: release });
     const history: { entries: Doc<"corrections">[]; truncated: boolean } =
       await ctx.runQuery(api.corrections.list, {});
     if (!env.TYPESAFE_API_KEY)

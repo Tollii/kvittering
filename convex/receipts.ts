@@ -1,3 +1,6 @@
+import { requireCompatibleClient } from "./releasePolicy";
+import { clientValidator } from "../src/lib/releases/policy";
+import { clientMutation as mutation } from "./clientFunctions";
 import { recordCorrections } from "./corrections";
 import { lineEvidenceKey } from "../src/lib/catalog/matching";
 import { productChange, correctProducts } from "./products";
@@ -7,12 +10,7 @@ import {
   paginationOptsValidator,
   paginationResultValidator,
 } from "convex/server";
-import {
-  query,
-  mutation,
-  internalQuery,
-  internalMutation,
-} from "./_generated/server";
+import { query, internalQuery, internalMutation } from "./_generated/server";
 import { internal } from "./_generated/api";
 import schema from "./schema";
 import { requireMember, requireReceipt } from "./access";
@@ -70,6 +68,7 @@ export const detail = query({
   },
 });
 export const reserve = mutation({
+  service: "receiptProcessing",
   args: {
     clientId: v.string(),
     imageCount: v.number(),
@@ -114,6 +113,7 @@ export const reserve = mutation({
 });
 /** All images are in storage: hand the receipt to the server workflow. The phone is done. */
 export const completeUpload = mutation({
+  service: "receiptProcessing",
   args: { id: v.id("receipts") },
   returns: v.null(),
   handler: async (ctx, { id }) => {
@@ -127,10 +127,16 @@ export const completeUpload = mutation({
       throw new Error("Noen bilder er ikke lastet opp.");
     await ctx.db.patch("receipts", id, { status: "uploaded", generation: 1 });
     await start(ctx, internal.processing.processReceipt, { id, generation: 1 });
+    console.info("receipt.upload_completed", {
+      receiptId: id,
+      generation: 1,
+      imageCount: images.length,
+    });
     return null;
   },
 });
 export const retry = mutation({
+  service: "receiptProcessing",
   args: { id: v.id("receipts") },
   returns: v.null(),
   handler: async (ctx, { id }) => {
@@ -144,6 +150,7 @@ export const retry = mutation({
       error: null,
     });
     await start(ctx, internal.processing.processReceipt, { id, generation });
+    console.info("receipt.processing_retried", { receiptId: id, generation });
     return null;
   },
 });
@@ -330,9 +337,11 @@ export const attachImage = internalMutation({
     id: v.id("receipts"),
     position: v.number(),
     storageId: v.id("_storage"),
+    client: v.optional(clientValidator),
   },
   returns: v.null(),
   handler: async (ctx, args) => {
+    await requireCompatibleClient(ctx, args.client, "receiptProcessing");
     const { receipt } = await requireReceipt(ctx, args.id);
     if (
       receipt.status !== "uploading" ||

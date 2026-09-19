@@ -1,6 +1,8 @@
+import { installedRelease, releaseError } from "@/lib/releases/client";
+import { useReleaseMutation } from "@/lib/releases/requests";
 import { useState } from "react";
 import { Stack } from "expo-router";
-import { useAction, useMutation, useQuery } from "convex/react";
+import { useAction, useQuery } from "convex/react";
 import { api } from "../../convex/_generated/api";
 import type { Id } from "../../convex/_generated/dataModel";
 import type { EvaluationResult } from "../../convex/correctionEvaluation";
@@ -29,8 +31,8 @@ export default function Corrections() {
     selected ? { id: selected } : "skip",
   );
   const evaluate = useAction(api.correctionEvaluation.evaluate);
-  const apply = useMutation(api.corrections.apply);
-  const undo = useMutation(api.corrections.undo);
+  const apply = useReleaseMutation(api.corrections.apply);
+  const undo = useReleaseMutation(api.corrections.undo);
   const [result, setResult] = useState<EvaluationResult | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
@@ -74,7 +76,17 @@ export default function Corrections() {
             disabled={
               !history.entries.some((entry) => entry.field === "category")
             }
-            onPress={() => void run(async () => setResult(await evaluate({})))}
+            onPress={() =>
+              void run(async () =>
+                setResult(
+                  await evaluate({ client: installedRelease }).catch(
+                    (error) => {
+                      throw releaseError(error);
+                    },
+                  ),
+                ),
+              )
+            }
           />
           {result && (
             <Panel>

@@ -1,3 +1,8 @@
+import "@/lib/sentry";
+import { reportError } from "@/lib/observability";
+import { ReceiptMigrationError } from "@/lib/receipt-migrations";
+import { useEffect } from "react";
+import * as Sentry from "@sentry/react-native";
 import {
   Stack,
   ThemeProvider,
@@ -14,17 +19,24 @@ import { useTheme } from "@/constants/theme";
 import { Button, Notice, Screen } from "@/components/ui";
 import { ShareIntentRoot, ShareIntentRouting } from "@/features/share-intent";
 
-export function ErrorBoundary({ retry }: ErrorBoundaryProps) {
+export function ErrorBoundary({ retry, error }: ErrorBoundaryProps) {
+  useEffect(() => {
+    reportError(error, "navigation.render");
+  }, [error]);
   return (
     <SafeAreaProvider>
       <Screen title="Kunne ikke åpne siden">
-        <Notice error>Kontroller nettilkoblingen og prøv igjen.</Notice>
+        <Notice error>
+          {error instanceof ReceiptMigrationError
+            ? error.message
+            : "Kontroller nettilkoblingen og prøv igjen."}
+        </Notice>
         <Button title="Prøv igjen" onPress={retry} />
       </Screen>
     </SafeAreaProvider>
   );
 }
-export default function RootLayout() {
+function RootLayout() {
   const colors = useTheme();
   const scheme = useColorScheme();
   const base = scheme === "dark" ? DarkTheme : DefaultTheme;
@@ -75,3 +87,5 @@ export default function RootLayout() {
     </ShareIntentRoot>
   );
 }
+
+export default Sentry.wrap(RootLayout);

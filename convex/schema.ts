@@ -1,3 +1,4 @@
+import { policyValidator, clientValidator } from "../src/lib/releases/policy";
 import { productAttributesValidator } from "../src/lib/domain/product-attributes";
 import { correctionFields } from "../src/lib/domain/corrections";
 import { lineValidator } from "../src/lib/domain/receipt";
@@ -49,6 +50,25 @@ export const receiptFields = {
   productAnalysis: v.optional(productAnalysisValidator),
 };
 export default defineSchema({
+  clientReleases: defineTable({
+    identity: v.string(),
+    installationId: v.string(),
+    client: clientValidator,
+    policyRevision: v.number(),
+    lastSeen: v.number(),
+  })
+    .index("by_identity_and_installationId", ["identity", "installationId"])
+    .index("by_lastSeen", ["lastSeen"]),
+  releasePolicies: defineTable(policyValidator).index(
+    "by_platform_and_channel",
+    ["platform", "channel"],
+  ),
+  releasePolicyHistory: defineTable({
+    previous: policyValidator,
+    policy: policyValidator,
+    operator: v.string(),
+    reason: v.string(),
+  }),
   corrections: defineTable(correctionFields)
     .index("by_householdId", ["householdId"])
     .index("by_receiptId", ["receiptId"]),

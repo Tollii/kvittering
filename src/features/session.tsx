@@ -1,3 +1,8 @@
+import { ReleaseDiagnostics } from "./release-diagnostics";
+import { recordEvent, reportError } from "@/lib/observability";
+import { ReleasePolicyProvider, useReleasePolicy } from "./release-policy";
+import { installedRelease, releaseError } from "@/lib/releases/client";
+import { releaseMutation } from "@/lib/releases/requests";
 import {
   createContext,
   useCallback,
@@ -58,7 +63,7 @@ const SessionContext = createContext<SessionData | null>(null);
 const client = convexUrl
   ? new ConvexReactClient(convexUrl, { unsavedChangesWarning: false })
   : null;
-const drainQueue = createQueueRunner(receiptStorage);
+const drainQueue = createQueueRunner(receiptStorage, recordEvent);
 export function useHousehold() {
   const value = useContext(SessionContext);
   if (!value) throw new Error("Husstanden er ikke klar.");
@@ -95,7 +100,9 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     );
   return (
     <ConvexProviderWithAuth client={client} useAuth={useSessionAuth}>
-      <SessionGate>{children}</SessionGate>
+      <ReleasePolicyProvider>
+        <SessionGate>{children}</SessionGate>
+      </ReleasePolicyProvider>
     </ConvexProviderWithAuth>
   );
 }
@@ -122,6 +129,7 @@ function HouseholdProvider({
   children: ReactNode;
 }) {
   const convex = useConvex();
+  const { policy, blocked } = useReleasePolicy();
   const auth = useConvexAuth();
   const network = useNetworkState();
   const online =
@@ -159,8 +167,19 @@ function HouseholdProvider({
   const active = useRef(true);
   const canUpload = useRef(false);
   useEffect(() => {
-    canUpload.current = online && auth.isAuthenticated && !!details;
-  }, [online, auth.isAuthenticated, details]);
+    canUpload.current =
+      online &&
+      auth.isAuthenticated &&
+      !!details &&
+      !blocked &&
+      policy.features.receiptProcessing;
+  }, [
+    online,
+    auth.isAuthenticated,
+    details,
+    blocked,
+    policy.features.receiptProcessing,
+  ]);
   useEffect(() => {
     active.current = true;
     return () => {
@@ -196,7 +215,7 @@ function HouseholdProvider({
           householdId,
           {
             reserve: (entry) =>
-              convex.mutation(api.receipts.reserve, {
+              releaseMutation(convex, api.receipts.reserve, {
                 clientId: entry.id,
                 imageCount: entry.images.length,
                 householdId,
@@ -214,18 +233,36 @@ function HouseholdProvider({
                   headers: {
                     Authorization: `Bearer ${token}`,
                     "Content-Type": "image/jpeg",
+                    "X-Kvitto-Client": JSON.stringify(installedRelease),
                   },
                   body: imageFile(name),
                   signal: AbortSignal.timeout(60000),
                 },
-              );
-              if (!response.ok)
-                throw new Error(
-                  "Bildet kunne ikke lastes opp. Prøv igjen med nett.",
+              ).catch((error) => {
+                throw releaseError(error, "receipt.image_upload", {
+                  receiptId: id,
+                  position,
+                });
+              });
+              if (!response.ok) {
+                const data = await response.json().catch(() => null);
+                if (data?.code)
+                  throw releaseError({ data }, "receipt.image_upload", {
+                    receiptId: id,
+                    position,
+                    status: response.status,
+                  });
+                throw releaseError(
+                  new Error(
+                    "Bildet kunne ikke lastes opp. Prøv igjen med nett.",
+                  ),
+                  "receipt.image_upload",
+                  { receiptId: id, position, status: response.status },
                 );
+              }
             },
             complete: (id) =>
-              convex.mutation(api.receipts.completeUpload, { id }),
+              releaseMutation(convex, api.receipts.completeUpload, { id }),
           },
           () => {},
           () =>
@@ -234,7 +271,8 @@ function HouseholdProvider({
             AppState.currentState === "active",
         );
         setQueueError("");
-      } catch {
+      } catch (error) {
+        reportError(error, "receipt.queue_read");
         if (active.current)
           setQueueError("Kunne ikke lese kvitteringene på denne enheten.");
       }
@@ -282,6 +320,13 @@ function HouseholdProvider({
         synchronize,
       }}
     >
+      {auth.isAuthenticated && <ReleaseDiagnostics />}
+      {!policy.features.receiptProcessing && (
+        <Notice>
+          {policy.message ||
+            "Behandling av kvitteringer er satt på pause. Nye bilder blir lagret på enheten."}
+        </Notice>
+      )}
       {queueError ? <Notice error>{queueError}</Notice> : null}
       <CatalogQueryProvider
         key={`${owner}:${household.id}`}
@@ -290,7 +335,13 @@ function HouseholdProvider({
       >
         <ProductAnalysisSync
           receipts={page.results}
-          enabled={online && auth.isAuthenticated && !!details}
+          enabled={
+            online &&
+            auth.isAuthenticated &&
+            !!details &&
+            !blocked &&
+            policy.features.spendingAnalysis
+          }
         />
         {children}
       </CatalogQueryProvider>

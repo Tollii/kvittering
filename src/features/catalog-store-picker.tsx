@@ -1,3 +1,4 @@
+import { useReleasePolicy } from "./release-policy";
 import { useState } from "react";
 import { Copy, Field, Loading, Notice, Row, Sheet } from "@/components/ui";
 import { useCatalogSearch } from "./catalog-queries";
@@ -15,6 +16,7 @@ export function CatalogStorePicker({
   onClose: () => void;
 }) {
   const [search, setSearch] = useState(name);
+  const { policy } = useReleasePolicy();
   const query = useCatalogSearch(search, receiptId);
   return (
     <Sheet
@@ -30,8 +32,12 @@ export function CatalogStorePicker({
         />
       }
     >
+      {!policy.features.productLookup && (
+        <Notice>Butikksøket er midlertidig satt på pause.</Notice>
+      )}
       {((query.isFetching && !query.data) ||
-        query.data?.status === "pending") && (
+        (policy.features.productLookup &&
+          query.data?.status === "pending")) && (
         <Loading title="Henter butikker …" />
       )}
       {(query.isError || query.data?.status === "error") && (

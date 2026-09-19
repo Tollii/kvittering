@@ -21,7 +21,11 @@ import {
   classificationState,
 } from "../src/lib/domain/classification";
 export const extract = internalAction({
-  args: { storageIds: v.array(v.id("_storage")) },
+  args: {
+    storageIds: v.array(v.id("_storage")),
+    receiptId: v.optional(v.id("receipts")),
+    generation: v.optional(v.number()),
+  },
   returns: v.object({
     data: receiptDataValidator,
     provider: v.string(),
@@ -75,12 +79,24 @@ export const extract = internalAction({
         "Modellen kunne ikke lese kvitteringen. Prøv et tydeligere bilde.",
       );
     const data = prepareExtraction(response.output_parsed, images.length);
+    console.info("receipt.extraction_completed", {
+      receiptId: args.receiptId,
+      generation: args.generation,
+      model,
+      durationMs: Date.now() - started,
+      imageCount: images.length,
+      lineCount: data.lines.length,
+      inputTokens: response.usage?.input_tokens,
+      outputTokens: response.usage?.output_tokens,
+    });
     return { data, provider: model, durationMs: Date.now() - started };
   },
 });
 export const classify = internalAction({
   args: {
     products: v.array(v.object({ id: v.string(), description: v.string() })),
+    receiptId: v.optional(v.id("receipts")),
+    generation: v.optional(v.number()),
   },
   returns: v.object({
     classifications: v.array(
@@ -141,6 +157,14 @@ export const classify = internalAction({
         });
       });
     }
+    console.info("receipt.classification_completed", {
+      receiptId: args.receiptId,
+      generation: args.generation,
+      model,
+      durationMs: Date.now() - started,
+      itemCount: results.length,
+      batchCount: Math.ceil(args.products.length / 12),
+    });
     return {
       classifications: results,
       provider: model,

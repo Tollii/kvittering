@@ -1,3 +1,4 @@
+import { featureEnabled } from "./releasePolicy";
 import { v } from "convex/values";
 import { internalMutation, internalQuery } from "./_generated/server";
 import { internal } from "./_generated/api";
@@ -10,6 +11,7 @@ export const sendAll = internalMutation({
   args: {},
   returns: v.number(),
   handler: async (ctx) => {
+    if (!(await featureEnabled(ctx, "spendingAnalysis"))) return 0;
     const subscriptions = await ctx.db.query("deviceSubscriptions").take(500);
     const byHousehold = new Map<Id<"households">, typeof subscriptions>();
     for (const subscription of subscriptions)

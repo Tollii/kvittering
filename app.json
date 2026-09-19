@@ -73,6 +73,14 @@
           "iosShareExtensionName": "Del til Kvitto",
           "disableAndroid": true
         }
+      ],
+      [
+        "@sentry/react-native/expo",
+        {
+          "url": "https://sentry.io/",
+          "project": "kvitto",
+          "organization": "andreas-tolnes"
+        }
       ]
     ],
     "experiments": {
@@ -82,9 +90,34 @@
     "extra": {
       "router": {},
       "eas": {
-        "projectId": "321ce577-fd8e-49c7-a2e3-619f8ac904b8"
+        "projectId": "321ce577-fd8e-49c7-a2e3-619f8ac904b8",
+        "build": {
+          "experimental": {
+            "ios": {
+              "appExtensions": [
+                {
+                  "targetName": "DeltilKvitto",
+                  "bundleIdentifier": "no.tolnes.kvitto.share-extension",
+                  "entitlements": {
+                    "com.apple.security.application-groups": [
+                      "group.no.tolnes.kvitto"
+                    ]
+                  }
+                }
+              ]
+            }
+          }
+        }
       }
     },
-    "owner": "atolness-team"
+    "owner": "atolness-team",
+    "runtimeVersion": {
+      "policy": "fingerprint"
+    },
+    "updates": {
+      "url": "https://u.expo.dev/321ce577-fd8e-49c7-a2e3-619f8ac904b8",
+      "checkAutomatically": "ON_LOAD",
+      "fallbackToCacheTimeout": 0
+    }
   }
 }

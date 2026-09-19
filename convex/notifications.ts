@@ -1,10 +1,6 @@
+import { clientMutation as mutation } from "./clientFunctions";
 import { v } from "convex/values";
-import {
-  query,
-  mutation,
-  internalQuery,
-  internalMutation,
-} from "./_generated/server";
+import { query, internalQuery, internalMutation } from "./_generated/server";
 import { requireMember } from "./access";
 import schema from "./schema";
 import { reviewSummary } from "../src/lib/domain/receipt-review";

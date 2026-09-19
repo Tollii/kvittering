@@ -1,10 +1,6 @@
+import { clientMutation as mutation } from "./clientFunctions";
 import { v } from "convex/values";
-import {
-  query,
-  mutation,
-  type MutationCtx,
-  type QueryCtx,
-} from "./_generated/server";
+import { query, type MutationCtx, type QueryCtx } from "./_generated/server";
 import { internal } from "./_generated/api";
 import schema from "./schema";
 import type { Doc, Id } from "./_generated/dataModel";

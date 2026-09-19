@@ -1,0 +1,79 @@
+import { useState } from "react";
+import * as Updates from "expo-updates";
+import { Button, Copy, Notice, Panel } from "@/components/ui";
+import { installedRelease } from "@/lib/releases/client";
+import { useReleasePolicy } from "./release-policy";
+import { recordEvent, reportError } from "@/lib/observability";
+
+/** OTA reload is explicit so a downloaded update cannot interrupt an edit. */
+export function ReleaseSettings() {
+  const { policy, refresh } = useReleasePolicy();
+  const [busy, setBusy] = useState(false);
+  const [ready, setReady] = useState(false);
+  const [message, setMessage] = useState("");
+  async function check() {
+    recordEvent("update.check_started");
+    setBusy(true);
+    setMessage("");
+    try {
+      await refresh();
+      if (!Updates.isEnabled) {
+        setMessage(
+          "Direkteoppdateringer er tilgjengelige i installerte utgivelsesbygg.",
+        );
+        return;
+      }
+      const result = await Updates.checkForUpdateAsync();
+      if (result.isAvailable || result.isRollBackToEmbedded) {
+        await Updates.fetchUpdateAsync();
+        setReady(true);
+        recordEvent("update.download_completed", {
+          outcome: result.isRollBackToEmbedded ? "rollback" : "update",
+        });
+      } else {
+        recordEvent("update.check_completed", { outcome: "current" });
+        setMessage("Appen er oppdatert.");
+      }
+    } catch (error) {
+      reportError(error, "update.check");
+      setMessage("Kunne ikke hente oppdateringen. Prøv igjen med nett.");
+    } finally {
+      setBusy(false);
+    }
+  }
+  return (
+    <Panel>
+      <Copy>
+        Versjon {installedRelease.version} ({installedRelease.build})
+      </Copy>
+      <Copy muted size={13}>
+        {installedRelease.channel} · API {installedRelease.apiVersion} · policy{" "}
+        {policy.revision}
+      </Copy>
+      <Button
+        title="Se etter oppdateringer"
+        secondary
+        busy={busy}
+        onPress={() => void check()}
+      />
+      {ready && (
+        <>
+          <Copy>
+            Oppdateringen er klar. Fullfør endringene dine før du starter appen
+            på nytt.
+          </Copy>
+          <Button
+            title="Start appen på nytt"
+            onPress={() =>
+              void Updates.reloadAsync().catch((error) => {
+                reportError(error, "update.reload");
+                setMessage("Lukk og åpne appen for å bruke oppdateringen.");
+              })
+            }
+          />
+        </>
+      )}
+      {!!message && <Notice>{message}</Notice>}
+    </Panel>
+  );
+}

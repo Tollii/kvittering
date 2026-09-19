@@ -1,3 +1,4 @@
+import { releaseMutation } from "@/lib/releases/requests";
 import { useState } from "react";
 import { View } from "react-native";
 import { useConvex } from "convex/react";
@@ -21,7 +22,7 @@ export function BudgetSettings() {
     setBusy(true);
     setError(null);
     try {
-      await client.mutation(api.households.setBudget, {
+      await releaseMutation(client, api.households.setBudget, {
         monthlyBudgetOre: next,
       });
       setValue(next);
