@@ -5,7 +5,9 @@ import { observeForeground, removedAccount } from "../features/query-lifecycle";
 vi.mock("react-native", () => ({ AppState: {} }));
 
 // oxlint-disable-next-line anti-slop/no-module-mocking -- Replace the native SDK or environment boundary; application behavior remains under test.
-vi.mock("expo-network", () => ({ useNetworkState: vi.fn<typeof import("expo-network").useNetworkState>() }));
+vi.mock("expo-network", () => ({
+  useNetworkState: vi.fn<typeof import("expo-network").useNetworkState>(),
+}));
 
 it("applies initial foreground state and removes its only subscription", () => {
   const changed = vi.fn<(active: boolean) => void>();

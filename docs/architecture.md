@@ -22,22 +22,22 @@ Add receipt issues in `receipt-issues.ts`; display text belongs in its mapper. P
 
 ## Table ownership
 
-| Tables | Owner and purpose |
-| --- | --- |
-| households, members | Household membership, invitation, and budget |
-| receipts, images | Current receipt state and uploaded image references |
-| extractions | Original provider output for each generation |
-| revisions | Prior receipt data before a committed non-extraction change |
-| aliases, categoryMemory | Explicit and learned household category decisions |
-| products, productMappings | Household identities and remembered product choices |
-| corrections, correctionBatches | Human decisions, bulk changes, and guarded undo |
-| catalogRequests, catalogRequestWaiters | Shared catalog work and workflow completion |
-| catalogProducts, catalogStores | Shared catalog records; detail freshness is separate from summary freshness |
-| productFamilies, productProfiles | Household family identity and reusable analysis evidence |
-| deviceSubscriptions | Device notification destinations |
-| clientReleases | Installed-client diagnostics |
-| releasePolicies, releasePolicyHistory | Native/API version controls and operator history |
-| featureFlags, featureFlagHistory | Platform-scoped service configuration and operator history |
+| Tables                                 | Owner and purpose                                                           |
+| -------------------------------------- | --------------------------------------------------------------------------- |
+| households, members                    | Household membership, invitation, and budget                                |
+| receipts, images                       | Current receipt state and uploaded image references                         |
+| extractions                            | Original provider output for each generation                                |
+| revisions                              | Prior receipt data before a committed non-extraction change                 |
+| aliases, categoryMemory                | Explicit and learned household category decisions                           |
+| products, productMappings              | Household identities and remembered product choices                         |
+| corrections, correctionBatches         | Human decisions, bulk changes, and guarded undo                             |
+| catalogRequests, catalogRequestWaiters | Shared catalog work and workflow completion                                 |
+| catalogProducts, catalogStores         | Shared catalog records; detail freshness is separate from summary freshness |
+| productFamilies, productProfiles       | Household family identity and reusable analysis evidence                    |
+| deviceSubscriptions                    | Device notification destinations                                            |
+| clientReleases                         | Installed-client diagnostics                                                |
+| releasePolicies, releasePolicyHistory  | Native/API version controls and operator history                            |
+| featureFlags, featureFlagHistory       | Platform-scoped service configuration and operator history                  |
 
 Convex components own their workflow, workpool, and authentication tables. There is no sample table. Revision retention is a separate operator decision; this refactor does not remove history.
 

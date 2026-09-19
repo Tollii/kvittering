@@ -64,7 +64,11 @@ it("publishes immutable scoped snapshots only after committed writes", () => {
   const household = testId<"households">("household");
   const empty = receiptStorage.list("owner", household);
   expect(receiptStorage.list("owner", household)).toBe(empty);
-  const notified = vi.fn<() => ReturnType<typeof receiptStorage.list>>(() => receiptStorage.list("owner", household));
+
+  const notified = vi.fn<() => ReturnType<typeof receiptStorage.list>>(() =>
+    receiptStorage.list("owner", household),
+  );
+
   const unsubscribe = subscribeStorage(notified);
   control.fail = true;
   expect(() => saveLocalReceipts("owner", household, ["image"], true)).toThrow(

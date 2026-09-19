@@ -2,16 +2,16 @@
 
 Use Node.js 24 and `npm ci`. The checks require no server, account, or secrets.
 
-| Command               | Purpose                                                              |
-| --------------------- | -------------------------------------------------------------------- |
-| `npm run check:fast`  | TypeScript, Oxlint, repository rules, and Expo/SonarJS ESLint checks |
-| `npm run check`       | Fast checks, custom lint-rule tests, and application tests           |
-| `npm run check:ci`    | The same checks with application coverage reports                    |
-| `npm run lint:fix`    | Apply available lint fixes; review the changes before committing     |
-| `npm run lint:oxlint` | Native Oxlint correctness and test checks                            |
-| `npm run lint:policy` | All general anti-slop rules                                          |
-| `npm run lint:eslint` | Expo, React, repository, and SonarJS checks                          |
-| `npm run test:rules`  | Custom rule tests in ESLint and the actual Oxlint CLI                |
+| Command               | Purpose                                                                   |
+| --------------------- | ------------------------------------------------------------------------- |
+| `npm run check:fast`  | Formatting, TypeScript, Oxlint, repository rules, and Expo/SonarJS checks |
+| `npm run check`       | Fast checks, custom lint-rule tests, and application tests                |
+| `npm run check:ci`    | The same checks with application coverage reports                         |
+| `npm run lint:fix`    | Apply available lint fixes; review the changes before committing          |
+| `npm run lint:oxlint` | Native Oxlint correctness and test checks                                 |
+| `npm run lint:policy` | All general anti-slop rules                                               |
+| `npm run lint:eslint` | Expo, React, repository, and SonarJS checks                               |
+| `npm run test:rules`  | Custom rule tests in ESLint and the actual Oxlint CLI                     |
 
 `Code quality / Quality checks` runs on pull requests and pushes to `main`.
 The TestFlight workflow runs `npm run check` before a new build. Set
@@ -24,6 +24,27 @@ are excluded. Application and backend source have no findings baseline.
 Coverage reports are written to `coverage/` and retained as CI artifacts for
 14 days. Coverage is reported, not used as an arbitrary percentage gate. Test
 business rules and important failures; do not add tests only to raise a number.
+
+## Formatting
+
+Prettier owns layout: two spaces, double quotes, semicolons, trailing commas,
+parentheses around arrow parameters, LF line endings, and an 80-column target.
+`.editorconfig` gives editors the same indentation and newline defaults.
+
+Use `npm run format` to apply Prettier and the anti-slop spacing rule. That rule
+separates logical statement groups without forcing blank lines between imports.
+Use `npm run format:check` to check layout without changing files. The existing
+lint check also checks statement spacing. `check:fast`, `check`, and `check:ci`
+include the format check, so local work and pull requests use the same standard.
+`lint:fix` ends with the formatter to keep automatic fixes consistent.
+
+Keep the SonarJS conventions for parenthesized arrow parameters, concise arrow
+bodies, camelCase/PascalCase function names, and simple template expressions.
+Do not reorder properties by shorthand syntax or add mandatory file headers.
+Formatting does not change string contents or persisted key ordering.
+
+Generated code, external schemas and rules, native output, agent assets, and
+archived plans are excluded. Do not reformat imported code to satisfy this policy.
 
 ## Repository policy
 

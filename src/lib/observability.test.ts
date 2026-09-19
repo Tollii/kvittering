@@ -8,8 +8,14 @@ import { prepareErrorEvent } from "./sentry-event";
 // oxlint-disable-next-line anti-slop/no-module-mocking -- Replace the native SDK or environment boundary; application behavior remains under test.
 vi.mock("@sentry/react-native", () => ({
   addBreadcrumb: vi.fn<typeof Sentry.addBreadcrumb>(),
-  logger: { info: vi.fn<typeof Sentry.logger.info>(), warn: vi.fn<typeof Sentry.logger.warn>(), error: vi.fn<typeof Sentry.logger.error>() },
-  captureException: vi.fn<typeof Sentry.captureException>(() => "verification-event-id"),
+  logger: {
+    info: vi.fn<typeof Sentry.logger.info>(),
+    warn: vi.fn<typeof Sentry.logger.warn>(),
+    error: vi.fn<typeof Sentry.logger.error>(),
+  },
+  captureException: vi.fn<typeof Sentry.captureException>(
+    () => "verification-event-id",
+  ),
 }));
 
 beforeEach(() => vi.clearAllMocks());

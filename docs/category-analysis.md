@@ -21,12 +21,12 @@ One category change was visible between saved revisions: **JORDAN INDIVIDUAL** c
 
 Four current lines had category uncertainty flags:
 
-| Product | Saved category | Interpretation to test |
-| --- | --- | --- |
-| Gulrot Snack 24X150 Gr R No | Potetgull | Snack carrots remain vegetables |
-| Sandwich French Herbs 30g Wasa | Prepared sandwiches | Packaged crispbread sandwich |
-| Sandwich Cheese&gressløk 37g Wasa | Prepared sandwiches | Packaged crispbread sandwich |
-| Dream Yoghurtis Frappe Uten 450ml | Yoghurt | Yoghurt ice cream |
+| Product                           | Saved category      | Interpretation to test          |
+| --------------------------------- | ------------------- | ------------------------------- |
+| Gulrot Snack 24X150 Gr R No       | Potetgull           | Snack carrots remain vegetables |
+| Sandwich French Herbs 30g Wasa    | Prepared sandwiches | Packaged crispbread sandwich    |
+| Sandwich Cheese&gressløk 37g Wasa | Prepared sandwiches | Packaged crispbread sandwich    |
+| Dream Yoghurtis Frappe Uten 450ml | Yoghurt             | Yoghurt ice cream               |
 
 These are diagnostic examples, not additional confirmed user corrections. The classifier descriptions now explain these boundaries. They also distinguish plain Crispi lettuce from prepared meal salads.
 
@@ -38,20 +38,20 @@ The existing `providers:classify` action evaluated the 12 product names below wi
 
 This is a focused check of revised rules, including examples used to write those rules. It is not a held-out accuracy measurement. Choice confidence measures concentration among the available categories, not a measured probability that the application is correct.
 
-| Input name | Expected and returned category | Choice confidence |
-| --- | --- | --- |
-| BATTERY REMIX | `drinks.soft-drinks` | 0.96 |
-| COCA-COLA10PK BX | `drinks.soft-drinks` | 1.00 |
-| TACOBAGUETTE HUSETS | `convenience.sandwiches` | 1.00 |
-| Nystekt pizza fra varmdisken | `convenience.fresh-meals` | 1.00 |
-| Ferdig kyllingsalat med pasta | `convenience.salads` | 0.99 |
-| BIGONE BBQ CHICKEN | `convenience.frozen-pizza` | 0.97 |
-| Melatonin 1 mg | `personal-care.supplements` | 1.00 |
-| JORDAN INDIVIDUAL | `personal-care.oral` | 0.92 |
-| Gulrot Snack 24X150 Gr R No | `produce.vegetables` | 0.96 |
-| Sandwich French Herbs 30g Wasa | `bakery.crispbread` | 0.99 |
-| Dream Yoghurtis Frappe Uten 450ml | `snacks.ice-cream` | 0.83 |
-| SALAT CRISPI | `produce.vegetables` | 0.90 |
+| Input name                        | Expected and returned category | Choice confidence |
+| --------------------------------- | ------------------------------ | ----------------- |
+| BATTERY REMIX                     | `drinks.soft-drinks`           | 0.96              |
+| COCA-COLA10PK BX                  | `drinks.soft-drinks`           | 1.00              |
+| TACOBAGUETTE HUSETS               | `convenience.sandwiches`       | 1.00              |
+| Nystekt pizza fra varmdisken      | `convenience.fresh-meals`      | 1.00              |
+| Ferdig kyllingsalat med pasta     | `convenience.salads`           | 0.99              |
+| BIGONE BBQ CHICKEN                | `convenience.frozen-pizza`     | 0.97              |
+| Melatonin 1 mg                    | `personal-care.supplements`    | 1.00              |
+| JORDAN INDIVIDUAL                 | `personal-care.oral`           | 0.92              |
+| Gulrot Snack 24X150 Gr R No       | `produce.vegetables`           | 0.96              |
+| Sandwich French Herbs 30g Wasa    | `bakery.crispbread`            | 0.99              |
+| Dream Yoghurtis Frappe Uten 450ml | `snacks.ice-cream`             | 0.83              |
+| SALAT CRISPI                      | `produce.vegetables`           | 0.90              |
 
 The first check returned BigOne as a sandwich. Clearer frozen-pizza criteria corrected that result on the second check. No confidence thresholds were changed.
 

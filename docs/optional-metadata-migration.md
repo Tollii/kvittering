@@ -17,16 +17,16 @@ Each deployment used this sequence:
 
 Both deployments had the same initial data counts:
 
-| Table | Scanned per deployment | Changed on first pass |
-| --- | ---: | ---: |
-| catalogProducts | 103 | 92 |
-| catalogStores | 3 | 0 |
-| catalogRequests | 31 | 31 |
-| receipts | 9 | 9 |
-| extractions | 10 | 0 |
-| revisions | 11 | 0 |
-| corrections | 0 | 0 |
-| correctionBatches | 0 | 0 |
+| Table             | Scanned per deployment | Changed on first pass |
+| ----------------- | ---------------------: | --------------------: |
+| catalogProducts   |                    103 |                    92 |
+| catalogStores     |                      3 |                     0 |
+| catalogRequests   |                     31 |                    31 |
+| receipts          |                      9 |                     9 |
+| extractions       |                     10 |                     0 |
+| revisions         |                     11 |                     0 |
+| corrections       |                      0 |                     0 |
+| correctionBatches |                      0 |                     0 |
 
 Each verification pass scanned the same 167 documents and changed none. No tables or documents were deleted. The temporary migration function and its dedicated tests were removed after both data migrations passed. The application retains its catalog normalization and receipt behavior tests. Both final deployments passed schema validation. Typecheck, lint and all 149 remaining tests across 31 files passed.
 

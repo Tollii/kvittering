@@ -15,9 +15,9 @@ Changing the API constant does not implement compatibility. Preserve old argumen
 ## Environments
 
 | Builds/channel | EAS environment | Convex deployment | Server RELEASE_CHANNEL |
-| --- | --- | --- | --- |
-| development | development | agile-falcon-148 | development |
-| testflight | preview | courteous-jay-215 | testflight |
+| -------------- | --------------- | ----------------- | ---------------------- |
+| development    | development     | agile-falcon-148  | development            |
+| testflight     | preview         | courteous-jay-215 | testflight             |
 
 Local builds retain the personal backend. Public App Store production is not configured; create a separate production profile/backend/environment before a public release. Do not promote TestFlight binaries that contain staging URLs to public release.
 

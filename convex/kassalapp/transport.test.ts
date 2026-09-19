@@ -19,7 +19,9 @@ it("adapts OpenAPI boolean query values to Kassalapp's accepted encoding", async
   expect(String(fetch.mock.calls[0][0])).toBe(
     "https://kassal.app/api/v1/products?search=Stratos&unique=1",
   );
-  expect(new Headers(fetch.mock.calls[0][1]?.headers).get("Authorization")).toBe("Bearer test-key");
+  expect(
+    new Headers(fetch.mock.calls[0][1]?.headers).get("Authorization"),
+  ).toBe("Bearer test-key");
 });
 
 it("retains the rate-limit status and Retry-After delay", async () => {
@@ -37,7 +39,9 @@ it("retains the rate-limit status and Retry-After delay", async () => {
   });
   vi.stubGlobal(
     "fetch",
-    vi.fn<typeof globalThis.fetch>().mockResolvedValue(new Response("", { status: 401 })),
+    vi
+      .fn<typeof globalThis.fetch>()
+      .mockResolvedValue(new Response("", { status: 401 })),
   );
   await expect(kassalappFetch("/products")).rejects.toBeInstanceOf(
     CatalogRequestError,

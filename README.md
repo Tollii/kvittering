@@ -144,7 +144,8 @@ Native push subscriptions use the deviceSubscriptions table. Existing browser su
 ## Checks
 
 ```sh
-npm run check:fast # Quick feedback while editing.
+npm run format # Apply layout and statement spacing.
+npm run check:fast # Check formatting, types, and lint rules.
 npm run check # Full local checks.
 npm run check:ci # Includes coverage.
 npx expo install --check

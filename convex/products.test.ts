@@ -225,7 +225,11 @@ it("continues with separate items when the matching provider fails", async () =>
   const id = await receipt();
   vi.stubEnv("TYPESAFE_API_KEY", "test-key");
   vi.stubEnv("RECEIPT_PROVIDER", "");
-  const fetch = vi.fn<typeof globalThis.fetch>().mockRejectedValue(new Error("Network unavailable"));
+
+  const fetch = vi
+    .fn<typeof globalThis.fetch>()
+    .mockRejectedValue(new Error("Network unavailable"));
+
   vi.stubGlobal("fetch", fetch);
 
   try {
