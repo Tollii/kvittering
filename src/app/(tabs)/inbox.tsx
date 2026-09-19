@@ -1,3 +1,4 @@
+import { useCompleteReceipts } from "@/features/receipt-queries";
 import { router } from "expo-router";
 import { ActivityIndicator, View } from "react-native";
 import {
@@ -18,8 +19,8 @@ import { useTheme } from "@/constants/theme";
 import { quickApproveData } from "@/lib/domain/receipt-review";
 export default function Inbox() {
   const colors = useTheme();
-  const { receipts, loadingReceipts, queue, online, synchronize } =
-    useHousehold();
+  const { queue, online, synchronize } = useHousehold();
+  const { receipts, loadingReceipts } = useCompleteReceipts({ kind: "inbox" });
   const reserved = new Set(queue.map((entry) => entry.receiptId));
   const open = receipts.filter(
     (receipt) =>

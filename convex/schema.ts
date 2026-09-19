@@ -204,6 +204,11 @@ export default defineSchema({
     .index("by_identity", ["identity"])
     .index("by_householdId", ["householdId"]),
   receipts: defineTable(receiptFields)
+    .index("by_householdId_and_purchaseDate", [
+      "householdId",
+      "data.purchaseDate",
+    ])
+    .index("by_householdId_and_status", ["householdId", "status"])
     .index("by_duplicateOf", ["duplicateOf"])
     .index("by_householdId", ["householdId"])
     .index("by_householdId_and_clientId", ["householdId", "clientId"]),

@@ -1,3 +1,5 @@
+import { useCompleteReceipts } from "@/features/receipt-queries";
+import { monthBefore } from "@/lib/domain/insights";
 import { useState } from "react";
 import { Pressable, View } from "react-native";
 import {
@@ -43,11 +45,15 @@ import { catalogInsights } from "@/lib/catalog/insights";
 import { router } from "expo-router";
 
 export default function Spending() {
-  const { receipts, loadingReceipts, completeReceipts, online, details } =
-    useHousehold();
+  const { online, details } = useHousehold();
   const colors = useTheme();
   const currentMonth = osloDate().slice(0, 7);
   const [month, setMonth] = useState(currentMonth);
+  const { receipts, loadingReceipts, completeReceipts } = useCompleteReceipts({
+    kind: "period",
+    start: `${monthBefore(month)}-01`,
+    end: `${month}-31`,
+  });
   const [filters, setFilters] = useState(false);
   const [report, setReport] = useState<
     | "attributes"
@@ -143,7 +149,13 @@ export default function Spending() {
   }).format(new Date(`${month}-01T12:00:00Z`));
   const monthLabel =
     rawMonth.charAt(0).toLocaleUpperCase("nb-NO") + rawMonth.slice(1);
-  const surprises = monthPriceSignals(receipts, month);
+  const history = useCompleteReceipts(
+    { kind: "allProducts" },
+    report === "prices",
+  );
+  const surprises = history.completeReceipts
+    ? monthPriceSignals(history.receipts, month)
+    : [];
   const pricier = surprises.filter((signal) => signal.ratio > 1);
   const budgetOre = details?.household.monthlyBudgetOre ?? null;
   const pace =
@@ -508,7 +520,9 @@ export default function Spending() {
                       id: "prices" as const,
                       title: "Prissjekk",
                       icon: "tag" as const,
-                      value: `${pricier.length} dyrere enn vanlig`,
+                      value: history.completeReceipts
+                        ? `${pricier.length} dyrere enn vanlig`
+                        : "Se prishistorikk",
                     },
                   ]
                 : []),
@@ -625,7 +639,10 @@ export default function Spending() {
             )}
           </>
         )}
-        {report === "prices" && (
+        {report === "prices" && !history.completeReceipts && (
+          <Notice>Henter full prishistorikk …</Notice>
+        )}
+        {report === "prices" && history.completeReceipts && (
           <Panel style={{ gap: 0, paddingVertical: 4 }}>
             {surprises.map((signal, index) => (
               <View

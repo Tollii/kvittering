@@ -20,12 +20,10 @@ import {
   ConvexReactClient,
   useConvex,
   useConvexAuth,
-  usePaginatedQuery,
   useQuery,
 } from "convex/react";
 import { api } from "../../convex/_generated/api";
 import type { FunctionReturnType } from "convex/server";
-import type { Receipt } from "@/lib/domain/insights";
 import {
   authClient,
   convexSiteUrl,
@@ -49,9 +47,6 @@ type SessionData = {
   owner: string;
   household: CachedHousehold;
   details: Household | undefined;
-  receipts: Receipt[];
-  loadingReceipts: boolean;
-  completeReceipts: boolean;
   online: boolean;
   queue: LocalReceipt[];
   synchronize: (retryFailed?: boolean) => Promise<void>;
@@ -152,11 +147,6 @@ function HouseholdProvider({
     : !online
       ? cached
       : null;
-  const page = usePaginatedQuery(
-    api.receipts.list,
-    auth.isAuthenticated && details ? {} : "skip",
-    { initialNumItems: 100 },
-  );
   const queue = useSyncExternalStore(
     subscribeStorage,
     () => (household ? receiptStorage.list(owner, household.id) : emptyQueue),
@@ -192,10 +182,6 @@ function HouseholdProvider({
       : null;
     cacheHousehold(owner, value);
   }, [details, owner]);
-  const { status, loadMore } = page;
-  useEffect(() => {
-    if (status === "CanLoadMore") loadMore(100);
-  }, [status, loadMore]);
   const householdId = household?.id;
   const synchronize = useCallback(
     async (retryFailed = false) => {
@@ -263,9 +249,6 @@ function HouseholdProvider({
         owner,
         household,
         details: details ?? undefined,
-        receipts: page.results,
-        loadingReceipts: page.status === "LoadingFirstPage",
-        completeReceipts: page.status === "Exhausted",
         online,
         queue,
         synchronize,

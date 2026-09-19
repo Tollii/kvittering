@@ -4,7 +4,7 @@
 
 ## Status
 
-- Status: TODO
+- Status: DONE
 - Priority: P2
 - Effort: M
 - Risk: Medium
@@ -205,3 +205,9 @@ Required check: With synthetic history spanning several pages, Capture requests 
 ## Maintenance notes
 
 New screens declare their data requirements instead of extending a global SessionData object.
+
+## Implementation record
+
+Removed receipt history from session context. Focused screens own summary pagination, complete period reads, global substring search, and explicit product/price history reads. Added household/date and household/status indexes. Detail no longer reads extraction history. Updated the editor, tab badge, and catalog sheet as necessary dependent consumers beyond the original file list. Reports wait for complete pages; recent categories use an explicit latest-50 scope. Multi-page tests include an older imported receipt. All 190 tests pass. Native tab navigation remains unverified.
+
+Validation: `npm run typecheck`, `npm run lint`, `npm test`, and `git diff --check` passed. No deployment was performed.

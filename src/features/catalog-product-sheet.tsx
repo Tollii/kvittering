@@ -1,3 +1,4 @@
+import { useCompleteReceipts } from "./receipt-queries";
 import { useReleasePolicy } from "./release-policy";
 import { useState } from "react";
 import { Image, View, type ImageStyle, type StyleProp } from "react-native";
@@ -155,7 +156,10 @@ export function CatalogProductSheet({
       ...catalogImageSources(product),
     ]),
   ];
-  const { receipts, completeReceipts } = useHousehold();
+  const { receipts, completeReceipts } = useCompleteReceipts({
+    kind: "product",
+    key: product.key,
+  });
   const purchases = catalogInsights(receipts).products.find(
     (item) => item.id === product.key,
   );
@@ -198,7 +202,7 @@ export function CatalogProductSheet({
       {(query.isError || query.data?.status === "error") && (
         <Notice>Produktdetaljene kunne ikke hentes nå.</Notice>
       )}
-      {purchases && (
+      {purchases && completeReceipts && (
         <Panel>
           <Copy weight="600">Deres kjøp</Copy>
           <Row title="Kjøpt for" value={formatMoney(purchases.amountOre)} />

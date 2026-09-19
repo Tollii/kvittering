@@ -1,17 +1,16 @@
+import { useQuery } from "convex/react";
+import { api } from "../../../convex/_generated/api";
 import { NativeTabs } from "expo-router/unstable-native-tabs";
 import { useTheme } from "@/constants/theme";
 import { useHousehold } from "@/features/session";
 import { NotificationRouting } from "@/features/notifications";
 export default function TabLayout() {
   const colors = useTheme();
-  const { receipts, queue } = useHousehold();
+  const { queue } = useHousehold();
+  const attention = useQuery(api.receipts.attentionCount);
   // Badge only what needs a person; processing receipts resolve on their own.
   const pending =
-    receipts.filter(
-      (receipt) =>
-        ["needs_review", "failed"].includes(receipt.status) &&
-        !receipt.excluded,
-    ).length + queue.filter((entry) => entry.error).length;
+    (attention?.count ?? 0) + queue.filter((entry) => entry.error).length;
   return (
     <>
       <NotificationRouting />
@@ -33,7 +32,7 @@ export default function TabLayout() {
           />
           {pending > 0 && (
             <NativeTabs.Trigger.Badge>
-              {String(pending)}
+              {attention?.capped ? `${pending}+` : String(pending)}
             </NativeTabs.Trigger.Badge>
           )}
         </NativeTabs.Trigger>

@@ -1,6 +1,13 @@
+import { router } from "expo-router";
+import {
+  useCompleteReceipts,
+  useReceiptHistory,
+} from "@/features/receipt-queries";
+import { useDebouncedSearch } from "@/features/catalog-queries";
 import { useState } from "react";
 import { View } from "react-native";
 import {
+  Button,
   Copy,
   Empty,
   Field,
@@ -12,21 +19,18 @@ import {
   Segments,
   Sheet,
 } from "@/components/ui";
-import { ReceiptCard, openReceipt } from "@/components/receipt-card";
+import { openReceipt } from "@/components/receipt-card";
 import { SpendingBars } from "@/components/spending-details";
-import { useHousehold } from "@/features/session";
 import {
   matchLabel,
   productHistory,
   productPrices,
-  receiptMonth,
 } from "@/lib/domain/insights";
-import { formatMoney, reconcile } from "@/lib/domain/receipt";
+import { formatMoney } from "@/lib/domain/receipt";
 import { formatDate } from "@/lib/format-date";
 import { useTheme } from "@/constants/theme";
 export default function History() {
   const colors = useTheme();
-  const { receipts, loadingReceipts, completeReceipts } = useHousehold();
   const [search, setSearch] = useState("");
   const [tab, setTab] = useState<"receipts" | "products">("receipts");
   const [selectedKey, setSelectedKey] = useState<string | null>(null);
@@ -34,27 +38,27 @@ export default function History() {
     value
       .toLocaleLowerCase("nb-NO")
       .includes(search.trim().toLocaleLowerCase("nb-NO"));
-  const filtered = receipts.filter((receipt) =>
-    matches(
-      [
-        receipt.data?.store,
-        receipt.data?.purchaseDate,
-        ...(receipt.data?.lines.flatMap((line) => [
-          line.name,
-          line.originalText,
-          ...line.tags,
-        ]) ?? []),
-      ].join(" "),
-    ),
+  const term = useDebouncedSearch(search.trim());
+  const history = useReceiptHistory(term, tab === "receipts");
+  const { receipts, completeReceipts: completeProducts } = useCompleteReceipts(
+    { kind: "allProducts" },
+    tab === "products",
   );
+  const filtered = history.results;
+  const completeReceipts =
+    tab === "products" ? completeProducts : history.status === "Exhausted";
+  const loadingReceipts =
+    tab === "products"
+      ? !completeProducts
+      : history.status === "LoadingFirstPage";
   const sorted = [...filtered].sort(
     (a, b) =>
-      (b.data?.purchaseDate ?? "").localeCompare(a.data?.purchaseDate ?? "") ||
+      (b.purchaseDate ?? "").localeCompare(a.purchaseDate ?? "") ||
       b._creationTime - a._creationTime,
   );
   const months = new Map<string, typeof sorted>();
   for (const receipt of sorted) {
-    const key = receiptMonth(receipt) ?? "unknown";
+    const key = receipt.purchaseDate?.slice(0, 7) ?? "unknown";
     months.set(key, [...(months.get(key) ?? []), receipt]);
   }
   const monthTitle = (key: string) => {
@@ -87,7 +91,13 @@ export default function History() {
           { value: "products", label: `Varer (${products.length})` },
         ]}
       />
-      {!completeReceipts && <Notice>Henter flere …</Notice>}
+      {!completeReceipts && (
+        <Notice>
+          {tab === "products" || term
+            ? "Henter hele resultatet …"
+            : "Viser innlastede kvitteringer."}
+        </Notice>
+      )}
       {loadingReceipts ? (
         <Loading />
       ) : (
@@ -95,11 +105,7 @@ export default function History() {
           {tab === "receipts" &&
             [...months.entries()].map(([key, items]) => {
               const total = items.reduce(
-                (sum, receipt) =>
-                  sum +
-                  (receipt.data && !receipt.excluded
-                    ? reconcile(receipt.data).productSpending
-                    : 0),
+                (sum, receipt) => sum + receipt.spendingOre,
                 0,
               );
               return (
@@ -127,7 +133,18 @@ export default function History() {
                     </Copy>
                   </View>
                   {items.map((receipt) => (
-                    <ReceiptCard key={receipt._id} receipt={receipt} />
+                    <Row
+                      key={receipt._id}
+                      title={receipt.store || "Ny kvittering"}
+                      detail={formatDate(receipt.purchaseDate)}
+                      value={formatMoney(receipt.totalOre)}
+                      onPress={() =>
+                        router.push({
+                          pathname: "/receipt/[id]",
+                          params: { id: receipt._id },
+                        })
+                      }
+                    />
                   ))}
                 </View>
               );
@@ -156,6 +173,13 @@ export default function History() {
             <Empty title="Ingen treff" icon="magnifyingglass" />
           )}
         </>
+      )}
+      {tab === "receipts" && history.status === "CanLoadMore" && !term && (
+        <Button
+          title="Vis flere kvitteringer"
+          secondary
+          onPress={() => history.loadMore(30)}
+        />
       )}
       <Sheet
         title={selected?.name || "Varehistorikk"}

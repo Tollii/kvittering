@@ -1,4 +1,5 @@
 import {
+  productIdentityKey,
   productSelectionValidator,
   productReference,
   withProductReference,
@@ -19,9 +20,10 @@ import {
 } from "convex/server";
 import { query, internalQuery, internalMutation } from "./_generated/server";
 import { internal } from "./_generated/api";
-import schema from "./schema";
+import schema, { statusValidator } from "./schema";
 import { requireMember, requireReceipt } from "./access";
 import {
+  reconcile,
   receiptDataValidator,
   validateReceipt,
   aliasKey,
@@ -51,7 +53,6 @@ export const detail = query({
     v.object({
       receipt: schema.doc("receipts"),
       images: v.array(schema.doc("images")),
-      extractions: v.array(schema.doc("extractions")),
     }),
   ),
   handler: async (ctx, args) => {
@@ -66,11 +67,6 @@ export const detail = query({
         .query("images")
         .withIndex("by_receiptId", (q) => q.eq("receiptId", id))
         .take(8),
-      extractions: await ctx.db
-        .query("extractions")
-        .withIndex("by_receiptId", (q) => q.eq("receiptId", id))
-        .order("desc")
-        .take(10),
     };
   },
 });
@@ -484,5 +480,195 @@ export const cleanupDeleted = internalMutation({
     if (remaining || duplicates.length === 5)
       await ctx.scheduler.runAfter(0, internal.receipts.cleanupDeleted, { id });
     return null;
+  },
+});
+
+/** Summary pages omit OCR text, catalog decisions, and analysis payloads. */
+export const history = query({
+  returns: paginationResultValidator(
+    v.object({
+      _id: v.id("receipts"),
+      _creationTime: v.number(),
+      status: statusValidator,
+      store: v.union(v.string(), v.null()),
+      purchaseDate: v.union(v.string(), v.null()),
+      totalOre: v.union(v.number(), v.null()),
+      spendingOre: v.number(),
+      excluded: v.boolean(),
+    }),
+  ),
+  args: { search: v.string(), paginationOpts: paginationOptsValidator },
+  handler: async (ctx, { search, paginationOpts }) => {
+    const member = await requireMember(ctx);
+    const page = await ctx.db
+      .query("receipts")
+      .withIndex("by_householdId_and_purchaseDate", (q) =>
+        q.eq("householdId", member.householdId),
+      )
+      .order("desc")
+      .paginate({ ...paginationOpts, maximumRowsRead: 100 });
+    const term = search.trim().toLocaleLowerCase("nb-NO");
+    return {
+      ...page,
+      page: page.page
+        .filter((receipt) =>
+          [
+            receipt.data?.store,
+            receipt.data?.purchaseDate,
+            ...(receipt.data?.lines.flatMap((line) => [
+              line.name,
+              line.originalText,
+              ...line.tags,
+            ]) ?? []),
+          ]
+            .join(" ")
+            .toLocaleLowerCase("nb-NO")
+            .includes(term),
+        )
+        .map((receipt) => ({
+          _id: receipt._id,
+          _creationTime: receipt._creationTime,
+          status: receipt.status,
+          store: receipt.data?.store ?? null,
+          purchaseDate: receipt.data?.purchaseDate ?? null,
+          totalOre: receipt.data?.totalOre ?? null,
+          spendingOre:
+            receipt.data && !receipt.excluded
+              ? reconcile(receipt.data).productSpending
+              : 0,
+          excluded: receipt.excluded,
+        })),
+    };
+  },
+});
+const readScopeValidator = v.union(
+  v.object({ kind: v.literal("period"), start: v.string(), end: v.string() }),
+  v.object({ kind: v.literal("product"), key: v.string() }),
+  v.object({ kind: v.literal("priceHistory"), receiptId: v.id("receipts") }),
+  v.object({ kind: v.literal("allProducts") }),
+  v.object({ kind: v.literal("inbox") }),
+);
+/** Complete consumers must exhaust these bounded pages before publishing totals. */
+export const readPage = query({
+  args: { scope: readScopeValidator, paginationOpts: paginationOptsValidator },
+  returns: paginationResultValidator(schema.doc("receipts")),
+  handler: async (ctx, { scope, paginationOpts }) => {
+    const member = await requireMember(ctx);
+    const options = { ...paginationOpts, maximumRowsRead: 100 };
+    if (scope.kind === "period") {
+      if (
+        !/^\d{4}-\d{2}-\d{2}$/.test(scope.start) ||
+        !/^\d{4}-\d{2}-\d{2}$/.test(scope.end) ||
+        scope.start > scope.end
+      )
+        throw new Error("Invalid report period.");
+      return ctx.db
+        .query("receipts")
+        .withIndex("by_householdId_and_purchaseDate", (q) =>
+          q
+            .eq("householdId", member.householdId)
+            .gte("data.purchaseDate", scope.start)
+            .lte("data.purchaseDate", scope.end),
+        )
+        .paginate(options);
+    }
+    const keys = new Set<string>();
+    if (scope.kind === "priceHistory") {
+      const { receipt } = await requireReceipt(ctx, scope.receiptId);
+      for (const line of receipt.data?.lines ?? []) {
+        const key = productIdentityKey(line);
+        if (key) keys.add(key);
+      }
+    }
+    const page = await ctx.db
+      .query("receipts")
+      .withIndex("by_householdId", (q) =>
+        q.eq("householdId", member.householdId),
+      )
+      .order("desc")
+      .paginate(options);
+    return {
+      ...page,
+      page: page.page.filter((receipt) => {
+        if (scope.kind === "inbox")
+          return receipt.status !== "reviewed" && !receipt.excluded;
+        if (scope.kind === "product")
+          return receipt.data?.lines.some(
+            (line) =>
+              line.catalogProduct?.key === scope.key ||
+              productIdentityKey(line) === scope.key,
+          );
+        if (scope.kind === "priceHistory")
+          return receipt.data?.lines.some((line) =>
+            keys.has(productIdentityKey(line) ?? ""),
+          );
+        return true;
+      }),
+    };
+  },
+});
+export const editorContext = query({
+  returns: v.object({
+    recentCategories: v.array(v.string()),
+    nextPendingId: v.union(v.id("receipts"), v.null()),
+  }),
+  args: { id: v.id("receipts") },
+  handler: async (ctx, { id }) => {
+    const { member } = await requireReceipt(ctx, id);
+    const recent = await ctx.db
+      .query("receipts")
+      .withIndex("by_householdId", (q) =>
+        q.eq("householdId", member.householdId),
+      )
+      .order("desc")
+      .take(50);
+    const pending = await Promise.all(
+      (["needs_review", "failed"] as const).map((status) =>
+        ctx.db
+          .query("receipts")
+          .withIndex("by_householdId_and_status", (q) =>
+            q.eq("householdId", member.householdId).eq("status", status),
+          )
+          .filter((q) =>
+            q.and(q.neq(q.field("_id"), id), q.eq(q.field("excluded"), false)),
+          )
+          .order("desc")
+          .first(),
+      ),
+    );
+    return {
+      recentCategories: recent.flatMap(
+        (receipt) =>
+          receipt.data?.lines.flatMap((line) =>
+            line.categoryId ? [line.categoryId] : [],
+          ) ?? [],
+      ),
+      nextPendingId:
+        pending
+          .filter((item) => item !== null)
+          .sort((a, b) => b._creationTime - a._creationTime)[0]?._id ?? null,
+    };
+  },
+});
+export const attentionCount = query({
+  returns: v.object({ count: v.number(), capped: v.boolean() }),
+  args: {},
+  handler: async (ctx) => {
+    const member = await requireMember(ctx);
+    const pages = await Promise.all(
+      (["needs_review", "failed"] as const).map((status) =>
+        ctx.db
+          .query("receipts")
+          .withIndex("by_householdId_and_status", (q) =>
+            q.eq("householdId", member.householdId).eq("status", status),
+          )
+          .filter((q) => q.eq(q.field("excluded"), false))
+          .take(100),
+      ),
+    );
+    return {
+      count: pages.reduce((sum, page) => sum + page.length, 0),
+      capped: pages.some((page) => page.length === 100),
+    };
   },
 });

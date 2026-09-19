@@ -107,7 +107,14 @@ it("duplicate processing commits once and preserves all manual edits during repr
   await t.mutation(internal.processing.finish, args);
   await t.mutation(internal.processing.finish, args);
   let detail = (await first.query(api.receipts.detail, { id }))!;
-  expect(detail.extractions).toHaveLength(1);
+  expect(
+    await t.run((ctx) =>
+      ctx.db
+        .query("extractions")
+        .withIndex("by_receiptId", (q) => q.eq("receiptId", id))
+        .collect(),
+    ),
+  ).toHaveLength(1);
   data.lines[0].name = "Corrected product";
   data.lines = data.lines.filter((line) => line.id !== "deposit");
   data.totalOre = 2331;
@@ -132,7 +139,14 @@ it("duplicate processing commits once and preserves all manual edits during repr
   detail = (await first.query(api.receipts.detail, { id }))!;
   expect(detail.receipt.data?.lines[0].name).toBe("Corrected product");
   expect(detail.receipt.data?.lines).toHaveLength(2);
-  expect(detail.extractions).toHaveLength(2);
+  expect(
+    await t.run((ctx) =>
+      ctx.db
+        .query("extractions")
+        .withIndex("by_receiptId", (q) => q.eq("receiptId", id))
+        .collect(),
+    ),
+  ).toHaveLength(2);
 });
 it("rejects stale edits and refuses approval when the total is unreadable", async () => {
   const { t, first, householdId } = await setup();
@@ -490,4 +504,59 @@ it("trusts a category after two approvals and settles the next reading without a
   expect(settled.issues).toEqual([]);
   expect(detail.receipt.status).toBe("reviewed");
   expect(detail.receipt.autoAccepted).toBe(true);
+});
+
+it("pages narrow history summaries and includes imported older purchases in complete periods", async () => {
+  const { t, first, householdId } = await setup();
+  const templateId = await first.mutation(api.receipts.reserve, {
+    householdId,
+    clientId: "history-page-template",
+    imageCount: 1,
+  });
+  await t.run(async (ctx) => {
+    const { _id, _creationTime, ...template } = (await ctx.db.get(
+      "receipts",
+      templateId,
+    ))!;
+    void _id;
+    void _creationTime;
+    for (let index = 0; index < 65; index++) {
+      const data = batteryFixture();
+      data.purchaseDate = index === 64 ? "2020-01-02" : "2026-09-01";
+      if (index === 64) data.lines[0].tags = ["older import"];
+      await ctx.db.insert("receipts", {
+        ...template,
+        clientId: `page-${index}`,
+        data,
+        status: "reviewed",
+      });
+    }
+  });
+  const firstPage = await first.query(api.receipts.history, {
+    search: "",
+    paginationOpts: { cursor: null, numItems: 30 },
+  });
+  expect(firstPage.page).toHaveLength(30);
+  expect(firstPage.isDone).toBe(false);
+  expect(firstPage.page[0]).not.toHaveProperty("data");
+  const older = await first.query(api.receipts.readPage, {
+    scope: { kind: "period", start: "2020-01-01", end: "2020-01-31" },
+    paginationOpts: { cursor: null, numItems: 30 },
+  });
+  expect(older.isDone).toBe(true);
+  expect(older.page).toHaveLength(1);
+  expect(older.page[0].data?.purchaseDate).toBe("2020-01-02");
+  let cursor: string | null = null;
+  let found = 0;
+  let complete = false;
+  while (!complete) {
+    const page: typeof firstPage = await first.query(api.receipts.history, {
+      search: "older import",
+      paginationOpts: { cursor, numItems: 30 },
+    });
+    found += page.page.length;
+    cursor = page.continueCursor;
+    complete = page.isDone;
+  }
+  expect(found).toBe(1);
 });

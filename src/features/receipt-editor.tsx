@@ -9,7 +9,7 @@ import {
   View,
 } from "react-native";
 import { router, Stack, useNavigation } from "expo-router";
-import { useConvex } from "convex/react";
+import { useConvex, useQuery } from "convex/react";
 import { randomUUID } from "expo-crypto";
 import { api } from "../../convex/_generated/api";
 import {
@@ -53,7 +53,7 @@ import {
   reviewTasks,
   type ReviewTask,
 } from "@/lib/domain/receipt-review";
-import { useHousehold } from "@/features/session";
+import { useCompleteReceipts } from "./receipt-queries";
 import type { Receipt } from "@/lib/domain/insights";
 import { receiptStatusLabel } from "@/components/receipt-card";
 import { formatDate } from "@/lib/format-date";
@@ -72,7 +72,11 @@ export function ReceiptEditor({
 }) {
   const client = useConvex();
   const colors = useTheme();
-  const { receipts } = useHousehold();
+  const history = useCompleteReceipts({
+    kind: "priceHistory",
+    receiptId: receipt._id,
+  });
+  const context = useQuery(api.receipts.editorContext, { id: receipt._id });
   const [draft, dispatch] = useReducer(
     reduceReceiptDraft,
     receipt,
@@ -135,13 +139,11 @@ export function ReceiptEditor({
     processing ||
     receipt.revision !== revision ||
     !!Object.keys(moneyErrors).length;
-  const signals = priceSignals(receipts, receipt);
-  const recentCategories = receipts.flatMap(
-    (item) =>
-      item.data?.lines.flatMap((line) =>
-        line.categoryId ? [line.categoryId] : [],
-      ) ?? [],
+  const signals = priceSignals(
+    history.completeReceipts ? history.receipts : [],
+    receipt,
   );
+  const recentCategories = context?.recentCategories ?? [];
   const productLines =
     data?.lines.filter((line) => !["summary", "vat"].includes(line.kind)) ?? [];
   const visibleLines =
@@ -152,12 +154,9 @@ export function ReceiptEditor({
           lineReviewIssues(line).length
         : reviewLineIds.has(line.id) || lineReviewIssues(line).length,
     ) ?? [];
-  const nextPending = receipts.find(
-    (item) =>
-      item._id !== receipt._id &&
-      ["needs_review", "failed"].includes(item.status) &&
-      !item.excluded,
-  );
+  const nextPending = context?.nextPendingId
+    ? { _id: context.nextPendingId }
+    : undefined;
 
   function change(next: ReceiptData) {
     dispatch({ type: "data", data: next });
@@ -937,7 +936,7 @@ function ReceiptFooter({
   ready: boolean;
   approved: boolean;
   label: string;
-  nextPending: Receipt | undefined;
+  nextPending: Pick<Receipt, "_id"> | undefined;
   dirty: boolean;
   receipt: Receipt;
   busy: boolean;

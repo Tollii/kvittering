@@ -1,3 +1,4 @@
+import { useCompleteReceipts } from "@/features/receipt-queries";
 import { useReleasePolicy } from "@/features/release-policy";
 import { useState } from "react";
 import { Stack, useLocalSearchParams } from "expo-router";
@@ -29,7 +30,7 @@ import type { SpendingGroup } from "@/lib/domain/insights";
 export default function Analysis() {
   const { policy } = useReleasePolicy();
   const { month } = useLocalSearchParams<{ month?: string }>();
-  const { receipts, completeReceipts, synchronize } = useHousehold();
+  const { synchronize } = useHousehold();
   const [frequency, setFrequency] = useState<AnalysisFrequency>("month");
   const [anchor, setAnchor] = useState(
     month &&
@@ -43,6 +44,11 @@ export default function Analysis() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const period = analysisPeriod(anchor, frequency, today);
+  const { receipts, completeReceipts } = useCompleteReceipts({
+    kind: "period",
+    start: period.previousStart,
+    end: period.end,
+  });
   const report = spendingAnalysis(receipts, period);
   function move(direction: number) {
     if (frequency === "week") setAnchor(shiftDate(period.start, direction * 7));
