@@ -1,3 +1,4 @@
+import type { Id } from "./_generated/dataModel";
 import {
   productIdentityKey,
   productSelectionValidator,
@@ -15,10 +16,16 @@ import { productChange } from "./products";
 import { resolveProductSelections } from "./catalogLinks";
 import { v } from "convex/values";
 import {
+  type PaginationOptions,
   paginationOptsValidator,
   paginationResultValidator,
 } from "convex/server";
-import { query, internalQuery, internalMutation } from "./_generated/server";
+import {
+  query,
+  internalQuery,
+  internalMutation,
+  type QueryCtx,
+} from "./_generated/server";
 import { internal } from "./_generated/api";
 import schema, { statusValidator } from "./schema";
 import { requireMember, requireReceipt } from "./access";
@@ -562,15 +569,13 @@ export const readPage = query({
         scope.start > scope.end
       )
         throw new Error("Invalid report period.");
-      return ctx.db
-        .query("receipts")
-        .withIndex("by_householdId_and_purchaseDate", (q) =>
-          q
-            .eq("householdId", member.householdId)
-            .gte("data.purchaseDate", scope.start)
-            .lte("data.purchaseDate", scope.end),
-        )
-        .paginate(options);
+      return receiptPeriodPage(
+        ctx,
+        member.householdId,
+        scope.start,
+        scope.end,
+        options,
+      );
     }
     const keys = new Set<string>();
     if (scope.kind === "priceHistory") {
@@ -672,3 +677,22 @@ export const attentionCount = query({
     };
   },
 });
+
+/** Shared indexed period contract for interactive reports and bounded background reads. */
+export function receiptPeriodPage(
+  ctx: QueryCtx,
+  householdId: Id<"households">,
+  start: string,
+  end: string,
+  paginationOpts: PaginationOptions,
+) {
+  return ctx.db
+    .query("receipts")
+    .withIndex("by_householdId_and_purchaseDate", (q) =>
+      q
+        .eq("householdId", householdId)
+        .gte("data.purchaseDate", start)
+        .lte("data.purchaseDate", end),
+    )
+    .paginate({ ...paginationOpts, maximumRowsRead: 100 });
+}

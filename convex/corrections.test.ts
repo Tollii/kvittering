@@ -186,3 +186,36 @@ it("evaluates only the caller's latest category decisions in one request", async
     vi.unstubAllGlobals();
   }
 });
+
+it("keeps every matching line when a preview receipt exceeds the selection limit", async () => {
+  const { t, first, ids, correction } = await setup();
+  await t.run(async (ctx) => {
+    const receipt = (await ctx.db.get("receipts", ids[1]))!;
+    await ctx.db.patch("receipts", ids[1], {
+      data: {
+        ...receipt.data!,
+        lines: Array.from({ length: 25 }, (_, index) => ({
+          ...receipt.data!.lines[0],
+          id: `line-${index}`,
+        })),
+      },
+    });
+  });
+  const page = await first.query(api.corrections.previewPage, {
+    id: correction._id,
+    paginationOpts: { cursor: null, numItems: 20 },
+  });
+  expect(page.page.flatMap((group) => group.targets)).toHaveLength(25);
+  await expect(
+    first.mutation(api.corrections.apply, {
+      id: correction._id,
+      targets: page.page
+        .flatMap((group) => group.targets)
+        .map(({ receiptId, revision, lineId }) => ({
+          receiptId,
+          revision,
+          lineId,
+        })),
+    }),
+  ).rejects.toThrow("20");
+});

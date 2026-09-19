@@ -119,3 +119,13 @@ export function weeklyDigest(
     body: parts.join(" · "),
   };
 }
+
+/** Required week comparison and whole calendar month, including future-dated month entries. */
+export function digestPeriod(today: string): { start: string; end: string } {
+  const week = analysisPeriod(today, "week", today);
+  const month = today.slice(0, 7);
+  return {
+    start: [week.previousStart, `${month}-01`].sort()[0],
+    end: `${month}-${daysInMonth(month)}`,
+  };
+}

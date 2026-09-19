@@ -2,7 +2,7 @@ import { installedRelease, releaseError } from "@/lib/releases/client";
 import { useReleaseMutation } from "@/lib/releases/requests";
 import { useState } from "react";
 import { Stack } from "expo-router";
-import { useAction, useQuery } from "convex/react";
+import { useAction, useQuery, usePaginatedQuery } from "convex/react";
 import { api } from "../../convex/_generated/api";
 import type { Id } from "../../convex/_generated/dataModel";
 import type { EvaluationResult } from "../../convex/correctionEvaluation";
@@ -23,13 +23,37 @@ const categoryName = (id: string | null) =>
   id ? (categoryById.get(id)?.name ?? id) : "Ingen";
 
 export default function Corrections() {
-  const history = useQuery(api.corrections.list, {});
+  const historyPage = usePaginatedQuery(
+    api.corrections.listPage,
+    {},
+    { initialNumItems: 50 },
+  );
+  const history =
+    historyPage.status === "LoadingFirstPage"
+      ? undefined
+      : {
+          entries: historyPage.results,
+          truncated: historyPage.status !== "Exhausted",
+        };
   const batches = useQuery(api.corrections.batches, {});
   const [selected, setSelected] = useState<Id<"corrections"> | null>(null);
-  const preview = useQuery(
-    api.corrections.preview,
+  const [targetKeys, setTargetKeys] = useState<string[]>([]);
+  const previewPage = usePaginatedQuery(
+    api.corrections.previewPage,
     selected ? { id: selected } : "skip",
+    { initialNumItems: 20 },
   );
+  const preview =
+    previewPage.status === "LoadingFirstPage"
+      ? undefined
+      : {
+          targets: previewPage.results.flatMap((group) => group.targets),
+          truncated: previewPage.status !== "Exhausted",
+        };
+  const targets =
+    preview?.targets.filter((target) =>
+      targetKeys.includes(`${target.receiptId}:${target.lineId}`),
+    ) ?? [];
   const evaluate = useAction(api.correctionEvaluation.evaluate);
   const apply = useReleaseMutation(api.corrections.apply);
   const undo = useReleaseMutation(api.corrections.undo);
@@ -132,11 +156,21 @@ export default function Corrections() {
                 entry.expected &&
                 entry.expected !== "fallback.unclear" &&
                 categoryById.has(entry.expected)
-                  ? () => setSelected(entry._id)
+                  ? () => {
+                      setTargetKeys([]);
+                      setSelected(entry._id);
+                    }
                   : undefined
               }
             />
           ))}
+          {historyPage.status === "CanLoadMore" && (
+            <Button
+              title="Vis eldre beslutninger"
+              secondary
+              onPress={() => historyPage.loadMore(50)}
+            />
+          )}
           {!!batches?.length && (
             <SectionTitle title="Rettelser på flere varer" />
           )}
@@ -177,6 +211,19 @@ export default function Corrections() {
               <Row
                 key={`${target.receiptId}:${target.lineId}`}
                 title={target.name}
+                selected={targetKeys.includes(
+                  `${target.receiptId}:${target.lineId}`,
+                )}
+                onPress={() => {
+                  const key = `${target.receiptId}:${target.lineId}`;
+                  setTargetKeys((previous) =>
+                    previous.includes(key)
+                      ? previous.filter((value) => value !== key)
+                      : previous.length < 20
+                        ? [...previous, key]
+                        : previous,
+                  );
+                }}
                 detail={`${formatDate(target.date)} · ${categoryName(target.categoryId)}`}
               />
             ))}
@@ -185,26 +232,31 @@ export default function Corrections() {
             )}
             {preview.truncated && (
               <Notice>
-                Viser inntil 20 varer fra de 200 nyeste kvitteringene.
+                Flere kvitteringer kan undersøkes. Velg inntil 20 varer.
               </Notice>
+            )}
+            {previewPage.status === "CanLoadMore" && (
+              <Button
+                title="Undersøk flere kvitteringer"
+                secondary
+                onPress={() => previewPage.loadMore(20)}
+              />
             )}
             {!!error && <Notice error>{error}</Notice>}
             <Button
-              title={`Rett ${preview.targets.length} varer`}
-              disabled={!preview.targets.length || busy}
+              title={`Rett ${targets.length} varer`}
+              disabled={!targets.length || busy}
               busy={busy}
               onPress={() =>
                 void run(async () => {
                   if (!selected) return;
                   await apply({
                     id: selected,
-                    targets: preview.targets.map(
-                      ({ receiptId, lineId, revision }) => ({
-                        receiptId,
-                        lineId,
-                        revision,
-                      }),
-                    ),
+                    targets: targets.map(({ receiptId, lineId, revision }) => ({
+                      receiptId,
+                      lineId,
+                      revision,
+                    })),
                   });
                   setSelected(null);
                 })

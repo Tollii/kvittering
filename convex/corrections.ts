@@ -1,3 +1,7 @@
+import {
+  paginationOptsValidator,
+  paginationResultValidator,
+} from "convex/server";
 import { commitReceiptChange } from "./receiptChanges";
 import { clientMutation as mutation } from "./clientFunctions";
 import { v } from "convex/values";
@@ -264,5 +268,60 @@ export const batches = query({
       )
       .order("desc")
       .take(10);
+  },
+});
+
+export const listPage = query({
+  args: { paginationOpts: paginationOptsValidator },
+  returns: paginationResultValidator(schema.doc("corrections")),
+  handler: async (ctx, { paginationOpts }) => {
+    const member = await requireMember(ctx);
+    return ctx.db
+      .query("corrections")
+      .withIndex("by_householdId", (q) =>
+        q.eq("householdId", member.householdId),
+      )
+      .order("desc")
+      .paginate({ ...paginationOpts, maximumRowsRead: 50 });
+  },
+});
+const previewTargetValidator = correctionTarget.extend({
+  name: v.string(),
+  categoryId: v.union(v.string(), v.null()),
+  date: v.union(v.string(), v.null()),
+});
+export const previewPage = query({
+  args: { id: v.id("corrections"), paginationOpts: paginationOptsValidator },
+  returns: paginationResultValidator(
+    v.object({
+      receiptId: v.id("receipts"),
+      targets: v.array(previewTargetValidator),
+    }),
+  ),
+  handler: async (ctx, { id, paginationOpts }) => {
+    const correction = await requireCorrection(ctx, id);
+    const page = await ctx.db
+      .query("receipts")
+      .withIndex("by_householdId", (q) =>
+        q.eq("householdId", correction.householdId),
+      )
+      .order("desc")
+      .paginate({ ...paginationOpts, maximumRowsRead: 20 });
+    return {
+      ...page,
+      page: page.page.map((receipt) => ({
+        receiptId: receipt._id,
+        targets: (receipt.data?.lines ?? [])
+          .filter((line) => matches(receipt, correction, line))
+          .map((line) => ({
+            receiptId: receipt._id,
+            revision: receipt.revision,
+            lineId: line.id,
+            name: line.name,
+            categoryId: line.categoryId,
+            date: receipt.data!.purchaseDate,
+          })),
+      })),
+    };
   },
 });

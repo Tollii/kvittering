@@ -4,7 +4,7 @@
 
 ## Status
 
-- Status: TODO
+- Status: DONE
 - Priority: P2
 - Effort: M–L
 - Change risk: Medium
@@ -184,3 +184,9 @@ Use the operator's chosen checkout. If a new branch is requested, use refactor/b
 ## Maintenance
 
 Keep the read/write distinction and completeness guarantee in the public contract. Review query scope when a consumer gains another period, filter, or evidence requirement. Record actual measurements before claiming cost savings.
+
+## Implementation record
+
+Duplicate checks use the exact purchase-date range and cursor continuation before extraction commit. Digest reads share the indexed period reader and exhaust pages; recipient traversal uses a fixed insertion boundary, 100-device pages, and per-batch household results. Removed devices are checked before delivery. Correction history and grouped previews have continuation; apply remains limited to 20 selected targets. Existing compatibility reads still expose truncation. Tests cover 501 devices, an older duplicate, and 25 matches in one receipt. All 193 tests pass; no real notification was sent.
+
+Validation: `npm run typecheck`, `npm run lint`, `npm test`, and `git diff --check` passed. No deployment was performed.

@@ -560,3 +560,56 @@ it("pages narrow history summaries and includes imported older purchases in comp
   }
   expect(found).toBe(1);
 });
+
+it("finds a dated duplicate beyond the former insertion-order limit", async () => {
+  const { t, first, householdId } = await setup();
+  const originalId = await first.mutation(api.receipts.reserve, {
+    householdId,
+    clientId: "duplicate-original-001",
+    imageCount: 1,
+  });
+  const data = batteryFixture();
+  data.purchaseDate = "2020-01-01";
+  data.receiptNumber = "fixed-receipt";
+  await t.run(async (ctx) => {
+    await ctx.db.patch("receipts", originalId, { data, status: "reviewed" });
+    const { _id, _creationTime, ...template } = (await ctx.db.get(
+      "receipts",
+      originalId,
+    ))!;
+    void _id;
+    void _creationTime;
+    for (let index = 0; index < 251; index++)
+      await ctx.db.insert("receipts", {
+        ...template,
+        clientId: `later-${index}`,
+        data: { ...data, purchaseDate: "2026-09-19" },
+      });
+  });
+  const id = await first.mutation(api.receipts.reserve, {
+    householdId,
+    clientId: "duplicate-new-import",
+    imageCount: 1,
+  });
+  await t.run((ctx) =>
+    ctx.db.patch("receipts", id, { status: "processing", generation: 1 }),
+  );
+  await t.mutation(internal.processing.finish, {
+    id,
+    generation: 1,
+    data,
+    original: data,
+    provider: "test",
+  });
+  expect(
+    (await first.query(api.receipts.detail, { id }))?.receipt.duplicateOf,
+  ).toBe(originalId);
+  const page = await t.query(internal.digest.periodPage, {
+    householdId,
+    today: "2020-01-05",
+    paginationOpts: { cursor: null, numItems: 100 },
+  });
+  expect(page.receipts.page.some((receipt) => receipt._id === originalId)).toBe(
+    true,
+  );
+});

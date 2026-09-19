@@ -160,6 +160,8 @@ export const finish = internalMutation({
     matches: v.array(productDecision).optional(),
     provider: v.string(),
     durationMs: v.number().optional(),
+    duplicateCursor: v.string().optional(),
+    duplicateThrough: v.number().optional(),
   },
   returns: v.null(),
   handler: async (ctx, args) => {
@@ -177,14 +179,6 @@ export const finish = internalMutation({
       )
       .unique();
     if (existing) return null;
-    await ctx.db.insert("extractions", {
-      receiptId: args.id,
-      generation: args.generation,
-      data: args.original,
-      provider: args.provider,
-      classifiedData: args.data,
-      ...(args.durationMs !== undefined ? { durationMs: args.durationMs } : {}),
-    });
     let duplicateOf = receipt.duplicateOf;
     if (
       !duplicateOf &&
@@ -192,13 +186,22 @@ export const finish = internalMutation({
       args.data.purchaseDate &&
       args.data.totalOre !== null
     ) {
-      const others = await ctx.db
+      const through = args.duplicateThrough ?? Date.now();
+      const page = await ctx.db
         .query("receipts")
-        .withIndex("by_householdId", (q) =>
-          q.eq("householdId", receipt.householdId),
+        .withIndex("by_householdId_and_purchaseDate", (q) =>
+          q
+            .eq("householdId", receipt.householdId)
+            .eq("data.purchaseDate", args.data.purchaseDate!),
         )
+        .filter((q) => q.lte(q.field("_creationTime"), through))
         .order("desc")
-        .take(250);
+        .paginate({
+          cursor: args.duplicateCursor ?? null,
+          numItems: 100,
+          maximumRowsRead: 100,
+        });
+      const others = page.page;
       const duplicate = others.find(
         (other) =>
           other._id !== receipt._id &&
@@ -213,7 +216,24 @@ export const finish = internalMutation({
               other.data.purchaseTime === args.data.purchaseTime)),
       );
       duplicateOf = duplicate?._id;
+      if (!duplicateOf && !page.isDone) {
+        await ctx.scheduler.runAfter(0, internal.processing.finish, {
+          ...args,
+          duplicateCursor: page.continueCursor,
+          duplicateThrough: through,
+        });
+        return null;
+      }
     }
+    await ctx.db.insert("extractions", {
+      receiptId: args.id,
+      generation: args.generation,
+      data: args.original,
+      provider: args.provider,
+      classifiedData: args.data,
+      ...(args.durationMs !== undefined ? { durationMs: args.durationMs } : {}),
+    });
+
     // A new extraction is kept for comparison. It never replaces a user's edits.
     const data =
       receipt.revision > 0 && receipt.data ? receipt.data : args.data;
