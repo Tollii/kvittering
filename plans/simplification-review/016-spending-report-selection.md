@@ -4,7 +4,7 @@
 
 ## Status
 
-- Status: TODO
+- Status: DONE
 - Priority: P2
 - Effort: S–M
 - Risk: Low–medium
@@ -187,3 +187,9 @@ Define the selected group by its dimension, key, and period. A pure selection re
 ## Maintenance notes
 
 Keep selection as identity, calculations as derived data, and transient sheet presentation as local state.
+
+## Implementation record
+
+Spending and Analysis now store period, dimension, and group keys. Detail rows and totals resolve from current report data; deletion or period changes close an absent selection. Report choices, titles, and render functions share one exhaustive typed registry. Product attribute callbacks now include their dimension, a narrow dependent-file extension. The price report is reachable before history has loaded. All 194 tests pass; native open-sheet updates remain unverified.
+
+Validation: `npm run typecheck`, `npm run lint`, `npm test`, and `git diff --check` passed. No deployment was performed.

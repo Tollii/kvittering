@@ -1,3 +1,7 @@
+import {
+  resolveSpendingSelection,
+  type SpendingSelection,
+} from "@/lib/spending-selection";
 import { useCompleteReceipts } from "@/features/receipt-queries";
 import { useReleasePolicy } from "@/features/release-policy";
 import { useState } from "react";
@@ -25,7 +29,6 @@ import {
 } from "@/lib/domain/spending-analysis";
 import { formatMoney, osloDate } from "@/lib/domain/receipt";
 import { formatDate } from "@/lib/format-date";
-import type { SpendingGroup } from "@/lib/domain/insights";
 
 export default function Analysis() {
   const { policy } = useReleasePolicy();
@@ -40,7 +43,7 @@ export default function Analysis() {
       : osloDate(),
   );
   const [today, setToday] = useState(osloDate());
-  const [selected, setSelected] = useState<SpendingGroup | null>(null);
+  const [selection, setSelection] = useState<SpendingSelection | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const period = analysisPeriod(anchor, frequency, today);
@@ -50,6 +53,21 @@ export default function Analysis() {
     end: period.end,
   });
   const report = spendingAnalysis(receipts, period);
+  const periodKey = JSON.stringify(period);
+  const selected = resolveSpendingSelection(selection, periodKey, {
+    effect: report.effects.map((effect) => ({
+      id: effect.id,
+      name: `${effect.name} · begge perioder`,
+      amountOre: effect.currentOre + effect.previousOre,
+      contributions: effect.contributions,
+    })),
+    category: report.categories.map((row) => ({
+      id: row.id,
+      name: `${row.name} · begge perioder`,
+      amountOre: row.currentOre + row.previousOre,
+      contributions: row.contributions,
+    })),
+  });
   function move(direction: number) {
     if (frequency === "week") setAnchor(shiftDate(period.start, direction * 7));
     else {
@@ -165,11 +183,10 @@ export default function Analysis() {
                   value={formatMoney(effect.differenceOre)}
                   detail={`${effect.previousQuantity} → ${effect.currentQuantity} ${effect.unit} · pris ${formatMoney(effect.priceOre)}, mengde ${formatMoney(effect.quantityOre)}`}
                   onPress={() =>
-                    setSelected({
-                      id: effect.id,
-                      name: `${effect.name} · begge perioder`,
-                      amountOre: effect.currentOre + effect.previousOre,
-                      contributions: effect.contributions,
+                    setSelection({
+                      period: periodKey,
+                      dimension: "effect",
+                      key: effect.id,
                     })
                   }
                 />
@@ -192,11 +209,10 @@ export default function Analysis() {
               }
               value={formatMoney(row.differenceOre)}
               onPress={() =>
-                setSelected({
-                  id: row.id,
-                  name: `${row.name} · begge perioder`,
-                  amountOre: row.currentOre + row.previousOre,
-                  contributions: row.contributions,
+                setSelection({
+                  period: periodKey,
+                  dimension: "category",
+                  key: row.id,
                 })
               }
             />
@@ -221,7 +237,7 @@ export default function Analysis() {
         kommer inn.
       </Copy>
       {!!error && <Notice error>{error}</Notice>}
-      <SpendingDetails selected={selected} onClose={() => setSelected(null)} />
+      <SpendingDetails selected={selected} onClose={() => setSelection(null)} />
     </Screen>
   );
 }

@@ -12,7 +12,7 @@ export function ProductAttributesReport({
   onSelect,
 }: {
   receipts: Receipt[];
-  onSelect: (value: SpendingGroup) => void;
+  onSelect: (value: SpendingGroup, dimension: AttributeDimension) => void;
 }) {
   const [dimension, setDimension] = useState<AttributeDimension>("type");
   const report = attributeInsights(receipts, dimension);
@@ -37,7 +37,7 @@ export function ProductAttributesReport({
           title={row.name}
           detail={`${formatPurchaseQuantity(row.quantity)} · ${row.contributions.length} varelinjer`}
           value={formatMoney(row.amountOre)}
-          onPress={() => onSelect(row)}
+          onPress={() => onSelect(row, dimension)}
         />
       ))}
       <Copy muted size={12}>

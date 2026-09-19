@@ -1,6 +1,12 @@
+import {
+  resolveSpendingSelection,
+  type SpendingSelection,
+  type SpendingDimension,
+} from "@/lib/spending-selection";
+import { attributeInsights } from "@/lib/domain/attribute-insights";
+import { spendingCalendar , monthBefore } from "@/lib/domain/insights";
 import { useCompleteReceipts } from "@/features/receipt-queries";
-import { monthBefore } from "@/lib/domain/insights";
-import { useState } from "react";
+import { useState, type ReactNode, type ComponentProps } from "react";
 import { Pressable, View } from "react-native";
 import {
   Button,
@@ -28,7 +34,6 @@ import { useHousehold } from "@/features/session";
 import {
   comparisonInsights,
   receiptCoverage,
-  type Contribution,
   type SpendingGroup,
 } from "@/lib/domain/insights";
 import { formatMoney, osloDate } from "@/lib/domain/receipt";
@@ -44,6 +49,18 @@ import { formatDate } from "@/lib/format-date";
 import { catalogInsights } from "@/lib/catalog/insights";
 import { router } from "expo-router";
 
+const reportIds = [
+  "attributes",
+  "catalog",
+  "prices",
+  "families",
+  "calendar",
+  "meat",
+  "changes",
+  "coverage",
+] as const;
+type ReportId = (typeof reportIds)[number];
+
 export default function Spending() {
   const { online, details } = useHousehold();
   const colors = useTheme();
@@ -55,24 +72,15 @@ export default function Spending() {
     end: `${month}-31`,
   });
   const [filters, setFilters] = useState(false);
-  const [report, setReport] = useState<
-    | "attributes"
-    | "catalog"
-    | "prices"
-    | "families"
-    | "calendar"
-    | "meat"
-    | "changes"
-    | "coverage"
-    | null
-  >(null);
+  const [report, setReport] = useState<ReportId | null>(null);
   const [showAllGroups, setShowAllGroups] = useState(false);
   const [reviewedOnly, setReviewedOnly] = useState(false);
   const [breakdown, setBreakdown] = useState<"category" | "store" | "type">(
     "category",
   );
   const [group, setGroup] = useState<string | null>(null);
-  const [selected, setSelected] = useState<SpendingGroup | null>(null);
+  const [selection, setSelection] = useState<SpendingSelection | null>(null);
+  const periodKey = JSON.stringify([month, reviewedOnly]);
   const comparison = comparisonInsights(receipts, month, reviewedOnly);
   const totals = comparison.current;
   const coverage = receiptCoverage(receipts);
@@ -96,15 +104,17 @@ export default function Spending() {
                 (group === "fallback" && category.id === "unallocated"),
             )
           : totals.groups;
-  const showDetails = (value: SpendingGroup) => {
+  const showDetails = (
+    value: SpendingGroup,
+    dimension: SpendingDimension = "category",
+  ) => {
     setReport(null);
-    setSelected(value);
+    setSelection({ period: periodKey, dimension, key: value.id });
   };
-  const select = (
-    name: string,
-    amountOre: number,
-    contributions: Contribution[],
-  ) => showDetails({ id: name, name, amountOre, contributions });
+  const select = (key: string) => {
+    setReport(null);
+    setSelection({ period: periodKey, dimension: "accounting", key });
+  };
   const accounting = totals.selected.flatMap((receipt) =>
     receipt.data!.lines.map((line) => ({
       receipt,
@@ -165,6 +175,345 @@ export default function Spending() {
   const [whole, fraction] = formatMoney(totals.products)
     .replace(/\s?kr$/, "")
     .split(",");
+  const selected = resolveSpendingSelection(selection, periodKey, {
+    group: totals.groups,
+    category: totals.categories,
+    store: totals.stores,
+    type: totals.purchaseTypes,
+    catalogProduct: catalog.products,
+    catalogBrand: catalog.brands,
+    catalogStore: catalog.stores,
+    attributeType: attributeInsights(totals.selected, "type").groups,
+    attributeSugar: attributeInsights(totals.selected, "sugar").groups,
+    attributePreparation: attributeInsights(totals.selected, "preparation")
+      .groups,
+    calendar: spendingCalendar(
+      receipts,
+      Number(month.slice(0, 4)),
+      reviewedOnly,
+    ).map((day) => ({
+      id: day.date,
+      name: day.date,
+      amountOre: day.amountOre,
+      contributions: day.contributions,
+    })),
+    change: comparison.changes.map((item) => ({
+      id: item.id,
+      name: item.name,
+      amountOre: item.current,
+      contributions: item.currentContributions,
+    })),
+    accounting: [
+      {
+        id: "paid",
+        name: "Betalt",
+        amountOre: totals.paid,
+        contributions: receiptContributions(totals.selected),
+      },
+      {
+        id: "Rabatter",
+        name: "Rabatter",
+        amountOre: totals.discounts,
+        contributions: accounting.filter((item) =>
+          ["item_discount", "receipt_discount"].includes(item.line.kind),
+        ),
+      },
+      {
+        id: "Pant betalt",
+        name: "Pant betalt",
+        amountOre: totals.deposits,
+        contributions: accounting.filter(
+          (item) => item.line.kind === "deposit",
+        ),
+      },
+      {
+        id: "Pant returnert",
+        name: "Pant returnert",
+        amountOre: totals.returns,
+        contributions: accounting.filter(
+          (item) => item.line.kind === "deposit_return",
+        ),
+      },
+      {
+        id: "previous",
+        name: "Forrige periode",
+        amountOre: comparison.previous.products,
+        contributions: comparison.changes.flatMap(
+          (item) => item.previousContributions,
+        ),
+      },
+      {
+        id: "unlinked",
+        name: "Uten produktkobling",
+        amountOre: 0,
+        contributions: receiptContributions(coverage.unlinked),
+      },
+    ],
+  });
+  const reports: Record<
+    ReportId,
+    {
+      title: string;
+      icon: ComponentProps<typeof Icon>["name"];
+      value?: string;
+      visible?: boolean;
+      render: () => ReactNode;
+    }
+  > = {
+    attributes: {
+      title: "Produktegenskaper",
+      icon: "tag",
+      value: undefined,
+      visible: true,
+      render: () => (
+        <>
+          {
+            <ProductAttributesReport
+              receipts={totals.selected}
+              onSelect={(value, dimension) =>
+                showDetails(
+                  value,
+                  dimension === "type"
+                    ? "attributeType"
+                    : dimension === "sugar"
+                      ? "attributeSugar"
+                      : "attributePreparation",
+                )
+              }
+            />
+          }
+        </>
+      ),
+    },
+    catalog: {
+      title: "Produkter og merker",
+      icon: "barcode",
+      value: `${catalog.linked} av ${catalog.total} koblet`,
+      visible: true,
+      render: () => (
+        <>
+          {
+            <>
+              <Copy weight="600">Produkter</Copy>
+              <SpendingBars
+                rows={catalog.products.slice(0, 8)}
+                onSelect={(value) => showDetails(value, "catalogProduct")}
+              />
+              {!catalog.products.length && (
+                <Copy muted>Ingen koblede varer ennå</Copy>
+              )}
+              {!!catalog.brands.length && (
+                <>
+                  <Copy weight="600">Merker</Copy>
+                  <SpendingBars
+                    rows={catalog.brands.slice(0, 8)}
+                    onSelect={(value) => showDetails(value, "catalogBrand")}
+                  />
+                </>
+              )}
+              {!!catalog.stores.length && (
+                <>
+                  <Copy weight="600">Butikksteder</Copy>
+                  <SpendingBars
+                    rows={catalog.stores.slice(0, 8)}
+                    onSelect={(value) => showDetails(value, "catalogStore")}
+                  />
+                </>
+              )}
+            </>
+          }
+        </>
+      ),
+    },
+    prices: {
+      title: "Prissjekk",
+      icon: "tag",
+      value: history.completeReceipts
+        ? `${pricier.length} dyrere enn vanlig`
+        : "Se prishistorikk",
+      visible: true,
+      render: () => (
+        <>
+          {!history.completeReceipts && (
+            <Notice>Henter full prishistorikk …</Notice>
+          )}
+          {history.completeReceipts && (
+            <Panel style={{ gap: 0, paddingVertical: 4 }}>
+              {surprises.map((signal, index) => (
+                <View
+                  key={`${signal.receipt._id}:${signal.line.id}`}
+                  style={{
+                    borderTopWidth: index ? 1 : 0,
+                    borderTopColor: colors.line,
+                  }}
+                >
+                  <Row
+                    title={signal.name}
+                    detail={`${formatDate(signal.receipt.data?.purchaseDate)} · vanlig ${formatMoney(signal.typicalOre)}`}
+                    value={priceSignalLabel(signal)}
+                    onPress={() => {
+                      setReport(null);
+                      openReceipt(signal.receipt);
+                    }}
+                  />
+                </View>
+              ))}
+            </Panel>
+          )}
+        </>
+      ),
+    },
+    families: {
+      title: "Mengder kjøpt",
+      icon: "scalemass",
+      value: familySummary(totals.selected),
+      visible: true,
+      render: () => (
+        <>
+          {
+            <FamilyPurchases
+              receipts={totals.selected}
+              onClose={() => setReport(null)}
+            />
+          }
+        </>
+      ),
+    },
+    calendar: {
+      title: "Handlekalender",
+      icon: "calendar",
+      value: undefined,
+      visible: true,
+      render: () => (
+        <>
+          {
+            <SpendingCalendar
+              receipts={receipts}
+              month={month}
+              reviewedOnly={reviewedOnly}
+              onSelect={(value) => showDetails(value, "calendar")}
+            />
+          }
+        </>
+      ),
+    },
+    meat: {
+      title: "Kjøtt og fisk",
+      icon: "fish",
+      value: formatMoney(meatRows.reduce((sum, row) => sum + row.amountOre, 0)),
+      visible: true,
+      render: () => (
+        <>
+          {
+            <>
+              <SpendingBars
+                rows={meatRows}
+                onSelect={(value) => showDetails(value)}
+              />
+              {!meatRows.length && <Copy muted>Ingen kjøp i perioden</Copy>}
+            </>
+          }
+        </>
+      ),
+    },
+    changes: {
+      title: "Endringer fra forrige måned",
+      icon: "arrow.up.arrow.down",
+      value: undefined,
+      visible: comparison.previous.selected.length > 0,
+      render: () => (
+        <>
+          {
+            <>
+              <Copy size={12} muted>
+                {formatDate(comparison.currentEnd)} mot{" "}
+                {formatDate(comparison.previousEnd)}
+              </Copy>
+              {comparison.changes.slice(0, 3).map((item) => (
+                <Row
+                  key={item.id}
+                  title={item.name}
+                  detail={`${formatMoney(item.previous)} → ${formatMoney(item.current)}`}
+                  value={formatMoney(item.difference)}
+                  onPress={() =>
+                    showDetails(
+                      {
+                        id: item.id,
+                        name: item.name,
+                        amountOre: item.current,
+                        contributions: item.currentContributions,
+                      },
+                      "change",
+                    )
+                  }
+                />
+              ))}
+              <Button
+                title="Se kjøp i forrige periode"
+                secondary
+                onPress={() => select("previous")}
+              />
+            </>
+          }
+        </>
+      ),
+    },
+    coverage: {
+      title: "Om tallene",
+      icon: "info.circle",
+      value: undefined,
+      visible: true,
+      render: () => (
+        <>
+          {
+            <>
+              <Row
+                title={`${coverage.unlinkedCount} varer uten produktkobling`}
+                onPress={() => select("unlinked")}
+              />
+              {totals.unknownTotals + totals.unknownAmounts > 0 && (
+                <Notice tone="warning">Beløp mangler</Notice>
+              )}
+              {[
+                {
+                  label: "Annen valuta",
+                  receipts: totals.unconverted,
+                },
+                {
+                  label: "Dato mangler",
+                  receipts: totals.undated,
+                },
+                {
+                  label: "Mulige duplikater",
+                  receipts: totals.suspectedDuplicates,
+                },
+                {
+                  label: "Beløpene stemmer ikke",
+                  receipts: totals.discrepancies,
+                },
+              ]
+                .filter((item) => item.receipts.length)
+                .map((item) => (
+                  <View key={item.label}>
+                    <Notice tone="warning">{item.label}</Notice>
+                    {item.receipts.map((receipt) => (
+                      <Row
+                        key={receipt._id}
+                        title={receipt.data?.store ?? "Kvittering"}
+                        onPress={() => {
+                          setReport(null);
+                          openReceipt(receipt);
+                        }}
+                      />
+                    ))}
+                  </View>
+                ))}
+            </>
+          }
+        </>
+      ),
+    },
+  };
   return (
     <Screen
       title="Forbruk"
@@ -393,7 +742,17 @@ export default function Spending() {
                 if (breakdown === "category" && !group) {
                   setGroup(row.id);
                   setShowAllGroups(false);
-                } else showDetails(row);
+                } else
+                  showDetails(
+                    row,
+                    breakdown === "store"
+                      ? "store"
+                      : breakdown === "type"
+                        ? "type"
+                        : group
+                          ? "category"
+                          : "group",
+                  );
               }}
             />
             {rows.length > 5 && (
@@ -446,13 +805,7 @@ export default function Spending() {
               title="Betalt"
               detail="Inkludert pant"
               value={formatMoney(totals.paid)}
-              onPress={() =>
-                select(
-                  "Betalt",
-                  totals.paid,
-                  receiptContributions(totals.selected),
-                )
-              }
+              onPress={() => select("paid")}
             />
             {[
               {
@@ -478,15 +831,7 @@ export default function Spending() {
                 <Row
                   title={metric.name}
                   value={formatMoney(metric.amount)}
-                  onPress={() =>
-                    select(
-                      metric.name,
-                      metric.amount,
-                      accounting.filter((item) =>
-                        metric.kinds.includes(item.line.kind),
-                      ),
-                    )
-                  }
+                  onPress={() => select(metric.name)}
                 />
               </View>
             ))}
@@ -501,273 +846,34 @@ export default function Spending() {
             }
           />
           <Panel style={{ gap: 0, paddingVertical: 4 }}>
-            {[
-              {
-                id: "attributes" as const,
-                title: "Produktegenskaper",
-                icon: "tag" as const,
-                value: undefined,
-              },
-              {
-                id: "catalog" as const,
-                title: "Produkter og merker",
-                icon: "barcode" as const,
-                value: `${catalog.linked} av ${catalog.total} koblet`,
-              },
-              ...(surprises.length
-                ? [
-                    {
-                      id: "prices" as const,
-                      title: "Prissjekk",
-                      icon: "tag" as const,
-                      value: history.completeReceipts
-                        ? `${pricier.length} dyrere enn vanlig`
-                        : "Se prishistorikk",
-                    },
-                  ]
-                : []),
-              {
-                id: "families" as const,
-                title: "Mengder kjøpt",
-                icon: "scalemass" as const,
-                value: familySummary(totals.selected),
-              },
-              {
-                id: "calendar" as const,
-                title: "Handlekalender",
-                icon: "calendar" as const,
-                value: undefined,
-              },
-              {
-                id: "meat" as const,
-                title: "Kjøtt og fisk",
-                icon: "fish" as const,
-                value: formatMoney(
-                  meatRows.reduce((sum, row) => sum + row.amountOre, 0),
-                ),
-              },
-              ...(comparison.previous.selected.length
-                ? [
-                    {
-                      id: "changes" as const,
-                      title: "Endringer fra forrige måned",
-                      icon: "arrow.up.arrow.down" as const,
-                      value: undefined,
-                    },
-                  ]
-                : []),
-              {
-                id: "coverage" as const,
-                title: "Om tallene",
-                icon: "info.circle" as const,
-                value: undefined,
-              },
-            ].map((item, index) => (
-              <View
-                key={item.id}
-                style={{
-                  borderTopWidth: index ? 1 : 0,
-                  borderTopColor: colors.line,
-                  paddingVertical: 2,
-                }}
-              >
-                <Row
-                  title={item.title}
-                  icon={item.icon}
-                  value={item.value}
-                  onPress={() => setReport(item.id)}
-                />
-              </View>
-            ))}
+            {reportIds
+              .filter((id) => reports[id].visible !== false)
+              .map((id, index) => (
+                <View
+                  key={id}
+                  style={{
+                    borderTopWidth: index ? 1 : 0,
+                    borderTopColor: colors.line,
+                    paddingVertical: 2,
+                  }}
+                >
+                  <Row
+                    title={reports[id].title}
+                    icon={reports[id].icon}
+                    value={reports[id].value}
+                    onPress={() => setReport(id)}
+                  />
+                </View>
+              ))}
           </Panel>
         </>
       )}
       <Sheet
-        title={
-          report === "attributes"
-            ? "Produktegenskaper"
-            : report === "catalog"
-              ? "Produkter og merker"
-              : report === "prices"
-                ? "Prissjekk"
-                : report === "families"
-                  ? "Mengder kjøpt"
-                  : report === "calendar"
-                    ? "Handlekalender"
-                    : report === "meat"
-                      ? "Kjøtt og fisk"
-                      : report === "changes"
-                        ? "Endringer fra forrige måned"
-                        : "Om tallene"
-        }
+        title={report ? reports[report].title : ""}
         visible={report !== null}
         onClose={() => setReport(null)}
       >
-        {report === "attributes" && (
-          <ProductAttributesReport
-            receipts={totals.selected}
-            onSelect={showDetails}
-          />
-        )}
-        {report === "catalog" && (
-          <>
-            <Copy weight="600">Produkter</Copy>
-            <SpendingBars
-              rows={catalog.products.slice(0, 8)}
-              onSelect={showDetails}
-            />
-            {!catalog.products.length && (
-              <Copy muted>Ingen koblede varer ennå</Copy>
-            )}
-            {!!catalog.brands.length && (
-              <>
-                <Copy weight="600">Merker</Copy>
-                <SpendingBars
-                  rows={catalog.brands.slice(0, 8)}
-                  onSelect={showDetails}
-                />
-              </>
-            )}
-            {!!catalog.stores.length && (
-              <>
-                <Copy weight="600">Butikksteder</Copy>
-                <SpendingBars
-                  rows={catalog.stores.slice(0, 8)}
-                  onSelect={showDetails}
-                />
-              </>
-            )}
-          </>
-        )}
-        {report === "prices" && !history.completeReceipts && (
-          <Notice>Henter full prishistorikk …</Notice>
-        )}
-        {report === "prices" && history.completeReceipts && (
-          <Panel style={{ gap: 0, paddingVertical: 4 }}>
-            {surprises.map((signal, index) => (
-              <View
-                key={`${signal.receipt._id}:${signal.line.id}`}
-                style={{
-                  borderTopWidth: index ? 1 : 0,
-                  borderTopColor: colors.line,
-                }}
-              >
-                <Row
-                  title={signal.name}
-                  detail={`${formatDate(signal.receipt.data?.purchaseDate)} · vanlig ${formatMoney(signal.typicalOre)}`}
-                  value={priceSignalLabel(signal)}
-                  onPress={() => {
-                    setReport(null);
-                    openReceipt(signal.receipt);
-                  }}
-                />
-              </View>
-            ))}
-          </Panel>
-        )}
-        {report === "families" && (
-          <FamilyPurchases
-            receipts={totals.selected}
-            onClose={() => setReport(null)}
-          />
-        )}
-        {report === "calendar" && (
-          <SpendingCalendar
-            receipts={receipts}
-            month={month}
-            reviewedOnly={reviewedOnly}
-            onSelect={showDetails}
-          />
-        )}
-        {report === "meat" && (
-          <>
-            <SpendingBars rows={meatRows} onSelect={showDetails} />
-            {!meatRows.length && <Copy muted>Ingen kjøp i perioden</Copy>}
-          </>
-        )}
-        {report === "changes" && (
-          <>
-            <Copy size={12} muted>
-              {formatDate(comparison.currentEnd)} mot{" "}
-              {formatDate(comparison.previousEnd)}
-            </Copy>
-            {comparison.changes.slice(0, 3).map((item) => (
-              <Row
-                key={item.id}
-                title={item.name}
-                detail={`${formatMoney(item.previous)} → ${formatMoney(item.current)}`}
-                value={formatMoney(item.difference)}
-                onPress={() =>
-                  select(item.name, item.current, item.currentContributions)
-                }
-              />
-            ))}
-            <Button
-              title="Se kjøp i forrige periode"
-              secondary
-              onPress={() =>
-                select(
-                  "Forrige periode",
-                  comparison.previous.products,
-                  comparison.changes.flatMap(
-                    (item) => item.previousContributions,
-                  ),
-                )
-              }
-            />
-          </>
-        )}
-        {report === "coverage" && (
-          <>
-            <Row
-              title={`${coverage.unlinkedCount} varer uten produktkobling`}
-              onPress={() =>
-                select(
-                  "Uten produktkobling",
-                  0,
-                  receiptContributions(coverage.unlinked),
-                )
-              }
-            />
-            {totals.unknownTotals + totals.unknownAmounts > 0 && (
-              <Notice tone="warning">Beløp mangler</Notice>
-            )}
-            {[
-              {
-                label: "Annen valuta",
-                receipts: totals.unconverted,
-              },
-              {
-                label: "Dato mangler",
-                receipts: totals.undated,
-              },
-              {
-                label: "Mulige duplikater",
-                receipts: totals.suspectedDuplicates,
-              },
-              {
-                label: "Beløpene stemmer ikke",
-                receipts: totals.discrepancies,
-              },
-            ]
-              .filter((item) => item.receipts.length)
-              .map((item) => (
-                <View key={item.label}>
-                  <Notice tone="warning">{item.label}</Notice>
-                  {item.receipts.map((receipt) => (
-                    <Row
-                      key={receipt._id}
-                      title={receipt.data?.store ?? "Kvittering"}
-                      onPress={() => {
-                        setReport(null);
-                        openReceipt(receipt);
-                      }}
-                    />
-                  ))}
-                </View>
-              ))}
-          </>
-        )}
+        {report ? reports[report].render() : null}
       </Sheet>
       <Sheet
         title="Vis forbruk"
@@ -783,7 +889,7 @@ export default function Spending() {
         </Panel>
         <Button title="Vis oversikt" onPress={() => setFilters(false)} />
       </Sheet>
-      <SpendingDetails selected={selected} onClose={() => setSelected(null)} />
+      <SpendingDetails selected={selected} onClose={() => setSelection(null)} />
     </Screen>
   );
 }
