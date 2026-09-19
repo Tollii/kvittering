@@ -1,8 +1,7 @@
 import { ReleaseDiagnostics } from "./release-diagnostics";
 import { recordEvent, reportError } from "@/lib/observability";
 import { ReleasePolicyProvider, useReleasePolicy } from "./release-policy";
-import { installedRelease, releaseError } from "@/lib/releases/client";
-import { releaseMutation } from "@/lib/releases/requests";
+import { receiptUploadTransport } from "@/lib/receipt-upload-transport";
 import {
   createContext,
   useCallback,
@@ -23,7 +22,6 @@ import {
   useQuery,
 } from "convex/react";
 import { useNetworkState } from "expo-network";
-import { fetch as nativeFetch } from "expo/fetch";
 import { api } from "../../convex/_generated/api";
 import type { FunctionReturnType } from "convex/server";
 import type { Receipt } from "@/lib/domain/insights";
@@ -37,7 +35,6 @@ import {
   subscribeStorage,
   cachedHousehold,
   cacheHousehold,
-  imageFile,
   receiptStorage,
   type CachedHousehold,
 } from "@/lib/receipt-storage";
@@ -58,6 +55,7 @@ type SessionData = {
   queue: LocalReceipt[];
   synchronize: (retryFailed?: boolean) => Promise<void>;
 };
+const emptyQueue: LocalReceipt[] = [];
 const SessionContext = createContext<SessionData | null>(null);
 const client = convexUrl
   ? new ConvexReactClient(convexUrl, { unsavedChangesWarning: false })
@@ -137,12 +135,11 @@ function HouseholdProvider({
     api.households.current,
     auth.isAuthenticated ? {} : "skip",
   );
-  const cachedSnapshot = useSyncExternalStore(
+  const cached = useSyncExternalStore(
     subscribeStorage,
-    () => JSON.stringify(cachedHousehold(owner)),
-    () => "null",
+    () => cachedHousehold(owner),
+    () => null,
   );
-  const cached = JSON.parse(cachedSnapshot) as CachedHousehold | null;
   const household = details
     ? { id: details.household._id, name: details.household.name }
     : !online
@@ -153,15 +150,11 @@ function HouseholdProvider({
     auth.isAuthenticated && details ? {} : "skip",
     { initialNumItems: 100 },
   );
-  const queueSnapshot = useSyncExternalStore(
+  const queue = useSyncExternalStore(
     subscribeStorage,
-    () =>
-      household
-        ? JSON.stringify(receiptStorage.list(owner, household.id))
-        : "[]",
-    () => "[]",
+    () => (household ? receiptStorage.list(owner, household.id) : emptyQueue),
+    () => emptyQueue,
   );
-  const queue = JSON.parse(queueSnapshot) as LocalReceipt[];
   const [queueError, setQueueError] = useState("");
   const active = useRef(true);
   const canUpload = useRef(false);
@@ -205,65 +198,17 @@ function HouseholdProvider({
         if (!canUpload.current) return;
         if (retryFailed) {
           for (const entry of receiptStorage.list(owner, householdId)) {
-            entry.error = undefined;
-            receiptStorage.update(entry);
+            receiptStorage.update({ ...entry, error: undefined });
           }
         }
         await drainQueue(
           owner,
           householdId,
-          {
-            reserve: (entry) =>
-              releaseMutation(convex, api.receipts.reserve, {
-                clientId: entry.id,
-                imageCount: entry.images.length,
-                householdId,
-              }),
-            upload: async (id, position, name) => {
-              const token = await fetchAccessToken();
-              if (!active.current || !canUpload.current)
-                throw new Error(
-                  "Opplastingen fortsetter når du åpner appen med nett.",
-                );
-              const response = await nativeFetch(
-                `${convexSiteUrl}/receipt-image?receipt=${id}&position=${position}`,
-                {
-                  method: "POST",
-                  headers: {
-                    Authorization: `Bearer ${token}`,
-                    "Content-Type": "image/jpeg",
-                    "X-Kvitto-Client": JSON.stringify(installedRelease),
-                  },
-                  body: imageFile(name),
-                  signal: AbortSignal.timeout(60000),
-                },
-              ).catch((error) => {
-                throw releaseError(error, "receipt.image_upload", {
-                  receiptId: id,
-                  position,
-                });
-              });
-              if (!response.ok) {
-                const data = await response.json().catch(() => null);
-                if (data?.code)
-                  throw releaseError({ data }, "receipt.image_upload", {
-                    receiptId: id,
-                    position,
-                    status: response.status,
-                  });
-                throw releaseError(
-                  new Error(
-                    "Bildet kunne ikke lastes opp. Prøv igjen med nett.",
-                  ),
-                  "receipt.image_upload",
-                  { receiptId: id, position, status: response.status },
-                );
-              }
-            },
-            complete: (id) =>
-              releaseMutation(convex, api.receipts.completeUpload, { id }),
-          },
-          () => {},
+          receiptUploadTransport(
+            convex,
+            householdId,
+            () => active.current && canUpload.current,
+          ),
           () =>
             active.current &&
             canUpload.current &&

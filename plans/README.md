@@ -28,7 +28,7 @@ Start with 001, 002, 003, and 004. They fix demonstrated state/model defects and
 | [007](simplification-review/007-server-owned-analysis.md) | Complete backend scheduling before removing UI workers | P2 | M | 006 | DONE |
 | [008](simplification-review/008-product-identity-resolution.md) | Resolve purchased product identity once | P2 | L | 002, 006 | DONE |
 | [009](simplification-review/009-batched-product-analysis.md) | Batch independent Jev analysis questions | P2 | M | 002 | DONE |
-| [010](simplification-review/010-local-receipt-store.md) | Expose stable local receipt snapshots | P2 | M | None | TODO |
+| [010](simplification-review/010-local-receipt-store.md) | Expose stable local receipt snapshots | P2 | M | None | DONE |
 | [015](simplification-review/015-application-lifecycle-cache.md) | Give query lifecycle and cache removal explicit owners | P2 | S–M | None | TODO |
 | [017](simplification-review/017-catalog-request-observation.md) | Observe catalog completion without polling mutations | P2 | M | 003, 015 | TODO |
 | [012](simplification-review/012-receipt-read-boundaries.md) | Load receipt data where it is needed | P2 | M | 004, 007 | TODO |

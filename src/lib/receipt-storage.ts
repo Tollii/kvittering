@@ -1,3 +1,5 @@
+import { parse } from "convex-helpers/validators";
+import { v } from "convex/values";
 import { migrateReceipt, migrateReceiptDatabase } from "./receipt-migrations";
 import { Directory, File, Paths } from "expo-file-system";
 import { openDatabaseSync } from "expo-sqlite";
@@ -20,13 +22,37 @@ function changed() {
 let database: ReturnType<typeof openDatabaseSync> | undefined;
 function storage() {
   if (!database) {
-    database = openDatabaseSync(`kvitto${storageSuffix}.db`);
-    database.execSync(
+    const opened = openDatabaseSync(`kvitto${storageSuffix}.db`);
+    opened.execSync(
       "PRAGMA journal_mode = WAL; CREATE TABLE IF NOT EXISTS receipt_queue (id TEXT PRIMARY KEY, owner TEXT NOT NULL, household TEXT NOT NULL, data TEXT NOT NULL); CREATE TABLE IF NOT EXISTS household_cache (owner TEXT PRIMARY KEY, data TEXT NOT NULL);",
     );
+    migrateReceiptDatabase(opened);
+    database = opened;
   }
-  migrateReceiptDatabase(database);
   return database;
+}
+const queueSnapshots = new Map<string, LocalReceipt[]>();
+const householdSnapshots = new Map<string, CachedHousehold | null>();
+const scopeKey = (owner: string, household: string) =>
+  JSON.stringify([owner, household]);
+function freezeReceipt(entry: LocalReceipt): LocalReceipt {
+  Object.freeze(entry.images);
+  Object.freeze(entry.uploaded);
+  return Object.freeze(entry);
+}
+function writeEntry(entry: LocalReceipt) {
+  storage().runSync(
+    "INSERT OR REPLACE INTO receipt_queue (id, owner, household, data) VALUES (?, ?, ?, ?)",
+    entry.id,
+    entry.owner,
+    entry.householdId,
+    JSON.stringify(entry),
+  );
+}
+function publishQueue(owner: string, household: Id<"households">) {
+  queueSnapshots.delete(scopeKey(owner, household));
+  receiptStorage.list(owner, household);
+  changed();
 }
 const directory = () =>
   new Directory(Paths.document, `receipts${storageSuffix}`);
@@ -36,28 +62,28 @@ export function imageFile(name: string) {
 }
 export const receiptStorage: QueueStore = {
   list(owner, householdId) {
-    return storage()
-      .getAllSync<{ data: string }>(
-        "SELECT data FROM receipt_queue WHERE owner = ? AND household = ? ORDER BY rowid",
-        owner,
-        householdId,
-      )
-      .map((row) => migrateReceipt(JSON.parse(row.data)));
+    const key = scopeKey(owner, householdId);
+    if (!queueSnapshots.has(key)) {
+      const entries = storage()
+        .getAllSync<{ data: string }>(
+          "SELECT data FROM receipt_queue WHERE owner = ? AND household = ? ORDER BY rowid",
+          owner,
+          householdId,
+        )
+        .map((row) => freezeReceipt(migrateReceipt(JSON.parse(row.data))));
+      Object.freeze(entries);
+      queueSnapshots.set(key, entries);
+    }
+    return queueSnapshots.get(key)!;
   },
   update(entry) {
-    storage().runSync(
-      "INSERT OR REPLACE INTO receipt_queue (id, owner, household, data) VALUES (?, ?, ?, ?)",
-      entry.id,
-      entry.owner,
-      entry.householdId,
-      JSON.stringify(entry),
-    );
-    changed();
+    writeEntry(entry);
+    publishQueue(entry.owner, entry.householdId);
   },
   remove(entry) {
     // Remove the durable record only after the server has accepted every image.
     storage().runSync("DELETE FROM receipt_queue WHERE id = ?", entry.id);
-    changed();
+    publishQueue(entry.owner, entry.householdId);
     for (const name of entry.images) {
       try {
         const file = imageFile(name);
@@ -101,7 +127,7 @@ export function saveLocalReceipts(
       },
     );
     storage().withTransactionSync(() => {
-      for (const entry of entries) receiptStorage.update(entry);
+      for (const entry of entries) writeEntry(entry);
     });
   } catch (error) {
     for (const file of files) {
@@ -109,14 +135,33 @@ export function saveLocalReceipts(
     }
     throw error;
   }
+  publishQueue(owner, householdId);
 }
 export type CachedHousehold = { id: Id<"households">; name: string };
+export function parseCachedHousehold(value: unknown): CachedHousehold | null {
+  try {
+    return Object.freeze(
+      parse(v.object({ id: v.id("households"), name: v.string() }), value),
+    );
+  } catch {
+    return null;
+  }
+}
 export function cachedHousehold(owner: string): CachedHousehold | null {
-  const row = storage().getFirstSync<{ data: string }>(
-    "SELECT data FROM household_cache WHERE owner = ?",
-    owner,
-  );
-  return row ? (JSON.parse(row.data) as CachedHousehold) : null;
+  if (!householdSnapshots.has(owner)) {
+    const row = storage().getFirstSync<{ data: string }>(
+      "SELECT data FROM household_cache WHERE owner = ?",
+      owner,
+    );
+    let value: CachedHousehold | null = null;
+    try {
+      value = row ? parseCachedHousehold(JSON.parse(row.data)) : null;
+    } catch {
+      /* Disposable cache only. */
+    }
+    householdSnapshots.set(owner, value);
+  }
+  return householdSnapshots.get(owner)!;
 }
 export function cacheHousehold(owner: string, value: CachedHousehold | null) {
   if (value)
@@ -126,5 +171,6 @@ export function cacheHousehold(owner: string, value: CachedHousehold | null) {
       JSON.stringify(value),
     );
   else storage().runSync("DELETE FROM household_cache WHERE owner = ?", owner);
+  householdSnapshots.set(owner, value ? parseCachedHousehold(value) : null);
   changed();
 }

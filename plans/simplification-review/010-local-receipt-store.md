@@ -4,7 +4,7 @@
 
 ## Status
 
-- Status: TODO
+- Status: DONE
 - Priority: P2
 - Effort: M
 - Risk: Medium
@@ -194,3 +194,9 @@ migrateReceipt at src/lib/receipt-migrations.ts:20 already parses unknown input 
 ## Maintenance notes
 
 Keep raw JSON parsing at the adapter boundary. A cache may be discarded on corruption; unsent receipts must be retained and reported.
+
+## Implementation record
+
+Added stable frozen snapshots, parsed household cache values, committed-write notifications, and a separate upload transport. Queue operations copy snapshots before editing. Kept schema version 1 and its existing migration because this change does not revise the durable payload. Tests cover failed transactions, snapshot identity, isolation, retry, and final-commit failure. All 185 tests pass; device restart remains unverified.
+
+Validation: `npm run typecheck`, `npm run lint`, `npm test`, and `git diff --check` passed. No deployment was performed.

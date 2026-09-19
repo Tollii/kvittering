@@ -56,23 +56,11 @@ describe("durable receipt upload", () => {
         completions++;
       },
     };
-    await run(
-      "user",
-      household,
-      transport,
-      () => {},
-      () => true,
-    );
+    await run("user", household, transport, () => true);
     expect(rows()[0].uploaded).toEqual([true, false]);
     expect(rows()[0].error).toBe("Connection lost");
     fail = false;
-    await run(
-      "user",
-      household,
-      transport,
-      () => {},
-      () => true,
-    );
+    await run("user", household, transport, () => true);
     expect(uploaded).toEqual([0, 1]);
     expect(reservations).toBe(1);
     expect(completions).toBe(1);
@@ -91,22 +79,10 @@ describe("durable receipt upload", () => {
         if (fail) throw new Error("Offline");
       },
     };
-    await run(
-      "user",
-      household,
-      transport,
-      () => {},
-      () => true,
-    );
+    await run("user", household, transport, () => true);
     expect(rows()).toHaveLength(1);
     fail = false;
-    await run(
-      "user",
-      household,
-      transport,
-      () => {},
-      () => true,
-    );
+    await run("user", household, transport, () => true);
     expect(uploads).toBe(2);
     expect(rows()).toHaveLength(0);
   });
@@ -127,21 +103,9 @@ describe("durable receipt upload", () => {
         calls++;
       },
     };
-    await run(
-      "other-user",
-      household,
-      transport,
-      () => {},
-      () => true,
-    );
+    await run("other-user", household, transport, () => true);
     expect(calls).toBe(0);
-    await run(
-      "user",
-      household,
-      transport,
-      () => {},
-      () => active,
-    );
+    await run("user", household, transport, () => active);
     expect(calls).toBe(1);
     expect(rows()[0].uploaded).toEqual([false, false]);
   });

@@ -33,13 +33,17 @@ export function createQueueRunner(
     owner: string,
     householdId: Id<"households">,
     transport: UploadTransport,
-    changed: () => void,
     active: () => boolean,
   ) => {
     if (running) return;
     running = true;
     try {
-      for (const entry of store.list(owner, householdId)) {
+      for (const snapshot of store.list(owner, householdId)) {
+        const entry = {
+          ...snapshot,
+          images: [...snapshot.images],
+          uploaded: [...snapshot.uploaded],
+        };
         if (!active()) break;
         try {
           entry.error = undefined;
@@ -68,7 +72,6 @@ export function createQueueRunner(
               position,
               durationMs: Date.now() - started,
             });
-            changed();
           }
           if (!active()) return;
           await transport.complete(entry.receiptId, entry);
@@ -82,7 +85,6 @@ export function createQueueRunner(
             cause instanceof Error ? cause.message : "Opplastingen mislyktes.";
           store.update(entry);
         }
-        changed();
       }
     } finally {
       running = false;
