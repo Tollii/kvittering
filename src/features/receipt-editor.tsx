@@ -9,7 +9,8 @@ import {
   View,
 } from "react-native";
 import { router, Stack, useNavigation } from "expo-router";
-import { useConvex, useQuery } from "convex/react";
+import { useConvex } from "convex/react";
+import { useQuery } from "convex-helpers/react/cache";
 import { randomUUID } from "expo-crypto";
 import { api } from "../../convex/_generated/api";
 import {

@@ -12,13 +12,16 @@ import { normalizeSearch, day, catalogDetailsTtl } from "@/lib/catalog/policy";
 import { productSearch } from "@/lib/catalog/search";
 
 export function useDebouncedSearch(search: string) {
-  const [term, setTerm] = useState("");
+  const [term, setTerm] = useState(search);
   useEffect(() => {
     const timeout = setTimeout(() => setTerm(search), 350);
+
     return () => clearTimeout(timeout);
   }, [search]);
+
   return term;
 }
+
 function useCatalogLookup(
   lookup: CatalogLookup,
   enabled: boolean,

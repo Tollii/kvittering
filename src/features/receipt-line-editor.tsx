@@ -3,7 +3,7 @@ import { productSearch } from "@/lib/catalog/search";
 import type { ProductSelection } from "@/lib/domain/product-reference";
 import { useState } from "react";
 import { Pressable, View } from "react-native";
-import { useQuery } from "convex/react";
+import { useQuery } from "convex-helpers/react/cache";
 import { api } from "../../convex/_generated/api";
 import type { Id } from "../../convex/_generated/dataModel";
 import {

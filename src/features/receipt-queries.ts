@@ -1,8 +1,18 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useIsFocused } from "expo-router";
-import { useConvexAuth, usePaginatedQuery } from "convex/react";
+import { useConvexAuth } from "convex/react";
+import { usePaginatedQuery } from "convex-helpers/react/cache";
 import type { FunctionArgs } from "convex/server";
 import { api } from "../../convex/_generated/api";
+
+/** Load on first use, then preserve pagination until the screen unmounts. */
+function useQueryRequested(enabled: boolean) {
+  const [requested, setRequested] = useState(enabled);
+
+  if (enabled && !requested) setRequested(true);
+
+  return enabled || requested;
+}
 
 /** Reports are complete only when every page in their declared scope is loaded. */
 export function useCompleteReceipts(
@@ -11,16 +21,20 @@ export function useCompleteReceipts(
 ) {
   const focused = useIsFocused();
   const { isAuthenticated } = useConvexAuth();
-  const active = focused && enabled && isAuthenticated;
+  const requested = useQueryRequested(enabled);
+  const active = requested && isAuthenticated;
+
   const page = usePaginatedQuery(
     api.receipts.readPage,
     active ? { scope } : "skip",
     { initialNumItems: 50 },
   );
+
   const { status, loadMore } = page;
   useEffect(() => {
-    if (active && status === "CanLoadMore") loadMore(50);
-  }, [active, status, loadMore]);
+    if (active && focused && enabled && status === "CanLoadMore") loadMore(50);
+  }, [active, focused, enabled, status, loadMore]);
+
   return {
     receipts: page.results,
     completeReceipts: active && status === "Exhausted",
@@ -30,8 +44,9 @@ export function useCompleteReceipts(
 export function useReceiptHistory(search: string, enabled: boolean) {
   const focused = useIsFocused();
   const { isAuthenticated } = useConvexAuth();
-  // Keep loaded pages live when a receipt covers the mounted history screen.
-  const active = enabled && isAuthenticated;
+  const requested = useQueryRequested(enabled);
+  const active = requested && isAuthenticated;
+
   const page = usePaginatedQuery(
     api.receipts.history,
     active ? { search } : "skip",
@@ -40,8 +55,15 @@ export function useReceiptHistory(search: string, enabled: boolean) {
   const { status, loadMore } = page;
   // Global substring search scans all pages; the ordinary list loads on demand.
   useEffect(() => {
-    if (active && focused && search.trim() && status === "CanLoadMore")
+    if (
+      active &&
+      focused &&
+      enabled &&
+      search.trim() &&
+      status === "CanLoadMore"
+    )
       loadMore(50);
-  }, [active, focused, search, status, loadMore]);
+  }, [active, focused, enabled, search, status, loadMore]);
+
   return page;
 }
