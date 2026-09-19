@@ -1,5 +1,5 @@
 import { normalizeAlias, type ReceiptLine } from "./receipt";
-import { categoryUncertainIssue } from "./receipt-review";
+import { isCategoryUncertain } from "./receipt-review";
 import { categoryById } from "./categories";
 
 /**
@@ -38,7 +38,7 @@ export function learnableLine(line: ReceiptLine): boolean {
     !!line.categoryId &&
     categoryById.has(line.categoryId) &&
     line.categoryId !== "fallback.unclear" &&
-    !line.issues.includes(categoryUncertainIssue)
+    !line.issues.some(isCategoryUncertain)
   );
 }
 
@@ -54,9 +54,7 @@ export function applyCategoryMemory(
     memory.confirmations < categoryMemoryThreshold
   )
     return false;
-  const issues = line.issues.filter(
-    (issue) => issue !== categoryUncertainIssue,
-  );
+  const issues = line.issues.filter((issue) => !isCategoryUncertain(issue));
   const changed =
     line.categoryId !== memory.categoryId ||
     issues.length !== line.issues.length ||

@@ -23,7 +23,7 @@ Start with 001, 002, 003, and 004. They fix demonstrated state/model defects and
 | [003](simplification-review/003-catalog-cache-completeness.md) | Distinguish a catalog summary from fetched details | P1 | S–M | None | DONE |
 | [004](simplification-review/004-purchase-projection.md) | Use one purchase projection for reports and price signals | P1 | M–L | 002 | DONE |
 | [011](simplification-review/011-capture-import-state.md) | Make shared-file import an explicit operation | P1 | S–M | None | DONE |
-| [005](simplification-review/005-typed-review-assessment.md) | Separate review decisions from displayed sentences | P2 | M | None | TODO |
+| [005](simplification-review/005-typed-review-assessment.md) | Separate review decisions from displayed sentences | P2 | M | None | DONE |
 | [006](simplification-review/006-receipt-write-policy.md) | Give receipt changes one transaction policy | P2 | M | 005 | TODO |
 | [007](simplification-review/007-server-owned-analysis.md) | Complete backend scheduling before removing UI workers | P2 | M | 006 | TODO |
 | [008](simplification-review/008-product-identity-resolution.md) | Resolve purchased product identity once | P2 | L | 002, 006 | TODO |

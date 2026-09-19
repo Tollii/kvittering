@@ -1,13 +1,20 @@
 import {
+  isCategoryUncertain,
+  parseReceiptIssue,
+  receiptIssueText,
+} from "./receipt-issues";
+import {
   emptyLine,
   reconcile,
+  parseReceipt,
+  type ParsedReceipt,
   type ReceiptData,
   type ReceiptLine,
 } from "./receipt";
 import { categoryById } from "./categories";
+export { categoryUncertainIssue, isCategoryUncertain } from "./receipt-issues";
 
 export const categoryReviewThreshold = 0.5;
-export const categoryUncertainIssue = "Kategorien er usikker.";
 
 /** A category decision resolves category uncertainty, not reading or amount errors. */
 export function confirmLineCategory(
@@ -24,7 +31,7 @@ export function confirmLineCategory(
     issues:
       categoryId === "fallback.unclear"
         ? line.issues
-        : line.issues.filter((issue) => issue !== categoryUncertainIssue),
+        : line.issues.filter((issue) => !isCategoryUncertain(issue)),
   };
 }
 
@@ -35,7 +42,7 @@ export function canConfirmSuggestedCategory(line: ReceiptLine): boolean {
     !!line.categoryId &&
     line.categoryId !== "fallback.unclear" &&
     categoryById.has(line.categoryId) &&
-    line.issues.includes(categoryUncertainIssue)
+    line.issues.some(isCategoryUncertain)
   );
 }
 
@@ -52,7 +59,9 @@ export function confirmSuggestedCategories(data: ReceiptData): ReceiptData {
 }
 
 export function lineReviewIssues(line: ReceiptLine): string[] {
-  const issues = [...line.issues];
+  const issues = line.issues.map((issue) =>
+    receiptIssueText(parseReceiptIssue(issue)),
+  );
   if (!["summary", "vat"].includes(line.kind) && line.amountOre === null)
     issues.push("Beløpet mangler.");
   if (line.kind === "product" && !line.name.trim())
@@ -63,7 +72,7 @@ export function lineReviewIssues(line: ReceiptLine): string[] {
 export function receiptReviewIssues(data: ReceiptData): string[] {
   return [
     ...new Set([
-      ...data.issues,
+      ...data.issues.map((issue) => receiptIssueText(parseReceiptIssue(issue))),
       ...reconcile(data).issues,
       ...(!data.store?.trim() ? ["Butikken mangler."] : []),
       ...(!data.lines.some((line) => line.kind === "product")
@@ -116,10 +125,10 @@ export function canAcceptReceipt(
   data: ReceiptData,
   unresolvedDuplicate: boolean,
 ): boolean {
+  const parsed = parseReceipt(data);
   return (
-    !unresolvedDuplicate &&
-    receiptReviewIssues(data).length === 0 &&
-    data.lines.every((line) => lineReviewIssues(line).length === 0)
+    parsed.kind === "parsed" &&
+    assessReceipt(parsed.receipt, unresolvedDuplicate).acceptable
   );
 }
 
@@ -141,10 +150,10 @@ export type ReviewTask =
  * Everything standing between the receipt and approval, grouped the way a
  * person would fix it: receipt facts first, then the affected product lines.
  */
-export function reviewTasks(
-  data: ReceiptData,
+export function assessReceipt(
+  data: ParsedReceipt,
   unresolvedDuplicate: boolean,
-): ReviewTask[] {
+): { acceptable: boolean; tasks: ReviewTask[] } {
   const tasks: ReviewTask[] = [];
   if (unresolvedDuplicate) tasks.push({ kind: "duplicate" });
   if (!data.store?.trim()) tasks.push({ kind: "store" });
@@ -163,9 +172,15 @@ export function reviewTasks(
   const receiptIssues = [
     ...new Set([
       ...data.issues,
-      ...totals.issues.filter(
-        (issue) => issue.includes("rabatt") || issue.includes("pantretur"),
-      ),
+      ...totals.reviewIssues
+        .filter((issue) =>
+          [
+            "duplicate_discount",
+            "positive_discount",
+            "positive_deposit_return",
+          ].includes(issue.code),
+        )
+        .map(receiptIssueText),
     ]),
   ];
   if (receiptIssues.length)
@@ -176,7 +191,7 @@ export function reviewTasks(
   const unclear = counted(
     (line) =>
       line.kind === "product" &&
-      line.issues.includes(categoryUncertainIssue) &&
+      line.issues.some(isCategoryUncertain) &&
       !canConfirmSuggestedCategory(line),
   );
   if (categories + unclear)
@@ -189,10 +204,20 @@ export function reviewTasks(
   const names = counted((line) => line.kind === "product" && !line.name.trim());
   if (names) tasks.push({ kind: "names", count: names });
   const other = counted((line) =>
-    line.issues.some((issue) => issue !== categoryUncertainIssue),
+    line.issues.some((issue) => !isCategoryUncertain(issue)),
   );
   if (other) tasks.push({ kind: "line-issues", count: other });
-  return tasks;
+  return { acceptable: tasks.length === 0, tasks };
+}
+
+export function reviewTasks(
+  data: ReceiptData,
+  unresolvedDuplicate: boolean,
+): ReviewTask[] {
+  const parsed = parseReceipt(data);
+  return parsed.kind === "parsed"
+    ? assessReceipt(parsed.receipt, unresolvedDuplicate).tasks
+    : [{ kind: "receipt-issues", issues: [parsed.issue.message] }];
 }
 
 /** Short, plain-language summary of what a receipt still needs, for lists. */

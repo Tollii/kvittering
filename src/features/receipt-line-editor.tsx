@@ -20,7 +20,7 @@ import { categoryById } from "@/lib/domain/categories";
 import { lineKinds, formatMoney, type ReceiptLine } from "@/lib/domain/receipt";
 import {
   canConfirmSuggestedCategory,
-  categoryUncertainIssue,
+  isCategoryUncertain,
   confirmLineCategory,
   lineReviewIssues,
 } from "@/lib/domain/receipt-review";
@@ -85,10 +85,8 @@ export function ReceiptLineEditor({
 }: Props) {
   const colors = useTheme();
   const issues = lineReviewIssues(line);
-  const categoryUncertain = line.issues.includes(categoryUncertainIssue);
-  const otherIssues = issues.filter(
-    (issue) => issue !== categoryUncertainIssue,
-  );
+  const categoryUncertain = line.issues.some(isCategoryUncertain);
+  const otherIssues = issues.filter((issue) => !isCategoryUncertain(issue));
   const missingAmount =
     line.amountOre === null && !["summary", "vat"].includes(line.kind);
   const missingName = line.kind === "product" && !line.name.trim();
@@ -446,17 +444,17 @@ export function ReceiptLineEditor({
                   kind: kind as ReceiptLine["kind"],
                   categoryId: kind === "product" ? "fallback.unclear" : null,
                   issues: line.issues.filter(
-                    (issue) => issue !== categoryUncertainIssue,
+                    (issue) => !isCategoryUncertain(issue),
                   ),
                 })
               }
             />
           )}
-          {line.issues.some((issue) => issue !== categoryUncertainIssue) && (
+          {line.issues.some((issue) => !isCategoryUncertain(issue)) && (
             <>
               <Notice tone="warning">
                 {line.issues
-                  .filter((issue) => issue !== categoryUncertainIssue)
+                  .filter((issue) => !isCategoryUncertain(issue))
                   .join("\n")}
               </Notice>
               <Button
@@ -467,8 +465,8 @@ export function ReceiptLineEditor({
                 onPress={() => {
                   tapFeedback();
                   patch({
-                    issues: line.issues.filter(
-                      (issue) => issue === categoryUncertainIssue,
+                    issues: line.issues.filter((issue) =>
+                      isCategoryUncertain(issue),
                     ),
                   });
                 }}
@@ -482,7 +480,7 @@ export function ReceiptLineEditor({
       )}
       {!showEditor &&
         review &&
-        line.issues.some((issue) => issue !== categoryUncertainIssue) && (
+        line.issues.some((issue) => !isCategoryUncertain(issue)) && (
           <View style={{ flexDirection: "row", gap: 8 }}>
             <Button
               title="Dette stemmer"
@@ -492,8 +490,8 @@ export function ReceiptLineEditor({
               onPress={() => {
                 tapFeedback();
                 patch({
-                  issues: line.issues.filter(
-                    (issue) => issue === categoryUncertainIssue,
+                  issues: line.issues.filter((issue) =>
+                    isCategoryUncertain(issue),
                   ),
                 });
               }}

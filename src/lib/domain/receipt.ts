@@ -1,3 +1,5 @@
+import { parse as parseValue } from "convex-helpers/validators";
+import { receiptIssueText, type ReceiptIssue } from "./receipt-issues";
 import { v, type Infer } from "convex/values";
 import { categoryById } from "./categories";
 import {
@@ -128,7 +130,26 @@ export function aliasKey(data: ReceiptData, line: ReceiptLine): string | null {
     line.unit,
   ]);
 }
-export function validateReceipt(data: ReceiptData) {
+declare const parsedReceipt: unique symbol;
+export type ParsedReceipt = ReceiptData & { readonly [parsedReceipt]: true };
+export type ReceiptParseOutcome =
+  | { kind: "parsed"; receipt: ParsedReceipt }
+  | { kind: "rejected"; issue: { code: "invalid_receipt"; message: string } };
+export function parseReceipt(input: unknown): ReceiptParseOutcome {
+  try {
+    const data = parseValue(receiptDataValidator, input);
+    return { kind: "parsed", receipt: validateReceipt(structuredClone(data)) };
+  } catch (cause) {
+    return {
+      kind: "rejected",
+      issue: {
+        code: "invalid_receipt",
+        message: cause instanceof Error ? cause.message : "Ugyldig kvittering.",
+      },
+    };
+  }
+}
+export function validateReceipt(data: ReceiptData): ParsedReceipt {
   if (data.lines.length > 300 || data.originalText.length > 60000)
     throw new Error("Kvitteringen er for stor. Del den opp.");
   const ids = new Set<string>();
@@ -166,9 +187,10 @@ export function validateReceipt(data: ReceiptData) {
         data.purchaseDate)
   )
     throw new Error("Ugyldig dato.");
+  return data as ParsedReceipt;
 }
 export function reconcile(data: ReceiptData) {
-  const issues: string[] = [];
+  const reviewIssues: ReceiptIssue[] = [];
   const discountsSeen = new Set<string>();
   let products = 0,
     discounts = 0,
@@ -191,26 +213,27 @@ export function reconcile(data: ReceiptData) {
         line.relatedLineId,
       ]);
       if (discountsSeen.has(key))
-        issues.push("Like rabattlinjer må kontrolleres.");
+        reviewIssues.push({ code: "duplicate_discount" });
       discountsSeen.add(key);
       discounts += line.amountOre;
-      if (line.amountOre > 0) issues.push("En rabatt er positiv.");
+      if (line.amountOre > 0) reviewIssues.push({ code: "positive_discount" });
     }
     if (line.kind === "deposit") deposits += line.amountOre;
     if (line.kind === "deposit_return") {
       returns += line.amountOre;
-      if (line.amountOre > 0) issues.push("En pantretur er positiv.");
+      if (line.amountOre > 0)
+        reviewIssues.push({ code: "positive_deposit_return" });
     }
     if (line.kind === "adjustment") adjustments += line.amountOre;
   }
   const calculated = products + discounts + deposits + returns + adjustments;
-  if (unknown) issues.push(`${unknown} linje(r) mangler beløp.`);
-  if (data.totalOre === null) issues.push("Betalt beløp er ukjent.");
-  if (data.currency !== "NOK") issues.push("Valuta må kontrolleres.");
-  if (!data.purchaseDate) issues.push("Kjøpsdato er ukjent.");
+  if (unknown) reviewIssues.push({ code: "amounts_missing", count: unknown });
+  if (data.totalOre === null) reviewIssues.push({ code: "total_missing" });
+  if (data.currency !== "NOK") reviewIssues.push({ code: "currency" });
+  if (!data.purchaseDate) reviewIssues.push({ code: "date_missing" });
   const difference = data.totalOre === null ? null : calculated - data.totalOre;
   if (difference !== null && difference !== 0)
-    issues.push(`Avvik mot betalt: ${formatMoney(difference)}.`);
+    reviewIssues.push({ code: "difference", amountOre: difference });
   return {
     products,
     discounts,
@@ -221,7 +244,8 @@ export function reconcile(data: ReceiptData) {
     calculated,
     difference,
     unknown,
-    issues,
+    reviewIssues,
+    issues: reviewIssues.map(receiptIssueText),
   };
 }
 /** Allocate receipt discounts in whole øre. Keep unlinked adjustments visible. */

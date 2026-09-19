@@ -1,3 +1,4 @@
+import { categoryUncertainIssue } from "../src/lib/domain/receipt-issues";
 import { v } from "convex/values";
 import { errorDetails } from "../src/lib/diagnostics";
 import { WorkflowManager } from "@convex-dev/workflow";
@@ -80,7 +81,7 @@ export const processReceipt = workflow
             result.confidence < categoryReviewThreshold ||
             result.categoryId === "fallback.unclear"
           )
-            line.issues.push("Kategorien er usikker.");
+            line.issues.push(categoryUncertainIssue);
         }
       }
       stage = "product_matching";

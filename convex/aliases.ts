@@ -17,7 +17,7 @@ import {
 } from "../src/lib/domain/category-memory";
 import {
   canAcceptReceipt,
-  categoryUncertainIssue,
+  isCategoryUncertain,
 } from "../src/lib/domain/receipt-review";
 
 /**
@@ -31,9 +31,7 @@ export function settleLineWithAlias(
   categoryId: string,
 ): boolean {
   const nextCategory = line.manual ? line.categoryId : categoryId;
-  const issues = line.issues.filter(
-    (issue) => issue !== categoryUncertainIssue,
-  );
+  const issues = line.issues.filter((issue) => !isCategoryUncertain(issue));
   const changed =
     line.productKey !== key ||
     line.categoryId !== nextCategory ||

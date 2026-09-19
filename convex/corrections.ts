@@ -12,7 +12,7 @@ import {
   type ReceiptData,
 } from "../src/lib/domain/receipt";
 import {
-  categoryUncertainIssue,
+  isCategoryUncertain,
   confirmLineCategory,
 } from "../src/lib/domain/receipt-review";
 import { correctionTarget } from "../src/lib/domain/corrections";
@@ -46,8 +46,8 @@ export async function recordCorrections(
           : (after.catalogProduct?.key ?? null);
       const confirmed =
         field === "category" &&
-        before.issues.includes(categoryUncertainIssue) &&
-        !after.issues.includes(categoryUncertainIssue);
+        before.issues.some(isCategoryUncertain) &&
+        !after.issues.some(isCategoryUncertain);
       if (previous === expected && !confirmed) continue;
       await ctx.db.insert("corrections", {
         householdId: receipt.householdId,

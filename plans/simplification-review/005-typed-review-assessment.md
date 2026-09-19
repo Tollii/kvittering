@@ -4,7 +4,7 @@
 
 ## Status
 
-- Status: TODO
+- Status: DONE
 - Priority: P2
 - Effort: M
 - Risk: Medium
@@ -197,3 +197,9 @@ validateReceipt at src/lib/domain/receipt.ts:131 throws on invalid amounts, dupl
 ## Maintenance notes
 
 A new review requirement enters the typed assessment and gets one test covering both approval and display.
+
+## Implementation record
+
+Added typed accounting/review issues, a checked receipt parser, and one assessment for tasks and approval. Category decisions use a stable code. The compatibility parser reads the previous stored category sentence; arbitrary provider warnings retain their text. Confirmation removes only the category issue. The correction recorder and extracted editor were included because they consume the same category decision.
+
+Verification: typecheck, lint, all 169 tests, and diff checks passed. Tests cover malformed input, structural parsing versus approval, reader-warning preservation, category confirmation, and unchanged inputs. Existing transactional tests retain human-only category learning. No backend was deployed.

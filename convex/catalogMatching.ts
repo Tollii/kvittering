@@ -1,3 +1,4 @@
+import { isCategoryUncertain } from "../src/lib/domain/receipt-issues";
 import { featureEnabled } from "./releasePolicy";
 import { clientMutation as mutation } from "./clientFunctions";
 import { v } from "convex/values";
@@ -298,12 +299,12 @@ export const apply = internalMutation({
       ) {
         if (
           line.categoryId !== decision.categoryId ||
-          line.issues.includes("Kategorien er usikker.")
+          line.issues.some(isCategoryUncertain)
         ) {
           line.categoryId = decision.categoryId;
           line.confidence = decision.categoryConfidence;
           line.issues = line.issues.filter(
-            (issue) => issue !== "Kategorien er usikker.",
+            (issue) => !isCategoryUncertain(issue),
           );
           changed = true;
         }

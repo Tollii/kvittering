@@ -48,7 +48,7 @@ import {
   balanceWithAdjustment,
   canAcceptReceipt,
   canConfirmSuggestedCategory,
-  categoryUncertainIssue,
+  isCategoryUncertain,
   confirmSuggestedCategories,
   lineReviewIssues,
   reviewTasks,
@@ -757,8 +757,8 @@ export function ReceiptEditor({
                     const categoryDecided =
                       next.kind === "product" &&
                       (next.categoryId !== line.categoryId ||
-                        (line.issues.includes(categoryUncertainIssue) &&
-                          !next.issues.includes(categoryUncertainIssue)));
+                        (line.issues.some(isCategoryUncertain) &&
+                          !next.issues.some(isCategoryUncertain)));
                     if (categoryDecided) rememberLines([line.id]);
                   }}
                   onRemember={(value) => rememberLines([line.id], value)}

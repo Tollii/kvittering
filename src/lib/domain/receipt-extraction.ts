@@ -5,6 +5,7 @@ import {
   osloDate,
   validateReceipt,
   type ReceiptData,
+  type ParsedReceipt,
 } from "./receipt";
 const text = z.string().nullable();
 const number = z.number().nullable();
@@ -69,7 +70,7 @@ export function prepareExtraction(
   extraction: z.infer<typeof extractionSchema>,
   imageCount: number,
   referenceTime = Date.now(),
-): ReceiptData {
+): ParsedReceipt {
   let purchaseDate = extraction.purchaseDate;
   const issues = blockingIssues(extraction.issues);
   if (purchaseDate && /^--\d{2}-\d{2}$/.test(purchaseDate)) {
@@ -122,6 +123,5 @@ export function prepareExtraction(
       },
     ),
   };
-  validateReceipt(data);
-  return data;
+  return validateReceipt(data);
 }

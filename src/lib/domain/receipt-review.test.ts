@@ -190,3 +190,42 @@ it("walks a weekly shop from reading to approval", () => {
   expect(reconcile(balanced).difference).toBe(0);
   expect(balanced.lines.at(-1)?.amountOre).toBe(20);
 });
+
+it("uses stable codes and preserves reader text independently of category confirmation", async () => {
+  const { categoryUncertainIssue } = await import("./receipt-issues");
+  const { parseReceipt } = await import("./receipt");
+  const { assessReceipt } = await import("./receipt-review");
+  const data = batteryFixture();
+  data.lines[0].issues = [categoryUncertainIssue, "Reader wording changed"];
+  const before = structuredClone(data);
+  const parsed = parseReceipt(data);
+  expect(parsed.kind).toBe("parsed");
+  if (parsed.kind !== "parsed") throw new Error("Fixture must parse");
+  expect(assessReceipt(parsed.receipt, false)).toMatchObject({
+    acceptable: false,
+    tasks: [{ kind: "categories" }, { kind: "line-issues" }],
+  });
+  expect(
+    confirmLineCategory(data.lines[0], "drinks.soft-drinks").issues,
+  ).toEqual(["Reader wording changed"]);
+  expect(data).toEqual(before);
+});
+
+it("parses structural invariants separately from approval", async () => {
+  const { parseReceipt } = await import("./receipt");
+  const incomplete = batteryFixture();
+  incomplete.lines[0].amountOre = null;
+  expect(parseReceipt(incomplete).kind).toBe("parsed");
+  expect(canAcceptReceipt(incomplete, false)).toBe(false);
+  expect(parseReceipt({ ...incomplete, totalOre: 0.5 }).kind).toBe("rejected");
+  expect(
+    parseReceipt({
+      ...incomplete,
+      lines: [incomplete.lines[0], incomplete.lines[0]],
+    }).kind,
+  ).toBe("rejected");
+  expect(parseReceipt({ ...incomplete, purchaseDate: "2026-02-30" }).kind).toBe(
+    "rejected",
+  );
+  expect(parseReceipt({ unexpected: true }).kind).toBe("rejected");
+});
