@@ -1,3 +1,11 @@
+import { query, type QueryCtx } from "./_generated/server";
+import { requireCompatibleClient } from "./releasePolicy";
+import { clientValidator } from "../src/lib/releases/policy";
+import { requestKey } from "../src/lib/catalog/policy";
+import {
+  catalogLookupValidator,
+  type CatalogLookup,
+} from "../src/lib/catalog/model";
 import { clientMutation as mutation } from "./clientFunctions";
 import { v } from "convex/values";
 import { requireMember, requireReceipt } from "./access";
@@ -121,5 +129,94 @@ export const product = mutation({
       ...response,
       products: response.products.length ? response.products : [record.product],
     };
+  },
+});
+
+async function lookupContext(
+  ctx: QueryCtx,
+  lookup: CatalogLookup,
+) {
+  if (lookup.kind === "stores") {
+    const { receipt } = await requireReceipt(ctx, lookup.receiptId);
+    return {
+      request: {
+        kind: "stores" as const,
+        search: lookup.search,
+        chain: retailerCode(receipt.data?.store ?? null) ?? undefined,
+      },
+      record: null,
+    };
+  }
+  await requireMember(ctx);
+  if (lookup.kind === "products") return { request: lookup, record: null };
+  const record = await ctx.db
+    .query("catalogProducts")
+    .withIndex("by_key", (q) => q.eq("key", lookup.productKey))
+    .unique();
+  return {
+    request: record
+      ? {
+          ...lookup,
+          id: record.product.ids[0],
+          ...(lookup.kind === "prices" ? { ean: record.product.ean } : {}),
+        }
+      : null,
+    record,
+  };
+}
+export const ensure = mutation({
+  service: "productLookup",
+  args: { lookup: catalogLookupValidator },
+  returns: v.null(),
+  handler: async (ctx, { lookup }) => {
+    const { request, record } = await lookupContext(ctx, lookup);
+    if (!request) return null;
+    if (
+      lookup.kind === "details" &&
+      record?.detailsFetchedAt !== undefined &&
+      record.detailsFetchedAt + catalogDetailsTtl > Date.now()
+    )
+      return null;
+    await ensureRequest(ctx, request);
+    return null;
+  },
+});
+export const observe = query({
+  args: { lookup: catalogLookupValidator, client: clientValidator.optional() },
+  returns: catalogResponseValidator,
+  handler: async (ctx, { lookup, client }) => {
+    await requireCompatibleClient(ctx, client, "productLookup");
+    const { request, record } = await lookupContext(ctx, lookup);
+    if (!request)
+      return {
+        ...emptyCatalogResult(),
+        status: "error" as const,
+        message: "Produktet finnes ikke i den lagrede katalogen.",
+      };
+    if (
+      lookup.kind === "details" &&
+      record?.detailsFetchedAt !== undefined &&
+      record.detailsFetchedAt + catalogDetailsTtl > Date.now()
+    )
+      return {
+        ...emptyCatalogResult(),
+        products: [record.product],
+        status: "ready" as const,
+        fetchedAt: record.detailsFetchedAt,
+      };
+    const row = await ctx.db
+      .query("catalogRequests")
+      .withIndex("by_key", (q) => q.eq("key", requestKey(request)))
+      .unique();
+    const response: CatalogResponse = row
+      ? requestResponse(row)
+      : {
+          ...emptyCatalogResult(),
+          status: "error",
+          message: "Søket er ikke startet. Prøv igjen.",
+        };
+    return lookup.kind === "details" && record && !response.products.length
+      ? { ...response, products: [record.product] }
+      : response;
   },
 });

@@ -30,7 +30,7 @@ Start with 001, 002, 003, and 004. They fix demonstrated state/model defects and
 | [009](simplification-review/009-batched-product-analysis.md) | Batch independent Jev analysis questions | P2 | M | 002 | DONE |
 | [010](simplification-review/010-local-receipt-store.md) | Expose stable local receipt snapshots | P2 | M | None | DONE |
 | [015](simplification-review/015-application-lifecycle-cache.md) | Give query lifecycle and cache removal explicit owners | P2 | S–M | None | DONE |
-| [017](simplification-review/017-catalog-request-observation.md) | Observe catalog completion without polling mutations | P2 | M | 003, 015 | TODO |
+| [017](simplification-review/017-catalog-request-observation.md) | Observe catalog completion without polling mutations | P2 | M | 003, 015 | DONE |
 | [012](simplification-review/012-receipt-read-boundaries.md) | Load receipt data where it is needed | P2 | M | 004, 007 | TODO |
 | [018](simplification-review/018-bounded-background-reads.md) | Replace arbitrary history limits with complete bounded reads | P2 | M–L | 004, 012 | TODO |
 | [016](simplification-review/016-spending-report-selection.md) | Keep report selections linked to current data | P2 | S–M | 004, 012 | TODO |

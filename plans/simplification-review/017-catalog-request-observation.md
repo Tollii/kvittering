@@ -4,7 +4,7 @@
 
 ## Status
 
-- Status: TODO
+- Status: DONE
 - Priority: P2
 - Effort: M
 - Change risk: Medium
@@ -188,3 +188,9 @@ Use the operator's chosen checkout. If a new branch is requested, use refactor/c
 ## Maintenance
 
 Keep the read/write distinction and completeness guarantee in the public contract. Review query scope when a consumer gains another period, filter, or evidence requirement. Record actual measurements before claiming cost savings.
+
+## Implementation record
+
+Added explicit ensure and scoped read-only observation contracts. New hooks have no polling timer and retain terminal data in TanStack Query; pending lookups subscribe until completion. Old mutation endpoints remain as installed-client adapters. Household searches use settled normalized input. All 189 tests pass, including no-write observation and receipt ownership checks. A controlled native 429 trace remains unverified.
+
+Validation: `npm run typecheck`, `npm run lint`, `npm test`, and `git diff --check` passed. No deployment was performed.

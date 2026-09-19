@@ -77,3 +77,16 @@ export function catalogIdentity(product: CatalogProduct): CatalogIdentity {
   const { key, ean, name, brand, image, weight, weightUnit } = product;
   return { key, ean, name, brand, image, weight, weightUnit };
 }
+
+/** Public lookup arguments omit provider IDs and receipt-owned store context. */
+export const catalogLookupValidator = v.union(
+  v.object({ kind: v.literal("products"), search: v.string() }),
+  v.object({
+    kind: v.literal("stores"),
+    search: v.string(),
+    receiptId: v.id("receipts"),
+  }),
+  v.object({ kind: v.literal("details"), productKey: v.string() }),
+  v.object({ kind: v.literal("prices"), productKey: v.string() }),
+);
+export type CatalogLookup = Infer<typeof catalogLookupValidator>;

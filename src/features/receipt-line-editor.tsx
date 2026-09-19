@@ -1,3 +1,5 @@
+import { useDebouncedSearch } from "./catalog-queries";
+import { productSearch } from "@/lib/catalog/search";
 import type { ProductSelection } from "@/lib/domain/product-reference";
 import { useState } from "react";
 import { Pressable, View } from "react-native";
@@ -527,10 +529,11 @@ function ProductSelector({
   onChange: (value: ProductChoice) => void;
 }) {
   const [search, setSearch] = useState("");
+  const term = useDebouncedSearch(productSearch(search));
   const products = useQuery(api.products.search, {
     receiptId,
     retailer,
-    search,
+    search: term,
   });
   return (
     <Panel tone="plain">

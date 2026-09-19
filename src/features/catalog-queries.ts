@@ -1,72 +1,85 @@
 import { releaseMutation } from "@/lib/releases/requests";
+import { installedRelease } from "@/lib/releases/client";
 import { useReleasePolicy } from "./release-policy";
-import { useEffect, useState } from "react";
-import { useQuery } from "@tanstack/react-query";
-import { useConvex } from "convex/react";
+import { useEffect, useMemo, useState } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useConvex, useQuery as useConvexQuery } from "convex/react";
 import { api } from "../../convex/_generated/api";
 import type { Id } from "../../convex/_generated/dataModel";
+import type { CatalogLookup } from "@/lib/catalog/model";
 import { normalizeSearch, day, catalogDetailsTtl } from "@/lib/catalog/policy";
 import { productSearch } from "@/lib/catalog/search";
 
-export function useCatalogSearch(search: string, receiptId?: Id<"receipts">) {
-  const convex = useConvex();
-  const { policy, blocked } = useReleasePolicy();
+export function useDebouncedSearch(search: string) {
   const [term, setTerm] = useState("");
   useEffect(() => {
-    const timeout = setTimeout(
-      () =>
-        setTerm(receiptId ? normalizeSearch(search) : productSearch(search)),
-      350,
-    );
+    const timeout = setTimeout(() => setTerm(search), 350);
     return () => clearTimeout(timeout);
-  }, [search, receiptId]);
-  return useQuery({
-    queryKey: [
-      "catalog",
-      receiptId ? "stores" : "products",
-      receiptId ?? null,
-      term,
-    ],
-    queryFn: () =>
-      receiptId
-        ? releaseMutation(convex, api.catalog.searchStores, {
-            receiptId,
-            search: term,
-          })
-        : releaseMutation(convex, api.catalog.searchProducts, { search: term }),
-    enabled:
-      !blocked &&
-      policy.features.productLookup &&
-      term.length >= 3 &&
-      term.length <= 120,
-    staleTime: (query) => (query.state.data?.status === "error" ? 60000 : day),
-    refetchInterval: (query) =>
-      query.state.data?.status === "pending" ? 2000 : false,
+  }, [search]);
+  return term;
+}
+function useCatalogLookup(
+  lookup: CatalogLookup,
+  enabled: boolean,
+  lifetime: number,
+) {
+  const convex = useConvex();
+  const cache = useQueryClient();
+  const { policy, blocked } = useReleasePolicy();
+  const allowed = enabled && !blocked && policy.features.productLookup;
+  const encoded = JSON.stringify(lookup);
+  const queryKey = useMemo(() => ["catalog", "lookup", encoded], [encoded]);
+  const result = useQuery({
+    queryKey,
+    queryFn: async () => {
+      await releaseMutation(convex, api.catalog.ensure, { lookup });
+      return convex.query(api.catalog.observe, {
+        lookup,
+        client: installedRelease,
+      });
+    },
+    enabled: allowed,
+    staleTime: (query) =>
+      query.state.data?.status === "pending"
+        ? Infinity
+        : query.state.data?.status === "error"
+          ? 60000
+          : lifetime,
   });
+  const observed = useConvexQuery(
+    api.catalog.observe,
+    allowed && result.data?.status === "pending"
+      ? { lookup, client: installedRelease }
+      : "skip",
+  );
+  useEffect(() => {
+    if (observed) cache.setQueryData(queryKey, observed);
+  }, [cache, queryKey, observed]);
+  return result;
+}
+export function useCatalogSearch(search: string, receiptId?: Id<"receipts">) {
+  const term = useDebouncedSearch(
+    receiptId ? normalizeSearch(search) : productSearch(search),
+  );
+  return useCatalogLookup(
+    receiptId
+      ? { kind: "stores", receiptId, search: term }
+      : { kind: "products", search: term },
+    term.length >= 3 && term.length <= 120,
+    day,
+  );
 }
 export function useCatalogProduct(key: string) {
-  const convex = useConvex();
-  const { policy, blocked } = useReleasePolicy();
-  return useQuery({
-    queryKey: ["catalog", "product", key],
-    enabled: !blocked && policy.features.productLookup,
-    queryFn: () => releaseMutation(convex, api.catalog.product, { key }),
-    staleTime: (query) =>
-      query.state.data?.status === "error" ? 60000 : catalogDetailsTtl,
-    refetchInterval: (query) =>
-      query.state.data?.status === "pending" ? 2000 : false,
-  });
+  return useCatalogLookup(
+    { kind: "details", productKey: key },
+    true,
+    catalogDetailsTtl,
+  );
 }
 export function useCatalogPrices(key: string, enabled: boolean) {
-  const convex = useConvex();
-  const { policy, blocked } = useReleasePolicy();
-  return useQuery({
-    queryKey: ["catalog", "prices", key],
-    queryFn: () =>
-      releaseMutation(convex, api.catalog.prices, { productKey: key }),
-    enabled: enabled && !blocked && policy.features.productLookup,
-    staleTime: day / 4,
-    refetchInterval: (query) =>
-      query.state.data?.status === "pending" ? 2000 : false,
-  });
+  return useCatalogLookup(
+    { kind: "prices", productKey: key },
+    enabled,
+    day / 4,
+  );
 }

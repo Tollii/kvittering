@@ -317,3 +317,47 @@ it("merges summary fields without erasing rich detail data or mutating inputs", 
     mergeCatalogProduct(previous, { kind: "details", product: summary }, 100),
   ).toMatchObject({ detailsFetchedAt: 100, product: { nutrition: [] } });
 });
+
+it("observes delayed catalog completion without queuing more work", async () => {
+  const { t, first } = await setup();
+  const lookup = { kind: "products" as const, search: "Stratos" };
+  await first.mutation(api.catalog.ensure, { lookup });
+  const initial = await t.run((ctx) =>
+    ctx.db.query("catalogRequests").collect(),
+  );
+  expect(await first.query(api.catalog.observe, { lookup })).toMatchObject({
+    status: "pending",
+  });
+  expect(await first.query(api.catalog.observe, { lookup })).toMatchObject({
+    status: "pending",
+  });
+  expect(
+    await t.run((ctx) => ctx.db.query("catalogRequests").collect()),
+  ).toEqual(initial);
+  await t.run((ctx) =>
+    ctx.db.patch("catalogRequests", initial[0]._id, {
+      state: "ready",
+      fetchedAt: Date.now(),
+      expiresAt: Date.now() + 10000,
+    }),
+  );
+  expect(await first.query(api.catalog.observe, { lookup })).toMatchObject({
+    status: "ready",
+  });
+  await expect(t.query(api.catalog.observe, { lookup })).rejects.toThrow(
+    "Logg inn",
+  );
+});
+it("keeps receipt-owned store observation inside its household", async () => {
+  const { first, other, householdId } = await setup();
+  const receiptId = await first.mutation(api.receipts.reserve, {
+    householdId,
+    clientId: "store-observation-001",
+    imageCount: 1,
+  });
+  await expect(
+    other.query(api.catalog.observe, {
+      lookup: { kind: "stores", receiptId, search: "Oslo" },
+    }),
+  ).rejects.toThrow("ikke tilgjengelig");
+});
