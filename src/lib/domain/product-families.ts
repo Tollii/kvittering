@@ -99,7 +99,9 @@ export function productProfileKey(line: ReceiptLine) {
       brand: line.brand,
       packageSize: line.packageSize,
       packageUnit: line.packageUnit,
-      attributes: [...line.attributes].sort(),
+      attributes: [...line.attributes].sort((left, right) =>
+        left < right ? -1 : left > right ? 1 : 0,
+      ),
       categoryId: line.categoryId,
       sellingUnit: line.unit,
     },

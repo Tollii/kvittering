@@ -19,7 +19,7 @@ import type {
   MatchingLine,
 } from "@/lib/domain/product-linking";
 
-function ProductImage({ product }: { product: CatalogProduct }) {
+function ProductImage({ product }: Readonly<{ product: CatalogProduct }>) {
   const [index, setIndex] = useState(0);
   const sources = catalogImageSources(product);
 
@@ -54,12 +54,12 @@ export function ProductLinkingOptions({
   line,
   disabled,
   onSelect,
-}: {
+}: Readonly<{
   receiptId: MatchingReceipt["receiptId"];
   line: MatchingLine;
   disabled: boolean;
   onSelect: (product: CatalogProduct) => void;
-}) {
+}>) {
   const colors = useTheme();
   const allowed = useFeatureFlag("productLookup");
 
@@ -110,8 +110,7 @@ export function ProductLinkingOptions({
   const pending =
     saved === undefined ||
     (allowed &&
-      ((saved !== undefined &&
-        saved.length < 4 &&
+      ((saved.length < 4 &&
         name.trim().length >= 3 &&
         !search.data &&
         !search.isError) ||

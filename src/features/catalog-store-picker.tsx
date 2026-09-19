@@ -10,12 +10,12 @@ export function CatalogStorePicker({
   name,
   onSelect,
   onClose,
-}: {
+}: Readonly<{
   receiptId: Id<"receipts">;
   name: string;
   onSelect: (store: PhysicalStore | null) => void;
   onClose: () => void;
-}) {
+}>) {
   const [search, setSearch] = useState(name);
   const productLookup = useFeatureFlag("productLookup");
   const query = useCatalogSearch(search, { kind: "stores", receiptId });

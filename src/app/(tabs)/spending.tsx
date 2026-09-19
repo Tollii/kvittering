@@ -360,7 +360,7 @@ export default function Spending() {
                 >
                   {whole}
                 </Copy>
-                {fraction !== undefined && (
+                {!!fraction && (
                   <Copy
                     size={22}
                     weight="700"

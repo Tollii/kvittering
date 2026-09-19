@@ -173,7 +173,6 @@ export const set = internalMutation({
         channel,
       );
 
-      void _features;
       await ctx.db.insert("releasePolicies", { ...policy, revision: 1 });
     }
 

@@ -8,12 +8,12 @@ export function Select<Value extends string>({
   value,
   options,
   onChange,
-}: {
+}: Readonly<{
   label: string;
   value: Value | null;
   options: { value: Value; label: string }[];
   onChange: (value: Value) => void;
-}) {
+}>) {
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState("");
 

@@ -46,7 +46,7 @@ export function CategoryPicker({
   onRemember,
   onSelect,
   onClose,
-}: {
+}: Readonly<{
   name: string;
   value: string | null;
   /** The reader's confidence in the current suggestion, 0–1. */
@@ -59,7 +59,7 @@ export function CategoryPicker({
   onRemember: (value: boolean) => void;
   onSelect: (value: string) => void;
   onClose: () => void;
-}) {
+}>) {
   const colors = useTheme();
   const [search, setSearch] = useState("");
   const [group, setGroup] = useState<string | null>(null);

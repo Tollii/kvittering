@@ -17,7 +17,7 @@ import {
 import { Mosaic } from "@/components/mosaic";
 import { useTheme } from "@/constants/theme";
 
-function Brand({ tagline }: { tagline: string }) {
+function Brand({ tagline }: Readonly<{ tagline: string }>) {
   const colors = useTheme();
 
   return (

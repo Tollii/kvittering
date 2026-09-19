@@ -342,7 +342,9 @@ async function writeProfile(
     const familyKey = JSON.stringify([
       productSearch(name),
       productSearch(line.catalogProduct?.brand ?? line.brand ?? ""),
-      [...line.attributes].sort(),
+      [...line.attributes].sort((left, right) =>
+        left < right ? -1 : left > right ? 1 : 0,
+      ),
     ]);
 
     const existing = await ctx.db

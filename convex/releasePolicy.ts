@@ -58,8 +58,6 @@ export async function readPolicy(
       features: legacyFeatures(flags.values),
     };
   const { _id, _creationTime, ...policy } = row;
-  void _id;
-  void _creationTime;
 
   return { ...policy, features: legacyFeatures(flags.values) };
 }
@@ -139,12 +137,8 @@ export const getVersions = query({
     const { features: _features, ...policy } =
       row ?? defaultPolicy(platform, channel);
 
-    void _features;
-
     if ("_id" in policy) {
       const { _id, _creationTime, ...version } = policy;
-      void _id;
-      void _creationTime;
 
       return version;
     }
@@ -204,7 +198,6 @@ export const configure = internalMutation({
       args.reason,
     );
     const { features: _features, ...versionPolicy } = policy;
-    void _features;
 
     if (row) await ctx.db.replace("releasePolicies", row._id, versionPolicy);
     else await ctx.db.insert("releasePolicies", versionPolicy);

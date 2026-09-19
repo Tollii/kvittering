@@ -40,7 +40,7 @@ function descriptor(product: CatalogProduct) {
         .split(/[^\p{L}\p{N}]+/u)
         .filter(Boolean),
     ),
-  ].sort();
+  ].sort((left, right) => (left < right ? -1 : left > right ? 1 : 0));
 
   return {
     product,
@@ -145,7 +145,9 @@ export function groupCatalogProducts(
         key: `equivalent:${key}`,
         equivalence: {
           representativeKey: representative.key,
-          candidateKeys: members.map((product) => product.key).sort(),
+          candidateKeys: members
+            .map((product) => product.key)
+            .sort((left, right) => (left < right ? -1 : left > right ? 1 : 0)),
         },
       };
     }),

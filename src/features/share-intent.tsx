@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import { useEffect } from "react";
 import { router } from "expo-router";
 import { ShareIntentProvider, useShareIntentContext } from "expo-share-intent";
@@ -30,7 +31,9 @@ export function ShareIntentRouting() {
   return null;
 }
 
-export function ShareIntentRoot({ children }: { children: React.ReactNode }) {
+export function ShareIntentRoot({
+  children,
+}: Readonly<{ children: ReactNode }>) {
   return (
     <ShareIntentProvider options={{ resetOnBackground: false }}>
       {children}

@@ -9,7 +9,7 @@ const httpBreadcrumbSchema = z.object({
 
 /** Keep the failure explanation, but remove credentials, URL parameters and payload dumps. */
 export function diagnosticText(value: string) {
-  return value
+  const text = value
     .replace(/https?:\/\/[^\s<>"')]+/gi, (url) => {
       try {
         const parsed = new URL(url);
@@ -25,15 +25,26 @@ export function diagnosticText(value: string) {
     .replace(/\beyJ[\w-]+\.[\w-]+\.[\w-]+\b/g, "[Filtered]")
     .replace(/\b[\w.+-]+@[\w.-]+\.[A-Za-z]{2,}\b/g, "[Filtered]")
     .replace(
+      // eslint-disable-next-line sonarjs/regex-complexity -- One credential pattern must consume quoted values with spaces before unquoted values.
       /\b(authorization|cookie|password|token|secret|api[_-]?key)\s*[:=]\s*(?:"[^"]*"|'[^']*'|[^\s,;]+)/gi,
       "$1=[Filtered]",
     )
     .replace(
       /\b(Arguments|Args|Request body|Response body|Object):[\s\S]*/gi,
       "$1: [Filtered]",
-    )
-    .replace(/\{[\s\S]*\}/g, "[Filtered payload]")
-    .slice(0, 2000);
+    );
+
+  const firstBrace = text.indexOf("{");
+  const lastBrace = text.lastIndexOf("}");
+
+  const filtered =
+    firstBrace >= 0 && lastBrace > firstBrace
+      ? text.slice(0, firstBrace) +
+        "[Filtered payload]" +
+        text.slice(lastBrace + 1)
+      : text;
+
+  return filtered.slice(0, 2000);
 }
 
 /** HTTP breadcrumbs retain method, endpoint and status, never bodies or query parameters. */

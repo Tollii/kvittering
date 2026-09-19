@@ -128,7 +128,7 @@ it("duplicate processing commits once and preserves all manual edits during repr
 
   await t.mutation(internal.processing.finish, args);
   await t.mutation(internal.processing.finish, args);
-  let detail = (await first.query(api.receipts.detail, { id }))!;
+
   expect(
     await t.run((ctx) =>
       ctx.db
@@ -158,7 +158,7 @@ it("duplicate processing commits once and preserves all manual edits during repr
     data: batteryFixture(),
     original: batteryFixture(),
   });
-  detail = (await first.query(api.receipts.detail, { id }))!;
+  const detail = (await first.query(api.receipts.detail, { id }))!;
   expect(detail.receipt.data?.lines[0].name).toBe("Corrected product");
   expect(detail.receipt.data?.lines).toHaveLength(2);
   expect(
@@ -584,9 +584,6 @@ it("pages narrow history summaries and includes imported older purchases in comp
       templateId,
     ))!;
 
-    void _id;
-    void _creationTime;
-
     for (let index = 0; index < 65; index++) {
       const data = batteryFixture();
       data.purchaseDate = index === 64 ? "2020-01-02" : "2026-09-01";
@@ -663,9 +660,6 @@ it("finds a dated duplicate beyond the former insertion-order limit", async () =
       "receipts",
       originalId,
     ))!;
-
-    void _id;
-    void _creationTime;
 
     for (let index = 0; index < 251; index++)
       await ctx.db.insert("receipts", {

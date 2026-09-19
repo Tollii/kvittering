@@ -7,7 +7,7 @@ import { formatMoney } from "@/lib/domain/receipt";
 import type { StoreMapProps } from "./store-map";
 import type { StoreLocation } from "@/lib/domain/store-spending";
 
-export function StoreMap({ stores, onSelect }: StoreMapProps) {
+export function StoreMap({ stores, onSelect }: Readonly<StoreMapProps>) {
   const colors = useTheme();
   const map = useRef<MapView>(null);
   const [ready, setReady] = useState(false);

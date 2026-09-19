@@ -19,7 +19,7 @@ export function IconButton({
   filled = false,
   size = 22,
   color,
-}: {
+}: Readonly<{
   name: SymbolViewProps["name"];
   label: string;
   onPress: () => void;
@@ -28,7 +28,7 @@ export function IconButton({
   filled?: boolean | string;
   size?: number;
   color?: string;
-}) {
+}>) {
   const colors = useTheme();
 
   return (
@@ -65,7 +65,7 @@ export function Button({
   busy = false,
   compact = false,
   icon,
-}: {
+}: Readonly<{
   title: string;
   onPress: () => void;
   secondary?: boolean;
@@ -76,7 +76,7 @@ export function Button({
   busy?: boolean;
   compact?: boolean;
   icon?: SymbolViewProps["name"];
-}) {
+}>) {
   const colors = useTheme();
 
   const foreground = danger
@@ -141,7 +141,7 @@ export function Chip({
   onPress,
   accessibilityLabel,
   trailing = "chevron",
-}: {
+}: Readonly<{
   label: string;
   icon?: SymbolViewProps["name"];
   tone?: "muted" | "primary" | "warning" | "success" | "accent";
@@ -149,7 +149,7 @@ export function Chip({
   accessibilityLabel?: string;
   /** Dropdown-style chips show a chevron; action chips do not. */
   trailing?: "chevron" | "none";
-}) {
+}>) {
   const colors = useTheme();
 
   const palette = {
@@ -260,13 +260,13 @@ export function Toggle({
   value,
   onChange,
   disabled,
-}: {
+}: Readonly<{
   label: string;
   detail?: string;
   value: boolean;
   onChange: (value: boolean) => void;
   disabled?: boolean;
-}) {
+}>) {
   const colors = useTheme();
 
   return (
@@ -294,11 +294,11 @@ export function Segments<T extends string>({
   value,
   options,
   onChange,
-}: {
+}: Readonly<{
   value: T;
   options: readonly { value: T; label: string }[];
   onChange: (value: T) => void;
-}) {
+}>) {
   const colors = useTheme();
 
   return (

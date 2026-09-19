@@ -92,7 +92,7 @@ export function ReceiptLineEditor({
   onProduct,
   onRemove,
   onMoneyError,
-}: Props) {
+}: Readonly<Props>) {
   const colors = useTheme();
   const issues = lineReviewIssues(line);
   const categoryUncertain = line.issues.some(isCategoryUncertain);
@@ -125,6 +125,12 @@ export function ReceiptLineEditor({
 
   const category = categoryById.get(line.categoryId ?? "");
   const categoryLabel = category?.name ?? "Velg kategori";
+
+  const confidenceLabel =
+    line.confidence != null
+      ? `, ${Math.round(line.confidence * 100)} prosent sikker`
+      : "";
+
   const showEditor = expanded || (review && (missingAmount || missingName));
 
   const kindLabel =
@@ -209,7 +215,7 @@ export function ReceiptLineEditor({
                 }
                 icon="tag"
                 tone="warning"
-                accessibilityLabel={`Forslag: ${categoryLabel}${line.confidence != null ? `, ${Math.round(line.confidence * 100)} prosent sikker` : ""}. Trykk for å velge en annen kategori`}
+                accessibilityLabel={`Forslag: ${categoryLabel}${confidenceLabel}. Trykk for å velge en annen kategori`}
                 onPress={() => setCategoryOpen(true)}
               />
               <Pressable
@@ -539,13 +545,13 @@ function ProductSelector({
   line,
   choice,
   onChange,
-}: {
+}: Readonly<{
   receiptId: Id<"receipts">;
   retailer: string;
   line: ReceiptLine;
   choice?: ProductChoice;
   onChange: (value: ProductChoice) => void;
-}) {
+}>) {
   const [search, setSearch] = useState("");
   const term = useDebouncedSearch(productSearch(search));
 

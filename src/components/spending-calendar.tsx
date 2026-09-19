@@ -13,12 +13,12 @@ export function SpendingCalendar({
   month,
   reviewedOnly,
   onSelect,
-}: {
+}: Readonly<{
   receipts: Receipt[];
   month: string;
   reviewedOnly: boolean;
   onSelect: (group: SpendingGroup) => void;
-}) {
+}>) {
   const colors = useTheme();
 
   const days = spendingCalendar(

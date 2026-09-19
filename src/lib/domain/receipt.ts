@@ -520,7 +520,7 @@ export function classificationInputs(
         name: line.name,
         relatedProductDescriptions: data.lines.flatMap((other) =>
           other.relatedLineId === line.id && other.kind === "item_discount"
-            ? [other.name.replace(/\d+(?:[.,]\d+)?\s*%/g, "").trim()]
+            ? [other.name.replace(/(?<![\d.,])\d+(?:[.,]\d+)?\s*%/g, "").trim()]
             : [],
         ),
       };

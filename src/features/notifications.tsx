@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { AppState, Linking, Platform } from "react-native";
 import * as Notifications from "expo-notifications";
 import * as SecureStore from "expo-secure-store";
-import Constants from "expo-constants";
+import Constants, { ExecutionEnvironment } from "expo-constants";
 import * as Device from "expo-device";
 import { router } from "expo-router";
 import { useConvex, useQuery, type ConvexReactClient } from "convex/react";
@@ -49,7 +49,9 @@ export function NotificationSettings() {
     Constants.easConfig?.projectId;
 
   const available =
-    Device.isDevice && !!projectId && Constants.appOwnership !== "expo";
+    Device.isDevice &&
+    !!projectId &&
+    Constants.executionEnvironment !== ExecutionEnvironment.StoreClient;
 
   useEffect(() => {
     const refresh = async () => {
@@ -155,7 +157,7 @@ export function NotificationRouting() {
 
       if (data.route === "/spending") {
         router.navigate("/spending");
-        await Notifications.clearLastNotificationResponseAsync();
+        Notifications.clearLastNotificationResponse();
 
         return;
       }
@@ -179,13 +181,15 @@ export function NotificationRouting() {
             "Kvitteringen i varselet er ikke tilgjengelig for denne kontoen.",
           );
       } finally {
-        await Notifications.clearLastNotificationResponseAsync();
+        Notifications.clearLastNotificationResponse();
       }
     }
 
-    void Notifications.getLastNotificationResponseAsync()
-      .then(open)
-      .catch(() => {});
+    try {
+      void open(Notifications.getLastNotificationResponse()).catch(() => {});
+    } catch {
+      // A launch response is optional; the listener still handles later notifications.
+    }
 
     const subscription = Notifications.addNotificationResponseReceivedListener(
       (response) => void open(response),

@@ -25,7 +25,7 @@ export function Screen({
   insetTop = true,
   footer,
   headerRight,
-}: {
+}: Readonly<{
   children: ReactNode;
   title?: string;
   subtitle?: string;
@@ -33,7 +33,7 @@ export function Screen({
   insetTop?: boolean;
   footer?: ReactNode;
   headerRight?: ReactNode;
-}) {
+}>) {
   const colors = useTheme();
   const insets = useSafeAreaInsets();
 
@@ -135,14 +135,14 @@ export function Sheet({
   children,
   header,
   footer,
-}: {
+}: Readonly<{
   title: string;
   visible: boolean;
   onClose: () => void;
   children: ReactNode;
   header?: ReactNode;
   footer?: ReactNode;
-}) {
+}>) {
   const colors = useTheme();
 
   return (

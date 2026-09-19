@@ -38,18 +38,21 @@ export function openReceipt(receipt: Receipt) {
 export function ReceiptCard({
   receipt,
   compact = false,
-}: {
+}: Readonly<{
   receipt: Receipt;
   compact?: boolean;
-}) {
+}>) {
   const colors = useTheme();
   const busy = ["uploading", "uploaded", "processing"].includes(receipt.status);
   const needs = receipt.status === "needs_review" ? receiptNeeds(receipt) : [];
 
+  const reviewLabel = needs.length ? `. ${needs.join(", ")}` : "";
+  const remainingLabel = needs.length > 3 ? ` · +${needs.length - 3}` : "";
+
   return (
     <Pressable
       accessibilityRole="button"
-      accessibilityLabel={`${receipt.data?.store || "Ny kvittering"}, ${formatMoney(receipt.data?.totalOre ?? null)}, ${receiptStatusLabel(receipt)}${needs.length ? `. ${needs.join(", ")}` : ""}`}
+      accessibilityLabel={`${receipt.data?.store || "Ny kvittering"}, ${formatMoney(receipt.data?.totalOre ?? null)}, ${receiptStatusLabel(receipt)}${reviewLabel}`}
       onPress={() => openReceipt(receipt)}
       style={(state) => [
         {
@@ -102,7 +105,7 @@ export function ReceiptCard({
               {receiptStatusLabel(receipt)}
             </Copy>
             {needs.length > 0
-              ? ` · ${needs.slice(0, 3).join(" · ")}${needs.length > 3 ? ` · +${needs.length - 3}` : ""}`
+              ? ` · ${needs.slice(0, 3).join(" · ")}${remainingLabel}`
               : ""}
           </Copy>
         )}

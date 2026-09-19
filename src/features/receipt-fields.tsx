@@ -25,7 +25,7 @@ export function ReceiptFields({
   onChange,
   onMoneyError,
   onClose,
-}: {
+}: Readonly<{
   visible: boolean;
   receiptId: Id<"receipts">;
   onPhysicalStore: (store: PhysicalStore | null) => void;
@@ -33,7 +33,7 @@ export function ReceiptFields({
   onChange: (value: ReceiptData) => void;
   onMoneyError: (value: string | null) => void;
   onClose: () => void;
-}) {
+}>) {
   const [showDate, setShowDate] = useState(false);
   const [totalError, setTotalError] = useState<string | null>(null);
   const [storePicker, setStorePicker] = useState(false);
@@ -114,7 +114,8 @@ export function ReceiptFields({
             display={Platform.OS === "ios" ? "inline" : "default"}
             locale="nb-NO"
             maximumDate={new Date()}
-            onChange={(_event, date) => {
+            onDismiss={() => setShowDate(false)}
+            onValueChange={(_event, date) => {
               if (Platform.OS !== "ios") setShowDate(false);
 
               if (date)

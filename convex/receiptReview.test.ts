@@ -74,8 +74,12 @@ it("keeps unresolved extraction issues, mismatches, duplicates and mock results 
       });
     }
 
-    expect((await user.query(api.receipts.detail, { id }))!.receipt.status).toBe(
-      scenario === "issue" || scenario === "clean" ? "reviewed" : "needs_review",
+    expect(
+      (await user.query(api.receipts.detail, { id }))!.receipt.status,
+    ).toBe(
+      scenario === "issue" || scenario === "clean"
+        ? "reviewed"
+        : "needs_review",
     );
     previousId = id;
   }
@@ -164,9 +168,9 @@ it("rejects stale commits without data or history changes and returns a small sa
       }),
     ),
   ).rejects.toThrow("endret");
-  expect(
-    (await t.run((ctx) => ctx.db.query("revisions").take(10))).length,
-  ).toBe(1);
+  expect(await t.run((ctx) => ctx.db.query("revisions").take(10))).toHaveLength(
+    1,
+  );
   expect(
     (await user.query(api.receipts.detail, { id }))!.receipt.revision,
   ).toBe(1);

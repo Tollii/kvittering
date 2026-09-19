@@ -40,7 +40,10 @@ export function analysisPeriod(
 
   if (frequency === "week") {
     const start = shiftDate(anchor, -((date.getUTCDay() + 6) % 7));
-    const end = [shiftDate(start, 6), today].sort()[0];
+
+    const end = [shiftDate(start, 6), today].sort((left, right) =>
+      left.localeCompare(right, "en"),
+    )[0];
 
     return {
       start,
@@ -56,7 +59,9 @@ export function analysisPeriod(
     new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth() + 1, 0, 12)),
   );
 
-  const end = [monthEnd, today].sort()[0];
+  const end = [monthEnd, today].sort((left, right) =>
+    left.localeCompare(right, "en"),
+  )[0];
 
   const previousStart = dateString(
     new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth() - 1, 1, 12)),
@@ -242,6 +247,7 @@ export function spendingAnalysis(
     });
   }
 
+  effects.sort((a, b) => Math.abs(b.differenceOre) - Math.abs(a.differenceOre));
   const differenceOre = currentOre - previousOre;
 
   return {
@@ -260,9 +266,7 @@ export function spendingAnalysis(
     missingAmounts,
     measuredLines,
     productLines,
-    effects: effects.sort(
-      (a, b) => Math.abs(b.differenceOre) - Math.abs(a.differenceOre),
-    ),
+    effects,
     categories: [...categories.values()]
       .map((row) => ({
         ...row,
@@ -284,5 +288,9 @@ export function analysisSummary(
     return "Registrert forbruk er likt i de to periodene.";
   const largest = report.categories[0];
 
-  return `Registrert forbruk er ${formatMoney(Math.abs(report.differenceOre))} ${report.differenceOre > 0 ? "høyere" : "lavere"}.${largest?.differenceOre ? ` Største kategoriendring: ${largest.name}, ${formatMoney(largest.differenceOre)}.` : ""}`;
+  const categoryChange = largest?.differenceOre
+    ? ` Største kategoriendring: ${largest.name}, ${formatMoney(largest.differenceOre)}.`
+    : "";
+
+  return `Registrert forbruk er ${formatMoney(Math.abs(report.differenceOre))} ${report.differenceOre > 0 ? "høyere" : "lavere"}.${categoryChange}`;
 }

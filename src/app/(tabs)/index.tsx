@@ -255,7 +255,7 @@ export default function Capture() {
   const failed = queue.some((entry) => !!entry.error);
   // Let the success note fade away on its own once the upload has landed.
   useEffect(() => {
-    if (!saved || uploading || failed) return;
+    if (!saved || uploading || failed) return undefined;
     const timeout = setTimeout(() => setSaved(0), 8000);
 
     return () => clearTimeout(timeout);

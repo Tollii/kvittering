@@ -29,11 +29,12 @@ export function createImportQueue() {
       };
     },
     offer(files: ImportedFile[]) {
-      if (files.length)
-        publish([
-          ...batches,
-          { id: ++sequence, files: [...files], state: "pending" },
-        ]);
+      if (!files.length) return;
+      sequence++;
+      publish([
+        ...batches,
+        { id: sequence, files: [...files], state: "pending" },
+      ]);
     },
     claim(id: number): ImportBatch | null {
       const batch = batches.find(

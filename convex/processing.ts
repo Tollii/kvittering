@@ -159,9 +159,9 @@ export const begin = internalMutation({
       imageCount: images.length,
     });
 
-    return images
-      .sort((a, b) => a.position - b.position)
-      .map((image) => image.storageId);
+    images.sort((a, b) => a.position - b.position);
+
+    return images.map((image) => image.storageId);
   },
 });
 

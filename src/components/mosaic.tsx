@@ -40,7 +40,7 @@ export function Mosaic({
   fade = true,
   opacity = 1,
   style,
-}: {
+}: Readonly<{
   seed?: number;
   height?: number;
   block?: number;
@@ -48,7 +48,7 @@ export function Mosaic({
   fade?: boolean;
   opacity?: number;
   style?: ViewStyle;
-}) {
+}>) {
   const blocks = createMosaicBlocks(seed, columns, fade);
 
   return (

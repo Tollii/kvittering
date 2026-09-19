@@ -55,7 +55,9 @@ function readSnapshot(): FeatureFlagSnapshot {
 const FeatureFlagsContext = createContext<FeatureFlags>(defaultFeatureFlags());
 
 /** One subscription remains mounted above sign-in and version gates. */
-export function FeatureFlagsProvider({ children }: { children: ReactNode }) {
+export function FeatureFlagsProvider({
+  children,
+}: Readonly<{ children: ReactNode }>) {
   const live = useQuery(api.featureFlags.get, { platform: scope.platform });
 
   const [state, setState] = useState<{

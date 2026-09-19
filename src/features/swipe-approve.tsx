@@ -23,11 +23,11 @@ export function SwipeToApprove({
   receipt,
   enabled,
   children,
-}: {
+}: Readonly<{
   receipt: Receipt;
   enabled: boolean;
   children: ReactNode;
-}) {
+}>) {
   const colors = useTheme();
   const client = useConvex();
   const swipeable = useRef<SwipeableMethods>(null);

@@ -11,10 +11,10 @@ import type { Receipt, SpendingGroup } from "@/lib/domain/insights";
 export function ProductAttributesReport({
   receipts,
   onSelect,
-}: {
+}: Readonly<{
   receipts: Receipt[];
   onSelect: (value: SpendingGroup, dimension: AttributeDimension) => void;
-}) {
+}>) {
   const [dimension, setDimension] = useState<AttributeDimension>("type");
   const report = attributeInsights(receipts, dimension);
 

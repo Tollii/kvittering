@@ -15,11 +15,11 @@ export function Panel({
   children,
   style,
   tone = "surface",
-}: {
+}: Readonly<{
   children: ReactNode;
   style?: StyleProp<ViewStyle>;
   tone?: "surface" | "primary" | "soft" | "plain";
-}) {
+}>) {
   const colors = useTheme();
 
   return (
@@ -58,12 +58,12 @@ export function SectionTitle({
   detail,
   action,
   onAction,
-}: {
+}: Readonly<{
   title: string;
   detail?: string;
   action?: string;
   onAction?: () => void;
-}) {
+}>) {
   const colors = useTheme();
 
   return (
@@ -102,12 +102,12 @@ export function Disclosure({
   value,
   children,
   initiallyOpen = false,
-}: {
+}: Readonly<{
   title: string;
   value?: string;
   children: ReactNode;
   initiallyOpen?: boolean;
-}) {
+}>) {
   const [open, setOpen] = useState(initiallyOpen);
   const colors = useTheme();
 
@@ -146,12 +146,12 @@ export function Notice({
   error = false,
   tone,
   icon,
-}: {
+}: Readonly<{
   children: ReactNode;
   error?: boolean;
   tone?: "info" | "warning" | "error" | "success";
   icon?: SymbolViewProps["name"];
-}) {
+}>) {
   const colors = useTheme();
   const kind = tone ?? (error ? "error" : "info");
 
@@ -209,7 +209,7 @@ export function Notice({
   );
 }
 
-export function Loading({ title = "Henter …" }: { title?: string }) {
+export function Loading({ title = "Henter …" }: Readonly<{ title?: string }>) {
   return (
     <View style={{ padding: 28, gap: 12, alignItems: "center" }}>
       <ActivityIndicator />
@@ -223,12 +223,12 @@ export function Empty({
   message,
   icon = "tray",
   children,
-}: {
+}: Readonly<{
   title: string;
   message?: string;
   icon?: SymbolViewProps["name"];
   children?: ReactNode;
-}) {
+}>) {
   const colors = useTheme();
 
   return (
@@ -266,14 +266,14 @@ export function Row({
   icon,
   onPress,
   selected = false,
-}: {
+}: Readonly<{
   title: string;
   detail?: string;
   value?: string;
   icon?: SymbolViewProps["name"];
   onPress?: () => void;
   selected?: boolean;
-}) {
+}>) {
   const colors = useTheme();
 
   return (

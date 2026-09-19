@@ -13,7 +13,7 @@ export default function ReceiptPage() {
   return <ReceiptDetail key={id} id={id} />;
 }
 
-function ReceiptDetail({ id }: { id: string }) {
+function ReceiptDetail({ id }: Readonly<{ id: string }>) {
   const { online } = useHousehold();
   const detail = useQuery(api.receipts.detail, { id: id ?? "" });
 

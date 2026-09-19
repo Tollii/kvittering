@@ -8,10 +8,10 @@ import { day } from "@/lib/catalog/policy";
 export function CatalogQueryProvider({
   scope,
   children,
-}: {
+}: Readonly<{
   scope: string;
   children: ReactNode;
-}) {
+}>) {
   const [client] = useState(
     () =>
       new QueryClient({

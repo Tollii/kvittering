@@ -79,7 +79,7 @@ it("sends all receipt matches and category questions in one model request", asyn
         decision.categoryId === "convenience.frozen-pizza",
     ),
   ).toBe(true);
-  expect(result[0].candidates?.[0].probability).toBe(0.86);
+  expect(result[0].candidates?.[0].probability).toBeCloseTo(0.86);
 });
 
 it("retains the reason for a provider failure and keeps exact links usable", async () => {

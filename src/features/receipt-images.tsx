@@ -9,12 +9,12 @@ export function ReceiptImages({
   compact = false,
   color,
   background,
-}: {
+}: Readonly<{
   receipt: Receipt;
   compact?: boolean;
   color?: string;
   background?: string;
-}) {
+}>) {
   const [token, setToken] = useState<string | null>(null);
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState(false);

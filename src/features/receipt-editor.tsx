@@ -1,6 +1,12 @@
 import { releaseMutation } from "@/lib/releases/requests";
 import { usePreventRemove } from "expo-router/react-navigation";
-import { useReducer, useRef, useState, type ReactNode } from "react";
+import {
+  useReducer,
+  useRef,
+  useState,
+  type ReactNode,
+  type ComponentProps,
+} from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -66,11 +72,11 @@ export function ReceiptEditor({
   receipt,
   online,
   onDeletionChange,
-}: {
+}: Readonly<{
   receipt: Receipt;
   online: boolean;
   onDeletionChange: (state: "idle" | "deleting" | "deleted") => void;
-}) {
+}>) {
   const client = useConvex();
   const colors = useTheme();
 
@@ -454,7 +460,7 @@ export function ReceiptEditor({
           ? "Én ting igjen"
           : `${tasks.length} ting igjen`;
 
-  const screenOptions: React.ComponentProps<typeof Stack.Screen>["options"] = {
+  const screenOptions: ComponentProps<typeof Stack.Screen>["options"] = {
     title: data?.store || receipt.data?.store || "Kvittering",
   };
 
@@ -988,7 +994,7 @@ function ReceiptFooter({
   busy,
   saveDisabled,
   onSave,
-}: {
+}: Readonly<{
   error: string;
   ready: boolean;
   approved: boolean;
@@ -999,7 +1005,7 @@ function ReceiptFooter({
   busy: boolean;
   saveDisabled: boolean;
   onSave: () => void;
-}) {
+}>) {
   const colors = useTheme();
 
   return (

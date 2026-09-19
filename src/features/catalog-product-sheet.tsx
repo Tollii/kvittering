@@ -31,12 +31,12 @@ export function CatalogProductPicker({
   store,
   onSelect,
   onClose,
-}: {
+}: Readonly<{
   name: string;
   store: string;
   onSelect: (product: CatalogProduct | null) => void;
   onClose: () => void;
-}) {
+}>) {
   const [search, setSearch] = useState(productSearch(name));
   const productLookup = useFeatureFlag("productLookup");
   const query = useCatalogSearch(search, { kind: "products", store });
@@ -144,11 +144,11 @@ export function CatalogProductSheet({
   product,
   onChange,
   onClose,
-}: {
+}: Readonly<{
   product: CatalogIdentity;
   onChange: () => void;
   onClose: () => void;
-}) {
+}>) {
   const productLookup = useFeatureFlag("productLookup");
   const query = useCatalogProduct(product.key);
   const [showPrices, setShowPrices] = useState(false);
@@ -321,11 +321,11 @@ function CatalogImage({
   sources,
   name,
   style,
-}: {
+}: Readonly<{
   sources: string[];
   name: string;
   style: StyleProp<ImageStyle>;
-}) {
+}>) {
   const [sourceIndex, setSourceIndex] = useState(0);
   const uri = sources[sourceIndex];
 

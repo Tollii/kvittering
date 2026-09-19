@@ -197,7 +197,6 @@ export function parseVersionPolicy(value: unknown): VersionPolicy {
     .looseObject({ features: z.unknown().optional() })
     .parse(value);
 
-  void _features;
   const result = parse(versionPolicyValidator, version);
   validateSettings({
     ...result,

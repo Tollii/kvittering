@@ -16,10 +16,10 @@ import { openReceipt } from "./receipt-card";
 export function FamilyPurchases({
   receipts,
   onClose,
-}: {
+}: Readonly<{
   receipts: Receipt[];
   onClose: () => void;
-}) {
+}>) {
   const colors = useTheme();
   const report = familyInsights(receipts);
   const [selection, setSelection] = useState<string | null>(null);

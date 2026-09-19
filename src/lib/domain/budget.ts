@@ -138,7 +138,9 @@ export function digestPeriod(today: string) {
   const month = today.slice(0, 7);
 
   return {
-    start: [week.previousStart, `${month}-01`].sort()[0],
+    start: [week.previousStart, `${month}-01`].sort((left, right) =>
+      left.localeCompare(right, "en"),
+    )[0],
     end: `${month}-${daysInMonth(month)}`,
   };
 }

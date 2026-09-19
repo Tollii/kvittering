@@ -3,7 +3,9 @@ import { ConvexQueryCacheProvider } from "convex-helpers/react/cache";
 import { ConvexQueryCacheContext } from "convex-helpers/react/cache/provider";
 
 /** Retain live results for return navigation within one account and household. */
-export function NavigationQueryProvider({ children }: PropsWithChildren) {
+export function NavigationQueryProvider({
+  children,
+}: Readonly<PropsWithChildren>) {
   return (
     <ConvexQueryCacheProvider expiration={5 * 60_000} maxIdleEntries={40}>
       <QueryCacheCleanup />

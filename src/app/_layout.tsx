@@ -20,7 +20,7 @@ import { useTheme } from "@/constants/theme";
 import { Button, Notice, Screen } from "@/components/ui";
 import { ShareIntentRoot, ShareIntentRouting } from "@/features/share-intent";
 
-export function ErrorBoundary({ retry, error }: ErrorBoundaryProps) {
+export function ErrorBoundary({ retry, error }: Readonly<ErrorBoundaryProps>) {
   useEffect(() => {
     reportError(error, "navigation.render");
   }, [error]);

@@ -1,6 +1,7 @@
 import { z } from "zod";
-import { createElement, StrictMode } from "react";
-import { act, create, type ReactTestRenderer } from "react-test-renderer";
+import { createElement, StrictMode, act } from "react";
+// eslint-disable-next-line sonarjs/deprecation -- The installed React Native test renderer exercises subscription lifecycle behavior.
+import { create, type ReactTestRenderer } from "react-test-renderer";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { ConvexProvider, ConvexReactClient } from "convex/react";
 import { useQuery, useQueries } from "convex-helpers/react/cache";
@@ -35,6 +36,7 @@ let subscriptions: Map<string, Subscription>;
 
 let client: ConvexReactClient;
 
+// eslint-disable-next-line sonarjs/deprecation -- The installed React Native test renderer exercises subscription lifecycle behavior.
 let renderer: ReactTestRenderer | undefined;
 
 beforeEach(() => {
@@ -109,11 +111,16 @@ async function show(component: (() => null) | null, scope = "household-a") {
 
   await act(() => {
     if (renderer) renderer.update(tree);
+    // eslint-disable-next-line sonarjs/deprecation -- The installed React Native test renderer exercises subscription lifecycle behavior.
     else renderer = create(tree);
   });
 }
 
-async function publish(name: string, value: Value, cursor: Value = null) {
+async function publish(
+  name: string,
+  value: Value,
+  cursor: string | null = null,
+) {
   const subscription = [...subscriptions.values()].find((entry) => {
     const pagination = entry.args.paginationOpts;
 

@@ -58,7 +58,9 @@ const queryKey = [
   installedRelease.channel,
 ];
 
-export function ReleasePolicyProvider({ children }: { children: ReactNode }) {
+export function ReleasePolicyProvider({
+  children,
+}: Readonly<{ children: ReactNode }>) {
   const [client] = useState(() => new QueryClient());
 
   return (
@@ -71,10 +73,10 @@ export function ReleasePolicyProvider({ children }: { children: ReactNode }) {
 function PolicyProvider({
   children,
   client,
-}: {
+}: Readonly<{
   children: ReactNode;
   client: QueryClient;
-}) {
+}>) {
   const [cached] = useState(readCachedPolicy);
   const featureFlags = useFeatureFlags();
   const { active, online } = useQueryLifecycle();

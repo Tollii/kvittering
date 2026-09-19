@@ -1,6 +1,6 @@
 import { featureEnabled } from "./featureFlags";
 import { v } from "convex/values";
-import { Workpool, vOnCompleteValidator } from "@convex-dev/workpool";
+import { Workpool, vOnCompleteArgs } from "@convex-dev/workpool";
 import {
   createEvent,
   sendEvent,
@@ -299,7 +299,7 @@ export const fail = internalMutation({
 });
 
 export const completed = internalMutation({
-  args: vOnCompleteValidator(v.object({ id: v.id("catalogRequests") })),
+  args: vOnCompleteArgs(v.object({ id: v.id("catalogRequests") })),
   returns: v.null(),
   handler: async (ctx, { context, result }) => {
     if (result.kind !== "success") await failRequest(ctx, context.id, 0, 0);

@@ -44,7 +44,7 @@ export function reportError(
 ) {
   // oxlint-disable-next-line anti-slop/no-runtime-typeof -- Deduplication requires the original object identity, including objects without a prototype.
   if (cause && typeof cause === "object") {
-    if (reported.has(cause)) return;
+    if (reported.has(cause)) return undefined;
     reported.add(cause);
   }
 
@@ -62,12 +62,13 @@ export function reportError(
     "warning",
   );
 
-  if (expected || fields.status === 429) return;
+  if (expected || fields.status === 429) return undefined;
   // Background uploads retry. Report a repeated failure at most once per five minutes.
   const key = `${operation}:${details.errorType}:${details.code ?? details.status ?? fields.status ?? ""}:${fields.receiptId ?? ""}:${message}`;
   const now = Date.now();
 
-  if (now - (recentFailures.get(key) ?? -Infinity) < 5 * 60_000) return;
+  if (now - (recentFailures.get(key) ?? -Infinity) < 5 * 60_000)
+    return undefined;
 
   if (recentFailures.size >= 100)
     recentFailures.delete(recentFailures.keys().next().value!);

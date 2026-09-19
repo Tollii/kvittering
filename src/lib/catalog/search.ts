@@ -22,7 +22,7 @@ export function productSearch(name: string) {
       /(\p{L})(\d+(?:[.,]\d+)?\s*(?:kg|g|ml|cl|dl|l|stk|pk|bx)\b)/gu,
       "$1 $2",
     )
-    .replace(/(\d)\s*[- ]\s*(kg|g|ml|cl|dl|l|stk|pk|bx)\b/g, "$1$2")
+    .replace(/(\d)(?: ?- ?| )(kg|g|ml|cl|dl|l|stk|pk|bx)\b/g, "$1$2")
     .replace(/(\d),(\d)/g, "$1.$2");
 }
 

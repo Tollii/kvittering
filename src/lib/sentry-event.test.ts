@@ -107,3 +107,13 @@ it("keeps HTTP status and app milestones without request bodies or UI labels", (
   });
   expect(JSON.stringify(event)).not.toContain("PRIVATE");
 });
+
+it("removes complete payloads while retaining the surrounding explanation", () => {
+  expect(
+    diagnosticText('Failed {"first": 1} and {"second": 2} while saving'),
+  ).toBe("Failed [Filtered payload] while saving");
+  expect(diagnosticText("Failed " + "{".repeat(20000))).toHaveLength(2000);
+  expect(
+    diagnosticText("token=\"private words\" password='private words'"),
+  ).not.toContain("private");
+});

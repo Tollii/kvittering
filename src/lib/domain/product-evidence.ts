@@ -22,10 +22,12 @@ export type ParsedProductEvidence = {
   variants: { zero: boolean; light: boolean; caffeineFree: boolean };
 };
 
-const measurePattern = /(\d+(?:[.,]\d+)?)\s*(kg|ml|cl|dl|g|l)\b/gi;
+const measurePattern = /(?<![\d.,])(\d+(?:[.,]\d+)?)\s*(kg|ml|cl|dl|g|l)\b/gi;
 
+// The three alternatives preserve left-to-right, non-overlapping package counts.
 const packPattern =
-  /(\d+)\s*(?:pk|stk|pack|pakning|bx)\b|\b[x×]\s*(\d+)\b|(\d+)\s*[x×]\s*(?=\d)/gi;
+  // eslint-disable-next-line sonarjs/regex-complexity -- Recognize count suffixes, trailing multipliers, and leading multipliers in one scan.
+  /(?<!\d)(\d+)\s*(?:pk|stk|pack|pakning|bx)\b|\b[x×]\s*(\d+)\b|(?<!\d)(\d+)\s*[x×]\s*(?=\d)/gi;
 
 export function measure(amount: number, unit: string | null): Measure | null {
   const units = new Map<string, ["g" | "ml", number]>([

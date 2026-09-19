@@ -29,7 +29,7 @@ const errorCodeSchema = z
 const errorMetadataSchema = z.object({
   name: z
     .string()
-    .regex(/^[A-Za-z][A-Za-z0-9_]{0,60}$/)
+    .regex(/^[A-Za-z]\w{0,60}$/)
     .catch("Error"),
   status: z.number().optional().catch(undefined),
   code: errorCodeSchema,
@@ -51,7 +51,7 @@ export function errorDetails(cause: unknown): ErrorDetails {
   const status = metadata?.status;
   const code = metadata?.data?.code ?? metadata?.code;
   const message = cause instanceof Error ? cause.message : "";
-  const requestId = message.match(/\[Request ID: ([a-f0-9]{16,64})\]/i)?.[1];
+  const requestId = /\[Request ID: ([a-f0-9]{16,64})\]/i.exec(message)?.[1];
 
   const expected =
     code === "UPDATE_REQUIRED" ||

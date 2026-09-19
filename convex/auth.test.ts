@@ -41,6 +41,7 @@ it.each([undefined, "false", "true"])(
 
       for (const origin of [
         "https://untrusted.example",
+        // eslint-disable-next-line sonarjs/no-clear-text-protocols -- The test verifies that an insecure origin is rejected.
         "http://192.168.1.20:8081",
         "exp-malicious://192.168.1.20:8081",
       ]) {

@@ -94,7 +94,9 @@ function useSessionAuth() {
   };
 }
 
-export function SessionProvider({ children }: { children: ReactNode }) {
+export function SessionProvider({
+  children,
+}: Readonly<{ children: ReactNode }>) {
   if (!client || !convexSiteUrl)
     return (
       <Screen title="Kvitto">
@@ -116,7 +118,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   );
 }
 
-function SessionGate({ children }: { children: ReactNode }) {
+function SessionGate({ children }: Readonly<{ children: ReactNode }>) {
   const session = authClient.useSession();
   const previousOwner = useRef<string | null>(null);
   const owner = session.data?.user.id ?? null;
@@ -147,10 +149,10 @@ function SessionGate({ children }: { children: ReactNode }) {
 function HouseholdProvider({
   owner,
   children,
-}: {
+}: Readonly<{
   owner: string;
   children: ReactNode;
-}) {
+}>) {
   const convex = useConvex();
   const { policy, blocked } = useReleasePolicy();
   const receiptProcessing = useFeatureFlag("receiptProcessing");

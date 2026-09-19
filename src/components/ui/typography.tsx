@@ -49,12 +49,12 @@ export function Icon({
   size = 22,
   color,
   weight,
-}: {
+}: Readonly<{
   name: SymbolViewProps["name"];
   size?: number;
   color?: string;
   weight?: SymbolViewProps["weight"];
-}) {
+}>) {
   const colors = useTheme();
 
   return (

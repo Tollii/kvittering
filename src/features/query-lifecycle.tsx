@@ -28,7 +28,9 @@ const LifecycleContext = createContext({ active: true, online: true });
 
 export const useQueryLifecycle = () => useContext(LifecycleContext);
 
-export function QueryLifecycleProvider({ children }: { children: ReactNode }) {
+export function QueryLifecycleProvider({
+  children,
+}: Readonly<{ children: ReactNode }>) {
   const [active, setActive] = useState(AppState.currentState === "active");
   const network = useNetworkState();
 

@@ -34,10 +34,10 @@ function storeName(store: StoreSpendingGroup) {
 function StoreReport({
   purchases,
   onClose,
-}: {
+}: Readonly<{
   purchases: StorePurchase[];
   onClose: () => void;
-}) {
+}>) {
   const colors = useTheme();
   const [dimension, setDimension] = useState<"stores" | "chains">("stores");
   const [selectedId, setSelectedId] = useState<string>();
@@ -175,6 +175,11 @@ function StoreReport({
             (point) => point.id === store.id,
           );
 
+          const markerLabel =
+            Platform.OS === "ios" && dimension === "stores" && markerIndex >= 0
+              ? `${markerIndex + 1}. `
+              : "";
+
           return (
             <View
               key={store.id}
@@ -185,7 +190,7 @@ function StoreReport({
               }}
             >
               <Row
-                title={`${Platform.OS === "ios" && dimension === "stores" && markerIndex >= 0 ? `${markerIndex + 1}. ` : ""}${storeName(store)}`}
+                title={`${markerLabel}${storeName(store)}`}
                 detail={[
                   `${store.purchases.length} kjøp`,
                   store.address,
@@ -217,7 +222,7 @@ export function StoreSpendingSheet({
   onNextMonth,
   nextDisabled,
   loading,
-}: {
+}: Readonly<{
   visible: boolean;
   onClose: () => void;
   purchases: StorePurchase[];
@@ -227,7 +232,7 @@ export function StoreSpendingSheet({
   onNextMonth: () => void;
   nextDisabled: boolean;
   loading: boolean;
-}) {
+}>) {
   return (
     <Sheet
       title="Butikker"

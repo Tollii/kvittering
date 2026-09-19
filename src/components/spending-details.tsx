@@ -10,12 +10,12 @@ export function SpendingBars({
   rows,
   total,
   onSelect,
-}: {
+}: Readonly<{
   rows: SpendingGroup[];
   /** When given, each row shows its share of this amount. */
   total?: number;
   onSelect: (row: SpendingGroup) => void;
-}) {
+}>) {
   const colors = useTheme();
   const maximum = Math.max(1, ...rows.map((row) => Math.abs(row.amountOre)));
 
@@ -27,11 +27,13 @@ export function SpendingBars({
             ? Math.round((Math.abs(row.amountOre) / total) * 100)
             : null;
 
+        const shareLabel = share !== null ? `, ${share} prosent` : "";
+
         return (
           <Pressable
             key={row.id}
             accessibilityRole="button"
-            accessibilityLabel={`${row.name}, ${formatMoney(row.amountOre)}${share !== null ? `, ${share} prosent` : ""}`}
+            accessibilityLabel={`${row.name}, ${formatMoney(row.amountOre)}${shareLabel}`}
             onPress={() => onSelect(row)}
             style={({ pressed }) => ({
               minHeight: 46,
@@ -95,10 +97,10 @@ export function SpendingBars({
 export function SpendingDetails({
   selected,
   onClose,
-}: {
+}: Readonly<{
   selected: SpendingGroup | null;
   onClose: () => void;
-}) {
+}>) {
   const colors = useTheme();
 
   return (

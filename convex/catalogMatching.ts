@@ -358,19 +358,16 @@ export const apply = internalMutation({
         decision.categoryId &&
         categoryById.has(decision.categoryId) &&
         decision.categoryId !== "fallback.unclear" &&
-        decision.categoryConfidence >= 0.85
+        decision.categoryConfidence >= 0.85 &&
+        (line.categoryId !== decision.categoryId ||
+          line.issues.some(isCategoryUncertain))
       ) {
-        if (
-          line.categoryId !== decision.categoryId ||
-          line.issues.some(isCategoryUncertain)
-        ) {
-          line.categoryId = decision.categoryId;
-          line.confidence = decision.categoryConfidence;
-          line.issues = line.issues.filter(
-            (issue) => !isCategoryUncertain(issue),
-          );
-          changed = true;
-        }
+        line.categoryId = decision.categoryId;
+        line.confidence = decision.categoryConfidence;
+        line.issues = line.issues.filter(
+          (issue) => !isCategoryUncertain(issue),
+        );
+        changed = true;
       }
     }
 

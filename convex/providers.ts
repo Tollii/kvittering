@@ -1,5 +1,7 @@
 "use node";
 
+import { Buffer } from "node:buffer";
+
 import OpenAI from "openai";
 import { zodTextFormat } from "openai/helpers/zod";
 import { TypeSafeClient } from "@typesafe-ai/sdk";
