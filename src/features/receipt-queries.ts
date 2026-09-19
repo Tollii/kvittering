@@ -30,7 +30,8 @@ export function useCompleteReceipts(
 export function useReceiptHistory(search: string, enabled: boolean) {
   const focused = useIsFocused();
   const { isAuthenticated } = useConvexAuth();
-  const active = enabled && focused && isAuthenticated;
+  // Keep loaded pages live when a receipt covers the mounted history screen.
+  const active = enabled && isAuthenticated;
   const page = usePaginatedQuery(
     api.receipts.history,
     active ? { search } : "skip",
@@ -39,7 +40,8 @@ export function useReceiptHistory(search: string, enabled: boolean) {
   const { status, loadMore } = page;
   // Global substring search scans all pages; the ordinary list loads on demand.
   useEffect(() => {
-    if (active && search.trim() && status === "CanLoadMore") loadMore(50);
-  }, [active, search, status, loadMore]);
+    if (active && focused && search.trim() && status === "CanLoadMore")
+      loadMore(50);
+  }, [active, focused, search, status, loadMore]);
   return page;
 }
