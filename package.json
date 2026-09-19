@@ -68,6 +68,7 @@
     "convex-test": "^0.0.59",
     "eslint": "^9.39.5",
     "eslint-config-expo": "^57.0.2",
+    "eslint-plugin-sonarjs": "4.2.1",
     "orval": "^8.33.0",
     "oxlint": "1.83.0",
     "prettier": "^3.9.8",
