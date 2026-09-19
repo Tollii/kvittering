@@ -68,9 +68,13 @@ export default function Spending() {
   const [group, setGroup] = useState<string | null>(null);
   const [selection, setSelection] = useState<SpendingSelection | null>(null);
   const periodKey = JSON.stringify([month, reviewedOnly]);
+  const undated = useCompleteReceipts(
+    { kind: "undated" },
+    report === "coverage" || selection?.key === "unlinked",
+  );
   const comparison = comparisonInsights(receipts, month, reviewedOnly);
   const totals = comparison.current;
-  const coverage = receiptCoverage(receipts);
+  const coverage = receiptCoverage([...receipts, ...undated.receipts]);
   const catalog = catalogInsights(totals.selected);
   const change = comparison.previous.products
     ? Math.round(
@@ -237,7 +241,8 @@ export default function Spending() {
     ],
   });
   const reports = useSpendingReports({
-    totals,
+    totals: { ...totals, undated: undated.receipts },
+    coverageComplete: undated.completeReceipts,
     comparison,
     coverage,
     catalog,

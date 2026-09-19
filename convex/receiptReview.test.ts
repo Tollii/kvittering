@@ -150,3 +150,30 @@ it("rejects stale commits without data or history changes and returns a small sa
     (await user.query(api.receipts.detail, { id }))!.receipt.revision,
   ).toBe(1);
 });
+
+it("persists category uncertainty in the representation understood by installed editors", async () => {
+  const t = convexTest(schema, modules);
+  const user = t.withIdentity({ subject: "legacy-reviewer", issuer: "test" });
+  const householdId = await user.mutation(api.households.create, {
+    name: "Home",
+    invitation: "0123456789abcdef0123456789abcdef",
+  });
+  const id = await user.mutation(api.receipts.reserve, {
+    householdId,
+    clientId: "legacy-category-001",
+    imageCount: 1,
+  });
+  const data = batteryFixture();
+  data.lines[0].issues = ["category_uncertain"];
+  await t.run((ctx) =>
+    commitReceiptChange(ctx, {
+      receiptId: id,
+      expected: { revision: 0, generation: 0 },
+      data,
+      origin: { kind: "extraction", provider: "test", next: "none" },
+    }),
+  );
+  const receipt = (await user.query(api.receipts.detail, { id }))!.receipt;
+  expect(receipt.data!.lines[0].issues).toEqual(["Kategorien er usikker."]);
+  expect(data.lines[0].issues).toEqual(["category_uncertain"]);
+});

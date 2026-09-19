@@ -70,6 +70,7 @@ export const processReceipt = workflow
           receiptId: args.id,
           generation: args.generation,
         },
+        // Structured evidence retains the old JSON evidence; stored step results remain valid.
         {
           unstableArgs: true,
           retry: { maxAttempts: 3, initialBackoffMs: 2000, base: 2 },

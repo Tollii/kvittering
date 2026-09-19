@@ -37,6 +37,7 @@ Add receipt issues in `receipt-issues.ts`; display text belongs in its mapper. P
 | deviceSubscriptions | Device notification destinations |
 | clientReleases | Installed-client diagnostics |
 | releasePolicies, releasePolicyHistory | Native/API version controls and operator history |
+| featureFlags, featureFlagHistory | Platform-scoped service configuration and operator history |
 
 Convex components own their workflow, workpool, and authentication tables. There is no sample table. Revision retention is a separate operator decision; this refactor does not remove history.
 

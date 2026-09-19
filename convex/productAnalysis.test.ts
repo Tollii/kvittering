@@ -252,3 +252,67 @@ it("commits duplicate profile decisions once and rejects a stale batch", async (
     await t.query(internal.productAnalysis.readProfiles, { ...snapshot, ids }),
   ).toEqual([]);
 });
+
+it("batches independent profiles and uses only quantity questions for cached profiles", async () => {
+  const { t, id, data, args } = await setup();
+  vi.stubEnv("TYPESAFE_API_KEY", "test-key");
+  const product = data.lines[0];
+  data.lines = [
+    product,
+    { ...product, id: "same-product" },
+    { ...product, id: "different-product", name: "Milk", originalText: "Milk" },
+  ];
+  await t.run((ctx) => ctx.db.patch("receipts", id, { data }));
+  const requests: { questions: Record<string, unknown> }[] = [];
+  vi.stubGlobal(
+    "fetch",
+    vi.fn(async (_url, init) => {
+      const request = JSON.parse(init.body);
+      requests.push(request);
+      return new Response(
+        JSON.stringify({
+          model: "jev-latest",
+          usage: { input_tokens: 1, output_tokens: 1 },
+          answers: Object.fromEntries(
+            Object.keys(request.questions).map((key) => [
+              key,
+              {
+                type: "choice",
+                choice: key.endsWith("_family") ? "new" : "unknown",
+                confidence: 0.9,
+                probabilities: { unknown: 0.9 },
+              },
+            ]),
+          ),
+        }),
+        { headers: { "Content-Type": "application/json" } },
+      );
+    }),
+  );
+  try {
+    const snapshot = {
+      id,
+      generation: args.generation,
+      revision: args.revision,
+      version: args.version,
+    };
+    expect(
+      await t.action(internal.productAnalysisWorker.analyze, snapshot),
+    ).toHaveLength(3);
+    expect(requests).toHaveLength(2);
+    expect(Object.keys(requests[0].questions)).toHaveLength(12);
+    expect(Object.keys(requests[1].questions)).toHaveLength(3);
+    requests.length = 0;
+    expect(
+      await t.action(internal.productAnalysisWorker.analyze, snapshot),
+    ).toHaveLength(3);
+    expect(requests).toHaveLength(1);
+    expect(
+      Object.keys(requests[0].questions).every((key) =>
+        key.startsWith("quantity_"),
+      ),
+    ).toBe(true);
+  } finally {
+    vi.unstubAllGlobals();
+  }
+});

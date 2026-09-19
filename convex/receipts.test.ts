@@ -546,6 +546,12 @@ it("pages narrow history summaries and includes imported older purchases in comp
   expect(older.isDone).toBe(true);
   expect(older.page).toHaveLength(1);
   expect(older.page[0].data?.purchaseDate).toBe("2020-01-02");
+  const undated = await first.query(api.receipts.readPage, {
+    scope: { kind: "undated" },
+    paginationOpts: { cursor: null, numItems: 30 },
+  });
+  expect(undated.isDone).toBe(true);
+  expect(undated.page.map((receipt) => receipt._id)).toEqual([templateId]);
   let cursor: string | null = null;
   let found = 0;
   let complete = false;

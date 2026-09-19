@@ -1,4 +1,4 @@
-import { featureEnabled } from "./releasePolicy";
+import { featureEnabled } from "./featureFlags";
 import { clientMutation as mutation } from "./clientFunctions";
 import { productAttributesValidator } from "../src/lib/domain/product-attributes";
 import { v, type Infer } from "convex/values";

@@ -1,5 +1,5 @@
 import { receiptPeriodPage } from "./receipts";
-import { featureEnabled } from "./releasePolicy";
+import { featureEnabled } from "./featureFlags";
 import { v } from "convex/values";
 import {
   paginationOptsValidator,

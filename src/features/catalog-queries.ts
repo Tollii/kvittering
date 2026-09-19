@@ -1,3 +1,4 @@
+import { useFeatureFlag } from "@/features/featureFlags";
 import { releaseMutation } from "@/lib/releases/requests";
 import { installedRelease } from "@/lib/releases/client";
 import { useReleasePolicy } from "./release-policy";
@@ -25,8 +26,9 @@ function useCatalogLookup(
 ) {
   const convex = useConvex();
   const cache = useQueryClient();
-  const { policy, blocked } = useReleasePolicy();
-  const allowed = enabled && !blocked && policy.features.productLookup;
+  const { blocked } = useReleasePolicy();
+  const productLookup = useFeatureFlag("productLookup");
+  const allowed = enabled && !blocked && productLookup;
   const encoded = JSON.stringify(lookup);
   const queryKey = useMemo(() => ["catalog", "lookup", encoded], [encoded]);
   const result = useQuery({

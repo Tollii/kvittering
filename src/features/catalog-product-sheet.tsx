@@ -1,5 +1,5 @@
+import { useFeatureFlag } from "@/features/featureFlags";
 import { useCompleteReceipts } from "./receipt-queries";
-import { useReleasePolicy } from "./release-policy";
 import { useState } from "react";
 import { Image, View, type ImageStyle, type StyleProp } from "react-native";
 import {
@@ -36,7 +36,7 @@ export function CatalogProductPicker({
   onClose: () => void;
 }) {
   const [search, setSearch] = useState(productSearch(name));
-  const { policy } = useReleasePolicy();
+  const productLookup = useFeatureFlag("productLookup");
   const query = useCatalogSearch(search);
   const [showWithoutBarcode, setShowWithoutBarcode] = useState(false);
   const products = rankCatalogProducts(search, query.data?.products ?? []).map(
@@ -60,7 +60,7 @@ export function CatalogProductPicker({
         />
       }
     >
-      {!policy.features.productLookup && (
+      {!productLookup && (
         <Notice>
           Produktkatalogen er midlertidig satt på pause. Lagrede opplysninger
           vises fortsatt.
@@ -68,8 +68,7 @@ export function CatalogProductPicker({
       )}
       {!online && <Notice icon="wifi.slash">Uten nett</Notice>}
       {((query.isFetching && !query.data) ||
-        (policy.features.productLookup &&
-          query.data?.status === "pending")) && (
+        (productLookup && query.data?.status === "pending")) && (
         <Loading title="Henter produkter …" />
       )}
       {(query.isError || query.data?.status === "error") && (
@@ -145,7 +144,7 @@ export function CatalogProductSheet({
   onChange: () => void;
   onClose: () => void;
 }) {
-  const { policy } = useReleasePolicy();
+  const productLookup = useFeatureFlag("productLookup");
   const query = useCatalogProduct(product.key);
   const [showPrices, setShowPrices] = useState(false);
   const prices = useCatalogPrices(product.key, showPrices);
@@ -165,7 +164,7 @@ export function CatalogProductSheet({
   );
   return (
     <Sheet title="Produktinformasjon" visible onClose={onClose}>
-      {!policy.features.productLookup && (
+      {!productLookup && (
         <Notice>
           Produktkatalogen er midlertidig satt på pause. Lagrede opplysninger
           vises fortsatt.

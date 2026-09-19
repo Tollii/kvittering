@@ -10,6 +10,7 @@ import { recordEvent, reportError } from "@/lib/observability";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Linking, Modal, View } from "react-native";
 import { useQueryLifecycle } from "./query-lifecycle";
+import { useFeatureFlags } from "./featureFlags";
 import {
   QueryClient,
   QueryClientProvider,
@@ -20,12 +21,12 @@ import { api } from "../../convex/_generated/api";
 import { Button, Copy, IconButton, Notice, Screen } from "@/components/ui";
 import {
   defaultPolicy,
-  parsePolicy,
+  parseVersionPolicy,
   policyFreshnessMs,
   reminderIntervalMs,
   updateRequirement,
   updateUrl,
-  type ReleasePolicy,
+  type VersionPolicy,
 } from "@/lib/releases/policy";
 import {
   installedRelease,
@@ -39,9 +40,8 @@ import {
   dismissUpdate,
 } from "@/lib/releases/cache";
 
-const fallback = defaultPolicy(
-  installedRelease.platform,
-  installedRelease.channel,
+const fallback = parseVersionPolicy(
+  defaultPolicy(installedRelease.platform, installedRelease.channel),
 );
 const PolicyContext = createContext({
   policy: fallback,
@@ -71,6 +71,7 @@ function PolicyProvider({
   client: QueryClient;
 }) {
   const [cached] = useState(readCachedPolicy);
+  const featureFlags = useFeatureFlags();
   const { active, online } = useQueryLifecycle();
   const http = useMemo(
     () =>
@@ -84,14 +85,14 @@ function PolicyProvider({
     queryKey,
     queryFn: async () => {
       // A failed or stalled policy request must not prevent local use.
-      const policy = parsePolicy(
-        await http.query(api.releasePolicy.get, {
+      const policy = parseVersionPolicy(
+        await http.query(api.releasePolicy.getVersions, {
           platform: installedRelease.platform,
         }),
       );
       if (policy.channel !== installedRelease.channel)
         throw new Error("Release environment mismatch.");
-      const previous = client.getQueryData<ReleasePolicy>(queryKey);
+      const previous = client.getQueryData<VersionPolicy>(queryKey);
       return previous && previous.revision > policy.revision
         ? previous
         : policy;
@@ -111,15 +112,16 @@ function PolicyProvider({
           policy.platform !== installedRelease.platform
         )
           return;
-        client.setQueryData<ReleasePolicy>(queryKey, (previous) =>
+        client.setQueryData<VersionPolicy>(queryKey, (previous) =>
           previous && previous.revision > policy.revision ? previous : policy,
         );
       }),
     [client],
   );
   useEffect(() => {
-    if (result.data) cachePolicy(result.data, result.dataUpdatedAt);
-  }, [result.data, result.dataUpdatedAt]);
+    if (result.data)
+      cachePolicy(result.data, result.dataUpdatedAt, featureFlags);
+  }, [result.data, result.dataUpdatedAt, featureFlags]);
   const policy = result.data ?? fallback;
   useEffect(() => setReleaseDiagnostics(policy.revision), [policy.revision]);
   const requirement = updateRequirement(policy, installedRelease);

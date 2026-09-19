@@ -1,3 +1,4 @@
+import { FeatureFlagsProvider, useFeatureFlag } from "./featureFlags";
 import { removeAccountCatalogCache } from "@/lib/catalog-cache";
 import { removedAccount, useQueryLifecycle } from "./query-lifecycle";
 import { ReleaseDiagnostics } from "./release-diagnostics";
@@ -93,9 +94,11 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     );
   return (
     <ConvexProviderWithAuth client={client} useAuth={useSessionAuth}>
-      <ReleasePolicyProvider>
-        <SessionGate>{children}</SessionGate>
-      </ReleasePolicyProvider>
+      <FeatureFlagsProvider>
+        <ReleasePolicyProvider>
+          <SessionGate>{children}</SessionGate>
+        </ReleasePolicyProvider>
+      </FeatureFlagsProvider>
     </ConvexProviderWithAuth>
   );
 }
@@ -131,6 +134,7 @@ function HouseholdProvider({
 }) {
   const convex = useConvex();
   const { policy, blocked } = useReleasePolicy();
+  const receiptProcessing = useFeatureFlag("receiptProcessing");
   const auth = useConvexAuth();
   const { online } = useQueryLifecycle();
   const details = useQuery(
@@ -161,14 +165,8 @@ function HouseholdProvider({
       auth.isAuthenticated &&
       !!details &&
       !blocked &&
-      policy.features.receiptProcessing;
-  }, [
-    online,
-    auth.isAuthenticated,
-    details,
-    blocked,
-    policy.features.receiptProcessing,
-  ]);
+      receiptProcessing;
+  }, [online, auth.isAuthenticated, details, blocked, receiptProcessing]);
   useEffect(() => {
     active.current = true;
     return () => {
@@ -255,7 +253,7 @@ function HouseholdProvider({
       }}
     >
       {auth.isAuthenticated && <ReleaseDiagnostics />}
-      {!policy.features.receiptProcessing && (
+      {!receiptProcessing && (
         <Notice>
           {policy.message ||
             "Behandling av kvitteringer er satt på pause. Nye bilder blir lagret på enheten."}

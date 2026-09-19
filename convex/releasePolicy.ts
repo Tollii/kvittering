@@ -1,3 +1,5 @@
+import { readFeatureFlags, writeFeatureFlags } from "./featureFlags";
+import { featureNameValidator, legacyFeatures } from "../src/lib/featureFlags";
 import { ConvexError, v } from "convex/values";
 import {
   query,
@@ -12,6 +14,7 @@ import {
   platformValidator,
   policySettingsValidator,
   policyValidator,
+  versionPolicyValidator,
   updateRequirement,
   validateSettings,
   type ClientRelease,
@@ -42,11 +45,16 @@ export async function readPolicy(
       q.eq("platform", platform).eq("channel", channel),
     )
     .unique();
-  if (!row) return defaultPolicy(platform, channel);
+  const flags = await readFeatureFlags(ctx, platform, channel);
+  if (!row)
+    return {
+      ...defaultPolicy(platform, channel),
+      features: legacyFeatures(flags.values),
+    };
   const { _id, _creationTime, ...policy } = row;
   void _id;
   void _creationTime;
-  return policy;
+  return { ...policy, features: legacyFeatures(flags.values) };
 }
 export async function requireCompatibleClient(
   ctx: Pick<QueryCtx, "db">,
@@ -72,7 +80,11 @@ export async function requireCompatibleClient(
       message: "Oppdater Kvitto for å fortsette.",
       policy,
     });
-  if (feature && !policy.features[feature])
+  if (
+    feature &&
+    !(await readFeatureFlags(ctx, client?.platform ?? "ios", policy.channel))
+      .values[feature]
+  )
     throw new ConvexError({
       code: "SERVICE_PAUSED",
       message:
@@ -89,30 +101,36 @@ export const get = query({
 export const check = internalQuery({
   args: {
     client: clientValidator.optional(),
-    feature: v
-      .union(
-        v.literal("receiptProcessing"),
-        v.literal("productLookup"),
-        v.literal("automaticProductMatching"),
-        v.literal("spendingAnalysis"),
-      )
-      .optional(),
+    feature: featureNameValidator.optional(),
   },
   returns: policyValidator,
   handler: (ctx, { client, feature }) =>
     requireCompatibleClient(ctx, client, feature),
 });
-export async function featureEnabled(
-  ctx: Pick<QueryCtx, "db">,
-  feature: Feature,
-) {
-  // Server work has no device platform; either platform can stop shared processing.
-  const policies = await Promise.all([
-    readPolicy(ctx, "ios"),
-    readPolicy(ctx, "android"),
-  ]);
-  return policies.every((policy) => policy.features[feature]);
-}
+/** Version controls no longer carry flags for current clients. */
+export const getVersions = query({
+  args: { platform: platformValidator },
+  returns: versionPolicyValidator,
+  handler: async (ctx, { platform }) => {
+    const channel = deploymentChannel();
+    const row = await ctx.db
+      .query("releasePolicies")
+      .withIndex("by_platform_and_channel", (q) =>
+        q.eq("platform", platform).eq("channel", channel),
+      )
+      .unique();
+    const { features: _features, ...policy } =
+      row ?? defaultPolicy(platform, channel);
+    void _features;
+    if ("_id" in policy) {
+      const { _id, _creationTime, ...version } = policy;
+      void _id;
+      void _creationTime;
+      return version;
+    }
+    return policy;
+  },
+});
 /** Operator-only change. Build and OTA workflows must never invoke this mutation. */
 export const configure = internalMutation({
   args: {
@@ -149,8 +167,18 @@ export const configure = internalMutation({
         q.eq("platform", args.platform).eq("channel", previous.channel),
       )
       .unique();
-    if (row) await ctx.db.replace("releasePolicies", row._id, policy);
-    else await ctx.db.insert("releasePolicies", policy);
+    const flags = await readFeatureFlags(ctx, args.platform, previous.channel);
+    await writeFeatureFlags(
+      ctx,
+      flags,
+      { ...flags.values, ...args.settings.features },
+      args.operator,
+      args.reason,
+    );
+    const { features: _features, ...versionPolicy } = policy;
+    void _features;
+    if (row) await ctx.db.replace("releasePolicies", row._id, versionPolicy);
+    else await ctx.db.insert("releasePolicies", versionPolicy);
     await ctx.db.insert("releasePolicyHistory", {
       previous,
       policy,

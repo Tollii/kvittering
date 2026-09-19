@@ -1,5 +1,11 @@
 import { productReferenceValidator } from "../src/lib/domain/product-reference";
-import { policyValidator, clientValidator } from "../src/lib/releases/policy";
+import {
+  policyValidator,
+  storedPolicyValidator,
+  platformValidator,
+  channelValidator,
+  clientValidator,
+} from "../src/lib/releases/policy";
 import { productAttributesValidator } from "../src/lib/domain/product-attributes";
 import { correctionFields } from "../src/lib/domain/corrections";
 import { lineValidator } from "../src/lib/domain/receipt";
@@ -60,7 +66,22 @@ export default defineSchema({
   })
     .index("by_identity_and_installationId", ["identity", "installationId"])
     .index("by_lastSeen", ["lastSeen"]),
-  releasePolicies: defineTable(policyValidator).index(
+  featureFlags: defineTable({
+    platform: platformValidator,
+    channel: channelValidator,
+    revision: v.number(),
+    values: v.record(v.string(), v.boolean()),
+  }).index("by_platform_and_channel", ["platform", "channel"]),
+  featureFlagHistory: defineTable({
+    platform: platformValidator,
+    channel: channelValidator,
+    revision: v.number(),
+    previous: v.record(v.string(), v.boolean()),
+    values: v.record(v.string(), v.boolean()),
+    operator: v.string(),
+    reason: v.string(),
+  }),
+  releasePolicies: defineTable(storedPolicyValidator).index(
     "by_platform_and_channel",
     ["platform", "channel"],
   ),

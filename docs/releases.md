@@ -25,7 +25,7 @@ EAS environments contain the public Convex URLs and `EXPO_PUBLIC_RELEASE_CHANNEL
 
 ## Policy operations
 
-`releasePolicy:get` is the small, unauthenticated bootstrap query. It returns only release policy. It is cached for five minutes and refreshed while active and on resume/reconnect when stale. The last valid policy persists across restarts. Failed fetches retain it, including a confirmed required update. A newer policy revision can remove a restriction. No background polling is required.
+`releasePolicy:getVersions` is the current unauthenticated version bootstrap query. `releasePolicy:get` remains a compatibility read for older clients and includes their legacy flag shape. It is cached for five minutes and refreshed while active and on resume/reconnect when stale. The last valid policy persists across restarts. Failed fetches retain it, including a confirmed required update. A newer policy revision can remove a restriction. No background polling is required.
 
 The UI gate keeps mounted drafts and stored images. Server writes independently check compatibility, including legacy callers, and return `UPDATE_REQUIRED` or `SERVICE_PAUSED`. Client release metadata is not a security credential; existing authentication/ownership checks remain required. Read endpoints stay compatible and available during a gate.
 
@@ -42,6 +42,8 @@ Use the actual available build; the example is not an instruction to recommend b
 Use `clientReleases:active` through operator tools to inspect installations seen in the last 30 days. The report is limited to 500 rows and indicates truncation. Clients report at most every six hours per session; the server also limits unchanged writes. Sentry receives native build, API version, channel, OTA update ID, runtime and policy revision for failures. Release reports and Sentry do not prove every installed client has connected recently.
 
 ## Service controls
+
+Use [featureFlags](featureFlags.md) for new single-flag operator changes. Current clients receive live flags from one Convex subscription with a persisted offline fallback. Version checks retain their separate refresh and update-lock behavior. The old full-settings mutation remains a compatibility adapter; it writes the same authoritative flag store.
 
 All current flags default on because they represent existing features. New experimental flags must default off. Remove a temporary flag once its release is established and the oldest supported client no longer needs the alternate path.
 

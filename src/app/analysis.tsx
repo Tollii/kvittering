@@ -1,9 +1,9 @@
+import { useFeatureFlag } from "@/features/featureFlags";
 import {
   resolveSpendingSelection,
   type SpendingSelection,
 } from "@/lib/spending-selection";
 import { useCompleteReceipts } from "@/features/receipt-queries";
-import { useReleasePolicy } from "@/features/release-policy";
 import { useState } from "react";
 import { Stack, useLocalSearchParams } from "expo-router";
 import { View } from "react-native";
@@ -31,7 +31,7 @@ import { formatMoney, osloDate } from "@/lib/domain/receipt";
 import { formatDate } from "@/lib/format-date";
 
 export default function Analysis() {
-  const { policy } = useReleasePolicy();
+  const spendingAnalysisEnabled = useFeatureFlag("spendingAnalysis");
   const { month } = useLocalSearchParams<{ month?: string }>();
   const { synchronize } = useHousehold();
   const [frequency, setFrequency] = useState<AnalysisFrequency>("month");
@@ -86,7 +86,7 @@ export default function Analysis() {
       );
     }
   }
-  if (!policy.features.spendingAnalysis)
+  if (!spendingAnalysisEnabled)
     return (
       <Screen title="Forbruksanalyse">
         <Notice>Forbruksanalysen er midlertidig satt på pause.</Notice>

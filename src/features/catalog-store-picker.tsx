@@ -1,4 +1,4 @@
-import { useReleasePolicy } from "./release-policy";
+import { useFeatureFlag } from "@/features/featureFlags";
 import { useState } from "react";
 import { Copy, Field, Loading, Notice, Row, Sheet } from "@/components/ui";
 import { useCatalogSearch } from "./catalog-queries";
@@ -16,7 +16,7 @@ export function CatalogStorePicker({
   onClose: () => void;
 }) {
   const [search, setSearch] = useState(name);
-  const { policy } = useReleasePolicy();
+  const productLookup = useFeatureFlag("productLookup");
   const query = useCatalogSearch(search, receiptId);
   return (
     <Sheet
@@ -32,12 +32,11 @@ export function CatalogStorePicker({
         />
       }
     >
-      {!policy.features.productLookup && (
+      {!productLookup && (
         <Notice>Butikksøket er midlertidig satt på pause.</Notice>
       )}
       {((query.isFetching && !query.data) ||
-        (policy.features.productLookup &&
-          query.data?.status === "pending")) && (
+        (productLookup && query.data?.status === "pending")) && (
         <Loading title="Henter butikker …" />
       )}
       {(query.isError || query.data?.status === "error") && (

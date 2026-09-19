@@ -43,6 +43,7 @@ type ReportProps = {
   month: string;
   reviewedOnly: boolean;
   historyComplete: boolean;
+  coverageComplete: boolean;
   surprises: ReturnType<typeof monthPriceSignals>;
   meatRows: SpendingGroup[];
   onSelect: (value: SpendingGroup, dimension?: SpendingDimension) => void;
@@ -58,6 +59,7 @@ export function useSpendingReports({
   month,
   reviewedOnly,
   historyComplete,
+  coverageComplete,
   surprises,
   meatRows,
   onSelect,
@@ -281,6 +283,9 @@ export function useSpendingReports({
         <>
           {
             <>
+              {!coverageComplete && (
+                <Notice>Henter kvitteringer uten dato …</Notice>
+              )}
               <Row
                 title={`${coverage.unlinkedCount} varer uten produktkobling`}
                 onPress={() => onAccounting("unlinked")}

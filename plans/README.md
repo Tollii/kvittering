@@ -2,11 +2,11 @@
 
 Read [the HTML report](simplification-review/report.html) for findings, all 23 tables, all 26 effects, architecture, evidence limits, and implementation packages.
 
-Audited commit: `af69fdafc24ae0b2367989e5203f50067b2479d8`, 2026-09-19. Application code was unchanged during the audit. Typecheck, lint, and all 148 tests passed. These plans are proposed work.
+Audited commit: `af69fdafc24ae0b2367989e5203f50067b2479d8`, 2026-09-19. Application code was unchanged during the audit. Typecheck, lint, and all 148 tests passed. All 19 plans are implemented in separate commits. See [the final verification record](simplification-review/verification.md) for checks and remaining native/release limits. The findings and source counts below describe the audit baseline.
 
 ## Follow-up: Convex reactivity and optional fields
 
-The report now explains where reactive queries can replace polling. Plans 007 and 017 remain TODO. Convex 1.46.0 was already current. A separate source update adopts fluent optional validators and removes absent metadata placeholders; see [the migration record](../docs/optional-metadata-migration.md). Recheck cited source lines before executing a plan.
+The report now explains where reactive queries can replace polling. Plans 007 and 017 are implemented. Convex 1.46.0 was already current. A separate source update adopts fluent optional validators and removes absent metadata placeholders; see [the migration record](../docs/optional-metadata-migration.md). Cited source lines describe the audit baseline; use the implementation records for the completed changes.
 
 ## Read and write contracts
 
@@ -36,7 +36,7 @@ Start with 001, 002, 003, and 004. They fix demonstrated state/model defects and
 | [016](simplification-review/016-spending-report-selection.md) | Keep report selections linked to current data | P2 | S–M | 004, 012 | DONE |
 | [014](simplification-review/014-typed-classification-contracts.md) | Keep classification evidence and taxonomy typed | P2 | M | None | DONE |
 | [013](simplification-review/013-module-and-table-cleanup.md) | Remove dead paths and separate large presentation modules | P3 | S–M | 001, 012, 016 | DONE |
-| [019](simplification-review/019-feature-flags.md) | Make featureFlags simple to define and consume | P2 | M | 015; execute last | TODO |
+| [019](simplification-review/019-feature-flags.md) | Make featureFlags simple to define and consume | P2 | M | 015; execute last | DONE |
 
 Status values: TODO, IN PROGRESS, DONE, BLOCKED (reason), REJECTED (reason).
 
@@ -50,7 +50,7 @@ The follow-up read review confirms full-history loading in the root provider, tw
 
 ## Function contracts
 
-The follow-up review adds pure decision functions, narrow semantic inputs, explicit results, and checked type transitions as acceptance criteria for all packages. See the Function contracts section of the HTML report and the embedded requirements in each plan. The strongest changes are in 002, 005, 006, 008, 010, and 014. Parsing establishes structural facts; approval, ownership, and current revisions need separate evidence. Application code remains unchanged.
+The follow-up review adds pure decision functions, narrow semantic inputs, explicit results, and checked type transitions as acceptance criteria for all packages. See the Function contracts section of the HTML report and the embedded requirements in each plan. The strongest changes are in 002, 005, 006, 008, 010, and 014. Parsing establishes structural facts; approval, ownership, and current revisions need separate evidence. The implementation records describe the resulting source changes.
 
 ## Dependencies and execution limits
 
@@ -61,8 +61,8 @@ The follow-up review adds pure decision functions, narrow semantic inputs, expli
 - 004 and 012 precede 016. 001, 012, and 016 precede the final presentation cleanup in 013.
 - 019 runs last and reuses lifecycle ownership from 015. It must preserve the flag consumers revised by earlier packages.
 - Plans overlap in schema, receipt routes, session, and worker files. Execute one overlapping package at a time. Any parallel execution needs explicit file ownership.
-- No deployment, data deletion, commit, or publication is part of this report.
-- New native modules are not proposed. A later implementation still needs release review if it changes backend contracts or local payload formats.
+- The audit did not authorize implementation. The later user request authorized implementation and one commit per plan. No deployment, live data deletion, push, or publication was performed.
+- No native modules were added. Source compatibility review is recorded in the final verification record; installed-client and live release checks remain required before release.
 
 ## Findings considered and rejected
 

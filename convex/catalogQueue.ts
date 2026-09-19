@@ -1,4 +1,4 @@
-import { featureEnabled } from "./releasePolicy";
+import { featureEnabled } from "./featureFlags";
 import { v } from "convex/values";
 import { Workpool, vOnCompleteValidator } from "@convex-dev/workpool";
 import {

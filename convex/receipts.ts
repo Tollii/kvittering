@@ -553,6 +553,7 @@ const readScopeValidator = v.union(
   v.object({ kind: v.literal("product"), key: v.string() }),
   v.object({ kind: v.literal("priceHistory"), receiptId: v.id("receipts") }),
   v.object({ kind: v.literal("allProducts") }),
+  v.object({ kind: v.literal("undated") }),
   v.object({ kind: v.literal("inbox") }),
 );
 /** Complete consumers must exhaust these bounded pages before publishing totals. */
@@ -562,6 +563,15 @@ export const readPage = query({
   handler: async (ctx, { scope, paginationOpts }) => {
     const member = await requireMember(ctx);
     const options = { ...paginationOpts, maximumRowsRead: 100 };
+    if (scope.kind === "undated")
+      return ctx.db
+        .query("receipts")
+        .withIndex("by_householdId_and_purchaseDate", (q) =>
+          q
+            .eq("householdId", member.householdId)
+            .lte("data.purchaseDate", null),
+        )
+        .paginate(options);
     if (scope.kind === "period") {
       if (
         !/^\d{4}-\d{2}-\d{2}$/.test(scope.start) ||

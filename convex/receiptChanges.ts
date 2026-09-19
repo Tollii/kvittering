@@ -1,3 +1,7 @@
+import {
+  parseReceiptIssue,
+  receiptIssueText,
+} from "../src/lib/domain/receipt-issues";
 import { v } from "convex/values";
 import type { Doc, Id } from "./_generated/dataModel";
 import type { MutationCtx } from "./_generated/server";
@@ -110,7 +114,19 @@ export async function commitReceiptChange(
     });
   await ctx.db.patch("receipts", previous._id, {
     ...decision,
-    data: parsed.receipt,
+    // Keep the installed-client representation at the storage boundary.
+    data: {
+      ...parsed.receipt,
+      issues: parsed.receipt.issues.map((issue) =>
+        receiptIssueText(parseReceiptIssue(issue)),
+      ),
+      lines: parsed.receipt.lines.map((line) => ({
+        ...line,
+        issues: line.issues.map((issue) =>
+          receiptIssueText(parseReceiptIssue(issue)),
+        ),
+      })),
+    },
     duplicateOf,
     duplicateResolved,
     excluded: input.excluded ?? previous.excluded,

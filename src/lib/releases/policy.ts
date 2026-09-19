@@ -1,3 +1,9 @@
+import {
+  defaultFeatureFlags,
+  legacyFeatures,
+  legacyFeaturesValidator,
+  type FeatureName,
+} from "../featureFlags";
 import { v, type Infer } from "convex/values";
 import { parse } from "convex-helpers/validators";
 
@@ -25,12 +31,7 @@ export const clientValidator = v.object({
   updateId: v.union(v.string(), v.null()),
   runtimeVersion: v.union(v.string(), v.null()),
 });
-export const featuresValidator = v.object({
-  receiptProcessing: v.boolean(),
-  productLookup: v.boolean(),
-  automaticProductMatching: v.boolean(),
-  spendingAnalysis: v.boolean(),
-});
+export const featuresValidator = legacyFeaturesValidator;
 export const policySettingsValidator = v.object({
   minimum: v.union(releaseValidator, v.null()),
   recommended: v.union(releaseValidator, v.null()),
@@ -45,10 +46,15 @@ export const policyValidator = v.object({
   platform: platformValidator,
   channel: channelValidator,
 });
+export const versionPolicyValidator = policyValidator.omit("features");
+export const storedPolicyValidator = versionPolicyValidator.extend({
+  features: featuresValidator.optional(),
+});
+export type VersionPolicy = Infer<typeof versionPolicyValidator>;
 export type ClientRelease = Infer<typeof clientValidator>;
 export type ReleasePolicy = Infer<typeof policyValidator>;
 export type ReleaseSettings = Infer<typeof policySettingsValidator>;
-export type Feature = keyof ReleasePolicy["features"];
+export type Feature = FeatureName;
 export type Platform = ReleasePolicy["platform"];
 export type Channel = ReleasePolicy["channel"];
 
@@ -65,13 +71,7 @@ export function defaultPolicy(
     recommended: null,
     minimumApiVersion: 0,
     message: "",
-    // Existing features remain enabled. New experimental flags must default off.
-    features: {
-      receiptProcessing: true,
-      productLookup: true,
-      automaticProductMatching: true,
-      spendingAnalysis: true,
-    },
+    features: legacyFeatures(defaultFeatureFlags()),
   };
 }
 function components(value: string) {
@@ -123,7 +123,7 @@ export function parsePolicy(value: unknown): ReleasePolicy {
   return result;
 }
 export function updateRequirement(
-  policy: ReleasePolicy,
+  policy: VersionPolicy,
   client?: ClientRelease,
 ): "required" | "recommended" | "none" {
   // Clients released before this contract declare API version zero.
@@ -142,9 +142,24 @@ export function updateRequirement(
   }
   return "none";
 }
-export function updateUrl(policy: ReleasePolicy) {
+export function updateUrl(policy: VersionPolicy) {
   if (policy.channel === "testflight") return "itms-beta://";
   return policy.platform === "ios"
     ? "https://apps.apple.com/app/id6813602733"
     : null;
+}
+
+export function parseVersionPolicy(value: unknown): VersionPolicy {
+  if (!value || typeof value !== "object")
+    throw new Error("Invalid release policy.");
+  const { features: _features, ...version } = value as Record<string, unknown>;
+  void _features;
+  const result = parse(versionPolicyValidator, version);
+  validateSettings({
+    ...result,
+    features: legacyFeatures(defaultFeatureFlags()),
+  });
+  if (!Number.isSafeInteger(result.revision) || result.revision < 0)
+    throw new Error("Invalid policy revision.");
+  return result;
 }

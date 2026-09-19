@@ -1,15 +1,16 @@
 import Storage from "expo-sqlite/kv-store";
 import { storageSuffix } from "../deployment-storage";
 import { installedRelease } from "./client";
-import { parsePolicy, type ReleasePolicy } from "./policy";
+import { parseVersionPolicy, type VersionPolicy } from "./policy";
+import { legacyFeatures, type FeatureFlags } from "../featureFlags";
 
 const prefix = `release-policy-v1${storageSuffix}:${installedRelease.channel}:${installedRelease.platform}`;
 export function readCachedPolicy():
-  { policy: ReleasePolicy; fetchedAt: number } | undefined {
+  { policy: VersionPolicy; fetchedAt: number } | undefined {
   try {
     const raw = JSON.parse(Storage.getItemSync(prefix) ?? "null");
     if (!raw || !Number.isFinite(raw.fetchedAt) || raw.fetchedAt < 0) return;
-    const policy = parsePolicy(raw.policy);
+    const policy = parseVersionPolicy(raw.policy);
     if (
       policy.channel !== installedRelease.channel ||
       policy.platform !== installedRelease.platform
@@ -20,9 +21,20 @@ export function readCachedPolicy():
     return;
   }
 }
-export function cachePolicy(policy: ReleasePolicy, fetchedAt: number) {
+export function cachePolicy(
+  policy: VersionPolicy,
+  fetchedAt: number,
+  flags: FeatureFlags,
+) {
   try {
-    Storage.setItemSync(prefix, JSON.stringify({ policy, fetchedAt }));
+    // Older OTA clients must still parse a confirmed update requirement after rollback.
+    Storage.setItemSync(
+      prefix,
+      JSON.stringify({
+        policy: { ...policy, features: legacyFeatures(flags) },
+        fetchedAt,
+      }),
+    );
   } catch {
     /* Memory remains available when storage is full. */
   }

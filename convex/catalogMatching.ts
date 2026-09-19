@@ -1,6 +1,6 @@
 import { commitReceiptChange } from "./receiptChanges";
 import { isCategoryUncertain } from "../src/lib/domain/receipt-issues";
-import { featureEnabled } from "./releasePolicy";
+import { featureEnabled } from "./featureFlags";
 import { clientMutation as mutation } from "./clientFunctions";
 import { v } from "convex/values";
 import {
