@@ -4,7 +4,7 @@
 
 ## Status
 
-- Status: TODO
+- Status: DONE
 - Priority: P1
 - Effort: M–L
 - Risk: Medium
@@ -197,3 +197,9 @@ The projection owns receipt eligibility, current-analysis evidence, and quantity
 ## Maintenance notes
 
 New reports consume the projection rather than duplicating reconciliation or analysis freshness checks.
+
+## Implementation record
+
+Added purchase preparation with explicit currency, provisional, duplicate, and date policies. Overview, product, family, attribute, catalog, calendar, and spending comparison reducers use the preparation boundary. Current analysis checks have one owner. Price comparisons use matching interpreted quantity bases and one history index per monthly report. Missing and stale denominators produce no warning.
+
+Verification: reproduced excluded-target and multipack failures before the change; focused report tests, typecheck, lint, all 165 tests, and diff checks passed. Accounting fixtures preserve existing totals. No device or live-data checks were performed.

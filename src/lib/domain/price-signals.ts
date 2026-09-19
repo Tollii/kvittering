@@ -1,8 +1,16 @@
 import { receiptMonth, type Receipt } from "./insights";
-import { spendingLines, type ReceiptLine } from "./receipt";
+import { type ReceiptLine } from "./receipt";
+import {
+  preparePurchases,
+  comparisonPurchasePolicy,
+  type PreparedPurchase,
+} from "./purchase-projection";
+import type { PurchaseQuantity } from "./product-families";
 
 export type PriceSignal = {
   key: string;
+  basis: keyof PurchaseQuantity;
+  quantity: number;
   name: string;
   /** Net unit price paid on this line. */
   currentOre: number;
@@ -24,11 +32,6 @@ function identity(line: ReceiptLine) {
   return line.catalogProduct?.key ?? line.productId ?? null;
 }
 
-function unitOre(line: ReceiptLine & { netOre: number }) {
-  const quantity = line.quantity && line.quantity > 0 ? line.quantity : 1;
-  return Math.round(line.netOre / quantity);
-}
-
 function median(values: number[]) {
   const sorted = [...values].sort((a, b) => a - b);
   const middle = Math.floor(sorted.length / 2);
@@ -37,58 +40,78 @@ function median(values: number[]) {
     : Math.round((sorted[middle - 1] + sorted[middle]) / 2);
 }
 
-/** Every priced, linked product line in the household, grouped by identity. */
-function observations(receipts: Receipt[]) {
-  const byKey = new Map<
-    string,
-    { receiptId: string; unitOre: number; name: string }[]
-  >();
-  for (const receipt of receipts) {
-    if (!receipt.data || receipt.excluded || receipt.data.currency !== "NOK")
-      continue;
-    for (const line of spendingLines(receipt.data).products) {
-      const key = identity(line);
-      if (!key || line.netOre <= 0) continue;
-      byKey.set(key, [
-        ...(byKey.get(key) ?? []),
-        {
-          receiptId: receipt._id,
-          unitOre: unitOre(line),
-          name: line.catalogProduct?.name ?? line.productName ?? line.name,
-        },
-      ]);
-    }
-  }
-  return byKey;
+type Observation = {
+  purchase: PreparedPurchase;
+  key: string;
+  basis: keyof PurchaseQuantity;
+  quantity: number;
+  ore: number;
+};
+const bases = ["packages", "units", "grams", "millilitres"] as const;
+function observations(purchases: PreparedPurchase[]) {
+  return purchases.flatMap((purchase) => {
+    const key = identity(purchase.line);
+    if (
+      !key ||
+      purchase.amountOre <= 0 ||
+      purchase.line.amountOre === null ||
+      !purchase.analysis
+    )
+      return [];
+    return bases.flatMap((basis) => {
+      const quantity = purchase.analysis!.quantity[basis];
+      return quantity !== null && Number.isFinite(quantity) && quantity > 0
+        ? [
+            {
+              purchase,
+              key,
+              basis,
+              quantity,
+              ore: purchase.amountOre / quantity,
+            },
+          ]
+        : [];
+    });
+  });
 }
-
-/**
- * Lines on `receipt` whose unit price departs from what the household usually
- * pays for the same product on other receipts.
- */
-export function priceSignals(
-  receipts: Receipt[],
-  receipt: Receipt,
-): Map<string, PriceSignal> {
+function priceHistory(purchases: PreparedPurchase[]) {
+  const history = new Map<string, Observation[]>();
+  for (const observation of observations(purchases)) {
+    const key = `${observation.key}:${observation.basis}`;
+    const values = history.get(key) ?? [];
+    values.push(observation);
+    history.set(key, values);
+  }
+  return history;
+}
+function comparePrices(
+  history: Map<string, Observation[]>,
+  purchases: PreparedPurchase[],
+) {
   const result = new Map<string, PriceSignal>();
-  if (!receipt.data) return result;
-  const history = observations(receipts);
-  for (const line of spendingLines(receipt.data).products) {
-    const key = identity(line);
-    if (!key || line.netOre <= 0) continue;
-    const others = (history.get(key) ?? []).filter(
-      (item) => item.receiptId !== receipt._id,
+  for (const observation of observations(purchases)) {
+    const {
+      purchase: { receipt, line },
+      key,
+      basis,
+      quantity,
+      ore,
+    } = observation;
+    if (result.has(line.id)) continue;
+    const others = (history.get(`${key}:${basis}`) ?? []).filter(
+      (item) => item.purchase.receipt._id !== receipt._id,
     );
     if (others.length < priceSignalMinimumObservations) continue;
-    const typicalOre = median(others.map((item) => item.unitOre));
+    const typicalOre = median(others.map((item) => item.ore));
     if (typicalOre <= 0) continue;
-    const currentOre = unitOre(line);
-    const ratio = currentOre / typicalOre;
+    const ratio = ore / typicalOre;
     if (Math.abs(ratio - 1) < priceSignalThreshold) continue;
     result.set(line.id, {
       key,
+      basis,
+      quantity,
       name: line.catalogProduct?.name ?? line.productName ?? line.name,
-      currentOre,
+      currentOre: ore,
       typicalOre,
       ratio,
       observations: others.length,
@@ -99,18 +122,36 @@ export function priceSignals(
   return result;
 }
 
-/** All unusual prices paid in a month, most expensive surprises first. */
-export function monthPriceSignals(receipts: Receipt[], month: string) {
-  const signals: PriceSignal[] = [];
-  for (const receipt of receipts) {
-    if (receiptMonth(receipt) !== month) continue;
-    signals.push(...priceSignals(receipts, receipt).values());
-  }
-  return signals.sort(
-    (a, b) =>
-      (b.currentOre - b.typicalOre) * (b.line.quantity ?? 1) -
-      (a.currentOre - a.typicalOre) * (a.line.quantity ?? 1),
+/** Compare current, known quantities for the same linked identity and measure. */
+export function priceSignals(
+  receipts: Receipt[],
+  receipt: Receipt,
+): Map<string, PriceSignal> {
+  const history = priceHistory(
+    preparePurchases(receipts, comparisonPurchasePolicy).flatMap(
+      (item) => item.purchases,
+    ),
   );
+  return comparePrices(
+    history,
+    preparePurchases([receipt], comparisonPurchasePolicy).flatMap(
+      (item) => item.purchases,
+    ),
+  );
+}
+
+/** Build history once, then compare eligible purchases in the selected month. */
+export function monthPriceSignals(receipts: Receipt[], month: string) {
+  const prepared = preparePurchases(receipts, comparisonPurchasePolicy);
+  const history = priceHistory(prepared.flatMap((item) => item.purchases));
+  return prepared
+    .filter((item) => receiptMonth(item.receipt) === month)
+    .flatMap((item) => [...comparePrices(history, item.purchases).values()])
+    .sort(
+      (a, b) =>
+        (b.currentOre - b.typicalOre) * b.quantity -
+        (a.currentOre - a.typicalOre) * a.quantity,
+    );
 }
 
 export function priceSignalLabel(signal: PriceSignal) {

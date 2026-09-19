@@ -1,9 +1,10 @@
 import type { Receipt, Contribution } from "./insights";
-import { spendingLines } from "./receipt";
+import {
+  preparePurchases,
+  overviewPurchasePolicy,
+} from "./purchase-projection";
 import {
   emptyPurchaseQuantity,
-  productAnalysisVersion,
-  purchaseEvidenceKey,
   type PurchaseQuantity,
 } from "./product-families";
 
@@ -21,26 +22,12 @@ export function familyInsights(receipts: Receipt[]) {
     linked = 0,
     pending = 0,
     failed = 0;
-  for (const receipt of receipts) {
-    if (!receipt.data || receipt.excluded || receipt.data.currency !== "NOK")
-      continue;
-    const analysis = receipt.productAnalysis;
-    const current =
-      analysis?.version === productAnalysisVersion &&
-      analysis.generation === receipt.generation &&
-      analysis.revision === receipt.revision;
-    if (!current || analysis.state === "pending") pending++;
-    else if (analysis.state === "error") failed++;
-    for (const line of spendingLines(receipt.data).products) {
+  for (const prepared of preparePurchases(receipts, overviewPurchasePolicy)) {
+    const { receipt } = prepared;
+    if (prepared.analysisState === "pending") pending++;
+    else if (prepared.analysisState === "error") failed++;
+    for (const { line, analysis: result } of prepared.purchases) {
       total++;
-      const result =
-        current && analysis.state === "complete"
-          ? analysis.results.find(
-              (item) =>
-                item.lineId === line.id &&
-                item.evidenceKey === purchaseEvidenceKey(line),
-            )
-          : null;
       if (!result?.family) continue;
       linked++;
       const family = families.get(result.family.id) ?? {

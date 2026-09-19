@@ -1,3 +1,7 @@
+import {
+  productAnalysisVersion,
+  purchaseEvidenceKey,
+} from "./product-families";
 import { expect, it } from "vitest";
 import {
   monthPriceSignals,
@@ -24,7 +28,24 @@ const receipt = (id: string, purchaseDate: string, colaOre: number) => {
     _creationTime: 0,
     excluded: false,
     status: "reviewed",
+    revision: 0,
+    generation: 0,
     data,
+    productAnalysis: {
+      version: productAnalysisVersion,
+      revision: 0,
+      generation: 0,
+      state: "complete",
+      updatedAt: 0,
+      results: [
+        {
+          lineId: cola.id,
+          evidenceKey: purchaseEvidenceKey(cola),
+          family: null,
+          quantity: { packages: 1, units: 10, grams: null, millilitres: 3300 },
+        },
+      ],
+    },
   } as unknown as Receipt;
 };
 
@@ -69,4 +90,41 @@ it("lists a month's surprises, largest overspend first", () => {
   const month = monthPriceSignals([...history, cheap, dear], "2026-09");
   expect(month.map((signal) => signal.receipt._id)).toEqual(["dear", "cheap"]);
   expect(priceSignalLabel(month[1])).toMatch(/^−2\d % vs vanlig$/);
+});
+
+it("omits excluded warning targets", () => {
+  const history = [
+    receipt("a", "2026-07-01", 9490),
+    receipt("b", "2026-07-02", 9490),
+    receipt("c", "2026-07-03", 9490),
+  ];
+  const target = { ...receipt("d", "2026-09-01", 20000), excluded: true };
+  expect(monthPriceSignals([...history, target], "2026-09")).toEqual([]);
+});
+
+it("uses interpreted packages for equivalent raw unit quantities", () => {
+  const history = [
+    receipt("a", "2026-07-01", 9490),
+    receipt("b", "2026-07-02", 9490),
+    receipt("c", "2026-07-03", 9490),
+  ];
+  const target = receipt("d", "2026-09-01", 9490);
+  target.data!.lines.find((line) => line.id === "cola")!.quantity = 10;
+  target.productAnalysis!.results[0].evidenceKey = purchaseEvidenceKey(
+    target.data!.lines.find((line) => line.id === "cola")!,
+  );
+  expect(priceSignals([...history, target], target).size).toBe(0);
+});
+
+it("does not invent a denominator for missing or stale analysis", () => {
+  const history = [
+    receipt("a", "2026-07-01", 9490),
+    receipt("b", "2026-07-02", 9490),
+    receipt("c", "2026-07-03", 9490),
+  ];
+  const target = receipt("d", "2026-09-01", 20000);
+  target.revision++;
+  expect(priceSignals(history, target).size).toBe(0);
+  delete target.productAnalysis;
+  expect(priceSignals(history, target).size).toBe(0);
 });

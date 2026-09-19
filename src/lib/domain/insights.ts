@@ -1,6 +1,10 @@
+import {
+  preparePurchases,
+  overviewPurchasePolicy,
+} from "./purchase-projection";
 import type { Doc } from "../../../convex/_generated/dataModel";
 import { categoryById } from "./categories";
-import { reconcile, spendingLines, type ReceiptLine } from "./receipt";
+import { type ReceiptLine } from "./receipt";
 export type Receipt = Doc<"receipts">;
 export type Contribution = {
   receipt: Receipt;
@@ -26,19 +30,17 @@ export function monthlyInsights(
   month: string,
   reviewedOnly = false,
 ) {
-  const eligible = receipts.filter(
-    (r) =>
-      !r.excluded &&
-      r.data &&
-      receiptMonth(r) === month &&
-      (!reviewedOnly || r.status === "reviewed"),
-  );
-  const unconverted = eligible.filter(
-    (receipt) => receipt.data!.currency !== "NOK",
-  );
-  const selected = eligible.filter(
-    (receipt) => receipt.data!.currency === "NOK",
-  );
+  const projected = preparePurchases(receipts, {
+    ...overviewPurchasePolicy,
+    currency: "all",
+    provisional: reviewedOnly ? "exclude" : "include",
+    period: { start: `${month}-01`, end: `${month}-31` },
+  });
+  const unconverted = projected
+    .filter((item) => item.data.currency !== "NOK")
+    .map((item) => item.receipt);
+  const prepared = projected.filter((item) => item.data.currency === "NOK");
+  const selected = prepared.map((item) => item.receipt);
   const category = new Map<string, SpendingGroup>();
   const stores = new Map<string, SpendingGroup>();
   let paid = 0,
@@ -59,9 +61,7 @@ export function monthlyInsights(
     group.contributions.push(contribution);
     map.set(id, group);
   };
-  for (const receipt of selected) {
-    const data = receipt.data!;
-    const totals = reconcile(data);
+  for (const { receipt, data, totals, purchases, unallocated } of prepared) {
     unknownAmounts += totals.unknown;
     paid += data.totalOre ?? 0;
     products += totals.productSpending;
@@ -69,8 +69,7 @@ export function monthlyInsights(
     deposits += totals.deposits;
     returns += totals.returns;
     if (data.totalOre === null) unknownTotals++;
-    const lines = spendingLines(data);
-    for (const line of lines.products) {
+    for (const { line } of purchases) {
       const found = categoryById.get(line.categoryId ?? "");
       add(
         category,
@@ -83,11 +82,11 @@ export function monthlyInsights(
         },
       );
     }
-    if (lines.unallocated)
+    if (unallocated)
       add(category, "unallocated", "Ufordelte rabatter og justeringer", {
         receipt,
         line: null,
-        amountOre: lines.unallocated,
+        amountOre: unallocated,
       });
     add(stores, data.store ?? "unknown", data.store ?? "Ukjent butikk", {
       receipt,
@@ -145,10 +144,11 @@ export function monthlyInsights(
     unknownTotals,
     unknownAmounts,
     purchaseTypes: [...purchaseTypes.values()],
-    discrepancies: selected.filter((receipt) => {
-      const result = reconcile(receipt.data!);
-      return result.difference !== null && result.difference !== 0;
-    }),
+    discrepancies: prepared
+      .filter(
+        ({ totals }) => totals.difference !== null && totals.difference !== 0,
+      )
+      .map((item) => item.receipt),
     suspectedDuplicates: selected.filter(
       (receipt) => receipt.duplicateOf && !receipt.duplicateResolved,
     ),
@@ -176,12 +176,16 @@ export function productHistory(receipts: Receipt[]) {
       contributions: Contribution[];
     }
   >();
-  for (const receipt of receipts) {
-    if (!receipt.data || receipt.excluded || receipt.data.currency !== "NOK")
-      continue;
-    for (const line of spendingLines(receipt.data).products) {
+  for (const { receipt, purchases } of preparePurchases(
+    receipts,
+    overviewPurchasePolicy,
+  )) {
+    for (const { line } of purchases) {
       // Unlinked items remain separate; similar names do not establish identity.
-      const key = line.catalogProduct?.key ?? line.productId ?? `${receipt._id}:${line.id}`;
+      const key =
+        line.catalogProduct?.key ??
+        line.productId ??
+        `${receipt._id}:${line.id}`;
       const product = products.get(key) ?? {
         key,
         name: line.catalogProduct?.name ?? (line.productName || line.name),
@@ -328,19 +332,14 @@ export function spendingCalendar(
       unknown: 0,
     });
   }
-  for (const receipt of receipts) {
-    if (
-      receipt.excluded ||
-      !receipt.data ||
-      receipt.data.currency !== "NOK" ||
-      (reviewedOnly && receipt.status !== "reviewed")
-    )
-      continue;
-    const date = receipt.data.purchaseDate;
+  for (const { receipt, data, totals } of preparePurchases(receipts, {
+    ...overviewPurchasePolicy,
+    provisional: reviewedOnly ? "exclude" : "include",
+  })) {
+    const date = data.purchaseDate;
     if (!date || date > today) continue;
     const day = days.get(date);
     if (!day) continue;
-    const totals = reconcile(receipt.data);
     day.amountOre += totals.productSpending;
     day.unknown += totals.unknown;
     day.provisional += receipt.status === "reviewed" ? 0 : 1;

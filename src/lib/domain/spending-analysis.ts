@@ -1,12 +1,15 @@
-import type { Contribution, Receipt } from "./insights";
-import { reconcile, spendingLines, formatMoney } from "./receipt";
 import {
-  productAnalysisVersion,
+  preparePurchases,
+  comparisonPurchasePolicy,
+} from "./purchase-projection";
+import type { Contribution, Receipt } from "./insights";
+import { formatMoney } from "./receipt";
+import {
   productProfileKey,
-  purchaseEvidenceKey,
   type ProductAnalysisResult,
 } from "./product-families";
 import { categoryById } from "./categories";
+export { currentLineAnalysis } from "./purchase-projection";
 
 export type AnalysisPeriod = {
   start: string;
@@ -59,24 +62,6 @@ export function analysisPeriod(
   return { start, end, previousStart, previousEnd };
 }
 
-export function currentLineAnalysis(
-  receipt: Receipt,
-  line: NonNullable<Receipt["data"]>["lines"][number],
-): ProductAnalysisResult | undefined {
-  const analysis = receipt.productAnalysis;
-  if (
-    analysis?.state !== "complete" ||
-    analysis.version !== productAnalysisVersion ||
-    analysis.generation !== receipt.generation ||
-    analysis.revision !== receipt.revision
-  )
-    return;
-  return analysis.results.find(
-    (result) =>
-      result.lineId === line.id &&
-      result.evidenceKey === purchaseEvidenceKey(line),
-  );
-}
 export type SpendingEffect = {
   id: string;
   name: string;
@@ -104,19 +89,16 @@ export function spendingAnalysis(
   period: AnalysisPeriod,
   reviewedOnly = false,
 ) {
-  const eligible = receipts.filter(
-    (receipt) =>
-      receipt.data?.currency === "NOK" &&
-      !receipt.excluded &&
-      !(receipt.duplicateOf && !receipt.duplicateResolved) &&
-      (!reviewedOnly || receipt.status === "reviewed"),
-  );
+  const prepared = preparePurchases(receipts, {
+    ...comparisonPurchasePolicy,
+    provisional: reviewedOnly ? "exclude" : "include",
+  });
   const within = (start: string, end: string) =>
-    eligible.filter(
-      (receipt) =>
-        !!receipt.data?.purchaseDate &&
-        receipt.data.purchaseDate >= start &&
-        receipt.data.purchaseDate <= end,
+    prepared.filter(
+      ({ data }) =>
+        !!data.purchaseDate &&
+        data.purchaseDate >= start &&
+        data.purchaseDate <= end,
     );
   const current = within(period.start, period.end),
     previous = within(period.previousStart, period.previousEnd);
@@ -131,13 +113,11 @@ export function spendingAnalysis(
     ["current", current],
     ["previous", previous],
   ] as const) {
-    for (const receipt of selected) {
-      const data = receipt.data!;
-      const total = reconcile(data);
+    for (const { receipt, totals: total, purchases } of selected) {
       if (side === "current") currentOre += total.productSpending;
       else previousOre += total.productSpending;
       missingAmounts += total.unknown;
-      for (const line of spendingLines(data).products) {
+      for (const { line, analysis: result } of purchases) {
         productLines++;
         const contribution = { receipt, line, amountOre: line.netOre };
         const categoryId = line.categoryId ?? "fallback.unclear";
@@ -158,7 +138,6 @@ export function spendingAnalysis(
           line.netOre;
         category.contributions.push(contribution);
         categories.set(categoryId, category);
-        const result = currentLineAnalysis(receipt, line);
         if (!result?.family) continue;
         const group = groups.get(result.family.id) ?? {
           name: result.family.name,
@@ -236,7 +215,7 @@ export function spendingAnalysis(
     currentReceipts: current.length,
     previousReceipts: previous.length,
     provisionalReceipts: [...current, ...previous].filter(
-      (r) => r.status !== "reviewed",
+      (r) => r.receipt.status !== "reviewed",
     ).length,
     missingAmounts,
     measuredLines,

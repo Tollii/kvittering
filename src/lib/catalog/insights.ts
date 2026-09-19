@@ -1,4 +1,7 @@
-import { spendingLines } from "../domain/receipt";
+import {
+  preparePurchases,
+  overviewPurchasePolicy,
+} from "../domain/purchase-projection";
 import type { Receipt, SpendingGroup, Contribution } from "../domain/insights";
 import { normalizeSearch } from "./policy";
 
@@ -25,11 +28,11 @@ export function catalogInsights(receipts: Receipt[]) {
     group.contributions.push(contribution);
     groups.set(id, group);
   }
-  for (const receipt of receipts) {
-    if (!receipt.data || receipt.excluded || receipt.data.currency !== "NOK")
-      continue;
-    const data = receipt.data;
-    for (const line of spendingLines(data).products) {
+  for (const { receipt, data, purchases } of preparePurchases(
+    receipts,
+    overviewPurchasePolicy,
+  )) {
+    for (const { line } of purchases) {
       total++;
       const contribution = { receipt, line, amountOre: line.netOre };
       if (data.physicalStore)

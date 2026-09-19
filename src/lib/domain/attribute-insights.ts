@@ -1,10 +1,12 @@
 import type { Receipt, SpendingGroup } from "./insights";
-import { currentLineAnalysis } from "./spending-analysis";
+import {
+  preparePurchases,
+  overviewPurchasePolicy,
+} from "./purchase-projection";
 import {
   emptyPurchaseQuantity,
   type PurchaseQuantity,
 } from "./product-families";
-import { spendingLines } from "./receipt";
 import {
   productTypes,
   sugarVariants,
@@ -27,17 +29,13 @@ export function attributeInsights(
   >();
   let total = 0,
     known = 0;
-  for (const receipt of receipts) {
-    if (
-      !receipt.data ||
-      receipt.excluded ||
-      receipt.data.currency !== "NOK" ||
-      (receipt.duplicateOf && !receipt.duplicateResolved)
-    )
-      continue;
-    for (const line of spendingLines(receipt.data).products) {
+  for (const prepared of preparePurchases(receipts, {
+    ...overviewPurchasePolicy,
+    duplicates: "exclude",
+  })) {
+    const { receipt } = prepared;
+    for (const { line, analysis } of prepared.purchases) {
       total++;
-      const analysis = currentLineAnalysis(receipt, line);
       const attribute = analysis?.attributes?.[dimension];
       const id =
         attribute && attribute.confidence >= 0.8 ? attribute.value : "unknown";

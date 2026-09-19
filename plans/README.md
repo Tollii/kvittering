@@ -14,14 +14,14 @@ Mutations perform writes and return null, an ID, or a small acknowledgement. Que
 
 ## Recommended execution order
 
-Start with 001, 002, 003, and 004. They fix demonstrated state/model defects and establish shared boundaries. Continue in the order below; respect dependencies. Small independent fixes 011 and 015 can be selected separately.
+Start with 001, 002, 003, and 004. They fix demonstrated state/model defects and establish shared boundaries. Continue in the order below; respect dependencies. Small independent fixes 011 and 015 can be selected separately. Execute 019 last; it consolidates feature flags under featureFlags and reuses Convex subscriptions instead of refresh timers.
 
 | Plan | Title | Priority | Effort | Depends on | Status |
 | --- | --- | --- | --- | --- | --- |
 | [001](simplification-review/001-receipt-draft-state.md) | Give each edit one draft state | P1 | M–L | None | DONE |
 | [002](simplification-review/002-package-evidence.md) | Parse package evidence once | P1 | M | None | DONE |
 | [003](simplification-review/003-catalog-cache-completeness.md) | Distinguish a catalog summary from fetched details | P1 | S–M | None | DONE |
-| [004](simplification-review/004-purchase-projection.md) | Use one purchase projection for reports and price signals | P1 | M–L | 002 | TODO |
+| [004](simplification-review/004-purchase-projection.md) | Use one purchase projection for reports and price signals | P1 | M–L | 002 | DONE |
 | [011](simplification-review/011-capture-import-state.md) | Make shared-file import an explicit operation | P1 | S–M | None | TODO |
 | [005](simplification-review/005-typed-review-assessment.md) | Separate review decisions from displayed sentences | P2 | M | None | TODO |
 | [006](simplification-review/006-receipt-write-policy.md) | Give receipt changes one transaction policy | P2 | M | 005 | TODO |
@@ -37,11 +37,17 @@ Start with 001, 002, 003, and 004. They fix demonstrated state/model defects and
 | [014](simplification-review/014-typed-classification-contracts.md) | Keep classification evidence and taxonomy typed | P2 | M | None | TODO |
 | [013](simplification-review/013-module-and-table-cleanup.md) | Remove dead paths and separate large presentation modules | P3 | S–M | 001, 012, 016 | TODO |
 
+| [019](simplification-review/019-feature-flags.md) | Make featureFlags simple to define and consume | P2 | M | 015; execute last | TODO |
+
 Status values: TODO, IN PROGRESS, DONE, BLOCKED (reason), REJECTED (reason).
 
 ## Read scope and repeated requests
 
 The follow-up read review confirms full-history loading in the root provider, two-second catalog mutation polling, repeated per-line preparation, and arbitrary historical/recipient limits. Plans 007, 009, 010, and 012 cover existing owners; 017 separates catalog commands from result observation, and 018 adds bounded continuation to background reads. 017 follows 003 and 015; 018 follows 004 and 012.
+
+## Feature flags
+
+[Plan 019](simplification-review/019-feature-flags.md) separates featureFlags from app-version requirements. Define each flag/default once, consume it through useFeatureFlag, and let a shared Convex subscription keep it current. No TTL or polling is needed for live values. Keep only a parsed, deployment-scoped last-known snapshot for startup/offline use. Server guards use current transactional state.
 
 ## Function contracts
 
@@ -54,6 +60,7 @@ The follow-up review adds pure decision functions, narrow semantic inputs, expli
 - 007 must prove server completion/retry paths before deleting client repair effects.
 - 004 and 007 precede 012 so report completeness and backend ownership stay clear.
 - 004 and 012 precede 016. 001, 012, and 016 precede the final presentation cleanup in 013.
+- 019 runs last and reuses lifecycle ownership from 015. It must preserve the flag consumers revised by earlier packages.
 - Plans overlap in schema, receipt routes, session, and worker files. Execute one overlapping package at a time. Any parallel execution needs explicit file ownership.
 - No deployment, data deletion, commit, or publication is part of this report.
 - New native modules are not proposed. A later implementation still needs release review if it changes backend contracts or local payload formats.
