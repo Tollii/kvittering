@@ -1,3 +1,4 @@
+import type { ClassificationEvidence } from "./classification";
 import { productReferenceValidator } from "./product-reference";
 import { parse as parseValue } from "convex-helpers/validators";
 import { receiptIssueText, type ReceiptIssue } from "./receipt-issues";
@@ -433,7 +434,9 @@ export function weeklyShopFixture(): ReceiptData {
 }
 
 /** Send only product evidence to the classifier, including a linked offer's product description. */
-export function classificationInputs(data: ReceiptData) {
+export function classificationInputs(
+  data: ReceiptData,
+): { id: string; evidence: ClassificationEvidence }[] {
   return data.lines
     .filter(
       (line) =>
@@ -441,12 +444,12 @@ export function classificationInputs(data: ReceiptData) {
     )
     .map((line) => ({
       id: line.id,
-      description: JSON.stringify({
+      evidence: {
         name: line.name,
-        brand: line.brand,
-        packageSize: line.packageSize,
-        packageUnit: line.packageUnit,
-        attributes: line.attributes,
+        ...(line.brand !== null ? { brand: line.brand } : {}),
+        ...(line.packageSize !== null ? { packageSize: line.packageSize } : {}),
+        ...(line.packageUnit !== null ? { packageUnit: line.packageUnit } : {}),
+        ...(line.attributes.length ? { attributes: line.attributes } : {}),
         relatedProductDescriptions: data.lines
           .filter(
             (other) =>
@@ -455,6 +458,6 @@ export function classificationInputs(data: ReceiptData) {
           .map((other) =>
             other.name.replace(/\d+(?:[.,]\d+)?\s*%/g, "").trim(),
           ),
-      }),
+      },
     }));
 }

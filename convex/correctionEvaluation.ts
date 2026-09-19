@@ -7,7 +7,7 @@ import { api, internal } from "./_generated/api";
 import type { Doc } from "./_generated/dataModel";
 import {
   classificationQuestion,
-  classificationState,
+  parseLegacyClassification,
 } from "../src/lib/domain/classification";
 import { categoryById } from "../src/lib/domain/categories";
 import { categoryMemoryKey } from "../src/lib/domain/category-memory";
@@ -55,8 +55,7 @@ export const evaluate = action({
         !categoryById.has(entry.expected)
       )
         return false;
-      const key =
-        categoryMemoryKey(entry.store, entry.name) ?? entry.description;
+      const key = categoryMemoryKey(entry.store, entry.name) ?? entry._id;
       if (seen.has(key)) return false;
       seen.add(key);
       return true;
@@ -71,8 +70,13 @@ export const evaluate = action({
     const response = await client.systemOne({
       model,
       state: {
-        products: examples.map((entry) =>
-          classificationState(entry.description),
+        products: examples.map(
+          (entry) =>
+            entry.classificationEvidence ??
+            parseLegacyClassification(
+              entry.description ?? "{}",
+              entry.evidence.name,
+            ),
         ),
       },
       questions: Object.fromEntries(

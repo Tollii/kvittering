@@ -53,7 +53,7 @@ it("records a human correction and keeps examples private to the household", asy
     previous: "other-purchases.batteries",
     expected: "drinks.soft-drinks",
   });
-  expect(JSON.parse(correction.description).name).toBe("BATTERY REMIX");
+  expect(correction.classificationEvidence?.name).toBe("BATTERY REMIX");
   expect((await other.query(api.corrections.list, {})).entries).toEqual([]);
   await expect(t.query(api.corrections.list, {})).rejects.toThrow("Logg inn");
   await expect(

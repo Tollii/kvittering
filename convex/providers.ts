@@ -18,7 +18,8 @@ import {
 import { categories } from "../src/lib/domain/categories";
 import {
   classificationQuestion,
-  classificationState,
+  classificationEvidence,
+  classificationProductValidator,
 } from "../src/lib/domain/classification";
 export const extract = internalAction({
   args: {
@@ -94,7 +95,7 @@ export const extract = internalAction({
 });
 export const classify = internalAction({
   args: {
-    products: v.array(v.object({ id: v.string(), description: v.string() })),
+    products: v.array(classificationProductValidator),
     receiptId: v.id("receipts").optional(),
     generation: v.number().optional(),
   },
@@ -142,7 +143,7 @@ export const classify = internalAction({
       const response = await client.systemOne({
         model,
         state: {
-          products: batch.map((p) => classificationState(p.description)),
+          products: batch.map((p) => classificationEvidence(p)),
         },
         questions,
       });

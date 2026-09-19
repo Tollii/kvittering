@@ -1,3 +1,4 @@
+import { classificationEvidenceValidator } from "./classification";
 import { v } from "convex/values";
 import { lineValidator } from "./receipt";
 export const correctionFields = {
@@ -10,7 +11,8 @@ export const correctionFields = {
   field: v.union(v.literal("category"), v.literal("catalog")),
   previous: v.union(v.string(), v.null()),
   expected: v.union(v.string(), v.null()),
-  description: v.string(),
+  description: v.string().optional(),
+  classificationEvidence: classificationEvidenceValidator.optional(),
   evidence: lineValidator,
 };
 export const correctionTarget = v.object({

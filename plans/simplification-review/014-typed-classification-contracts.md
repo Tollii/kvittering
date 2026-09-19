@@ -4,7 +4,7 @@
 
 ## Status
 
-- Status: TODO
+- Status: DONE
 - Priority: P2
 - Effort: M
 - Risk: Low–medium
@@ -197,3 +197,9 @@ classificationInputs and classificationState currently serialize and parse inter
 ## Maintenance notes
 
 New categories require one typed entry. New evidence fields require one contract change and a matching boundary test.
+
+## Implementation record
+
+Classification uses a shared typed evidence validator without an internal JSON round trip. New correction records store structured evidence; old descriptions and workflow arguments remain readable through a validated adapter. Taxonomy entries own purchase type and classifier metadata. Compared all 99 category IDs and labels against the previous commit: unchanged. All 195 tests pass. Active workflow replay and installed binaries remain release checks; no deployment or journal migration was performed.
+
+Validation: `npm run typecheck`, `npm run lint`, `npm test`, and `git diff --check` passed. No deployment was performed.

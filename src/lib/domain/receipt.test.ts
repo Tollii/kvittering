@@ -123,9 +123,9 @@ it("uses linked product evidence without sending prices or payment details to Je
   const data = batteryFixture();
   data.lines[1].name = "10% Battery energidrikk";
   const input = classificationInputs(data);
-  expect(input[0].description).toContain("Battery energidrikk");
-  expect(input[0].description).not.toContain("2590");
-  expect(input[0].description).not.toContain("25,90");
+  expect(JSON.stringify(input[0].evidence)).toContain("Battery energidrikk");
+  expect(JSON.stringify(input[0].evidence)).not.toContain("2590");
+  expect(JSON.stringify(input[0].evidence)).not.toContain("25,90");
 });
 it("flags repeated discount lines instead of subtracting them silently", () => {
   const data = batteryFixture();
@@ -149,13 +149,12 @@ it("keeps unknown and foreign currencies out of NOK totals", () => {
 });
 
 it("provides structured category evidence without unknown package fields or accounting data", async () => {
-  const { classificationState } = await import("./classification");
   const data = batteryFixture();
   data.lines[0].name = "MONSTER PIPELINE PUNCH";
   data.lines[0].brand = null;
   data.lines[0].packageSize = null;
   data.lines[0].packageUnit = null;
-  const state = classificationState(classificationInputs(data)[0].description);
+  const state = classificationInputs(data)[0].evidence;
   expect(state.name).toBe("MONSTER PIPELINE PUNCH");
   expect(state).not.toHaveProperty("packageSize");
   expect(state).not.toHaveProperty("brand");

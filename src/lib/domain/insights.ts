@@ -109,20 +109,7 @@ export function monthlyInsights(
   const purchaseTypes = new Map<string, SpendingGroup>();
   for (const leaf of category.values()) {
     const found = categoryById.get(leaf.id);
-    const type =
-      found?.group === "household"
-        ? "household"
-        : found?.group === "personal-care"
-          ? "personal-care"
-          : found?.group === "pets"
-            ? "pets"
-            : found?.group === "other-purchases" ||
-                leaf.id === "fallback.non-food"
-              ? "other"
-              : (found?.group === "fallback" && leaf.id !== "fallback.food") ||
-                  leaf.id === "unallocated"
-                ? "unknown"
-                : "food";
+    const type = found?.purchaseType ?? "unknown";
     const names: Record<string, string> = {
       food: "Mat og drikke",
       household: "Husholdning",

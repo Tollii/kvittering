@@ -28,11 +28,15 @@ export async function recordCorrections(
   data: ReceiptData,
 ) {
   if (!receipt.data) return;
-  const descriptions = new Map(
+  const evidence = new Map(
     classificationInputs({
       ...data,
-      lines: data.lines.map((line) => ({ ...line, productKey: null })),
-    }).map((item) => [item.id, item.description]),
+      lines: data.lines.map((line) => ({
+        ...line,
+        productKey: null,
+        categoryAliasKey: null,
+      })),
+    }).map((item) => [item.id, item.evidence]),
   );
   for (const after of data.lines) {
     const before = receipt.data.lines.find(
@@ -63,8 +67,9 @@ export async function recordCorrections(
         field,
         previous,
         expected,
-        description:
-          descriptions.get(before.id) ?? JSON.stringify({ name: before.name }),
+        classificationEvidence: evidence.get(before.id) ?? {
+          name: before.name,
+        },
         evidence: before,
       });
     }

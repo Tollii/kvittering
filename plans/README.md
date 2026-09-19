@@ -34,7 +34,7 @@ Start with 001, 002, 003, and 004. They fix demonstrated state/model defects and
 | [012](simplification-review/012-receipt-read-boundaries.md) | Load receipt data where it is needed | P2 | M | 004, 007 | DONE |
 | [018](simplification-review/018-bounded-background-reads.md) | Replace arbitrary history limits with complete bounded reads | P2 | M–L | 004, 012 | DONE |
 | [016](simplification-review/016-spending-report-selection.md) | Keep report selections linked to current data | P2 | S–M | 004, 012 | DONE |
-| [014](simplification-review/014-typed-classification-contracts.md) | Keep classification evidence and taxonomy typed | P2 | M | None | TODO |
+| [014](simplification-review/014-typed-classification-contracts.md) | Keep classification evidence and taxonomy typed | P2 | M | None | DONE |
 | [013](simplification-review/013-module-and-table-cleanup.md) | Remove dead paths and separate large presentation modules | P3 | S–M | 001, 012, 016 | TODO |
 | [019](simplification-review/019-feature-flags.md) | Make featureFlags simple to define and consume | P2 | M | 015; execute last | TODO |
 
