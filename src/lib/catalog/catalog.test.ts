@@ -81,7 +81,7 @@ it("rejects conflicting size, brand and sugar-free variants", () => {
   );
   expect(
     compatibleCatalogProduct({ ...line, name: "Cola Zero" }, product),
-  ).toBe(false);
+  ).toBe(true);
 });
 it("normalizes searches and caches genuine empty results", () => {
   expect(productSearch("  STRATOS   150G ")).toBe("stratos 150g");
@@ -118,7 +118,7 @@ it("links ordinary Coca-Cola by receipt text even when Light is the first search
   expect(
     automaticCatalogProduct({ ...line, name: "Coca Cola 0,5L" }, products)?.key,
   ).toBe(products[1].key);
-  expect(compatibleCatalogProduct(line, products[0], true)).toBe(false);
+  expect(compatibleCatalogProduct(line, products[0])).toBe(false);
   expect(automaticCatalogProduct(line, [products[0], products[2]])).toBeNull();
   expect(
     automaticCatalogProduct(line, [
@@ -128,7 +128,7 @@ it("links ordinary Coca-Cola by receipt text even when Light is the first search
   ).toBeNull();
 });
 
-it("links the only compatible product when the catalog adds nothing but size, pack or variant-neutral words", () => {
+it("links the only compatible product when package evidence agrees and additions are neutral", () => {
   const products = normalizeProducts({
     data: [
       { id: 1, name: "Battery Whirl Sugar 0,5l boks", ean: "7310865000001" },
@@ -167,6 +167,47 @@ it("links the only compatible product when the catalog adds nothing but size, pa
   ).toBe(cola[0].key);
 });
 
+it("does not let an exact name hide an unresolved size or pack alternative", () => {
+  const line = { ...emptyLine(), name: "Battery Whirl" };
+  const products = normalizeProducts({
+    data: [
+      {
+        id: 1,
+        name: "Battery Whirl",
+        ean: "7310865000001",
+        weight: 500,
+        weight_unit: "ml",
+      },
+      { id: 2, name: "Battery Whirl 330ml", ean: "7310865000002" },
+      { id: 3, name: "Battery Whirl X 24", ean: "7310865000003" },
+    ],
+  });
+  expect(automaticCatalogProduct(line, products.slice(0, 2))).toBeNull();
+  expect(automaticCatalogProduct(line, [products[0], products[2]])).toBeNull();
+  expect(automaticCatalogProduct(line, [products[2]])).toBeNull();
+  expect(compatibleCatalogProduct(line, products[2])).toBe(true);
+  expect(
+    compatibleCatalogProduct(
+      { ...line, packageSize: 10, packageUnit: "pk" },
+      products[2],
+    ),
+  ).toBe(false);
+});
+
+it("keeps the original variant evidence after broader retrieval", () => {
+  const products = normalizeProducts({
+    data: [
+      { id: 1, name: "Cheez Doodles 120g", brand: "OLW", ean: "7310865000001" },
+    ],
+  });
+  expect(
+    automaticCatalogProduct(
+      { ...emptyLine(), name: "CHEEZ DOODLES XL" },
+      products,
+    ),
+  ).toBeNull();
+});
+
 it("keeps multipacks, flavours, generic fresh food and missing package evidence distinct", () => {
   const products = normalizeProducts({
     data: [
@@ -177,7 +218,7 @@ it("keeps multipacks, flavours, generic fresh food and missing package evidence 
     ],
   });
   const line = { ...emptyLine(), name: "COCA-COLA 500ML" };
-  expect(compatibleCatalogProduct(line, products[0], true)).toBe(false);
+  expect(compatibleCatalogProduct(line, products[0])).toBe(true);
   expect(automaticCatalogProduct(line, products)).toBeNull();
   expect(
     automaticCatalogProduct({ ...line, name: "Agurk" }, products),
@@ -189,7 +230,6 @@ it("keeps multipacks, flavours, generic fresh food and missing package evidence 
     compatibleCatalogProduct(
       { ...line, name: "COCA-COLA10PK BX", packageSize: 10, packageUnit: "pk" },
       products[3],
-      true,
     ),
   ).toBe(true);
 });
@@ -236,7 +276,10 @@ it.each(["Stratos Helt Sprøtt 200g", "Stratos Helt Sprøtt Hvit 150g"])(
       data: [{ id: 3, name, brand: "Stratos", ean: "7037710000002" }],
     });
     expect(
-      automaticCatalogProduct(stratosLine, [...stratosProducts, ...alternatives]),
+      automaticCatalogProduct(stratosLine, [
+        ...stratosProducts,
+        ...alternatives,
+      ]),
     ).toBeNull();
   },
 );

@@ -41,7 +41,7 @@ it("rejects conflicting sizes, brands and zero variants before semantic matching
     false,
   );
   expect(compatibleProduct(product, { ...product, packageSize: null })).toBe(
-    false,
+    true,
   );
   expect(
     similarProducts(product, [{ ...product, packageSize: 1000 }, product]),
@@ -82,6 +82,19 @@ it("groups linked products across receipt descriptions and keeps unknown items s
     },
   };
   expect(productHistory([first, separate])).toHaveLength(2);
+});
+
+it("keeps missing pack counts eligible but rejects explicit count differences", () => {
+  const unknown = { ...emptyLine(), name: "Big Beef Burger" };
+  const pair = { ...unknown, name: "Big Beef Burger 2x180g" };
+  expect(compatibleProduct(unknown, pair)).toBe(true);
+  expect(compatibleProduct(pair, unknown)).toBe(true);
+  expect(
+    compatibleProduct(pair, { ...unknown, name: "Big Beef Burger 4x180g" }),
+  ).toBe(false);
+  expect(
+    compatibleProduct(pair, { ...unknown, packageSize: 1, packageUnit: "pk" }),
+  ).toBe(false);
 });
 
 it.each([

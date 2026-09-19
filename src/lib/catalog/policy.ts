@@ -18,11 +18,10 @@ export function requestKey(request: CatalogRequest) {
   const value = normalizeRequest(request);
   if (value.kind === "prices" || value.kind === "details")
     return JSON.stringify([value.kind, value.productKey]);
-  return JSON.stringify([
-    value.kind,
-    value.search,
-    value.kind === "stores" ? value.chain : null,
-  ]);
+  // New searches must not reuse empty results from the previous retrieval rules.
+  if (value.kind === "products")
+    return JSON.stringify([value.kind, value.search, value.store ?? null, 2]);
+  return JSON.stringify([value.kind, value.search, value.chain]);
 }
 export function resultLifetime(request: CatalogRequest, result: CatalogResult) {
   const count =

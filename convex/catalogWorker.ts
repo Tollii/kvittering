@@ -20,6 +20,8 @@ import {
   type CatalogResult,
 } from "../src/lib/catalog/model";
 import type { SearchPhysicalStoresParams } from "./kassalapp/generated/models";
+import { broaderProductSearch } from "../src/lib/catalog/search";
+import { compatibleCatalogProduct } from "../src/lib/catalog/matching";
 
 export const execute = internalAction({
   args: { id: v.id("catalogRequests") },
@@ -33,15 +35,36 @@ export const execute = internalAction({
     const started = Date.now();
     try {
       let result: CatalogResult = emptyCatalogResult();
-      if (request.kind === "products")
-        result.products = normalizeProducts(
-          await searchProducts({
-            search: request.search,
-            size: 20,
-            unique: true,
-          }),
-        );
-      else if (request.kind === "stores")
+      if (request.kind === "products") {
+        const search = async (term: string, store?: string) =>
+          normalizeProducts(
+            await searchProducts({
+              search: term,
+              store,
+              size: 20,
+              unique: true,
+            }),
+          );
+        result.products = await search(request.search, request.store);
+        const evidence = {
+          name: request.search,
+          brand: null,
+          packageSize: null,
+          packageUnit: null,
+          attributes: [],
+        };
+        // Retailer coverage is incomplete. Do not let it hide an otherwise valid product.
+        if (
+          request.store &&
+          !result.products.some((product) =>
+            compatibleCatalogProduct(evidence, product),
+          )
+        )
+          result.products = await search(request.search);
+        const broaderSearch = broaderProductSearch(request.search);
+        if (!result.products.length && broaderSearch)
+          result.products = await search(broaderSearch);
+      } else if (request.kind === "stores")
         result.stores = normalizeStores(
           await searchPhysicalStores({
             search: request.search,

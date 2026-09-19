@@ -1,5 +1,5 @@
 import { expect, it } from "vitest";
-import { productSearch } from "./search";
+import { broaderProductSearch, productSearch } from "./search";
 import { requestKey } from "./policy";
 import { matchingKey } from "../domain/product-matching";
 import { compatibleCatalogProduct } from "./matching";
@@ -25,7 +25,7 @@ it("uses the same identity and cached request for receipt spacing and Unicode va
   expect(productSearch("COLA0,5 L")).toBe("cola 0.5l");
 });
 
-it("recognizes glued multipack evidence without requiring GPT package fields", () => {
+it("recognizes glued multipack evidence and keeps missing counts unknown", () => {
   const [pack, bottle] = normalizeProducts({
     data: [
       { id: 1, name: "Coca-Cola 10pk bx" },
@@ -33,7 +33,22 @@ it("recognizes glued multipack evidence without requiring GPT package fields", (
     ],
   });
   const line = { ...emptyLine(), name: "COCA-COLA10PK BX" };
-  expect(compatibleCatalogProduct(line, pack, true)).toBe(true);
-  expect(compatibleCatalogProduct(line, bottle, true)).toBe(false);
+  expect(compatibleCatalogProduct(line, pack)).toBe(true);
+  expect(compatibleCatalogProduct(line, bottle)).toBe(true);
   expect(line.name).toBe("COCA-COLA10PK BX");
 });
+
+it.each([
+  ["CHEEZ DOODLES XL", "cheez doodles"],
+  ["Coca-Cola 500ml", "coca-cola"],
+  ["Coca-Cola Zero 10PK BX", "coca-cola zero"],
+  ["Vitamin B12 100 G", "vitamin b12"],
+  ["Jordan Individual", null],
+  ["Milk 1L", null],
+  ["500ml 10pk", null],
+])(
+  "broadens %s without discarding brand numbers or flavour",
+  (name, expected) => {
+    expect(broaderProductSearch(name)).toBe(expected);
+  },
+);

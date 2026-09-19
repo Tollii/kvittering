@@ -9,7 +9,11 @@ import { emptyCatalogResult } from "../src/lib/catalog/model";
 import { normalizeProducts } from "./kassalapp/normalize";
 import { lineEvidenceKey } from "../src/lib/catalog/matching";
 const modules = import.meta.glob("./**/*.ts");
-afterEach(() => vi.useRealTimers());
+afterEach(() => {
+  vi.useRealTimers();
+  vi.unstubAllGlobals();
+  vi.unstubAllEnvs();
+});
 async function setup() {
   vi.useFakeTimers();
   const t = convexTest(schema, modules);
@@ -58,6 +62,210 @@ it("shares normalized pending and completed lookups across households and reject
   ).toEqual(products);
   expect((await t.query(internal.catalogQueue.read, { id }))?.attempts).toBe(1);
 });
+it("isolates retailer search results while sharing equivalent retailer names", async () => {
+  const { t, first, other } = await setup();
+  const lookup = { kind: "products" as const, search: "Cheez Doodles XL" };
+  await first.mutation(api.catalog.ensure, {
+    lookup: { ...lookup, store: "KIWI Majorstuen" },
+  });
+  await other.mutation(api.catalog.ensure, {
+    lookup: { ...lookup, store: "Kiwi" },
+  });
+  await first.mutation(api.catalog.ensure, {
+    lookup: { ...lookup, store: "Meny" },
+  });
+  await first.mutation(api.catalog.ensure, { lookup });
+  await first.mutation(api.catalog.ensure, {
+    lookup: { ...lookup, store: "Unknown retailer" },
+  });
+  const requests = await t.run((ctx) =>
+    ctx.db.query("catalogRequests").take(10),
+  );
+  expect(requests).toHaveLength(3);
+  const kiwi = requests.find(
+    (row) => row.request.kind === "products" && row.request.store === "KIWI",
+  )!;
+  await t.mutation(internal.catalogQueue.claim, { id: kiwi._id });
+  const products = normalizeProducts({
+    data: [{ id: 1, name: "Cheez Doodles XL" }],
+  });
+  await t.mutation(internal.catalogQueue.succeed, {
+    id: kiwi._id,
+    result: { ...emptyCatalogResult(), products },
+  });
+  const observed = await other.query(api.catalog.observe, {
+    lookup: { ...lookup, store: "KIWI" },
+  });
+  expect(observed.status).toBe("ready");
+  expect(observed.products).toEqual(products);
+  expect(
+    await first.query(api.catalog.observe, {
+      lookup: { ...lookup, store: "Meny" },
+    }),
+  ).toMatchObject({ status: "pending", products: [] });
+  expect(await first.query(api.catalog.observe, { lookup })).toMatchObject({
+    status: "pending",
+    products: [],
+  });
+  await expect(t.mutation(api.catalog.ensure, { lookup })).rejects.toThrow(
+    "Logg inn",
+  );
+});
+
+it("refreshes cached searches made before the retrieval rules changed", async () => {
+  const { t, first } = await setup();
+  await t.run((ctx) =>
+    ctx.db.insert("catalogRequests", {
+      key: JSON.stringify(["products", "cheez doodles xl", null]),
+      request: { kind: "products", search: "cheez doodles xl" },
+      state: "ready",
+      result: emptyCatalogResult(),
+      fetchedAt: Date.now(),
+      expiresAt: Date.now() + 7 * 86400000,
+      scheduledAt: Date.now(),
+      attempts: 1,
+    }),
+  );
+  const lookup = { kind: "products" as const, search: "cheez doodles xl" };
+  expect(await first.query(api.catalog.observe, { lookup })).toMatchObject({
+    status: "ready",
+  });
+  await first.mutation(api.catalog.ensure, { lookup });
+  expect(await first.query(api.catalog.observe, { lookup })).toMatchObject({
+    status: "pending",
+  });
+});
+
+it("includes the receipt retailer in matching inputs without changing line evidence", async () => {
+  const { t, first, householdId } = await setup();
+  const id = await first.mutation(api.receipts.reserve, {
+    householdId,
+    clientId: "catalog-retailer-0001",
+    imageCount: 1,
+  });
+  const data = { ...batteryFixture(), store: "KIWI Majorstuen" };
+  await t.run((ctx) =>
+    ctx.db.patch("receipts", id, { data, status: "needs_review" }),
+  );
+  const inputs = await t.query(internal.catalogMatching.inputs, {
+    id,
+    generation: 0,
+  });
+  expect(inputs.length).toBeGreaterThan(0);
+  expect(inputs.every((input) => input.store === "KIWI")).toBe(true);
+  expect(inputs[0].line).toEqual(
+    data.lines.find((line) => line.kind === "product"),
+  );
+});
+
+it.each([
+  {
+    name: "broader search after empty retailer and global results",
+    search: "CHEEZ DOODLES XL",
+    store: "KIWI",
+    responses: [[], [], [{ id: 1, name: "Cheez Doodles 120g" }]],
+    searches: ["cheez doodles xl", "cheez doodles xl", "cheez doodles"],
+    status: 200,
+    state: "ready",
+    count: 1,
+  },
+  {
+    name: "retailer result needs no fallback",
+    search: "CHEEZ DOODLES XL",
+    store: "KIWI",
+    responses: [[{ id: 1, name: "Cheez Doodles XL" }]],
+    searches: ["cheez doodles xl"],
+    status: 200,
+    state: "ready",
+    count: 1,
+  },
+  {
+    name: "retailer variant conflict falls back to the original global search",
+    search: "Coca-Cola 500ml",
+    store: "REMA 1000",
+    responses: [
+      [{ id: 1, name: "Coca-Cola Light 500ml" }],
+      [{ id: 2, name: "Coca-Cola 500ml" }],
+    ],
+    searches: ["coca-cola 500ml", "coca-cola 500ml"],
+    status: 200,
+    state: "ready",
+    count: 1,
+  },
+  {
+    name: "broader search without a retailer",
+    search: "CHEEZ DOODLES XL",
+    store: undefined,
+    responses: [[], [{ id: 1, name: "Cheez Doodles 120g" }]],
+    searches: ["cheez doodles xl", "cheez doodles"],
+    status: 200,
+    state: "ready",
+    count: 1,
+  },
+  {
+    name: "all searches empty",
+    search: "CHEEZ DOODLES XL",
+    store: "KIWI",
+    responses: [[], [], []],
+    searches: ["cheez doodles xl", "cheez doodles xl", "cheez doodles"],
+    status: 200,
+    state: "ready",
+    count: 0,
+  },
+  {
+    name: "rate limit follows the queue retry policy",
+    search: "CHEEZ DOODLES XL",
+    store: "KIWI",
+    responses: [[]],
+    searches: ["cheez doodles xl"],
+    status: 429,
+    state: "pending",
+    count: 0,
+  },
+])(
+  "bounds catalog requests: $name",
+  async ({ search, store, responses, searches, status, state, count }) => {
+    const { t, first } = await setup();
+    vi.stubEnv("KASSALAPP_API_KEY", "test-key");
+    const urls: URL[] = [];
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (url: URL | string) => {
+        urls.push(new URL(url));
+        return new Response(
+          JSON.stringify({ data: responses[urls.length - 1] }),
+          {
+            status,
+            headers: {
+              "Content-Type": "application/json",
+              "Retry-After": "60",
+            },
+          },
+        );
+      }),
+    );
+    const lookup = { kind: "products" as const, search, store };
+    await first.mutation(api.catalog.ensure, { lookup });
+    const request = (await t.run((ctx) =>
+      ctx.db.query("catalogRequests").first(),
+    ))!;
+    await t.action(internal.catalogWorker.execute, { id: request._id });
+    expect(urls.map((url) => url.searchParams.get("search"))).toEqual(searches);
+    expect(urls[0].searchParams.get("store")).toBe(
+      store === "REMA 1000" ? "REMA_1000" : (store ?? null),
+    );
+    expect(urls.slice(1).every((url) => !url.searchParams.has("store"))).toBe(
+      true,
+    );
+    const completed = await t.query(internal.catalogQueue.read, {
+      id: request._id,
+    });
+    expect(completed?.state).toBe(state);
+    expect(completed?.request).toEqual(request.request);
+    expect(completed?.result.products).toHaveLength(count);
+  },
+);
+
 it("honors Retry-After on 429 and ends repeated failures without caching an empty success", async () => {
   const { t, first } = await setup();
   await first.mutation(api.catalog.searchProducts, { search: "Stratos" });

@@ -1,7 +1,7 @@
 import { query, type QueryCtx } from "./_generated/server";
 import { requireCompatibleClient } from "./releasePolicy";
 import { clientValidator } from "../src/lib/releases/policy";
-import { requestKey } from "../src/lib/catalog/policy";
+import { normalizeRequest, requestKey } from "../src/lib/catalog/policy";
 import {
   catalogLookupValidator,
   type CatalogLookup,
@@ -132,10 +132,7 @@ export const product = mutation({
   },
 });
 
-async function lookupContext(
-  ctx: QueryCtx,
-  lookup: CatalogLookup,
-) {
+async function lookupContext(ctx: QueryCtx, lookup: CatalogLookup) {
   if (lookup.kind === "stores") {
     const { receipt } = await requireReceipt(ctx, lookup.receiptId);
     return {
@@ -148,7 +145,14 @@ async function lookupContext(
     };
   }
   await requireMember(ctx);
-  if (lookup.kind === "products") return { request: lookup, record: null };
+  if (lookup.kind === "products")
+    return {
+      request: normalizeRequest({
+        ...lookup,
+        store: retailerCode(lookup.store ?? null) ?? undefined,
+      }),
+      record: null,
+    };
   const record = await ctx.db
     .query("catalogProducts")
     .withIndex("by_key", (q) => q.eq("key", lookup.productKey))
@@ -204,10 +208,25 @@ export const observe = query({
         status: "ready" as const,
         fetchedAt: record.detailsFetchedAt,
       };
-    const row = await ctx.db
+    let row = await ctx.db
       .query("catalogRequests")
       .withIndex("by_key", (q) => q.eq("key", requestKey(request)))
       .unique();
+    // An installed client may still be observing a search started before deployment.
+    if (!row && request.kind === "products")
+      row = await ctx.db
+        .query("catalogRequests")
+        .withIndex("by_key", (q) =>
+          q.eq(
+            "key",
+            JSON.stringify([
+              request.kind,
+              request.search,
+              request.store ?? null,
+            ]),
+          ),
+        )
+        .unique();
     const response: CatalogResponse = row
       ? requestResponse(row)
       : {

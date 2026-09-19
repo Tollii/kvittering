@@ -37,7 +37,7 @@ export const catalogPriceValidator = v.object({
   checkedAt: text,
 });
 export const catalogRequestValidator = v.union(
-  v.object({ kind: v.literal("products"), search: v.string() }),
+  v.object({ kind: v.literal("products"), search: v.string(), store: text }),
   v.object({ kind: v.literal("stores"), search: v.string(), chain: text }),
   v.object({
     kind: v.literal("details"),
@@ -78,9 +78,9 @@ export function catalogIdentity(product: CatalogProduct): CatalogIdentity {
   return { key, ean, name, brand, image, weight, weightUnit };
 }
 
-/** Public lookup arguments omit provider IDs and receipt-owned store context. */
+/** Product lookups accept a retailer name; provider codes are resolved on the server. */
 export const catalogLookupValidator = v.union(
-  v.object({ kind: v.literal("products"), search: v.string() }),
+  v.object({ kind: v.literal("products"), search: v.string(), store: text }),
   v.object({
     kind: v.literal("stores"),
     search: v.string(),

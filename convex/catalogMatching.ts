@@ -50,7 +50,12 @@ export const process = workflow
       const requests = new Map<string, CatalogRequest>();
       for (const item of inputs)
         if (!item.product && item.search.length >= 3)
-          requests.set(item.search, { kind: "products", search: item.search });
+          requests.set(item.search, {
+            kind: "products",
+            search: item.search,
+            // Old workflow steps have no store field and retain their original arguments.
+            ...(item.store ? { store: item.store } : {}),
+          });
       const branch = receipt.data.branch?.trim();
       if (
         branch &&
@@ -185,6 +190,7 @@ export const receipt = internalQuery({
 export const matchingInput = v.object({
   line: lineValidator,
   search: v.string(),
+  store: v.string().optional(),
   product: v.union(catalogProductValidator, v.null()),
 });
 export const inputs = internalQuery({
@@ -218,9 +224,9 @@ export const inputs = internalQuery({
       result.push({
         line,
         search: productSearch(line.name).slice(0, 120),
+        store: retailerCode(data.store) ?? undefined,
         product:
-          record &&
-          compatibleCatalogProduct(line, record.product, !!mapping?.confirmedBy)
+          record && compatibleCatalogProduct(line, record.product)
             ? record.product
             : null,
       });

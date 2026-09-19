@@ -28,16 +28,18 @@ import { useHousehold } from "./session";
 
 export function CatalogProductPicker({
   name,
+  store,
   onSelect,
   onClose,
 }: {
   name: string;
+  store: string;
   onSelect: (product: CatalogProduct | null) => void;
   onClose: () => void;
 }) {
   const [search, setSearch] = useState(productSearch(name));
   const productLookup = useFeatureFlag("productLookup");
-  const query = useCatalogSearch(search);
+  const query = useCatalogSearch(search, { kind: "products", store });
   const [showWithoutBarcode, setShowWithoutBarcode] = useState(false);
   const products = rankCatalogProducts(search, query.data?.products ?? []).map(
     ({ product }) => product,

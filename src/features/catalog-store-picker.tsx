@@ -17,7 +17,7 @@ export function CatalogStorePicker({
 }) {
   const [search, setSearch] = useState(name);
   const productLookup = useFeatureFlag("productLookup");
-  const query = useCatalogSearch(search, receiptId);
+  const query = useCatalogSearch(search, { kind: "stores", receiptId });
   return (
     <Sheet
       title="Velg butikk"

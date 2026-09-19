@@ -59,14 +59,17 @@ function useCatalogLookup(
   }, [cache, queryKey, observed]);
   return result;
 }
-export function useCatalogSearch(search: string, receiptId?: Id<"receipts">) {
+export function useCatalogSearch(
+  search: string,
+  scope:
+    | { kind: "products"; store?: string }
+    | { kind: "stores"; receiptId: Id<"receipts"> },
+) {
   const term = useDebouncedSearch(
-    receiptId ? normalizeSearch(search) : productSearch(search),
+    scope.kind === "stores" ? normalizeSearch(search) : productSearch(search),
   );
   return useCatalogLookup(
-    receiptId
-      ? { kind: "stores", receiptId, search: term }
-      : { kind: "products", search: term },
+    { ...scope, search: term },
     term.length >= 3 && term.length <= 120,
     day,
   );

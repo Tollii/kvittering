@@ -311,6 +311,7 @@ export function ReceiptLineEditor({
       {catalogScreen === "search" && (
         <CatalogProductPicker
           name={line.name}
+          store={retailer}
           onSelect={(product) =>
             onProduct(
               product

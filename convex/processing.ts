@@ -258,14 +258,7 @@ export const finish = internalMutation({
             .query("catalogProducts")
             .withIndex("by_key", (q) => q.eq("key", reference.product.key))
             .unique();
-          if (
-            catalog &&
-            compatibleCatalogProduct(
-              line,
-              catalog.product,
-              reference.provenance === "manual",
-            )
-          ) {
+          if (catalog && compatibleCatalogProduct(line, catalog.product)) {
             Object.assign(
               line,
               await linkCatalogProduct(
@@ -285,8 +278,7 @@ export const finish = internalMutation({
             : null;
           if (
             !mapping.productId ||
-            (product &&
-              compatibleProduct(line, product, mapping.confirmedBy !== null))
+            (product && compatibleProduct(line, product))
           ) {
             Object.assign(
               line,

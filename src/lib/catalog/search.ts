@@ -1,3 +1,5 @@
+import { removePackageText } from "../domain/product-evidence";
+
 /** Normalize search text without changing the receipt description or product identity. */
 export function normalizeSearch(value: string) {
   return value
@@ -19,4 +21,16 @@ export function productSearch(name: string) {
     )
     .replace(/(\d)\s*[- ]\s*(kg|g|ml|cl|dl|l|stk|pk|bx)\b/g, "$1$2")
     .replace(/(\d),(\d)/g, "$1.$2");
+}
+
+/** Broaden retrieval once. The original receipt remains the matching evidence. */
+export function broaderProductSearch(name: string): string | null {
+  const original = productSearch(name);
+  const search = normalizeSearch(
+    removePackageText(original).replace(/\b(?:xl|xxl|pk|stk|bx)\b/g, " "),
+  );
+  const words = search.match(/\p{L}[\p{L}\p{N}]*/gu) ?? [];
+  return search !== original && words.length >= 2 && search.length >= 3
+    ? search
+    : null;
 }

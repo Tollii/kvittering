@@ -3,16 +3,19 @@ import {
   normalizeMeasureText,
 } from "../domain/product-evidence";
 import type { ReceiptLine } from "../domain/receipt";
-import { compatibleProduct, matchingKey } from "../domain/product-matching";
+import {
+  compatibleProduct,
+  matchingKey,
+  type ProductEvidence,
+} from "../domain/product-matching";
 import type { CatalogProduct, PhysicalStore } from "./model";
 import { normalizeSearch } from "./policy";
 import { productSearch } from "./search";
 export { productSearch } from "./search";
 
 export function compatibleCatalogProduct(
-  line: ReceiptLine,
+  line: ProductEvidence,
   product: CatalogProduct,
-  allowMissingSize = false,
 ) {
   const source = parseProductEvidence({ ...line, source: "receipt" });
   const target = parseProductEvidence({
@@ -26,7 +29,9 @@ export function compatibleCatalogProduct(
   if (
     source.counts.length > 1 ||
     target.counts.length > 1 ||
-    (source.counts[0] ?? 1) !== (target.counts[0] ?? 1)
+    (source.counts[0] !== undefined &&
+      target.counts[0] !== undefined &&
+      source.counts[0] !== target.counts[0])
   )
     return false;
   const brand = (value: string | null) =>
@@ -55,7 +60,6 @@ export function compatibleCatalogProduct(
       packageUnit: targetSize?.unit ?? null,
       attributes: [],
     },
-    allowMissingSize,
   );
 }
 
@@ -88,7 +92,8 @@ export function rankCatalogProducts(name: string, products: CatalogProduct[]) {
 
 /**
  * Words a catalog name may add without changing which product it is: sizes,
- * pack counts, packaging, and markers for the ordinary (non-Zero) variant.
+ * packaging, and markers for the ordinary (non-Zero) variant. Pack counts
+ * must also agree before an automatic link can be made.
  */
 function neutralWord(word: string) {
   return (
@@ -136,16 +141,17 @@ export function automaticCatalogProduct(
     ];
   };
   const ranked = rankCatalogProducts(name, products);
-  const exact = unique(
-    ranked
-      .filter(
-        ({ product, score }) =>
-          score === 1 && compatibleCatalogProduct(line, product),
-      )
-      .map(({ product }) => product),
-  );
-  if (exact.length === 1) return exact[0];
-  if (exact.length > 1) return null;
+  const sourceCount = parseProductEvidence({ ...line, source: "receipt" })
+    .counts[0];
+  // Missing counts keep candidates eligible for the model, but do not prove pack identity.
+  const hasUnresolvedCount = (product: CatalogProduct) =>
+    sourceCount !==
+    parseProductEvidence({
+      source: "catalog",
+      name: product.name,
+      packageSize: product.weight,
+      packageUnit: product.weightUnit,
+    }).counts[0];
   const contained = unique(
     ranked
       .filter(({ product }) => {
@@ -153,32 +159,34 @@ export function automaticCatalogProduct(
         return (
           [...source].every((word) => target.has(word)) &&
           [...target].every((word) => source.has(word) || neutralWord(word)) &&
-          compatibleCatalogProduct(line, product, true)
+          compatibleCatalogProduct(line, product)
         );
       })
       .map(({ product }) => product),
   );
-  if (contained.length) return contained.length === 1 ? contained[0] : null;
+  if (contained.length)
+    return contained.length === 1 && !hasUnresolvedCount(contained[0])
+      ? contained[0]
+      : null;
   const candidates = unique(
     ranked
       .filter(({ product }) => {
         const target = productWords(product.name);
         return (
           [...source].every((word) => target.has(word)) &&
-          compatibleCatalogProduct(line, product, true)
+          compatibleCatalogProduct(line, product)
         );
       })
       .map(({ product }) => product),
   );
   if (candidates.length !== 1) return null;
   const candidate = candidates[0];
-  if (!candidate.ean || !candidate.brand) return null;
+  if (!candidate.ean || !candidate.brand || hasUnresolvedCount(candidate))
+    return null;
   const brandWords = productWords(candidate.brand);
-  return (
-    brandWords.size > 0 &&
+  return brandWords.size > 0 &&
     [...brandWords].every((word) => source.has(word)) &&
     [...source].some((word) => !brandWords.has(word) && !neutralWord(word))
-  )
     ? candidate
     : null;
 }

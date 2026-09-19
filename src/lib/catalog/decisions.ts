@@ -44,7 +44,7 @@ export function selectCatalogMatch(
     key: product.key,
     name: product.name,
     probability: probabilities[index] ?? null,
-    compatible: compatibleCatalogProduct(line, product, true),
+    compatible: compatibleCatalogProduct(line, product),
   }));
   const above = candidates.filter(
     (candidate) =>

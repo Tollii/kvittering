@@ -125,8 +125,7 @@ export const prepare = internalQuery({
         : null;
       if (
         !mapping.productId ||
-        (product &&
-          compatibleProduct(args.line, product, mapping.confirmedBy !== null))
+        (product && compatibleProduct(args.line, product))
       )
         return { saved: true, productId: mapping.productId, candidates: [] };
       return { saved: true, productId: null, candidates: [] };
