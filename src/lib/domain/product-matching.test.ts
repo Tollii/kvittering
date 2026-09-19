@@ -83,3 +83,18 @@ it("groups linked products across receipt descriptions and keeps unknown items s
   };
   expect(productHistory([first, separate])).toHaveLength(2);
 });
+
+it.each([
+  [50, "cl"],
+  [5, "dl"],
+])("matches %s %s to 500 ml", (packageSize, packageUnit) => {
+  const item = {
+    ...emptyLine("item"),
+    name: "Cola",
+    packageSize: 500,
+    packageUnit: "ml",
+  };
+  expect(compatibleProduct(item, { ...item, packageSize, packageUnit })).toBe(
+    true,
+  );
+});

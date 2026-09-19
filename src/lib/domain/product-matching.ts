@@ -1,3 +1,4 @@
+import { parseProductEvidence } from "./product-evidence";
 import type { ReceiptLine } from "./receipt";
 import { productSearch } from "../catalog/search";
 
@@ -18,23 +19,21 @@ export function productEvidence(line: ProductEvidence): ProductEvidence {
     attributes: line.attributes,
   };
 }
-function size(item: ProductEvidence) {
-  if (item.packageSize === null || !item.packageUnit) return null;
-  const unit = matchingKey(item.packageUnit);
-  return {
-    value: item.packageSize * (unit === "kg" || unit === "l" ? 1000 : 1),
-    unit: unit === "kg" ? "g" : unit === "l" ? "ml" : unit,
-  };
-}
 /** Explicit differences always refuse an automatic link, including an exact name mapping. */
 export function compatibleProduct(
   left: ProductEvidence,
   right: ProductEvidence,
   savedMapping = false,
 ) {
-  const a = size(left),
-    b = size(right);
-  if (a && b && (a.value !== b.value || a.unit !== b.unit)) return false;
+  const leftEvidence = parseProductEvidence({ ...left, source: "receipt" });
+  const rightEvidence = parseProductEvidence({ ...right, source: "catalog" });
+  const a = leftEvidence.measures[0],
+    b = rightEvidence.measures[0];
+  if (leftEvidence.counts.length > 1 || rightEvidence.counts.length > 1)
+    return false;
+  if ((leftEvidence.counts[0] ?? 1) !== (rightEvidence.counts[0] ?? 1))
+    return false;
+  if (a && b && (a.amount !== b.amount || a.unit !== b.unit)) return false;
   if (!savedMapping && Boolean(a) !== Boolean(b)) return false;
   if (
     left.brand &&
@@ -42,11 +41,7 @@ export function compatibleProduct(
     matchingKey(left.brand) !== matchingKey(right.brand)
   )
     return false;
-  const zero = (item: ProductEvidence) =>
-    /\b(zero|sukkerfri|sugar free|uten sukker)\b/.test(
-      matchingKey([item.name, ...item.attributes].join(" ")),
-    );
-  if (zero(left) !== zero(right)) return false;
+  if (leftEvidence.variants.zero !== rightEvidence.variants.zero) return false;
   return true;
 }
 export function similarProducts<T extends ProductEvidence>(

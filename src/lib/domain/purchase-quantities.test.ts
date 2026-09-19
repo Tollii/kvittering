@@ -29,12 +29,14 @@ describe("product families and purchased quantities", () => {
     ).toBe("Coca-Cola Zero");
   });
   it("finds glued pack counts and per-item and total measures without choosing their meaning", () => {
-    const candidates = packageCandidates({
-      ...line(),
-      name: "COCA-COLA10PK BX 10x330ml",
-      packageSize: 3.3,
-      packageUnit: "l",
-    });
+    const candidates = packageCandidates(
+      quantityEvidence({
+        ...line(),
+        name: "COCA-COLA10PK BX 10x330ml",
+        packageSize: 3.3,
+        packageUnit: "l",
+      }),
+    );
     expect(candidates.counts).toContain(10);
     expect(candidates.measures).toEqual([
       { amount: 3300, unit: "ml" },
@@ -107,8 +109,39 @@ it("does not copy size from a catalog product with a conflicting pack count", ()
     },
   };
   const evidence = quantityEvidence(source);
-  expect(evidence.catalogProduct).toBeNull();
+  expect(evidence.catalog.kind).toBe("pack-conflict");
   expect(packageCandidates(evidence).measures).toEqual([]);
   expect(packageCandidates(evidence).counts).toContain(10);
   expect(source.catalogProduct).not.toBeNull();
+});
+
+it("rejects conflicting BX package evidence without changing the source", () => {
+  const source = {
+    ...line(),
+    name: "Cola 10BX",
+    catalogProduct: { key: "other", name: "Cola 15BX 330ml" },
+  };
+  expect(packageCandidates(quantityEvidence(source)).measures).toEqual([]);
+  expect(source.catalogProduct.name).toBe("Cola 15BX 330ml");
+});
+
+it("retains provenance and uncertain multiplier meaning in package evidence", async () => {
+  const { parseProductEvidence } = await import("./product-evidence");
+  const input = {
+    source: "receipt" as const,
+    name: "Gulrot 24x150g",
+    packageSize: null,
+  };
+  const before = structuredClone(input);
+  const evidence = parseProductEvidence(input);
+  expect(evidence.counts).toEqual([24]);
+  expect(evidence.ambiguousMultiplier).toBe(true);
+  expect(evidence.source).toBe("receipt");
+  expect(input).toEqual(before);
+  expect(
+    parseProductEvidence({ source: "receipt", name: "10PK" }).counts,
+  ).toEqual(parseProductEvidence({ source: "receipt", name: "10 pk" }).counts);
+  expect(
+    parseProductEvidence({ source: "receipt", name: "Ukjent" }).measures,
+  ).toEqual([]);
 });

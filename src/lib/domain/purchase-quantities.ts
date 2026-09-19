@@ -4,86 +4,68 @@ import {
   type PackageProfile,
   type PurchaseQuantity,
 } from "./product-families";
+import {
+  measure,
+  parseProductEvidence,
+  type Measure,
+  type ParsedProductEvidence,
+} from "./product-evidence";
 
-export type Measure = { amount: number; unit: "g" | "ml" };
-export function measure(amount: number, unit: string | null): Measure | null {
-  const units: Record<string, ["g" | "ml", number]> = {
-    g: ["g", 1],
-    kg: ["g", 1000],
-    ml: ["ml", 1],
-    cl: ["ml", 10],
-    dl: ["ml", 100],
-    l: ["ml", 1000],
+export { measure, type Measure } from "./product-evidence";
+
+export type QuantityEvidence = {
+  receipt: ParsedProductEvidence;
+  catalog:
+    | { kind: "absent" }
+    | { kind: "usable" | "pack-conflict"; evidence: ParsedProductEvidence };
+};
+
+/** Select usable quantity facts without changing the stored catalog identity. */
+export function quantityEvidence(line: ReceiptLine): QuantityEvidence {
+  const receipt = parseProductEvidence({ ...line, source: "receipt" });
+  if (!line.catalogProduct) return { receipt, catalog: { kind: "absent" } };
+  const catalog = parseProductEvidence({
+    source: "catalog",
+    name: line.catalogProduct.name,
+    packageSize: line.catalogProduct.weight,
+    packageUnit: line.catalogProduct.weightUnit,
+  });
+  const conflict =
+    receipt.counts.length > 0 &&
+    catalog.counts.length > 0 &&
+    (receipt.counts.length !== 1 ||
+      catalog.counts.length !== 1 ||
+      receipt.counts[0] !== catalog.counts[0]);
+  return {
+    receipt,
+    catalog: { kind: conflict ? "pack-conflict" : "usable", evidence: catalog },
   };
-  const conversion = units[unit?.toLowerCase().trim() ?? ""];
-  return conversion && Number.isFinite(amount) && amount > 0
-    ? { amount: amount * conversion[1], unit: conversion[0] }
-    : null;
 }
 
-/** An explicit pack-count conflict makes catalog sizes unsuitable for quantity calculations. */
-export function quantityEvidence(line: ReceiptLine): ReceiptLine {
-  const count = (name: string) => {
-    const match = name.match(
-      /(\d+)\s*(?:pk|pack|pakning)\b|(\d+)\s*[x×]\s*\d/iu,
-    );
-    return match ? Number(match[1] ?? match[2]) : null;
-  };
-  const receiptCount = /^(pk|pack|pakning)$/i.test(line.packageUnit ?? "")
-    ? line.packageSize
-    : count(line.name);
-  const catalogCount = line.catalogProduct
-    ? count(line.catalogProduct.name)
-    : null;
-  return receiptCount !== null &&
-    catalogCount !== null &&
-    receiptCount !== catalogCount
-    ? { ...line, catalogProduct: null }
-    : line;
-}
-
-/** Collect source values. The classifier decides what the values describe. */
+/** Collect candidates; the classifier decides what the source values describe. */
 export function packageCandidates(
-  line: ReceiptLine,
+  evidence: QuantityEvidence,
   description: string | null = null,
 ) {
-  const text = [line.catalogProduct?.name, line.name, description]
-    .filter(Boolean)
-    .join(" · ");
+  const sources = [evidence.receipt];
+  if (evidence.catalog.kind === "usable")
+    sources.unshift(evidence.catalog.evidence);
+  if (description && evidence.catalog.kind !== "pack-conflict")
+    sources.push(
+      parseProductEvidence({ source: "description", name: description }),
+    );
   const counts = new Set<number>([1]);
-  for (const match of text.matchAll(
-    /(?:^|[^\d])(\d{1,3})\s*(?:pk|stk|pack|pakning|[x×])/gi,
-  ))
-    counts.add(Number(match[1]));
-  if (line.packageSize && /^(pk|stk|pack)$/i.test(line.packageUnit ?? ""))
-    counts.add(line.packageSize);
   const measures: Measure[] = [];
-  const append = (value: Measure | null) => {
-    if (
-      value &&
-      !measures.some(
-        (item) => item.amount === value.amount && item.unit === value.unit,
+  for (const source of sources) {
+    source.counts.forEach((count) => counts.add(count));
+    for (const { amount, unit } of source.measures) {
+      if (
+        !measures.some((item) => item.amount === amount && item.unit === unit)
       )
-    )
-      measures.push(value);
-  };
-  append(
-    measure(
-      line.catalogProduct?.weight ?? 0,
-      line.catalogProduct?.weightUnit ?? null,
-    ),
-  );
-  append(measure(line.packageSize ?? 0, line.packageUnit));
-  for (const match of text.matchAll(
-    /(\d+(?:[.,]\d+)?)\s*(kg|ml|cl|dl|g|l)\b/gi,
-  ))
-    append(measure(Number(match[1].replace(",", ".")), match[2]));
-  return {
-    counts: [...counts]
-      .filter((count) => count > 0 && Number.isInteger(count))
-      .slice(0, 30),
-    measures: measures.slice(0, 40),
-  };
+        measures.push({ amount, unit });
+    }
+  }
+  return { counts: [...counts].slice(0, 30), measures: measures.slice(0, 40) };
 }
 
 export type PurchaseInterpretation = {

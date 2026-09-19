@@ -1,3 +1,4 @@
+import { parseProductEvidence } from "../../src/lib/domain/product-evidence";
 import { z } from "zod";
 import type {
   CatalogProduct,
@@ -54,14 +55,15 @@ export function normalizeProducts(response: unknown): CatalogProduct[] {
   for (const row of (Array.isArray(rows) ? rows : [rows]).slice(0, 24)) {
     const ean = row.ean && /^\d{8,14}$/.test(row.ean) ? row.ean : undefined;
     const key = ean ? `ean:${ean}` : `kassalapp:${row.id}`;
-    const namedSize = row.name.match(/\b(\d+(?:[.,]\d+)?)\s*(kg|g|ml|cl|l)\b/i);
-    const namedWeight = namedSize
-      ? Number(namedSize[1].replace(",", "."))
-      : undefined;
+    const namedSize = parseProductEvidence({
+      source: "catalog",
+      name: row.name,
+    }).measures[0];
+    const namedWeight = namedSize?.rawAmount;
     const weightUnit =
       string(row.weight_unit, 20) ??
       (namedWeight && (!row.weight || row.weight === namedWeight)
-        ? namedSize![2].toLowerCase()
+        ? namedSize.rawUnit
         : undefined);
     const product: CatalogProduct = {
       key,

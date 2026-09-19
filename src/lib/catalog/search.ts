@@ -14,10 +14,10 @@ export function normalizeSearch(value: string) {
 export function productSearch(name: string) {
   return normalizeSearch(name)
     .replace(
-      /(\p{L})(\d+(?:[.,]\d+)?\s*(?:kg|g|ml|cl|l|stk|pk|bx)\b)/gu,
+      /(\p{L})(\d+(?:[.,]\d+)?\s*(?:kg|g|ml|cl|dl|l|stk|pk|bx)\b)/gu,
       "$1 $2",
     )
-    .replace(/(\d)\s*[- ]\s*(kg|g|ml|cl|l|stk|pk|bx)\b/g, "$1$2")
+    .replace(/(\d)\s*[- ]\s*(kg|g|ml|cl|dl|l|stk|pk|bx)\b/g, "$1$2")
     .replace(/(\d),(\d)/g, "$1.$2");
 }
 
@@ -33,7 +33,7 @@ export function validateSearchSuggestion(
     return null;
   const numbers = (value: string) => value.match(/\d+(?:\.\d+)?/g) ?? [];
   const units = (value: string) =>
-    value.match(/\d+(?:\.\d+)?(?:kg|g|ml|cl|l|stk|pk|bx)\b/g) ?? [];
+    value.match(/\d+(?:\.\d+)?(?:kg|g|ml|cl|dl|l|stk|pk|bx)\b/g) ?? [];
   if (
     JSON.stringify(numbers(source)) !== JSON.stringify(numbers(search)) ||
     JSON.stringify(units(source)) !== JSON.stringify(units(search))

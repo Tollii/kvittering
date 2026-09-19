@@ -73,8 +73,7 @@ export const analyze = internalAction({
       if (!context) return [];
       if (!context.profile) {
         const evidence = quantityEvidence(line);
-        const catalogSizeConflict =
-          !!line.catalogProduct && !evidence.catalogProduct;
+        const catalogSizeConflict = evidence.catalog.kind === "pack-conflict";
         const candidates = packageCandidates(
           evidence,
           catalogSizeConflict ? null : (context.catalog?.description ?? null),

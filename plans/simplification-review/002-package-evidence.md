@@ -4,7 +4,7 @@
 
 ## Status
 
-- Status: TODO
+- Status: DONE
 - Priority: P1
 - Effort: M
 - Risk: Medium
@@ -195,3 +195,9 @@ quantityEvidence(line: ReceiptLine): ReceiptLine at src/lib/domain/purchase-quan
 ## Maintenance notes
 
 New Norwegian pack abbreviations require one parser change plus cross-consumer tests.
+
+## Implementation record
+
+One parser now supplies normalized measures, pack candidates, variant facts, and source provenance. Quantity evidence reports catalog pack conflicts without changing the receipt line. The analysis worker was updated to consume that result. Matching, ranking, family naming, and catalog normalization use the shared parser and conversion. Multiplier notation remains ambiguous evidence for the classifier.
+
+Verification: reproduced the cl/dl and BX failures before the change; focused tests, typecheck, lint, all 160 tests, and diff checks passed. No provider calls or deployment were performed.

@@ -1,3 +1,4 @@
+import { removePackageText } from "./product-evidence";
 import { v, type Infer } from "convex/values";
 import type { ReceiptLine } from "./receipt";
 import { productAttributesValidator } from "./product-attributes";
@@ -56,16 +57,7 @@ export function familyName(line: ReceiptLine) {
 
 export function normalizeFamilyName(name: string) {
   return (
-    name
-      .replace(
-        /([\p{L}])(\d+(?:[.,]\d+)?\s*(?:kg|g|ml|cl|dl|l|stk|pk)\b)/giu,
-        "$1 $2",
-      )
-      .replace(/\b\d+\s*[x×]\s*/gi, " ")
-      .replace(
-        /\b(?:x\s*)?\d+(?:[.,]\d+)?\s*(?:kg|g|ml|cl|dl|l|stk|pk|pakning|pack|bx)\b/gi,
-        " ",
-      )
+    removePackageText(name)
       .replace(
         /\b(?:flaske|boks|bokser|flasker|pet|sleek|bx|multipack|x)\b/gi,
         " ",

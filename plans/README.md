@@ -19,7 +19,7 @@ Start with 001, 002, 003, and 004. They fix demonstrated state/model defects and
 | Plan | Title | Priority | Effort | Depends on | Status |
 | --- | --- | --- | --- | --- | --- |
 | [001](simplification-review/001-receipt-draft-state.md) | Give each edit one draft state | P1 | M–L | None | DONE |
-| [002](simplification-review/002-package-evidence.md) | Parse package evidence once | P1 | M | None | TODO |
+| [002](simplification-review/002-package-evidence.md) | Parse package evidence once | P1 | M | None | DONE |
 | [003](simplification-review/003-catalog-cache-completeness.md) | Distinguish a catalog summary from fetched details | P1 | S–M | None | TODO |
 | [004](simplification-review/004-purchase-projection.md) | Use one purchase projection for reports and price signals | P1 | M–L | 002 | TODO |
 | [011](simplification-review/011-capture-import-state.md) | Make shared-file import an explicit operation | P1 | S–M | None | TODO |

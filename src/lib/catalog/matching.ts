@@ -1,3 +1,7 @@
+import {
+  parseProductEvidence,
+  normalizeMeasureText,
+} from "../domain/product-evidence";
 import type { ReceiptLine } from "../domain/receipt";
 import { compatibleProduct, matchingKey } from "../domain/product-matching";
 import type { CatalogProduct, PhysicalStore } from "./model";
@@ -10,35 +14,21 @@ export function compatibleCatalogProduct(
   product: CatalogProduct,
   allowMissingSize = false,
 ) {
-  const size = productSearch(line.name).match(
-    /\b(\d+(?:[.,]\d+)?)\s*(kg|g|ml|cl|l)\b/i,
-  );
-  const isWeightOrVolume = /^(kg|g|ml|cl|l)$/i.test(line.packageUnit ?? "");
-  const amount = isWeightOrVolume
-    ? line.packageSize
-    : size
-      ? Number(size[1].replace(",", "."))
-      : null;
-  const unit = isWeightOrVolume
-    ? line.packageUnit
-    : (size?.[2]?.toLowerCase() ?? null);
-  const packCount = (name: string) => {
-    const match = productSearch(name).match(
-      /(\d+)\s*(?:pk|stk|bx)\b|\bx\s*(\d+)\b|(\d+)\s*x\s*\d/,
-    );
-    return match ? Number(match[1] ?? match[2] ?? match[3]) : null;
-  };
-  const count = /^(pk|stk|bx)$/i.test(line.packageUnit ?? "")
-    ? line.packageSize
-    : packCount(line.name);
-  const targetCount = packCount(product.name);
-  if ((count ?? 1) !== (targetCount ?? 1)) return false;
-  const normalizeUnit = (value: number | null, unit: string | null) => ({
-    packageSize:
-      unit?.toLowerCase() === "cl" && value !== null ? value * 10 : value,
-    packageUnit:
-      unit?.toLowerCase() === "cl" ? "ml" : (unit?.toLowerCase() ?? null),
+  const source = parseProductEvidence({ ...line, source: "receipt" });
+  const target = parseProductEvidence({
+    source: "catalog",
+    name: product.name,
+    packageSize: product.weight,
+    packageUnit: product.weightUnit,
   });
+  const size = source.measures[0];
+  const targetSize = target.measures[0];
+  if (
+    source.counts.length > 1 ||
+    target.counts.length > 1 ||
+    (source.counts[0] ?? 1) !== (target.counts[0] ?? 1)
+  )
+    return false;
   const brand = (value: string | null) =>
     value ? normalizeSearch(value).replace(/[^\p{L}\p{N}]/gu, "") : null;
   const variant = (name: string) => [
@@ -52,11 +42,17 @@ export function compatibleCatalogProduct(
   )
     return false;
   return compatibleProduct(
-    { ...line, brand: brand(line.brand), ...normalizeUnit(amount, unit) },
+    {
+      ...line,
+      brand: brand(line.brand),
+      packageSize: size?.amount ?? null,
+      packageUnit: size?.unit ?? null,
+    },
     {
       name: product.name,
       brand: brand(product.brand ?? null),
-      ...normalizeUnit(product.weight ?? null, product.weightUnit ?? null),
+      packageSize: targetSize?.amount ?? null,
+      packageUnit: targetSize?.unit ?? null,
       attributes: [],
     },
     allowMissingSize,
@@ -66,16 +62,7 @@ export function compatibleCatalogProduct(
 /** Normalize text without removing flavour, variant or multipack evidence. */
 function productWords(name: string) {
   return new Set(
-    productSearch(name)
-      .replace(
-        /(\d+(?:[.,]\d+)?)\s*(kg|g|ml|cl|l)\b/g,
-        (_, amount: string, unit: string) => {
-          const value = Number(amount.replace(",", "."));
-          const factor =
-            unit === "kg" || unit === "l" ? 1000 : unit === "cl" ? 10 : 1;
-          return ` ${Math.round(value * factor * 1000) / 1000}${unit === "kg" ? "g" : unit === "l" || unit === "cl" ? "ml" : unit} `;
-        },
-      )
+    normalizeMeasureText(productSearch(name))
       .replace(/\b(uten sukker|sugar free|sukkerfri)\b/g, "zero")
       .split(/[^\p{L}\p{N}]+/u)
       .filter((word) => word && !["flaske", "boks", "pet"].includes(word)),
