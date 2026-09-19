@@ -1,3 +1,4 @@
+import { commitReceiptChange } from "./receiptChanges";
 import { categoryUncertainIssue } from "../src/lib/domain/receipt-issues";
 import { v } from "convex/values";
 import { errorDetails } from "../src/lib/diagnostics";
@@ -294,25 +295,21 @@ export const finish = internalMutation({
       autoAccepted,
       duplicate: !!duplicateOf,
     });
-    await ctx.db.patch("receipts", args.id, {
+    await commitReceiptChange(ctx, {
+      receiptId: receipt._id,
+      expected: receipt,
       data,
-      autoAccepted,
-      provider: args.provider,
-      status: autoAccepted ? "reviewed" : "needs_review",
-      error: undefined,
-      duplicateOf,
-      catalogStatus: undefined,
-      catalogWorkflowId: undefined,
+      origin: {
+        kind: "extraction",
+        provider: args.provider,
+        next: env.KASSALAPP_API_KEY
+          ? "catalog"
+          : env.TYPESAFE_API_KEY
+            ? "analysis"
+            : "none",
+      },
+      duplicate: { duplicateOf, resolved: receipt.duplicateResolved },
     });
-    if (env.KASSALAPP_API_KEY)
-      await ctx.scheduler.runAfter(0, internal.catalogMatching.start, {
-        id: args.id,
-        generation: args.generation,
-      });
-    else if (env.TYPESAFE_API_KEY)
-      await ctx.scheduler.runAfter(0, internal.productAnalysis.start, {
-        id: args.id,
-      });
     if (!receipt.receiptReadyNotified) {
       await ctx.db.patch("receipts", args.id, { receiptReadyNotified: true });
       const subscriptions = await ctx.db

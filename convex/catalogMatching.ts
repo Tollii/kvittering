@@ -1,3 +1,4 @@
+import { commitReceiptChange } from "./receiptChanges";
 import { isCategoryUncertain } from "../src/lib/domain/receipt-issues";
 import { featureEnabled } from "./releasePolicy";
 import { clientMutation as mutation } from "./clientFunctions";
@@ -26,7 +27,6 @@ import {
 } from "../src/lib/catalog/matching";
 import { normalizeSearch } from "../src/lib/catalog/policy";
 import { matchingKey } from "../src/lib/domain/product-matching";
-import { canAcceptReceipt } from "../src/lib/domain/receipt-review";
 import { categoryById } from "../src/lib/domain/categories";
 import { lineValidator } from "../src/lib/domain/receipt";
 import type { Id } from "./_generated/dataModel";
@@ -321,21 +321,11 @@ export const apply = internalMutation({
       ),
     });
     if (changed) {
-      const acceptable =
-        canAcceptReceipt(
-          data,
-          !!receipt.duplicateOf && !receipt.duplicateResolved,
-        ) && !receipt.provider.includes("mock");
-      await ctx.db.patch("receipts", receipt._id, {
+      await commitReceiptChange(ctx, {
+        receiptId: receipt._id,
+        expected: receipt,
         data,
-        revision: receipt.revision + 1,
-        ...(acceptable
-          ? {
-              status: "reviewed" as const,
-              autoAccepted:
-                receipt.status !== "reviewed" || receipt.autoAccepted === true,
-            }
-          : {}),
+        origin: { kind: "catalog" },
       });
     }
     return null;
@@ -398,11 +388,18 @@ export const finish = internalMutation({
         )
           ? "error"
           : "complete",
-      ...(changed ? { data, revision: receipt.revision + 1 } : {}),
     });
-    await ctx.scheduler.runAfter(0, internal.productAnalysis.start, {
-      id: args.id,
-    });
+    if (changed)
+      await commitReceiptChange(ctx, {
+        receiptId: receipt._id,
+        expected: receipt,
+        data,
+        origin: { kind: "catalog" },
+      });
+    else
+      await ctx.scheduler.runAfter(0, internal.productAnalysis.start, {
+        id: args.id,
+      });
     return null;
   },
 });

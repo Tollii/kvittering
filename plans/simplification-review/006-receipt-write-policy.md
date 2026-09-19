@@ -4,7 +4,7 @@
 
 ## Status
 
-- Status: TODO
+- Status: DONE
 - Priority: P2
 - Effort: M
 - Risk: Medium–high
@@ -203,3 +203,11 @@ Required check: A save returns only the ID/revision acknowledgement. The query s
 ## Maintenance notes
 
 Every future receipt writer must either use this helper or document a narrow reason it is not a content change.
+
+## Implementation record
+
+All content writers use `commitReceiptChange` in their current transaction. The pure decision owns status, revision, and automatic-approval state. The helper checks the expected revision/generation, parses the candidate, retains history, and schedules dependent analysis. Human learning remains in save. Save returns only receipt ID and revision; the editor uses that acknowledgement with its reactive snapshot.
+
+Policy matrix: human approval can approve a valid mock receipt and never marks automatic approval; alias/correction/catalog can automatically approve acceptable non-mock receipts; undo reassesses safety without automatically approving a pending receipt; extraction keeps its initial revision and schedules its selected next stage. Non-extraction content changes increment the revision and retain history.
+
+Verification: typecheck, lint, complete tests, stale-commit rollback, acknowledgement shape, and origin-matrix cases passed. Existing extraction review cases also passed after integration. Native save/query timing is covered by the draft tests, but is not device-verified.

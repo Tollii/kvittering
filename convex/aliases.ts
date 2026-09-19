@@ -1,3 +1,4 @@
+import { commitReceiptChange } from "./receiptChanges";
 import { v } from "convex/values";
 import {
   internalMutation,
@@ -15,10 +16,7 @@ import {
   learnableLine,
   recordCategoryDecision,
 } from "../src/lib/domain/category-memory";
-import {
-  canAcceptReceipt,
-  isCategoryUncertain,
-} from "../src/lib/domain/receipt-review";
+import { isCategoryUncertain } from "../src/lib/domain/receipt-review";
 
 /**
  * A remembered household decision settles the category: it replaces the
@@ -161,26 +159,11 @@ export const applyToMatching = internalMutation({
           changed = true;
       }
       if (changed) {
-        const autoAccepted =
-          receipt.status === "needs_review" &&
-          !receipt.provider.includes("mock") &&
-          canAcceptReceipt(
-            data,
-            !!receipt.duplicateOf && !receipt.duplicateResolved,
-          );
-        await ctx.db.insert("revisions", {
+        await commitReceiptChange(ctx, {
           receiptId: receipt._id,
-          data: receipt.data,
-          editor: alias.confirmedBy,
-          revision: receipt.revision,
-        });
-        await ctx.db.patch("receipts", receipt._id, {
+          expected: receipt,
           data,
-          revision: receipt.revision + 1,
-          ...(autoAccepted ? { status: "reviewed", autoAccepted: true } : {}),
-        });
-        await ctx.scheduler.runAfter(0, internal.productAnalysis.start, {
-          id: receipt._id,
+          origin: { kind: "alias", editor: alias.confirmedBy },
         });
       }
     }

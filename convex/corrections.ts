@@ -1,7 +1,7 @@
+import { commitReceiptChange } from "./receiptChanges";
 import { clientMutation as mutation } from "./clientFunctions";
 import { v } from "convex/values";
 import { query, type MutationCtx, type QueryCtx } from "./_generated/server";
-import { internal } from "./_generated/api";
 import schema from "./schema";
 import type { Doc, Id } from "./_generated/dataModel";
 import { requireMember } from "./access";
@@ -194,14 +194,10 @@ export const apply = mutation({
         return line;
       });
       const ids = new Set(before.map((line) => line.id));
-      await ctx.db.insert("revisions", {
+      const acknowledgement = await commitReceiptChange(ctx, {
         receiptId,
-        revision: receipt.revision,
-        data: receipt.data,
-        editor: "category correction batch",
-      });
-      await ctx.db.patch("receipts", receiptId, {
-        revision: receipt.revision + 1,
+        expected: receipt,
+        origin: { kind: "correction", editor: "category correction batch" },
         data: {
           ...receipt.data,
           lines: receipt.data.lines.map((line) =>
@@ -211,10 +207,7 @@ export const apply = mutation({
           ),
         },
       });
-      changes.push({ receiptId, revision: receipt.revision + 1, before });
-      await ctx.scheduler.runAfter(0, internal.productAnalysis.start, {
-        id: receiptId,
-      });
+      changes.push({ receiptId, revision: acknowledgement.revision, before });
     }
     return ctx.db.insert("correctionBatches", {
       householdId: correction.householdId,
@@ -243,23 +236,16 @@ export const undo = mutation({
         throw new Error(
           "En kvittering er endret etter rettelsen. Åpne den for å rette manuelt.",
         );
-      await ctx.db.insert("revisions", {
+      await commitReceiptChange(ctx, {
         receiptId: receipt._id,
-        revision: receipt.revision,
-        data: receipt.data,
-        editor: member.identity,
-      });
-      await ctx.db.patch("receipts", receipt._id, {
-        revision: receipt.revision + 1,
+        expected: receipt,
+        origin: { kind: "undo", editor: member.identity },
         data: {
           ...receipt.data,
           lines: receipt.data.lines.map(
             (line) => change.before.find((old) => old.id === line.id) ?? line,
           ),
         },
-      });
-      await ctx.scheduler.runAfter(0, internal.productAnalysis.start, {
-        id: receipt._id,
       });
     }
     await ctx.db.patch("correctionBatches", id, { undone: true });

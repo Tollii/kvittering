@@ -1,3 +1,4 @@
+import { commitReceiptChange, receiptCommitValidator } from "./receiptChanges";
 import { requireCompatibleClient } from "./releasePolicy";
 import { clientValidator } from "../src/lib/releases/policy";
 import { clientMutation as mutation } from "./clientFunctions";
@@ -169,7 +170,7 @@ export const save = mutation({
     duplicateResolved: v.boolean(),
     excluded: v.boolean(),
   },
-  returns: v.null(),
+  returns: receiptCommitValidator,
   handler: async (ctx, args) => {
     const { member, receipt } = await requireReceipt(ctx, args.id);
     if (receipt.revision !== args.revision)
@@ -180,13 +181,12 @@ export const save = mutation({
       receipt.status === "uploading"
     )
       throw new Error("Vent til behandlingen er ferdig.");
+    args = { ...args, data: structuredClone(args.data) };
     validateReceipt(args.data);
     const acceptable = canAcceptReceipt(
       args.data,
       !!receipt.duplicateOf && !args.duplicateResolved,
     );
-    const reviewed =
-      args.reviewed || (acceptable && !receipt.provider.includes("mock"));
     if (args.reviewed && !acceptable)
       throw new Error("Kontroller avvik og uklare felt før godkjenning.");
     for (const line of args.data.lines) {
@@ -283,26 +283,21 @@ export const save = mutation({
         args.data,
         args.rememberLineIds,
       );
-    if (receipt.data)
-      await ctx.db.insert("revisions", {
-        receiptId: receipt._id,
-        data: receipt.data,
-        editor: member.identity,
-        revision: receipt.revision,
-      });
-    await ctx.db.patch("receipts", args.id, {
-      autoAccepted: false,
+    return commitReceiptChange(ctx, {
+      receiptId: receipt._id,
+      expected: receipt,
       data: args.data,
-      revision: receipt.revision + 1,
-      status: reviewed ? "reviewed" : "needs_review",
-      duplicateResolved: args.duplicateResolved,
+      origin: {
+        kind: "human",
+        editor: member.identity,
+        reviewed: args.reviewed,
+      },
+      duplicate: {
+        duplicateOf: receipt.duplicateOf,
+        resolved: args.duplicateResolved,
+      },
       excluded: args.excluded,
-      error: undefined,
     });
-    await ctx.scheduler.runAfter(0, internal.productAnalysis.start, {
-      id: args.id,
-    });
-    return null;
   },
 });
 export const imageAccess = internalQuery({

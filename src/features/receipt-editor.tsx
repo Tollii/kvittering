@@ -241,7 +241,7 @@ export function ReceiptEditor({
   async function save() {
     if (!data || saveDisabled) return;
     await run(async () => {
-      await releaseMutation(client, api.receipts.save, {
+      const acknowledgement = await releaseMutation(client, api.receipts.save, {
         id: receipt._id,
         revision,
         data,
@@ -278,8 +278,11 @@ export function ReceiptEditor({
         duplicateResolved,
         excluded,
       });
-      // The current save contract advances the submitted revision by one.
-      dispatch({ type: "saved", revision: revision + 1, approved: ready });
+      dispatch({
+        type: "saved",
+        revision: acknowledgement.revision,
+        approved: ready,
+      });
       if (ready) successFeedback();
     }, "saving");
   }
