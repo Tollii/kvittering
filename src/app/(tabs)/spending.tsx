@@ -47,6 +47,7 @@ import { monthPriceSignals } from "@/lib/domain/price-signals";
 import { formatDate } from "@/lib/format-date";
 import { catalogInsights } from "@/lib/catalog/insights";
 import { router } from "expo-router";
+import { StoreSpendingSheet } from "@/features/spending-reports/stores";
 
 export default function Spending() {
   const { online, details } = useHousehold();
@@ -59,6 +60,7 @@ export default function Spending() {
     end: `${month}-31`,
   });
   const [filters, setFilters] = useState(false);
+  const [storesOpen, setStoresOpen] = useState(false);
   const [report, setReport] = useState<ReportId | null>(null);
   const [showAllGroups, setShowAllGroups] = useState(false);
   const [reviewedOnly, setReviewedOnly] = useState(false);
@@ -507,6 +509,14 @@ export default function Spending() {
               <Empty title="Ingen kjøp denne måneden" icon="cart" />
             )}
           </Panel>
+          <Panel tone="soft">
+            <Row
+              title="Butikker"
+              detail="Se hvor dere handler, og hva dere bruker per butikk"
+              icon="map"
+              onPress={() => setStoresOpen(true)}
+            />
+          </Panel>
           {recentReceipts.length > 0 && (
             <>
               <SectionTitle
@@ -610,6 +620,17 @@ export default function Spending() {
           </Panel>
         </>
       )}
+      <StoreSpendingSheet
+        visible={storesOpen}
+        onClose={() => setStoresOpen(false)}
+        purchases={totals.storePurchases}
+        periodKey={periodKey}
+        monthLabel={monthLabel}
+        onPreviousMonth={() => moveMonth(-1)}
+        onNextMonth={() => moveMonth(1)}
+        nextDisabled={month >= currentMonth}
+        loading={loadingReceipts}
+      />
       <Sheet
         title={report ? reports[report].title : ""}
         visible={report !== null}

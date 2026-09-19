@@ -6,6 +6,7 @@ import {
 import type { Doc } from "../../../convex/_generated/dataModel";
 import { categoryById } from "./categories";
 import { type ReceiptLine } from "./receipt";
+import type { StorePurchase } from "./store-spending";
 export type Receipt = Doc<"receipts">;
 export type Contribution = {
   receipt: Receipt;
@@ -123,6 +124,18 @@ export function monthlyInsights(
   }
   return {
     selected,
+    storePurchases: prepared.map(
+      ({ receipt, data, totals }) =>
+        ({
+          receiptId: receipt._id,
+          date: data.purchaseDate ?? undefined,
+          retailer: data.store ?? undefined,
+          branch: data.physicalStore ?? undefined,
+          amountOre: totals.productSpending,
+          unknownAmounts: totals.unknown,
+          provisional: receipt.status !== "reviewed",
+        }) satisfies StorePurchase,
+    ),
     unconverted,
     paid,
     products,
