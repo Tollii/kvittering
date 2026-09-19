@@ -141,8 +141,12 @@ export type ReceiptParseOutcome =
   | { kind: "rejected"; issue: { code: "invalid_receipt"; message: string } };
 export function parseReceipt(input: unknown): ReceiptParseOutcome {
   try {
-    const data = parseValue(receiptDataValidator, input);
-    return { kind: "parsed", receipt: validateReceipt(structuredClone(data)) };
+    const data = structuredClone(parseValue(receiptDataValidator, input));
+    // Older receipts use a separate category for energy drinks, now part of soft drinks.
+    for (const line of data.lines)
+      if (line.categoryId === "drinks.energy-drinks")
+        line.categoryId = "drinks.soft-drinks";
+    return { kind: "parsed", receipt: validateReceipt(data) };
   } catch (cause) {
     return {
       kind: "rejected",

@@ -6,6 +6,7 @@ import {
   parseOre,
   spendingLines,
   validateReceipt,
+  parseReceipt,
   aliasKey,
   classificationInputs,
 } from "./receipt";
@@ -97,6 +98,18 @@ describe("receipt accounting", () => {
     receipt.lines[0].amountOre = 2590;
     receipt.lines.push(receipt.lines[0]);
     expect(() => validateReceipt(receipt)).toThrow();
+  });
+  it("accepts the retired energy-drink category without changing the source receipt", () => {
+    const receipt = batteryFixture();
+    receipt.lines[0].categoryId = "drinks.energy-drinks";
+    const parsed = parseReceipt(receipt);
+    expect(parsed.kind).toBe("parsed");
+    if (parsed.kind !== "parsed") throw new Error(parsed.issue.message);
+    expect(parsed.receipt.lines[0].categoryId).toBe("drinks.soft-drinks");
+    expect(parsed.receipt.totalOre).toBe(receipt.totalOre);
+    expect(receipt.lines[0].categoryId).toBe("drinks.energy-drinks");
+    receipt.lines[0].categoryId = "unknown.category";
+    expect(parseReceipt(receipt).kind).toBe("rejected");
   });
   it("keeps undated receipts visible and excluded receipts out of spending", () => {
     const base = {
