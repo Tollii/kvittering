@@ -1,3 +1,5 @@
+import { linkCatalogProduct } from "./catalogLinks";
+import { compatibleCatalogProduct } from "../src/lib/catalog/matching";
 import { commitReceiptChange } from "./receiptChanges";
 import { categoryUncertainIssue } from "../src/lib/domain/receipt-issues";
 import { v } from "convex/values";
@@ -229,7 +231,34 @@ export const finish = internalMutation({
           line,
         );
         let productId = null;
-        if (mapping) {
+        if (mapping?.reference?.kind === "catalog") {
+          const reference = mapping.reference;
+          const catalog = await ctx.db
+            .query("catalogProducts")
+            .withIndex("by_key", (q) => q.eq("key", reference.product.key))
+            .unique();
+          if (
+            catalog &&
+            compatibleCatalogProduct(
+              line,
+              catalog.product,
+              reference.provenance === "manual",
+            )
+          ) {
+            Object.assign(
+              line,
+              await linkCatalogProduct(
+                ctx,
+                receipt.householdId,
+                retailer,
+                line,
+                catalog.product,
+                mapping.confirmedBy,
+              ),
+            );
+            continue;
+          }
+        } else if (mapping) {
           const product = mapping.productId
             ? await ctx.db.get("products", mapping.productId)
             : null;
@@ -238,12 +267,16 @@ export const finish = internalMutation({
             (product &&
               compatibleProduct(line, product, mapping.confirmedBy !== null))
           ) {
-            await linkProduct(
-              ctx,
-              receipt.householdId,
-              retailer,
+            Object.assign(
               line,
-              mapping.productId,
+              await linkProduct(
+                ctx,
+                receipt.householdId,
+                retailer,
+                line,
+                mapping.productId,
+                mapping.confirmedBy !== null ? "manual" : "automatic",
+              ),
             );
             continue;
           }
@@ -268,7 +301,16 @@ export const finish = internalMutation({
           )
             productId = product._id;
         }
-        await linkProduct(ctx, receipt.householdId, retailer, line, productId);
+        Object.assign(
+          line,
+          await linkProduct(
+            ctx,
+            receipt.householdId,
+            retailer,
+            line,
+            productId,
+          ),
+        );
         if (productId)
           await saveMapping(
             ctx,

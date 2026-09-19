@@ -278,3 +278,74 @@ it("accepts a clear Jev candidate and refuses low confidence without creating a 
     vi.unstubAllEnvs();
   }
 });
+
+it("links catalog identity without creating a second household product and reuses the choice", async () => {
+  const { t, user, receipt, householdId } = await setup();
+  const id = await receipt();
+  const data = batteryFixture();
+  await t.run((ctx) =>
+    ctx.db.patch("receipts", id, { status: "processing", generation: 1 }),
+  );
+  await t.mutation(internal.processing.finish, {
+    id,
+    generation: 1,
+    data,
+    original: data,
+    provider: "test",
+    matches: [{ lineId: "battery", kind: "new", productId: null }],
+  });
+  const { normalizeProducts } = await import("./kassalapp/normalize");
+  const product = normalizeProducts({
+    data: [{ id: 71, name: "Battery Remix" }],
+  })[0];
+  await t.run((ctx) =>
+    ctx.db.insert("catalogProducts", {
+      key: product.key,
+      product,
+      fetchedAt: 1,
+    }),
+  );
+  await user.mutation(api.receipts.save, {
+    id,
+    revision: 0,
+    data,
+    reviewed: false,
+    rememberLineIds: [],
+    duplicateResolved: false,
+    excluded: false,
+    selections: [{ kind: "catalog", lineId: "battery", key: product.key }],
+  });
+  const saved = (await user.query(api.receipts.detail, { id }))!.receipt.data!
+    .lines[0];
+  expect(saved.productReference).toMatchObject({
+    kind: "catalog",
+    provenance: "manual",
+    product: { key: product.key },
+  });
+  expect(saved.productId).toBeNull();
+  expect(
+    await t.run((ctx) =>
+      ctx.db
+        .query("products")
+        .withIndex("by_householdId_and_retailer", (q) =>
+          q.eq("householdId", householdId),
+        )
+        .take(10),
+    ),
+  ).toHaveLength(1);
+  const next = await receipt();
+  await t.run((ctx) =>
+    ctx.db.patch("receipts", next, { status: "processing", generation: 1 }),
+  );
+  await t.mutation(internal.processing.finish, {
+    id: next,
+    generation: 1,
+    data,
+    original: data,
+    provider: "test",
+  });
+  expect(
+    (await user.query(api.receipts.detail, { id: next }))!.receipt.data!
+      .lines[0].productReference,
+  ).toEqual(saved.productReference);
+});

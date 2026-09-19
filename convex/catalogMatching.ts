@@ -282,20 +282,23 @@ export const apply = internalMutation({
           .withIndex("by_key", (q) => q.eq("key", decision.productKey!))
           .unique();
         if (product && line.catalogProduct?.key !== product.key && data.store) {
-          await linkCatalogProduct(
-            ctx,
-            receipt.householdId,
-            data.store,
+          Object.assign(
             line,
-            product.product,
-            null,
+            await linkCatalogProduct(
+              ctx,
+              receipt.householdId,
+              data.store,
+              line,
+              product.product,
+              null,
+            ),
           );
           changed = true;
         }
       }
       if (
         !line.manual &&
-        !line.productKey &&
+        !(line.categoryAliasKey ?? line.productKey) &&
         decision.categoryId &&
         categoryById.has(decision.categoryId) &&
         decision.categoryId !== "fallback.unclear" &&

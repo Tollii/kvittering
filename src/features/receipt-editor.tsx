@@ -222,22 +222,10 @@ export function ReceiptEditor({
             aliasKey(data, line) !== null
           );
         }),
-        productChanges: Object.entries(productChanges)
-          .filter(([, choice]) => choice.kind !== "catalog")
-          .map(([lineId, choice]) => ({
-            lineId,
-            productId: choice.kind === "existing" ? choice.id : null,
-            createNew: choice.kind === "new",
-          })),
-        catalogChanges: Object.entries(productChanges).flatMap<{
-          lineId: string;
-          key: string | null;
-        }>(([lineId, choice]) =>
+        selections: Object.entries(productChanges).map(([lineId, choice]) =>
           choice.kind === "catalog"
-            ? [{ lineId, key: choice.product.key }]
-            : choice.kind === "separate"
-              ? [{ lineId, key: null }]
-              : [],
+            ? { kind: "catalog" as const, lineId, key: choice.key }
+            : { ...choice, lineId },
         ),
         physicalStoreId,
         duplicateResolved,

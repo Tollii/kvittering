@@ -1,3 +1,4 @@
+import { productIdentityKey, productReference } from "./product-reference";
 import {
   preparePurchases,
   overviewPurchasePolicy,
@@ -182,14 +183,11 @@ export function productHistory(receipts: Receipt[]) {
   )) {
     for (const { line } of purchases) {
       // Unlinked items remain separate; similar names do not establish identity.
-      const key =
-        line.catalogProduct?.key ??
-        line.productId ??
-        `${receipt._id}:${line.id}`;
+      const key = productIdentityKey(line) ?? `${receipt._id}:${line.id}`;
       const product = products.get(key) ?? {
         key,
         name: line.catalogProduct?.name ?? (line.productName || line.name),
-        linked: !!line.catalogProduct || !!line.productId,
+        linked: productIdentityKey(line) !== null,
         quantity: 0,
         purchases: new Set<string>(),
         amountOre: 0,
@@ -252,21 +250,25 @@ export function receiptCoverage(receipts: Receipt[]) {
   return {
     pending: included.filter((r) => r.status !== "reviewed"),
     unlinked: included.filter((r) =>
-      r.data?.lines.some((l) => l.kind === "product" && !l.productId),
+      r.data?.lines.some(
+        (l) => l.kind === "product" && productIdentityKey(l) === null,
+      ),
     ),
     unlinkedCount: included.reduce(
       (n, r) =>
         n +
-        (r.data?.lines.filter((l) => l.kind === "product" && !l.productId)
-          .length ?? 0),
+        (r.data?.lines.filter(
+          (l) => l.kind === "product" && productIdentityKey(l) === null,
+        ).length ?? 0),
       0,
     ),
   };
 }
 export function matchLabel(line: ReceiptLine) {
-  return !line.productId
+  const reference = productReference(line);
+  return reference.kind === "unresolved" || reference.kind === "separate"
     ? "Ikke koblet"
-    : line.productMatchManual
+    : reference.provenance === "manual"
       ? "Bekreftet av deg"
       : "Automatisk koblet";
 }

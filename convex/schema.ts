@@ -1,3 +1,4 @@
+import { productReferenceValidator } from "../src/lib/domain/product-reference";
 import { policyValidator, clientValidator } from "../src/lib/releases/policy";
 import { productAttributesValidator } from "../src/lib/domain/product-attributes";
 import { correctionFields } from "../src/lib/domain/corrections";
@@ -178,6 +179,7 @@ export default defineSchema({
     retailer: v.string(),
     key: v.string(),
     productId: v.union(v.id("products"), v.null()),
+    reference: productReferenceValidator.optional(),
     confirmedBy: v.union(v.string(), v.null()),
   }).index("by_householdId_and_retailer_and_key", [
     "householdId",

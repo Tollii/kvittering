@@ -4,7 +4,7 @@
 
 ## Status
 
-- Status: TODO
+- Status: DONE
 - Priority: P2
 - Effort: L
 - Risk: High
@@ -200,3 +200,11 @@ correctProducts at convex/products.ts:198 and linkCatalogProduct at convex/catal
 ## Maintenance notes
 
 Treat this as a staged refactor. No broad rewrite or dual-write migration system is required for disposable development data; preserve retained local drafts if their payload changes.
+
+## Implementation record
+
+Added ProductReference and ProductSelection unions. The UI submits one selection list; the resolver returns changed receipt data without mutating its input. Catalog selection stores a direct catalog reference and no longer inserts a mirrored household product. Remembered catalog and separate choices retain manual provenance on later receipts. Household products remain available for unlisted goods. Reports recognize direct catalog identity. Category alias state has the explicit categoryAliasKey name.
+
+Compatibility decision: retained legacy command inputs and serialized line fields for installed clients. Commands are translated once into the new selection union; legacy line fields are projections written by one reference constructor. The old two-pass selection implementation is removed. No live migration or product deletion was performed.
+
+Verification: typecheck, lint, all 181 tests, and diff checks passed. Tests cover catalog linking after household matching without a second product row, remembered manual catalog choice, separate products, household isolation, variants, package sizes, and existing correction/quantity behavior. Native selection checks remain unverified.

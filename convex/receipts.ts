@@ -1,11 +1,17 @@
+import {
+  productSelectionValidator,
+  productReference,
+  withProductReference,
+  type ProductSelection,
+} from "../src/lib/domain/product-reference";
 import { commitReceiptChange, receiptCommitValidator } from "./receiptChanges";
 import { requireCompatibleClient } from "./releasePolicy";
 import { clientValidator } from "../src/lib/releases/policy";
 import { clientMutation as mutation } from "./clientFunctions";
 import { recordCorrections } from "./corrections";
 import { lineEvidenceKey } from "../src/lib/catalog/matching";
-import { productChange, correctProducts } from "./products";
-import { correctCatalogLinks } from "./catalogLinks";
+import { productChange } from "./products";
+import { resolveProductSelections } from "./catalogLinks";
 import { v } from "convex/values";
 import {
   paginationOptsValidator,
@@ -160,6 +166,7 @@ export const save = mutation({
     data: receiptDataValidator,
     reviewed: v.boolean(),
     rememberLineIds: v.array(v.string()),
+    selections: v.array(productSelectionValidator).optional(),
     productChanges: v.array(productChange).optional(),
     catalogChanges: v
       .array(
@@ -193,19 +200,23 @@ export const save = mutation({
       const previous = receipt.data?.lines.find((old) => old.id === line.id);
       if (previous) line.originalText = previous.originalText;
       line.receiptName = previous?.receiptName ?? previous?.name ?? line.name;
-      line.productId = previous?.productId ?? null;
-      line.productName = previous?.productName ?? "";
-      line.productMatchManual = previous?.productMatchManual ?? false;
-      line.catalogProduct =
-        previous && lineEvidenceKey(previous) === lineEvidenceKey(line)
-          ? (previous.catalogProduct ?? null)
-          : null;
-      if (line.kind !== "product" || args.data.store !== receipt.data?.store) {
-        line.productId = null;
-        line.productName = "";
-        line.productMatchManual = false;
-        line.catalogProduct = null;
-      }
+      const reference =
+        previous &&
+        line.kind === "product" &&
+        args.data.store === receipt.data?.store
+          ? productReference(previous)
+          : { kind: "unresolved" as const };
+      Object.assign(
+        line,
+        withProductReference(
+          line,
+          reference.kind === "catalog" &&
+            previous &&
+            lineEvidenceKey(previous) !== lineEvidenceKey(line)
+            ? { kind: "unresolved" }
+            : reference,
+        ),
+      );
     }
     args.data.physicalStore =
       args.data.store === receipt.data?.store &&
@@ -217,27 +228,59 @@ export const save = mutation({
       args.data.branch === receipt.data?.branch
         ? (receipt.data?.physicalStoreManual ?? false)
         : false;
-    await correctProducts(
+    // Translate installed-client commands once; the resolver consumes one selection union.
+    const selections = new Map<string, ProductSelection>();
+    if (
+      args.selections &&
+      (args.productChanges?.length || args.catalogChanges?.length)
+    )
+      throw new Error("Velg én kommandoform.");
+    for (const change of args.productChanges ?? []) {
+      if (selections.has(change.lineId))
+        throw new Error("Velg ett produkt per varelinje.");
+      selections.set(
+        change.lineId,
+        change.createNew
+          ? { kind: "new_household", lineId: change.lineId }
+          : change.productId
+            ? {
+                kind: "household",
+                lineId: change.lineId,
+                productId: change.productId,
+              }
+            : { kind: "separate", lineId: change.lineId },
+      );
+    }
+    for (const change of args.catalogChanges ?? []) {
+      const previous = selections.get(change.lineId);
+      if (previous && (previous.kind !== "separate" || change.key !== null))
+        throw new Error("Velg ett produkt per varelinje.");
+      selections.set(
+        change.lineId,
+        change.key
+          ? { kind: "catalog", lineId: change.lineId, key: change.key }
+          : { kind: "separate", lineId: change.lineId },
+      );
+    }
+    args.data = await resolveProductSelections(
       ctx,
       member.householdId,
       member.identity,
       args.data,
-      args.productChanges ?? [],
-    );
-    await correctCatalogLinks(
-      ctx,
-      member.householdId,
-      member.identity,
-      args.data,
-      args.catalogChanges ?? [],
+      args.selections ?? [...selections.values()],
       args.physicalStoreId,
     );
     for (const line of args.data.lines) {
       const previous = receipt.data?.lines.find((old) => old.id === line.id);
       if (!previous || JSON.stringify(previous) !== JSON.stringify(line))
         line.manual = true;
-      if (line.productKey && line.productKey !== aliasKey(args.data, line))
-        line.productKey = null;
+      line.categoryAliasKey = line.categoryAliasKey ?? line.productKey;
+      if (
+        line.categoryAliasKey &&
+        line.categoryAliasKey !== aliasKey(args.data, line)
+      )
+        line.categoryAliasKey = null;
+      line.productKey = line.categoryAliasKey ?? null;
       if (
         args.rememberLineIds.includes(line.id) &&
         line.kind === "product" &&
@@ -266,6 +309,7 @@ export const save = mutation({
             categoryId: line.categoryId,
             confirmedBy: member.identity,
           });
+        line.categoryAliasKey = key;
         line.productKey = key;
         await ctx.scheduler.runAfter(0, internal.aliases.applyToMatching, {
           householdId: member.householdId,

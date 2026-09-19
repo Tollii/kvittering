@@ -35,6 +35,7 @@ export function settleLineWithAlias(
     line.categoryId !== nextCategory ||
     issues.length !== line.issues.length ||
     line.confidence !== 1;
+  line.categoryAliasKey = key;
   line.productKey = key;
   line.categoryId = nextCategory;
   line.issues = issues;

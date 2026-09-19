@@ -1,3 +1,7 @@
+import {
+  withProductReference,
+  type ProductReference,
+} from "../src/lib/domain/product-reference";
 import { v } from "convex/values";
 import {
   query,
@@ -8,11 +12,7 @@ import {
 import type { Id } from "./_generated/dataModel";
 import schema from "./schema";
 import { requireReceipt } from "./access";
-import {
-  lineValidator,
-  type ReceiptData,
-  type ReceiptLine,
-} from "../src/lib/domain/receipt";
+import { lineValidator, type ReceiptLine } from "../src/lib/domain/receipt";
 import {
   matchingKey,
   compatibleProduct,
@@ -148,6 +148,7 @@ export async function saveMapping(
   line: ReceiptLine,
   productId: Id<"products"> | null,
   confirmedBy: string | null,
+  reference?: ProductReference,
 ) {
   const existing = await findMapping(ctx, householdId, retailer, line);
   const values = {
@@ -155,6 +156,7 @@ export async function saveMapping(
     retailer,
     key: matchingKey(line.receiptName ?? line.name),
     productId,
+    ...(reference ? { reference } : {}),
     confirmedBy,
   };
   if (existing) await ctx.db.replace("productMappings", existing._id, values);
@@ -181,7 +183,8 @@ export async function linkProduct(
   retailer: string,
   line: ReceiptLine,
   id: Id<"products"> | null,
-) {
+  provenance: "manual" | "automatic" = "automatic",
+): Promise<ReceiptLine> {
   const product = id ? await ctx.db.get("products", id) : null;
   if (
     id &&
@@ -190,37 +193,12 @@ export async function linkProduct(
       product.retailer !== retailer)
   )
     throw new Error("Varen er ikke tilgjengelig i denne butikken.");
-  line.productId = id;
-  line.productName = product?.name ?? "";
-  line.productKey = null;
-}
-/** Corrections and mappings are written in the same transaction as the receipt edit. */
-export async function correctProducts(
-  ctx: MutationCtx,
-  householdId: Id<"households">,
-  editor: string,
-  data: ReceiptData,
-  changes: {
-    lineId: string;
-    productId: Id<"products"> | null;
-    createNew: boolean;
-  }[],
-) {
-  if (new Set(changes.map((change) => change.lineId)).size !== changes.length)
-    throw new Error("En vare kan bare kobles én gang per lagring.");
-  const retailer = matchingKey(data.store ?? "");
-  for (const change of changes) {
-    const line = data.lines.find(
-      (l) => l.id === change.lineId && l.kind === "product",
-    );
-    if (!line || !retailer || !matchingKey(line.receiptName ?? line.name))
-      throw new Error("Butikk og varenavn kreves for produktkobling.");
-    const id = change.createNew
-      ? await createProduct(ctx, householdId, retailer, line)
-      : change.productId;
-    await linkProduct(ctx, householdId, retailer, line, id);
-  line.productMatchManual = true;
-    line.catalogProduct = null;
-    await saveMapping(ctx, householdId, retailer, line, id, editor);
-  }
+  return withProductReference(
+    line,
+    product
+      ? { kind: "household", id: product._id, name: product.name, provenance }
+      : provenance === "manual"
+        ? { kind: "separate", provenance }
+        : { kind: "unresolved" },
+  );
 }

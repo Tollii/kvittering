@@ -1,3 +1,4 @@
+import type { ProductSelection } from "@/lib/domain/product-reference";
 import { useState } from "react";
 import { Pressable, View } from "react-native";
 import { useQuery } from "convex/react";
@@ -44,11 +45,14 @@ export const lineLabels: Record<ReceiptLine["kind"], string> = {
   summary: "Oppsummering (telles ikke)",
   vat: "MVA (telles ikke)",
 };
+type SelectionChoice<T> = T extends { lineId: string }
+  ? Omit<T, "lineId">
+  : never;
 export type ProductChoice =
-  | { kind: "existing"; id: Id<"products"> }
-  | { kind: "new" }
-  | { kind: "catalog"; product: CatalogProduct }
-  | { kind: "separate" };
+  | Exclude<SelectionChoice<ProductSelection>, { kind: "catalog" }>
+  | (SelectionChoice<Extract<ProductSelection, { kind: "catalog" }>> & {
+      product: CatalogProduct;
+    });
 type Props = {
   line: ReceiptLine;
   lines: ReceiptLine[];
@@ -101,8 +105,8 @@ export function ReceiptLineEditor({
     productChoice?.kind === "catalog"
       ? productChoice.product
       : productChoice?.kind === "separate" ||
-          productChoice?.kind === "new" ||
-          productChoice?.kind === "existing"
+          productChoice?.kind === "new_household" ||
+          productChoice?.kind === "household"
         ? null
         : line.catalogProduct;
   const patch = (value: Partial<ReceiptLine>) =>
@@ -307,7 +311,9 @@ export function ReceiptLineEditor({
           name={line.name}
           onSelect={(product) =>
             onProduct(
-              product ? { kind: "catalog", product } : { kind: "separate" },
+              product
+                ? { kind: "catalog", key: product.key, product }
+                : { kind: "separate" },
             )
           }
           onClose={() => setCatalogScreen(null)}
@@ -542,7 +548,7 @@ function ProductSelector({
             title="Opprett eget produkt"
             secondary
             compact
-            onPress={() => onChange({ kind: "new" })}
+            onPress={() => onChange({ kind: "new_household" })}
           />
         </View>
         <View style={{ flex: 1 }}>
@@ -558,8 +564,12 @@ function ProductSelector({
         <Row
           key={product._id}
           title={product.name}
-          selected={choice?.kind === "existing" && choice.id === product._id}
-          onPress={() => onChange({ kind: "existing", id: product._id })}
+          selected={
+            choice?.kind === "household" && choice.productId === product._id
+          }
+          onPress={() =>
+            onChange({ kind: "household", productId: product._id })
+          }
         />
       ))}
     </Panel>

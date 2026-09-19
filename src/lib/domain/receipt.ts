@@ -1,3 +1,4 @@
+import { productReferenceValidator } from "./product-reference";
 import { parse as parseValue } from "convex-helpers/validators";
 import { receiptIssueText, type ReceiptIssue } from "./receipt-issues";
 import { v, type Infer } from "convex/values";
@@ -39,6 +40,8 @@ export const lineValidator = v.object({
   issues: v.array(v.string()),
   manual: v.boolean(),
   productKey: nullableString,
+  categoryAliasKey: nullableString.optional(),
+  productReference: productReferenceValidator.optional(),
   receiptName: v.string().optional(),
   productId: v.union(v.id("products"), v.null()).optional(),
   productName: v.string().optional(),
@@ -432,7 +435,10 @@ export function weeklyShopFixture(): ReceiptData {
 /** Send only product evidence to the classifier, including a linked offer's product description. */
 export function classificationInputs(data: ReceiptData) {
   return data.lines
-    .filter((line) => line.kind === "product" && !line.productKey)
+    .filter(
+      (line) =>
+        line.kind === "product" && !(line.categoryAliasKey ?? line.productKey),
+    )
     .map((line) => ({
       id: line.id,
       description: JSON.stringify({
