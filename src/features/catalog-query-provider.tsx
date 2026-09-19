@@ -1,21 +1,14 @@
-import { useEffect, useState, type ReactNode } from "react";
-import { AppState } from "react-native";
-import {
-  focusManager,
-  onlineManager,
-  QueryClient,
-} from "@tanstack/react-query";
+import { useState, type ReactNode } from "react";
+import { QueryClient } from "@tanstack/react-query";
 import { PersistQueryClientProvider } from "@tanstack/react-query-persist-client";
 import { catalogPersister } from "@/lib/catalog-cache";
 import { day } from "@/lib/catalog/policy";
 
 export function CatalogQueryProvider({
   scope,
-  online,
   children,
 }: {
   scope: string;
-  online: boolean;
   children: ReactNode;
 }) {
   const [client] = useState(
@@ -27,20 +20,6 @@ export function CatalogQueryProvider({
       }),
   );
   const [persister] = useState(() => catalogPersister(scope));
-  useEffect(() => {
-    onlineManager.setOnline(online);
-  }, [online]);
-  useEffect(() => {
-    focusManager.setFocused(AppState.currentState === "active");
-    const subscription = AppState.addEventListener("change", (state) =>
-      focusManager.setFocused(state === "active"),
-    );
-    return () => {
-      subscription.remove();
-      client.clear();
-      void persister.removeClient();
-    };
-  }, [client, persister]);
   return (
     <PersistQueryClientProvider
       client={client}

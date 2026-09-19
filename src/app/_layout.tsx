@@ -14,6 +14,7 @@ import { StatusBar } from "expo-status-bar";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { useColorScheme } from "react-native";
+import { QueryLifecycleProvider } from "@/features/query-lifecycle";
 import { SessionProvider } from "@/features/session";
 import { useTheme } from "@/constants/theme";
 import { Button, Notice, Screen } from "@/components/ui";
@@ -59,28 +60,33 @@ function RootLayout() {
           <ThemeProvider value={navigationTheme}>
             <StatusBar style="auto" />
             <ShareIntentRouting />
-            <SessionProvider>
-              <Stack
-                screenOptions={{
-                  headerTintColor: colors.primary,
-                  headerStyle: { backgroundColor: colors.background },
-                  headerTitleStyle: { color: colors.text, fontWeight: "700" },
-                  contentStyle: { backgroundColor: colors.background },
-                  headerShadowVisible: false,
-                  headerBackButtonDisplayMode: "minimal",
-                }}
-              >
-                <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-                <Stack.Screen
-                  name="receipt/[id]"
-                  options={{ title: "Kvittering" }}
-                />
-                <Stack.Screen
-                  name="settings"
-                  options={{ title: "Husstanden", presentation: "modal" }}
-                />
-              </Stack>
-            </SessionProvider>
+            <QueryLifecycleProvider>
+              <SessionProvider>
+                <Stack
+                  screenOptions={{
+                    headerTintColor: colors.primary,
+                    headerStyle: { backgroundColor: colors.background },
+                    headerTitleStyle: { color: colors.text, fontWeight: "700" },
+                    contentStyle: { backgroundColor: colors.background },
+                    headerShadowVisible: false,
+                    headerBackButtonDisplayMode: "minimal",
+                  }}
+                >
+                  <Stack.Screen
+                    name="(tabs)"
+                    options={{ headerShown: false }}
+                  />
+                  <Stack.Screen
+                    name="receipt/[id]"
+                    options={{ title: "Kvittering" }}
+                  />
+                  <Stack.Screen
+                    name="settings"
+                    options={{ title: "Husstanden", presentation: "modal" }}
+                  />
+                </Stack>
+              </SessionProvider>
+            </QueryLifecycleProvider>
           </ThemeProvider>
         </SafeAreaProvider>
       </GestureHandlerRootView>

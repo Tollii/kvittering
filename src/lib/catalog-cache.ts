@@ -45,3 +45,13 @@ export function catalogPersister(scope: string): Persister {
     },
   };
 }
+
+/** Explicit account removal; ordinary provider cleanup preserves the cache. */
+export function removeAccountCatalogCache(owner: string) {
+  const prefix = `${owner}:`;
+  storage().runSync(
+    "DELETE FROM query_cache WHERE substr(scope, 1, ?) = ?",
+    prefix.length,
+    prefix,
+  );
+}

@@ -4,7 +4,7 @@
 
 ## Status
 
-- Status: TODO
+- Status: DONE
 - Priority: P2
 - Effort: S–M
 - Risk: Medium
@@ -183,3 +183,9 @@ The lifecycle bridge has explicit native subscription effects. Keep those effect
 ## Maintenance notes
 
 When adding a query provider, reuse the application lifecycle bridge. Decide its persistence scope and eviction trigger separately.
+
+## Implementation record
+
+Installed one application foreground/network bridge above sign-in and kept separate policy/catalog clients. Provider teardown now retains catalog persistence. Account changes explicitly remove private catalog entries; this required a narrow scope extension in src/lib/catalog-cache.ts. All 187 tests pass, including lifecycle subscription and eviction decisions. Offline restore and sign-out on a native build remain unverified.
+
+Validation: `npm run typecheck`, `npm run lint`, `npm test`, and `git diff --check` passed. No deployment was performed.

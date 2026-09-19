@@ -8,10 +8,9 @@ import {
 } from "react";
 import { recordEvent, reportError } from "@/lib/observability";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { AppState, Linking, Modal, View } from "react-native";
-import { useNetworkState } from "expo-network";
+import { Linking, Modal, View } from "react-native";
+import { useQueryLifecycle } from "./query-lifecycle";
 import {
-  focusManager,
   QueryClient,
   QueryClientProvider,
   useQuery,
@@ -72,10 +71,7 @@ function PolicyProvider({
   client: QueryClient;
 }) {
   const [cached] = useState(readCachedPolicy);
-  const [active, setActive] = useState(AppState.currentState === "active");
-  const network = useNetworkState();
-  const online =
-    network.isConnected !== false && network.isInternetReachable !== false;
+  const { active, online } = useQueryLifecycle();
   const http = useMemo(
     () =>
       new ConvexHttpClient(process.env.EXPO_PUBLIC_CONVEX_URL!, {
@@ -107,14 +103,6 @@ function PolicyProvider({
     enabled: active && online,
     refetchInterval: active && online ? policyFreshnessMs : false,
   });
-  useEffect(() => {
-    focusManager.setFocused(AppState.currentState === "active");
-    const listener = AppState.addEventListener("change", (state) => {
-      setActive(state === "active");
-      focusManager.setFocused(state === "active");
-    });
-    return () => listener.remove();
-  }, []);
   useEffect(
     () =>
       subscribeServerPolicy((policy) => {

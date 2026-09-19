@@ -1,3 +1,5 @@
+import { removeAccountCatalogCache } from "@/lib/catalog-cache";
+import { removedAccount, useQueryLifecycle } from "./query-lifecycle";
 import { ReleaseDiagnostics } from "./release-diagnostics";
 import { recordEvent, reportError } from "@/lib/observability";
 import { ReleasePolicyProvider, useReleasePolicy } from "./release-policy";
@@ -21,7 +23,6 @@ import {
   usePaginatedQuery,
   useQuery,
 } from "convex/react";
-import { useNetworkState } from "expo-network";
 import { api } from "../../convex/_generated/api";
 import type { FunctionReturnType } from "convex/server";
 import type { Receipt } from "@/lib/domain/insights";
@@ -105,6 +106,14 @@ export function SessionProvider({ children }: { children: ReactNode }) {
 }
 function SessionGate({ children }: { children: ReactNode }) {
   const session = authClient.useSession();
+  const previousOwner = useRef<string | null>(null);
+  const owner = session.data?.user.id ?? null;
+  useEffect(() => {
+    if (session.isPending) return;
+    const removed = removedAccount(previousOwner.current, owner);
+    if (removed) removeAccountCatalogCache(removed);
+    previousOwner.current = owner;
+  }, [owner, session.isPending]);
   if (session.isPending && !session.data)
     return (
       <Screen>
@@ -128,9 +137,7 @@ function HouseholdProvider({
   const convex = useConvex();
   const { policy, blocked } = useReleasePolicy();
   const auth = useConvexAuth();
-  const network = useNetworkState();
-  const online =
-    network.isConnected !== false && network.isInternetReachable !== false;
+  const { online } = useQueryLifecycle();
   const details = useQuery(
     api.households.current,
     auth.isAuthenticated ? {} : "skip",
@@ -275,7 +282,6 @@ function HouseholdProvider({
       <CatalogQueryProvider
         key={`${owner}:${household.id}`}
         scope={`${owner}:${household.id}`}
-        online={online}
       >
         {children}
       </CatalogQueryProvider>
