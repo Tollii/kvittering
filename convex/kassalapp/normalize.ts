@@ -43,26 +43,26 @@ const productSchema = z.object({
   labels: z.array(z.object({ display_name: z.string() })).nullish(),
 });
 const string = (value: string | null | undefined, limit = 5000) =>
-  value?.trim().slice(0, limit) || null;
+  value?.trim().slice(0, limit) || undefined;
 const imageUrl = (value: string | null | undefined) =>
-  value?.startsWith("https://") ? value : null;
+  value?.startsWith("https://") ? value : undefined;
 export function normalizeProducts(response: unknown): CatalogProduct[] {
   const rows = z
     .object({ data: z.union([z.array(productSchema), productSchema]) })
     .parse(response).data;
   const products = new Map<string, CatalogProduct>();
   for (const row of (Array.isArray(rows) ? rows : [rows]).slice(0, 24)) {
-    const ean = row.ean && /^\d{8,14}$/.test(row.ean) ? row.ean : null;
+    const ean = row.ean && /^\d{8,14}$/.test(row.ean) ? row.ean : undefined;
     const key = ean ? `ean:${ean}` : `kassalapp:${row.id}`;
     const namedSize = row.name.match(/\b(\d+(?:[.,]\d+)?)\s*(kg|g|ml|cl|l)\b/i);
     const namedWeight = namedSize
       ? Number(namedSize[1].replace(",", "."))
-      : null;
+      : undefined;
     const weightUnit =
       string(row.weight_unit, 20) ??
       (namedWeight && (!row.weight || row.weight === namedWeight)
         ? namedSize![2].toLowerCase()
-        : null);
+        : undefined);
     const product: CatalogProduct = {
       key,
       ids: [row.id],
@@ -77,20 +77,16 @@ export function normalizeProducts(response: unknown): CatalogProduct[] {
       weight: row.weight && row.weight > 0 ? row.weight : namedWeight,
       weightUnit,
       nutrition:
-        row.nutrition
-          ?.slice(0, 30)
-          .map((value) => ({
-            name: value.display_name,
-            amount: value.amount ?? null,
-            unit: value.unit ?? null,
-          })) ?? [],
+        row.nutrition?.slice(0, 30).map((value) => ({
+          name: value.display_name,
+          amount: value.amount ?? undefined,
+          unit: value.unit ?? undefined,
+        })) ?? [],
       allergens:
-        row.allergens
-          ?.slice(0, 30)
-          .map((value) => ({
-            name: value.display_name,
-            status: value.contains,
-          })) ?? [],
+        row.allergens?.slice(0, 30).map((value) => ({
+          name: value.display_name,
+          status: value.contains,
+        })) ?? [],
       labels: row.labels?.map((value) => value.display_name).slice(0, 30) ?? [],
     };
     const previous = products.get(key);
@@ -132,10 +128,10 @@ export function normalizeStores(response: unknown): PhysicalStore[] {
     .map((row) => ({
       id: row.id,
       name: row.name,
-      chain: row.group ?? null,
+      chain: row.group ?? undefined,
       address: row.address,
-      latitude: row.position?.lat ?? null,
-      longitude: row.position?.lng ?? null,
+      latitude: row.position?.lat ?? undefined,
+      longitude: row.position?.lng ?? undefined,
     }));
 }
 export function normalizePrices(response: unknown): CatalogResult {
@@ -178,7 +174,7 @@ export function normalizePrices(response: unknown): CatalogResult {
       result.prices.push({
         store: store ?? "Ukjent butikk",
         priceOre: Math.round(price.price * 100),
-        checkedAt: price.date ?? null,
+        checkedAt: price.date ?? undefined,
       });
     }
   }

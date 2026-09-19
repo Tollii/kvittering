@@ -28,7 +28,7 @@ export const productAnalysisResultValidator = v.object({
   evidenceKey: v.string(),
   family: v.union(familyIdentityValidator, v.null()),
   quantity: purchaseQuantityValidator,
-  attributes: v.optional(productAttributesValidator),
+  attributes: productAttributesValidator.optional(),
 });
 export const productAnalysisValidator = v.object({
   version: v.number(),

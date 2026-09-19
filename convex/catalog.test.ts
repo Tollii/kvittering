@@ -181,7 +181,8 @@ it("refreshes expired searches while retaining the last usable result", async ()
   const response = await first.mutation(api.catalog.searchProducts, {
     search: "stratos",
   });
-  expect(response).toMatchObject({ status: "pending", products });
+  expect(response.status).toBe("pending");
+  expect(response.products).toEqual(products);
   expect(
     await t.run((ctx) => ctx.db.query("catalogRequests").take(10)),
   ).toHaveLength(1);

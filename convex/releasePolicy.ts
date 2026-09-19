@@ -88,15 +88,15 @@ export const get = query({
 });
 export const check = internalQuery({
   args: {
-    client: v.optional(clientValidator),
-    feature: v.optional(
-      v.union(
+    client: clientValidator.optional(),
+    feature: v
+      .union(
         v.literal("receiptProcessing"),
         v.literal("productLookup"),
         v.literal("automaticProductMatching"),
         v.literal("spendingAnalysis"),
-      ),
-    ),
+      )
+      .optional(),
   },
   returns: policyValidator,
   handler: (ctx, { client, feature }) =>

@@ -47,7 +47,7 @@ export function CatalogQueryProvider({
       persistOptions={{
         persister,
         maxAge: 7 * day,
-        buster: "catalog-v1",
+        buster: "catalog-v2",
         dehydrateOptions: {
           shouldDehydrateQuery: (query) =>
             query.state.status === "success" &&

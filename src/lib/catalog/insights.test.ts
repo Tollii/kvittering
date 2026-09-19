@@ -22,8 +22,6 @@ it("groups a barcode across shops using receipt amounts and preserves uncatalogu
     name: "KIWI Test",
     chain: "KIWI",
     address: "Test 2",
-    latitude: null,
-    longitude: null,
   };
   const first = { _id: "first", data, excluded: false } as Receipt;
   const second = {

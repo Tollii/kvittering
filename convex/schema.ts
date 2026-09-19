@@ -36,18 +36,18 @@ export const receiptFields = {
   generation: v.number(),
   data: v.union(receiptDataValidator, v.null()),
   provider: v.string(),
-  error: v.union(v.string(), v.null()),
-  duplicateOf: v.union(v.id("receipts"), v.null()),
+  error: v.string().optional(),
+  duplicateOf: v.id("receipts").optional(),
   duplicateResolved: v.boolean(),
   excluded: v.boolean(),
-  autoAccepted: v.optional(v.boolean()),
-  receiptReadyNotified: v.optional(v.boolean()),
-  catalogStatus: v.optional(
-    v.union(v.literal("pending"), v.literal("complete"), v.literal("error")),
-  ),
-  catalogWorkflowId: v.optional(vWorkflowId),
-  catalogDecisions: v.optional(v.array(catalogDecision)),
-  productAnalysis: v.optional(productAnalysisValidator),
+  autoAccepted: v.boolean().optional(),
+  receiptReadyNotified: v.boolean().optional(),
+  catalogStatus: v
+    .union(v.literal("pending"), v.literal("complete"), v.literal("error"))
+    .optional(),
+  catalogWorkflowId: vWorkflowId.optional(),
+  catalogDecisions: v.array(catalogDecision).optional(),
+  productAnalysis: productAnalysisValidator.optional(),
 };
 export default defineSchema({
   clientReleases: defineTable({
@@ -106,7 +106,7 @@ export default defineSchema({
     key: v.string(),
     familyId: v.union(v.id("productFamilies"), v.null()),
     package: packageProfileValidator,
-    attributes: v.optional(productAttributesValidator),
+    attributes: productAttributesValidator.optional(),
     decisions: v.array(
       v.object({
         question: v.string(),
@@ -125,11 +125,11 @@ export default defineSchema({
       v.literal("error"),
     ),
     result: catalogResultValidator,
-    fetchedAt: v.union(v.number(), v.null()),
+    fetchedAt: v.number().optional(),
     expiresAt: v.number(),
     attempts: v.number(),
     scheduledAt: v.number(),
-    error: v.union(v.string(), v.null()),
+    error: v.string().optional(),
   }).index("by_key", ["key"]),
   catalogProducts: defineTable({
     key: v.string(),
@@ -153,7 +153,7 @@ export default defineSchema({
     .index("by_token", ["token"])
     .index("by_identity", ["identity"]),
   products: defineTable({
-    catalogKey: v.optional(v.string()),
+    catalogKey: v.string().optional(),
     householdId: v.id("households"),
     retailer: v.string(),
     name: v.string(),
@@ -191,7 +191,7 @@ export default defineSchema({
     name: v.string(),
     invitation: v.string(),
     /** Monthly product-spending budget in øre; unset means no budget. */
-    monthlyBudgetOre: v.optional(v.number()),
+    monthlyBudgetOre: v.number().optional(),
   }).index("by_invitation", ["invitation"]),
   members: defineTable({
     householdId: v.id("households"),
@@ -218,8 +218,8 @@ export default defineSchema({
     generation: v.number(),
     data: receiptDataValidator,
     provider: v.string(),
-    classifiedData: v.optional(receiptDataValidator),
-    durationMs: v.optional(v.number()),
+    classifiedData: receiptDataValidator.optional(),
+    durationMs: v.number().optional(),
   })
     .index("by_receiptId", ["receiptId"])
     .index("by_receiptId_and_generation", ["receiptId", "generation"]),

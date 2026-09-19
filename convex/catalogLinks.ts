@@ -30,9 +30,9 @@ export async function linkCatalogProduct(
       retailer: store,
       catalogKey: product.key,
       name: product.name,
-      brand: product.brand,
-      packageSize: product.weight,
-      packageUnit: product.weightUnit,
+      brand: product.brand ?? null,
+      packageSize: product.weight ?? null,
+      packageUnit: product.weightUnit ?? null,
       attributes: [],
     }));
   line.catalogProduct = catalogIdentity(product);

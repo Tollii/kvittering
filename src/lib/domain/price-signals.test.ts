@@ -15,9 +15,7 @@ const receipt = (id: string, purchaseDate: string, colaOre: number) => {
   cola.catalogProduct = {
     key: "ean:5000112637380",
     name: "Coca-Cola 330ml Sleek X 10pk bx",
-    brand: null,
     ean: "5000112637380",
-    image: null,
     weight: 330,
     weightUnit: "ml",
   };

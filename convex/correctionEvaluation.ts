@@ -26,7 +26,7 @@ export type EvaluationResult = {
 };
 /** Evaluate the latest human decision for each product against the current classifier. */
 export const evaluate = action({
-  args: { client: v.optional(clientValidator) },
+  args: { client: clientValidator.optional() },
   returns: v.object({
     model: v.string(),
     checked: v.number(),

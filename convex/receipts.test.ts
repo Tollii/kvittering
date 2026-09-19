@@ -386,7 +386,7 @@ it("deletes a household receipt, its images and history without allowing a late 
           .take(1),
       ).toEqual([]);
     }
-    expect((await ctx.db.get("receipts", other))?.duplicateOf).toBeNull();
+    expect((await ctx.db.get("receipts", other))?.duplicateOf).toBeUndefined();
   });
 });
 

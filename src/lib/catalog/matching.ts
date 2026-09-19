@@ -55,8 +55,8 @@ export function compatibleCatalogProduct(
     { ...line, brand: brand(line.brand), ...normalizeUnit(amount, unit) },
     {
       name: product.name,
-      brand: brand(product.brand),
-      ...normalizeUnit(product.weight, product.weightUnit),
+      brand: brand(product.brand ?? null),
+      ...normalizeUnit(product.weight ?? null, product.weightUnit ?? null),
       attributes: [],
     },
     allowMissingSize,

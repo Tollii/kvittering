@@ -60,7 +60,7 @@ export const process = workflow
         requests.set("physical-store", {
           kind: "stores",
           search: branch.slice(0, 120),
-          chain: retailerCode(receipt.data.store),
+          chain: retailerCode(receipt.data.store) ?? undefined,
         });
       // Register all missing lookups before waiting; identical requests share one API call.
       const entries = await Promise.all(
@@ -148,7 +148,7 @@ export const start = internalMutation({
 });
 export const enrich = mutation({
   service: "automaticProductMatching",
-  args: { id: v.id("receipts"), onlyIfMissing: v.optional(v.boolean()) },
+  args: { id: v.id("receipts"), onlyIfMissing: v.boolean().optional() },
   returns: v.null(),
   handler: async (ctx, { id, onlyIfMissing }) => {
     const { receipt } = await requireReceipt(ctx, id);

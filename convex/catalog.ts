@@ -25,7 +25,7 @@ export function requestResponse(
     fetchedAt: request.fetchedAt,
     retryAt:
       request.state === "ready"
-        ? null
+        ? undefined
         : request.state === "error"
           ? request.expiresAt
           : request.scheduledAt,
@@ -53,7 +53,7 @@ export const searchStores = mutation({
       await ensureRequest(ctx, {
         kind: "stores",
         search: args.search,
-        chain: retailerCode(receipt.data?.store ?? null),
+        chain: retailerCode(receipt.data?.store ?? null) ?? undefined,
       }),
     );
   },
@@ -72,8 +72,6 @@ export const prices = mutation({
       return {
         ...emptyCatalogResult(),
         status: "error" as const,
-        fetchedAt: null,
-        retryAt: null,
         message: "Produktet finnes ikke i den lagrede katalogen.",
       };
     return requestResponse(
@@ -100,8 +98,6 @@ export const product = mutation({
       return {
         ...emptyCatalogResult(),
         status: "error" as const,
-        fetchedAt: null,
-        retryAt: null,
         message: "Produktet finnes ikke i den lagrede katalogen.",
       };
     if (record.fetchedAt + catalogDetailsTtl > Date.now())
@@ -110,8 +106,6 @@ export const product = mutation({
         products: [record.product],
         status: "ready" as const,
         fetchedAt: record.fetchedAt,
-        retryAt: null,
-        message: null,
       };
     const response = requestResponse(
       await ensureRequest(ctx, {

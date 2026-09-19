@@ -102,9 +102,6 @@ it("does not copy size from a catalog product with a conflicting pack count", ()
     catalogProduct: {
       key: "wrong-pack",
       name: "Coca-Cola 330ml x 15pk",
-      brand: null,
-      ean: null,
-      image: null,
       weight: 330,
       weightUnit: "ml",
     },

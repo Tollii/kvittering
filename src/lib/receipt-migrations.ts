@@ -12,8 +12,8 @@ const receiptValidator = v.object({
   createdAt: v.number(),
   images: v.array(v.string()),
   uploaded: v.array(v.boolean()),
-  receiptId: v.optional(v.id("receipts")),
-  error: v.optional(v.string()),
+  receiptId: v.id("receipts").optional(),
+  error: v.string().optional(),
 });
 /** Retain reservation IDs, upload progress and relative image paths during upgrades. */
 export function migrateReceipt(value: unknown): LocalReceipt {

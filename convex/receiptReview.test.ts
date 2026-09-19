@@ -16,7 +16,7 @@ it("keeps unresolved extraction issues, mismatches, duplicates and mock results 
     name: "Home",
     invitation: "0123456789abcdef0123456789abcdef",
   });
-  let previousId: Id<"receipts"> | null = null;
+  let previousId: Id<"receipts"> | undefined;
   for (const scenario of ["issue", "mismatch", "duplicate", "mock", "clean"]) {
     const id = await user.mutation(api.receipts.reserve, {
       clientId: `review-policy-${scenario}`,

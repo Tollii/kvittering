@@ -5,16 +5,16 @@ import workflow from "@convex-dev/workflow/convex.config";
 import workpool from "@convex-dev/workpool/convex.config";
 const app = defineApp({
   env: {
-    KASSALAPP_API_KEY: v.optional(v.string()),
-    OPENAI_API_KEY: v.optional(v.string()),
-    TYPESAFE_API_KEY: v.optional(v.string()),
-    OPENAI_RECEIPT_MODEL: v.optional(v.string()),
-    TYPESAFE_MODEL: v.optional(v.string()),
-    BETTER_AUTH_SECRET: v.optional(v.string()),
-    SITE_URL: v.optional(v.string()),
-    ALLOW_EXPO_GO: v.optional(v.string()),
-    RECEIPT_PROVIDER: v.optional(v.string()),
-    EXPO_ACCESS_TOKEN: v.optional(v.string()),
+    KASSALAPP_API_KEY: v.string().optional(),
+    OPENAI_API_KEY: v.string().optional(),
+    TYPESAFE_API_KEY: v.string().optional(),
+    OPENAI_RECEIPT_MODEL: v.string().optional(),
+    TYPESAFE_MODEL: v.string().optional(),
+    BETTER_AUTH_SECRET: v.string().optional(),
+    SITE_URL: v.string().optional(),
+    ALLOW_EXPO_GO: v.string().optional(),
+    RECEIPT_PROVIDER: v.string().optional(),
+    EXPO_ACCESS_TOKEN: v.string().optional(),
   },
 });
 app.use(betterAuth);

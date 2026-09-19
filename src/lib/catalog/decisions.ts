@@ -17,9 +17,9 @@ export const catalogDecision = v.object({
   categoryId: v.union(v.string(), v.null()),
   categoryConfidence: v.number(),
   // Optional so completed steps in existing workflows can still be applied.
-  candidates: v.optional(v.array(catalogCandidateScore)),
-  reason: v.optional(
-    v.union(
+  candidates: v.array(catalogCandidateScore).optional(),
+  reason: v
+    .union(
       v.literal("saved_match"),
       v.literal("exact_match"),
       v.literal("model_match"),
@@ -29,8 +29,8 @@ export const catalogDecision = v.object({
       v.literal("conflict"),
       v.literal("unavailable"),
       v.literal("provider_error"),
-    ),
-  ),
+    )
+    .optional(),
 });
 export type CatalogDecision = Infer<typeof catalogDecision>;
 

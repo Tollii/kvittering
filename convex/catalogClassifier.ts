@@ -93,9 +93,9 @@ export async function classifyCatalogProducts(
           originalText: item.line.originalText,
           catalogCandidates: item.candidates.map((product) => ({
             name: product.name,
-            brand: product.brand,
-            packageSize: product.weight,
-            packageUnit: product.weightUnit,
+            brand: product.brand ?? null,
+            packageSize: product.weight ?? null,
+            packageUnit: product.weightUnit ?? null,
             categories: product.categories,
           })),
           catalogInstructions:

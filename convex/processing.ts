@@ -153,9 +153,9 @@ export const finish = internalMutation({
     generation: v.number(),
     data: receiptDataValidator,
     original: receiptDataValidator,
-    matches: v.optional(v.array(productDecision)),
+    matches: v.array(productDecision).optional(),
     provider: v.string(),
-    durationMs: v.optional(v.number()),
+    durationMs: v.number().optional(),
   },
   returns: v.null(),
   handler: async (ctx, args) => {
@@ -208,7 +208,7 @@ export const finish = internalMutation({
             (args.data.purchaseTime &&
               other.data.purchaseTime === args.data.purchaseTime)),
       );
-      duplicateOf = duplicate?._id ?? null;
+      duplicateOf = duplicate?._id;
     }
     // A new extraction is kept for comparison. It never replaces a user's edits.
     const data =
@@ -298,7 +298,7 @@ export const finish = internalMutation({
       autoAccepted,
       provider: args.provider,
       status: autoAccepted ? "reviewed" : "needs_review",
-      error: null,
+      error: undefined,
       duplicateOf,
       catalogStatus: undefined,
       catalogWorkflowId: undefined,
@@ -336,8 +336,8 @@ export const fail = internalMutation({
     id: v.id("receipts"),
     generation: v.number(),
     error: v.string(),
-    stage: v.optional(v.string()),
-    errorType: v.optional(v.string()),
+    stage: v.string().optional(),
+    errorType: v.string().optional(),
   },
   returns: v.null(),
   handler: async (ctx, args) => {

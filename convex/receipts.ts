@@ -104,8 +104,6 @@ export const reserve = mutation({
       generation: 0,
       data: null,
       provider: "pending",
-      error: null,
-      duplicateOf: null,
       duplicateResolved: false,
       excluded: false,
     });
@@ -147,7 +145,7 @@ export const retry = mutation({
     await ctx.db.patch("receipts", id, {
       status: "uploaded",
       generation,
-      error: null,
+      error: undefined,
     });
     await start(ctx, internal.processing.processReceipt, { id, generation });
     console.info("receipt.processing_retried", { receiptId: id, generation });
@@ -161,13 +159,13 @@ export const save = mutation({
     data: receiptDataValidator,
     reviewed: v.boolean(),
     rememberLineIds: v.array(v.string()),
-    productChanges: v.optional(v.array(productChange)),
-    catalogChanges: v.optional(
-      v.array(
+    productChanges: v.array(productChange).optional(),
+    catalogChanges: v
+      .array(
         v.object({ lineId: v.string(), key: v.union(v.string(), v.null()) }),
-      ),
-    ),
-    physicalStoreId: v.optional(v.union(v.number(), v.null())),
+      )
+      .optional(),
+    physicalStoreId: v.union(v.number(), v.null()).optional(),
     duplicateResolved: v.boolean(),
     excluded: v.boolean(),
   },
@@ -299,7 +297,7 @@ export const save = mutation({
       status: reviewed ? "reviewed" : "needs_review",
       duplicateResolved: args.duplicateResolved,
       excluded: args.excluded,
-      error: null,
+      error: undefined,
     });
     await ctx.scheduler.runAfter(0, internal.productAnalysis.start, {
       id: args.id,
@@ -337,7 +335,7 @@ export const attachImage = internalMutation({
     id: v.id("receipts"),
     position: v.number(),
     storageId: v.id("_storage"),
-    client: v.optional(clientValidator),
+    client: clientValidator.optional(),
   },
   returns: v.null(),
   handler: async (ctx, args) => {
@@ -441,7 +439,7 @@ export const cleanupDeleted = internalMutation({
       .take(5);
     for (const receipt of duplicates)
       await ctx.db.patch("receipts", receipt._id, {
-        duplicateOf: null,
+        duplicateOf: undefined,
         duplicateResolved: false,
       });
     if (remaining || duplicates.length === 5)

@@ -1,4 +1,5 @@
 import { expect, it } from "vitest";
+import { parse } from "convex-helpers/validators";
 import {
   normalizeProducts,
   normalizePrices,
@@ -13,7 +14,25 @@ import {
 } from "./matching";
 import { emptyLine } from "../domain/receipt";
 import { requestKey, resultLifetime, day } from "./policy";
-import { emptyCatalogResult } from "./model";
+import { catalogProductValidator, emptyCatalogResult } from "./model";
+
+it("parses missing and null provider metadata into optional catalog fields", () => {
+  const [missing, nullable] = normalizeProducts({
+    data: [
+      { id: 1, name: "Fresh baguette" },
+      { id: 2, name: "Fresh baguette", brand: null, weight: null, image: null },
+    ],
+  });
+  for (const product of [missing, nullable]) {
+    expect(parse(catalogProductValidator, product)).toEqual(product);
+    expect(product.brand).toBeUndefined();
+    expect(product.weight).toBeUndefined();
+    expect(product.image).toBeUndefined();
+  }
+  expect(() =>
+    parse(catalogProductValidator, { ...missing, brand: null }),
+  ).toThrow();
+});
 
 it("combines listings with the same EAN while retaining distinct variants and unknown barcodes", () => {
   const products = normalizeProducts({
@@ -212,5 +231,5 @@ it("recovers an omitted weight unit only from an explicit, consistent product na
     ],
   });
   expect(result[0]).toMatchObject({ weight: 150, weightUnit: "g" });
-  expect(result[1].weightUnit).toBeNull();
+  expect(result[1].weightUnit).toBeUndefined();
 });

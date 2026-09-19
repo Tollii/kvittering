@@ -42,8 +42,6 @@ function receipt(date: string, ore: number, ml: number | null): Receipt {
     status: "reviewed",
     data,
     provider: "test",
-    error: null,
-    duplicateOf: null,
     duplicateResolved: false,
     excluded: false,
     productAnalysis: {

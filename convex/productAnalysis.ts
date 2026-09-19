@@ -210,7 +210,7 @@ export const saveProfile = internalMutation({
     evidenceKey: v.string(),
     family: v.union(v.literal("new"), v.id("productFamilies"), v.null()),
     package: packageProfileValidator,
-    attributes: v.optional(productAttributesValidator),
+    attributes: productAttributesValidator.optional(),
     decisions: v.array(
       v.object({
         question: v.string(),

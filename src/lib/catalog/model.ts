@@ -1,7 +1,7 @@
 import { v, type Infer } from "convex/values";
 
-const text = v.union(v.string(), v.null());
-const number = v.union(v.number(), v.null());
+const text = v.string().optional();
+const number = v.number().optional();
 export const catalogIdentityValidator = v.object({
   key: v.string(),
   ean: text,

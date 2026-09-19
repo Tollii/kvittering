@@ -84,11 +84,10 @@ export async function ensureRequest(
     request,
     state: "pending" as const,
     result: existing?.result ?? emptyCatalogResult(),
-    fetchedAt: existing?.fetchedAt ?? null,
+    fetchedAt: existing?.fetchedAt,
     expiresAt: 0,
     attempts: 0,
     scheduledAt: Date.now(),
-    error: null,
   };
   const id = existing?._id ?? (await ctx.db.insert("catalogRequests", values));
   if (existing) await ctx.db.replace("catalogRequests", id, values);
@@ -220,7 +219,7 @@ export const succeed = internalMutation({
       result,
       fetchedAt: now,
       expiresAt: now + resultLifetime(request.request, result),
-      error: null,
+      error: undefined,
     });
     await ctx.scheduler.runAfter(0, internal.catalogQueue.notify, { id });
     return null;

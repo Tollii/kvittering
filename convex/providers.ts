@@ -23,8 +23,8 @@ import {
 export const extract = internalAction({
   args: {
     storageIds: v.array(v.id("_storage")),
-    receiptId: v.optional(v.id("receipts")),
-    generation: v.optional(v.number()),
+    receiptId: v.id("receipts").optional(),
+    generation: v.number().optional(),
   },
   returns: v.object({
     data: receiptDataValidator,
@@ -95,8 +95,8 @@ export const extract = internalAction({
 export const classify = internalAction({
   args: {
     products: v.array(v.object({ id: v.string(), description: v.string() })),
-    receiptId: v.optional(v.id("receipts")),
-    generation: v.optional(v.number()),
+    receiptId: v.id("receipts").optional(),
+    generation: v.number().optional(),
   },
   returns: v.object({
     classifications: v.array(
