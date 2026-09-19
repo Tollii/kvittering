@@ -4,7 +4,7 @@
 
 ## Status
 
-- Status: TODO
+- Status: DONE
 - Priority: P1
 - Effort: S–M
 - Risk: Medium
@@ -189,3 +189,9 @@ Give the import operation a typed outcome for imported, cancelled, and failed at
 ## Maintenance notes
 
 Each new import source must enter the same claim/acknowledge path.
+
+## Implementation record
+
+Shared and picked files enter stable batches with claim, completion, retry, and dismissal. Capture observes idle state and uses a stable callback. Failed imports remain available, and completed batches cannot be claimed again. The existing eight-image bound and document-combination rules remain in the preparation operation.
+
+Verification: typecheck, lint, all 167 tests, and diff checks passed. Deterministic queue tests cover waiting while busy, retry, duplicate claims, and a new batch arriving during a claimed operation. Native camera, PDF rendering, and navigation checks remain unverified.

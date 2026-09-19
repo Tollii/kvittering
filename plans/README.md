@@ -22,7 +22,7 @@ Start with 001, 002, 003, and 004. They fix demonstrated state/model defects and
 | [002](simplification-review/002-package-evidence.md) | Parse package evidence once | P1 | M | None | DONE |
 | [003](simplification-review/003-catalog-cache-completeness.md) | Distinguish a catalog summary from fetched details | P1 | S–M | None | DONE |
 | [004](simplification-review/004-purchase-projection.md) | Use one purchase projection for reports and price signals | P1 | M–L | 002 | DONE |
-| [011](simplification-review/011-capture-import-state.md) | Make shared-file import an explicit operation | P1 | S–M | None | TODO |
+| [011](simplification-review/011-capture-import-state.md) | Make shared-file import an explicit operation | P1 | S–M | None | DONE |
 | [005](simplification-review/005-typed-review-assessment.md) | Separate review decisions from displayed sentences | P2 | M | None | TODO |
 | [006](simplification-review/006-receipt-write-policy.md) | Give receipt changes one transaction policy | P2 | M | 005 | TODO |
 | [007](simplification-review/007-server-owned-analysis.md) | Complete backend scheduling before removing UI workers | P2 | M | 006 | TODO |
@@ -36,7 +36,6 @@ Start with 001, 002, 003, and 004. They fix demonstrated state/model defects and
 | [016](simplification-review/016-spending-report-selection.md) | Keep report selections linked to current data | P2 | S–M | 004, 012 | TODO |
 | [014](simplification-review/014-typed-classification-contracts.md) | Keep classification evidence and taxonomy typed | P2 | M | None | TODO |
 | [013](simplification-review/013-module-and-table-cleanup.md) | Remove dead paths and separate large presentation modules | P3 | S–M | 001, 012, 016 | TODO |
-
 | [019](simplification-review/019-feature-flags.md) | Make featureFlags simple to define and consume | P2 | M | 015; execute last | TODO |
 
 Status values: TODO, IN PROGRESS, DONE, BLOCKED (reason), REJECTED (reason).

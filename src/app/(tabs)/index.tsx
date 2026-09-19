@@ -41,7 +41,15 @@ import {
   prepareImage,
   type ImportedFile,
 } from "@/lib/receipt-import";
-import { takeImportedFiles, usePendingImports } from "@/lib/pending-import";
+import {
+  claimImportedFiles,
+  finishImportedFiles,
+  retryImportedFiles,
+  dismissImportedFiles,
+  offerImportedFiles,
+  usePendingImports,
+} from "@/lib/pending-import";
+import { nextImport, type ImportOutcome } from "@/features/capture-import";
 import { useTheme } from "@/constants/theme";
 
 const cameraBackground = "#1B1543";
@@ -62,7 +70,15 @@ export default function Capture() {
   const [photos, setPhotos] = useState<string[]>([]);
   const [combined, setCombined] = useState(false);
   const [review, setReview] = useState(false);
-  const [busy, setBusy] = useState(false);
+  const [operation, setOperation] = useState<"idle" | "working">("idle");
+  const busy = operation !== "idle";
+  const mounted = useRef(true);
+  useEffect(() => {
+    mounted.current = true;
+    return () => {
+      mounted.current = false;
+    };
+  }, []);
   const busyRef = useRef(false);
   const [error, setError] = useState("");
   const [saved, setSaved] = useState(0);
@@ -76,34 +92,43 @@ export default function Capture() {
     camera.current = value;
     if (!value) setReady(false);
   }, []);
-  async function run(action: () => Promise<void>) {
-    if (busyRef.current) return;
-    busyRef.current = true;
-    setBusy(true);
-    setError("");
-    setSaved(0);
-    try {
-      await action();
-    } catch (cause) {
-      setError(
-        cause instanceof Error ? cause.message : "Bildet kunne ikke åpnes.",
-      );
-    } finally {
-      busyRef.current = false;
-      setBusy(false);
-    }
-  }
+  const run = useCallback(
+    async (action: () => Promise<void>): Promise<ImportOutcome> => {
+      if (busyRef.current) return "busy";
+      busyRef.current = true;
+      setOperation("working");
+      setError("");
+      setSaved(0);
+      try {
+        await action();
+        return "completed";
+      } catch (cause) {
+        setError(
+          cause instanceof Error ? cause.message : "Bildet kunne ikke åpnes.",
+        );
+        return "failed";
+      } finally {
+        busyRef.current = false;
+        setOperation("idle");
+      }
+    },
+    [],
+  );
   /** Shared images and PDFs arrive here from the share sheet and the file picker. */
-  const addFiles = (files: ImportedFile[]) =>
-    run(async () => {
-      const room = maxReceiptImages - photos.length;
-      if (room <= 0) throw new Error(`Maks ${maxReceiptImages} bilder`);
-      const imported = await importReceiptFiles(files, room);
-      if (!imported.uris.length) return;
-      setPhotos((current) => [...current, ...imported.uris]);
-      if (imported.singleDocument && photos.length === 0) setCombined(true);
-      setReview(true);
-    });
+  const addFiles = useCallback(
+    (files: ImportedFile[]) =>
+      run(async () => {
+        const room = maxReceiptImages - photos.length;
+        if (room <= 0) throw new Error(`Maks ${maxReceiptImages} bilder`);
+        const imported = await importReceiptFiles(files, room);
+        if (!mounted.current || !imported.uris.length)
+          throw new Error("Importen ble avbrutt. Prøv igjen.");
+        setPhotos((current) => [...current, ...imported.uris]);
+        if (imported.singleDocument && photos.length === 0) setCombined(true);
+        setReview(true);
+      }),
+    [photos.length, run],
+  );
   const takePhoto = () =>
     run(async () => {
       if (!ready || !camera.current) return;
@@ -142,7 +167,7 @@ export default function Capture() {
       copyToCacheDirectory: true,
     });
     if (result.canceled) return;
-    await addFiles(
+    offerImportedFiles(
       result.assets.map((asset) => ({
         uri: asset.uri,
         mimeType: asset.mimeType,
@@ -153,10 +178,35 @@ export default function Capture() {
   // Files shared from other apps wait until this screen is on show.
   const pendingImports = usePendingImports();
   useEffect(() => {
-    if (!focused || !pendingImports.length || busyRef.current) return;
-    void addFiles(takeImportedFiles());
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [focused, pendingImports]);
+    const next = nextImport(pendingImports, focused, busy);
+    if (!next || busyRef.current) return;
+    const batch = claimImportedFiles(next.id);
+    if (!batch) return;
+    void addFiles(batch.files).then((outcome) =>
+      finishImportedFiles(batch.id, outcome),
+    );
+  }, [addFiles, busy, focused, pendingImports]);
+  const failedImports = pendingImports.filter(
+    (batch) => batch.state === "failed",
+  );
+  const importRecovery = failedImports.map((batch) => (
+    <Panel key={batch.id}>
+      <Notice error>
+        Importen er ikke fullført. Filene venter på nytt forsøk.
+      </Notice>
+      <Button
+        title="Prøv importen igjen"
+        disabled={busy}
+        onPress={() => retryImportedFiles(batch.id)}
+      />
+      <Button
+        title="Forkast importen"
+        secondary
+        disabled={busy}
+        onPress={() => dismissImportedFiles(batch.id)}
+      />
+    </Panel>
+  ));
   const save = () =>
     run(async () => {
       const count = combined ? 1 : photos.length;
@@ -322,6 +372,7 @@ export default function Capture() {
           </Panel>
         )}
         {!!error && !review && <Notice error>{error}</Notice>}
+        {!review && importRecovery}
         <View style={{ flex: 1, justifyContent: "center" }}>
           {live ? (
             <View
@@ -503,6 +554,7 @@ export default function Capture() {
         footer={
           <>
             {!!error && <Notice error>{error}</Notice>}
+            {importRecovery}
             <Button
               title={
                 combined || photos.length === 1
