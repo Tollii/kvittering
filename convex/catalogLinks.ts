@@ -8,6 +8,62 @@ import type { ReceiptData, ReceiptLine } from "../src/lib/domain/receipt";
 import { catalogIdentity, type CatalogProduct } from "../src/lib/catalog/model";
 import { matchingKey } from "../src/lib/domain/product-matching";
 import { saveMapping, createProduct, linkProduct } from "./products";
+import type { CatalogDecision } from "../src/lib/catalog/decisions";
+import {
+  groupCatalogProducts,
+  equivalentCatalogProduct,
+} from "../src/lib/catalog/equivalence";
+import { compatibleCatalogProduct } from "../src/lib/catalog/matching";
+
+/** Recheck group members before persisting a package-independent catalog identity. */
+export async function resolveCatalogMatch(
+  ctx: MutationCtx,
+  line: ReceiptLine,
+  decision: CatalogDecision,
+): Promise<CatalogProduct | null> {
+  if (!decision.productKey) return null;
+  const existing = await ctx.db
+    .query("catalogProducts")
+    .withIndex("by_key", (q) => q.eq("key", decision.productKey!))
+    .unique();
+  if (!decision.equivalentKeys)
+    return existing && compatibleCatalogProduct(line, existing.product)
+      ? existing.product
+      : null;
+  const keys = [...new Set(decision.equivalentKeys)];
+  if (keys.length < 2 || keys.length > 24) return null;
+  const records = await Promise.all(
+    keys.map((key) =>
+      ctx.db
+        .query("catalogProducts")
+        .withIndex("by_key", (q) => q.eq("key", key))
+        .unique(),
+    ),
+  );
+  if (
+    records.some(
+      (record) => !record || !compatibleCatalogProduct(line, record.product),
+    )
+  )
+    return null;
+  const group = groupCatalogProducts(
+    records.map((record) => record!.product),
+  ).find(
+    (candidate) =>
+      candidate.key === decision.productKey && candidate.equivalence,
+  );
+  if (!group) return null;
+  const product = equivalentCatalogProduct(group);
+  const values = {
+    key: product.key,
+    product,
+    fetchedAt: Date.now(),
+    detailsFetchedAt: Date.now(),
+  };
+  if (existing) await ctx.db.patch("catalogProducts", existing._id, values);
+  else await ctx.db.insert("catalogProducts", values);
+  return product;
+}
 
 export async function linkCatalogProduct(
   ctx: MutationCtx,
@@ -20,7 +76,7 @@ export async function linkCatalogProduct(
   const store = matchingKey(retailer);
   const reference = {
     kind: "catalog" as const,
-    product: catalogIdentity(product),
+    product: catalogIdentity(equivalentCatalogProduct(product)),
     provenance: editor !== null ? ("manual" as const) : ("automatic" as const),
   };
   await saveMapping(ctx, householdId, store, line, null, editor, reference);

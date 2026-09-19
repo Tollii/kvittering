@@ -100,7 +100,8 @@ export function ReceiptEditor({
   const [message, setMessage] = useState("");
   const operationActive = useRef(false);
   if (draft.remote !== receipt) dispatch({ type: "remote", receipt });
-  const [allLines, setAllLines] = useState(receipt.status === "reviewed");
+  const [allLinesSelected, setAllLines] = useState(false);
+  const allLines = receipt.status === "reviewed" || allLinesSelected;
   const [reviewLineIds, setReviewLineIds] = useState(
     () =>
       new Set(
@@ -652,7 +653,72 @@ export function ReceiptEditor({
             pointerEvents={busy || processing ? "none" : "auto"}
             style={{ gap: 12 }}
           >
-            {productLines.length > 0 && (
+            <Panel>
+              <View
+                style={{
+                  flexDirection: "row",
+                  alignItems: "baseline",
+                  gap: 12,
+                }}
+              >
+                <Copy
+                  weight="600"
+                  accessibilityRole="header"
+                  style={{ flex: 1 }}
+                >
+                  Kjøpsoversikt
+                </Copy>
+                <Copy size={13} muted>
+                  {data.lines.filter((line) => line.kind === "product").length}{" "}
+                  varer
+                </Copy>
+              </View>
+              {totals.difference !== 0 && (
+                <Notice tone="warning">
+                  {totals.difference === null
+                    ? "Betalt beløp mangler"
+                    : `Avvik mellom varelinjer og betalt beløp: ${formatMoney(totals.difference)}`}
+                </Notice>
+              )}
+              {[
+                { label: "Varer før rabatt", amount: totals.products },
+                { label: "Rabatter", amount: totals.discounts },
+                {
+                  label: "Pant og pantretur",
+                  amount: totals.deposits + totals.returns,
+                },
+                { label: "Andre justeringer", amount: totals.adjustments },
+                { label: "Sum av linjene", amount: totals.calculated },
+                { label: "Betalt", amount: data.totalOre },
+              ]
+                .filter(
+                  (row) =>
+                    row.amount !== 0 ||
+                    ["Sum av linjene", "Betalt"].includes(row.label),
+                )
+                .map((row) => (
+                  <View
+                    key={row.label}
+                    style={{
+                      flexDirection: "row",
+                      justifyContent: "space-between",
+                      gap: 16,
+                      paddingVertical: 3,
+                    }}
+                  >
+                    <Copy size={14} muted>
+                      {row.label}
+                    </Copy>
+                    <Copy
+                      size={14}
+                      weight={row.label === "Betalt" ? "700" : "500"}
+                    >
+                      {formatMoney(row.amount)}
+                    </Copy>
+                  </View>
+                ))}
+            </Panel>
+            {receipt.status !== "reviewed" && productLines.length > 0 && (
               <Segments
                 value={allLines ? "all" : "review"}
                 onChange={(value) => setAllLines(value === "all")}
@@ -748,54 +814,6 @@ export function ReceiptEditor({
                 {value}
               </Notice>
             ))}
-            <Disclosure
-              title={
-                totals.difference === 0
-                  ? "Beløpene stemmer"
-                  : totals.difference === null
-                    ? "Betalt beløp mangler"
-                    : `Avvik ${formatMoney(totals.difference)}`
-              }
-              value={`${data.lines.filter((line) => line.kind === "product").length} varer`}
-            >
-              {[
-                { label: "Varer før rabatt", amount: totals.products },
-                { label: "Rabatter", amount: totals.discounts },
-                {
-                  label: "Pant og pantretur",
-                  amount: totals.deposits + totals.returns,
-                },
-                { label: "Andre justeringer", amount: totals.adjustments },
-                { label: "Sum av linjene", amount: totals.calculated },
-                { label: "Betalt", amount: data.totalOre },
-              ]
-                .filter(
-                  (row) =>
-                    row.amount !== 0 ||
-                    ["Sum av linjene", "Betalt"].includes(row.label),
-                )
-                .map((row) => (
-                  <View
-                    key={row.label}
-                    style={{
-                      flexDirection: "row",
-                      justifyContent: "space-between",
-                      gap: 16,
-                      paddingVertical: 3,
-                    }}
-                  >
-                    <Copy size={14} muted>
-                      {row.label}
-                    </Copy>
-                    <Copy
-                      size={14}
-                      weight={row.label === "Betalt" ? "700" : "500"}
-                    >
-                      {formatMoney(row.amount)}
-                    </Copy>
-                  </View>
-                ))}
-            </Disclosure>
             <Disclosure title="Om lesingen" value={receipt.uploaderName}>
               <Row title="Lest med" detail={receipt.provider} icon="sparkles" />
               {receipt.catalogStatus === "pending" && (

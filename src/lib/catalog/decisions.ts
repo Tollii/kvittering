@@ -18,11 +18,13 @@ export const catalogDecision = v.object({
   categoryConfidence: v.number(),
   // Optional so completed steps in existing workflows can still be applied.
   candidates: v.array(catalogCandidateScore).optional(),
+  equivalentKeys: v.array(v.string()).optional(),
   reason: v
     .union(
       v.literal("saved_match"),
       v.literal("exact_match"),
       v.literal("model_match"),
+      v.literal("equivalent_match"),
       v.literal("no_candidates"),
       v.literal("below_threshold"),
       v.literal("ambiguous"),
@@ -58,12 +60,19 @@ export function selectCatalogMatch(
       supported.map((candidate) => [candidate.key, candidate]),
     ).values(),
   ];
+  const selected =
+    eligible.length === 1
+      ? products.find((product) => product.key === eligible[0].key)
+      : undefined;
   return {
     candidates,
-    productKey: eligible.length === 1 ? eligible[0].key : null,
+    productKey: selected?.key ?? null,
+    equivalentKeys: selected?.equivalence?.candidateKeys,
     reason:
       eligible.length === 1
-        ? ("model_match" as const)
+        ? selected?.equivalence
+          ? ("equivalent_match" as const)
+          : ("model_match" as const)
         : eligible.length > 1
           ? ("ambiguous" as const)
           : above.length

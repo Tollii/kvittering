@@ -1,4 +1,5 @@
 import { productReferenceValidator } from "../src/lib/domain/product-reference";
+import { productLinkUndoValidator } from "../src/lib/domain/product-linking";
 import {
   policyValidator,
   storedPolicyValidator,
@@ -55,6 +56,7 @@ export const receiptFields = {
   catalogWorkflowId: vWorkflowId.optional(),
   catalogDecisions: v.array(catalogDecision).optional(),
   productAnalysis: productAnalysisValidator.optional(),
+  productLinkUndo: productLinkUndoValidator.optional(),
 };
 export default defineSchema({
   clientReleases: defineTable({
@@ -196,6 +198,7 @@ export default defineSchema({
       filterFields: ["householdId", "retailer"],
     }),
   productMappings: defineTable({
+    revision: v.number().optional(),
     householdId: v.id("households"),
     retailer: v.string(),
     key: v.string(),

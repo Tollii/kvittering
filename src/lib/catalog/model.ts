@@ -10,6 +10,12 @@ export const catalogIdentityValidator = v.object({
   image: text,
   weight: number,
   weightUnit: text,
+  equivalence: v
+    .object({
+      representativeKey: v.string(),
+      candidateKeys: v.array(v.string()),
+    })
+    .optional(),
 });
 export const catalogProductValidator = catalogIdentityValidator.extend({
   ids: v.array(v.number()),
@@ -74,8 +80,9 @@ export const emptyCatalogResult = (): CatalogResult => ({
   prices: [],
 });
 export function catalogIdentity(product: CatalogProduct): CatalogIdentity {
-  const { key, ean, name, brand, image, weight, weightUnit } = product;
-  return { key, ean, name, brand, image, weight, weightUnit };
+  const { key, ean, name, brand, image, weight, weightUnit, equivalence } =
+    product;
+  return { key, ean, name, brand, image, weight, weightUnit, equivalence };
 }
 
 /** Product lookups accept a retailer name; provider codes are resolved on the server. */

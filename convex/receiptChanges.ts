@@ -24,6 +24,7 @@ export type ReceiptCommitAcknowledgement = {
 export type ReceiptChangeOrigin =
   | { kind: "human"; editor: string; reviewed: boolean }
   | { kind: "alias" | "correction" | "undo"; editor: string }
+  | { kind: "product_link"; editor: string }
   | { kind: "catalog" }
   | {
       kind: "extraction";
@@ -47,6 +48,12 @@ export function decideReceiptChange({
   unresolvedDuplicate,
   origin,
 }: ReceiptChangeInput) {
+  if (origin.kind === "product_link")
+    return {
+      revision: previous.revision + 1,
+      status: previous.status,
+      autoAccepted: previous.autoAccepted,
+    };
   const acceptable = assessReceipt(data, unresolvedDuplicate).acceptable;
   if (origin.kind === "human" && origin.reviewed && !acceptable)
     throw new Error("Kontroller avvik og uklare felt før godkjenning.");
@@ -114,6 +121,7 @@ export async function commitReceiptChange(
     });
   await ctx.db.patch("receipts", previous._id, {
     ...decision,
+    productLinkUndo: undefined,
     // Keep the installed-client representation at the storage boundary.
     data: {
       ...parsed.receipt,

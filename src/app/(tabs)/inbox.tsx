@@ -9,6 +9,7 @@ import {
   Loading,
   Notice,
   Panel,
+  Row,
   Screen,
   SectionTitle,
 } from "@/components/ui";
@@ -17,8 +18,10 @@ import { SwipeToApprove } from "@/features/swipe-approve";
 import { useHousehold } from "@/features/session";
 import { useTheme } from "@/constants/theme";
 import { quickApproveData } from "@/lib/domain/receipt-review";
+import { useProductLinkingQueue } from "@/features/product-linking-queue";
 export default function Inbox() {
   const colors = useTheme();
+  const productQueue = useProductLinkingQueue();
   const { queue, online, synchronize } = useHousehold();
   const { receipts, loadingReceipts } = useCompleteReceipts({ kind: "inbox" });
   const reserved = new Set(queue.map((entry) => entry.receiptId));
@@ -49,6 +52,21 @@ export default function Inbox() {
     >
       {!online && <Notice icon="wifi.slash">Uten nett</Notice>}
       {loadingReceipts && <Loading />}
+      {(productQueue.items.length > 0 || productQueue.loading) && (
+        <Panel tone="soft">
+          <Row
+            title="Koble produkter"
+            icon="barcode"
+            detail="Velg riktig produkt fra bilder. Ett trykk per vare."
+            value={
+              productQueue.loading
+                ? "…"
+                : `${productQueue.items.length}${productQueue.complete ? "" : "+"}`
+            }
+            onPress={() => router.push("/product-linking")}
+          />
+        </Panel>
+      )}
       {attention.length > 0 && (
         <>
           <SectionTitle

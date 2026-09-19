@@ -8,7 +8,132 @@ import { batteryFixture } from "../src/lib/domain/receipt";
 import { emptyCatalogResult } from "../src/lib/catalog/model";
 import { normalizeProducts } from "./kassalapp/normalize";
 import { lineEvidenceKey } from "../src/lib/catalog/matching";
+import { groupCatalogProducts } from "../src/lib/catalog/equivalence";
+import {
+  quantityEvidence,
+  packageCandidates,
+} from "../src/lib/domain/purchase-quantities";
+import { needsProductLink } from "../src/lib/domain/product-linking";
 const modules = import.meta.glob("./**/*.ts");
+
+it("persists equivalent matches safely across catalog reads, old editors and manual corrections", async () => {
+  const { t, first, householdId } = await setup();
+  const id = await first.mutation(api.receipts.reserve, {
+    householdId,
+    clientId: "equivalent-products-0001",
+    imageCount: 1,
+  });
+  const data = batteryFixture();
+  const line = data.lines[0];
+  Object.assign(line, {
+    name: "SALAT CRISPI",
+    receiptName: "SALAT CRISPI",
+    brand: null,
+    packageSize: null,
+    packageUnit: null,
+  });
+  const products = normalizeProducts({
+    data: [
+      {
+        id: 91,
+        name: "Crispi Salat 150g",
+        ean: "7030000000091",
+        ingredients: "Representative ingredients",
+      },
+      { id: 92, name: "Salat Crispi 150g pakke", ean: "7030000000092" },
+    ],
+  });
+  const group = groupCatalogProducts(products)[0];
+  await t.run(async (ctx) => {
+    await ctx.db.patch("receipts", id, {
+      data,
+      status: "reviewed",
+      autoAccepted: true,
+    });
+    for (const product of products)
+      await ctx.db.insert("catalogProducts", {
+        key: product.key,
+        product,
+        fetchedAt: Date.now(),
+      });
+  });
+  const decision = {
+    lineId: line.id,
+    evidenceKey: lineEvidenceKey(line),
+    productKey: group.key,
+    equivalentKeys: group.equivalence!.candidateKeys,
+    reason: "equivalent_match" as const,
+    categoryId: null,
+    categoryConfidence: 0,
+  };
+  const apply = { id, generation: 0, store: data.store, decisions: [decision] };
+  await t.mutation(internal.catalogMatching.apply, apply);
+  let receipt = (await first.query(api.receipts.detail, { id }))!.receipt;
+  const linked = receipt.data!.lines[0];
+  expect(linked.catalogProduct).toMatchObject({
+    key: group.key,
+    name: "Crispi Salat",
+    equivalence: group.equivalence,
+  });
+  expect(needsProductLink(linked)).toBe(false);
+  expect(packageCandidates(quantityEvidence(linked)).measures).toEqual([]);
+  expect(receipt.status).toBe("reviewed");
+
+  // Expiration must never fetch the representative SKU and overwrite the safe group record.
+  vi.setSystemTime(Date.now() + 31 * 86400000);
+  await first.mutation(api.catalog.ensure, {
+    lookup: { kind: "details", productKey: group.key },
+  });
+  const details = await first.query(api.catalog.observe, {
+    lookup: { kind: "details", productKey: group.key },
+  });
+  expect(details.status).toBe("ready");
+  expect(details.products[0].ids).toEqual([]);
+  expect(details.products[0].weight).toBeUndefined();
+  expect(details.products[0].ingredients).toBeUndefined();
+  expect(
+    (await first.mutation(api.catalog.product, { key: group.key })).products,
+  ).toEqual(details.products);
+  expect(
+    await first.mutation(api.catalog.prices, { productKey: group.key }),
+  ).toMatchObject({ status: "ready", prices: [] });
+  expect(
+    await t.run((ctx) => ctx.db.query("catalogRequests").take(10)),
+  ).toHaveLength(0);
+  await expect(
+    t.query(api.catalog.observe, {
+      lookup: { kind: "details", productKey: group.key },
+    }),
+  ).rejects.toThrow("Logg inn");
+
+  const oldData = structuredClone(receipt.data!);
+  delete oldData.lines[0].productReference;
+  delete oldData.lines[0].catalogProduct!.equivalence;
+  const save = {
+    id,
+    revision: receipt.revision,
+    data: oldData,
+    reviewed: false,
+    rememberLineIds: [],
+    duplicateResolved: false,
+    excluded: false,
+  };
+  await first.mutation(api.receipts.save, save);
+  receipt = (await first.query(api.receipts.detail, { id }))!.receipt;
+  expect(receipt.data!.lines[0].catalogProduct?.equivalence).toEqual(
+    group.equivalence,
+  );
+  await first.mutation(api.receipts.save, {
+    ...save,
+    revision: receipt.revision,
+    data: receipt.data!,
+    catalogChanges: [{ lineId: line.id, key: products[1].key }],
+  });
+  await t.mutation(internal.catalogMatching.apply, apply);
+  receipt = (await first.query(api.receipts.detail, { id }))!.receipt;
+  expect(receipt.data!.lines[0].catalogProduct?.key).toBe(products[1].key);
+  expect(receipt.data!.lines[0].catalogProduct?.equivalence).toBeUndefined();
+});
 afterEach(() => {
   vi.useRealTimers();
   vi.unstubAllGlobals();

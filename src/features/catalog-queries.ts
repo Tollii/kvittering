@@ -64,13 +64,14 @@ export function useCatalogSearch(
   scope:
     | { kind: "products"; store?: string }
     | { kind: "stores"; receiptId: Id<"receipts"> },
+  enabled = true,
 ) {
   const term = useDebouncedSearch(
     scope.kind === "stores" ? normalizeSearch(search) : productSearch(search),
   );
   return useCatalogLookup(
     { ...scope, search: term },
-    term.length >= 3 && term.length <= 120,
+    enabled && term.length >= 3 && term.length <= 120,
     day,
   );
 }

@@ -13,7 +13,7 @@ import { internalMutation, internalQuery, env } from "./_generated/server";
 import { requireReceipt } from "./access";
 import schema from "./schema";
 import { findMapping } from "./products";
-import { linkCatalogProduct } from "./catalogLinks";
+import { linkCatalogProduct, resolveCatalogMatch } from "./catalogLinks";
 import {
   catalogProductValidator,
   type CatalogRequest,
@@ -283,10 +283,7 @@ export const apply = internalMutation({
       if (line.productMatchManual) continue;
       diagnostics.set(line.id, decision);
       if (decision.productKey) {
-        const product = await ctx.db
-          .query("catalogProducts")
-          .withIndex("by_key", (q) => q.eq("key", decision.productKey!))
-          .unique();
+        const product = await resolveCatalogMatch(ctx, line, decision);
         if (product && line.catalogProduct?.key !== product.key && data.store) {
           Object.assign(
             line,
@@ -295,7 +292,7 @@ export const apply = internalMutation({
               receipt.householdId,
               data.store,
               line,
-              product.product,
+              product,
               null,
             ),
           );

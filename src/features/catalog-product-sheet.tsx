@@ -166,6 +166,12 @@ export function CatalogProductSheet({
   );
   return (
     <Sheet title="Produktinformasjon" visible onClose={onClose}>
+      {product.equivalence && (
+        <Notice>
+          Koblet til tilsvarende produkter. Bildet viser ett eksempel. Nøyaktig
+          pakning og strekkode er ikke bekreftet.
+        </Notice>
+      )}
       {!productLookup && (
         <Notice>
           Produktkatalogen er midlertidig satt på pause. Lagrede opplysninger
@@ -260,41 +266,42 @@ export function CatalogProductSheet({
           Strekkode: {product.ean}
         </Copy>
       )}
-      {!showPrices ? (
-        <Button
-          title="Hent butikkpriser"
-          secondary
-          onPress={() => setShowPrices(true)}
-        />
-      ) : (
-        <Panel>
-          <Copy weight="600">Priser i katalogen</Copy>
-          {((prices.isFetching && !prices.data) ||
-            prices.data?.status === "pending") && (
-            <Loading title="Henter priser …" />
-          )}
-          {(prices.isError || prices.data?.status === "error") && (
-            <Notice>
-              {prices.data?.message ?? "Prisene kunne ikke hentes nå."}
-            </Notice>
-          )}
-          {prices.data?.prices.map((price, index) => (
-            <Row
-              key={`${price.store}-${index}`}
-              title={price.store}
-              detail={
-                price.checkedAt
-                  ? formatDate(price.checkedAt.slice(0, 10))
-                  : "Dato ukjent"
-              }
-              value={formatMoney(price.priceOre)}
-            />
-          ))}
-          {prices.data?.status === "ready" && !prices.data.prices.length && (
-            <Copy muted>Ingen priser</Copy>
-          )}
-        </Panel>
-      )}
+      {!product.equivalence &&
+        (!showPrices ? (
+          <Button
+            title="Hent butikkpriser"
+            secondary
+            onPress={() => setShowPrices(true)}
+          />
+        ) : (
+          <Panel>
+            <Copy weight="600">Priser i katalogen</Copy>
+            {((prices.isFetching && !prices.data) ||
+              prices.data?.status === "pending") && (
+              <Loading title="Henter priser …" />
+            )}
+            {(prices.isError || prices.data?.status === "error") && (
+              <Notice>
+                {prices.data?.message ?? "Prisene kunne ikke hentes nå."}
+              </Notice>
+            )}
+            {prices.data?.prices.map((price, index) => (
+              <Row
+                key={`${price.store}-${index}`}
+                title={price.store}
+                detail={
+                  price.checkedAt
+                    ? formatDate(price.checkedAt.slice(0, 10))
+                    : "Dato ukjent"
+                }
+                value={formatMoney(price.priceOre)}
+              />
+            ))}
+            {prices.data?.status === "ready" && !prices.data.prices.length && (
+              <Copy muted>Ingen priser</Copy>
+            )}
+          </Panel>
+        ))}
       <Copy size={12} muted>
         Produktdata fra Kassalapp
         {query.data?.fetchedAt

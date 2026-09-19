@@ -92,3 +92,79 @@ it("retains the reason for a provider failure and keeps exact links usable", asy
     reason: "saved_match",
   });
 });
+
+it("scores duplicate catalog records together and keeps their individual diagnostics", async () => {
+  const candidates = normalizeProducts({
+    data: [
+      { id: 1, name: "BigOne Bbq Chicken Deluxe 560g", ean: "7039010576581" },
+      {
+        id: 2,
+        name: "BigOne Bbq Chicken Deluxe 560g pose",
+        ean: "7039010576582",
+      },
+    ],
+  });
+  let questionCount = 0;
+  vi.stubGlobal(
+    "fetch",
+    vi.fn(async (_url, init) => {
+      const request = JSON.parse(init.body);
+      questionCount = Object.keys(request.questions).length;
+      expect(request.state.products[0].catalogCandidates).toHaveLength(1);
+      expect(
+        request.state.products[0].catalogCandidates[0].alternativeNames,
+      ).toHaveLength(2);
+      return new Response(
+        JSON.stringify({
+          model: "jev-latest",
+          answers: {
+            product_0_0: { type: "noul", noul: 0.92 },
+          },
+          usage: { input_tokens: 100, output_tokens: 20 },
+        }),
+        { headers: { "Content-Type": "application/json" } },
+      );
+    }),
+  );
+  const [result] = await classifyCatalogProducts(
+    [{ ...item(0), line: { ...item(0).line, manual: true }, candidates }],
+    client(),
+  );
+  expect(questionCount).toBe(1);
+  expect(result.reason).toBe("equivalent_match");
+  expect(result.equivalentKeys).toEqual(
+    candidates.map((product) => product.key),
+  );
+  expect(result.candidates?.map((candidate) => candidate.probability)).toEqual([
+    0.92, 0.92,
+  ]);
+});
+
+it("does not treat an unanswered competing group as a negative answer", async () => {
+  vi.stubGlobal(
+    "fetch",
+    vi.fn(
+      async () =>
+        new Response(
+          JSON.stringify({
+            model: "jev-latest",
+            answers: { product_0_0: { type: "noul", noul: 0.98 } },
+            usage: { input_tokens: 100, output_tokens: 10 },
+          }),
+          { headers: { "Content-Type": "application/json" } },
+        ),
+    ),
+  );
+  const candidates = normalizeProducts({
+    data: [
+      { id: 1, name: "BigOne Bbq Chicken Deluxe 560g" },
+      { id: 2, name: "BigOne Bbq Chicken Deluxe 700g" },
+    ],
+  });
+  const [result] = await classifyCatalogProducts(
+    [{ ...item(0), candidates }],
+    client(),
+  );
+  expect(result).toMatchObject({ productKey: null, reason: "provider_error" });
+  expect(result.equivalentKeys).toBeUndefined();
+});

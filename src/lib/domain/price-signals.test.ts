@@ -79,6 +79,29 @@ it("needs three other observations before it speaks", () => {
   const today = receipt("d", "2026-09-12", 12900);
   expect(priceSignals([...few, today], today).size).toBe(0);
 });
+
+it("does not report exact-product price changes for equivalent catalog matches", () => {
+  const history = [
+    receipt("a", "2026-07-02", 9490),
+    receipt("b", "2026-07-16", 9490),
+    receipt("c", "2026-08-03", 8990),
+  ];
+  const today = receipt("d", "2026-09-12", 12900);
+  for (const purchase of [...history, today]) {
+    const line = purchase.data!.lines.find((item) => item.id === "cola")!;
+    line.catalogProduct = {
+      key: "equivalent:cola",
+      name: "Coca-Cola",
+      equivalence: {
+        representativeKey: "ean:111",
+        candidateKeys: ["ean:111", "ean:222"],
+      },
+    };
+    purchase.productAnalysis!.results[0].evidenceKey =
+      purchaseEvidenceKey(line);
+  }
+  expect(priceSignals([...history, today], today).size).toBe(0);
+});
 it("lists a month's surprises, largest overspend first", () => {
   const history = [
     receipt("a", "2026-07-02", 9490),

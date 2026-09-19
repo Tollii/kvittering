@@ -1,4 +1,4 @@
-import { productIdentityKey } from "./product-reference";
+import { productIdentityKey, productReference } from "./product-reference";
 import { receiptMonth, type Receipt } from "./insights";
 import { type ReceiptLine } from "./receipt";
 import {
@@ -30,6 +30,9 @@ export const priceSignalThreshold = 0.15;
 
 /** Linked identity only: the same catalog product or the same saved product. */
 function identity(line: ReceiptLine) {
+  const reference = productReference(line);
+  if (reference.kind === "catalog" && reference.product.equivalence)
+    return null;
   return productIdentityKey(line);
 }
 

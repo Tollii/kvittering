@@ -151,6 +151,7 @@ export async function saveMapping(
 ) {
   const existing = await findMapping(ctx, householdId, retailer, line);
   const values = {
+    revision: (existing?.revision ?? 0) + 1,
     householdId,
     retailer,
     key: matchingKey(line.receiptName ?? line.name),

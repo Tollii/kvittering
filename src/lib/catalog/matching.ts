@@ -11,6 +11,7 @@ import {
 import type { CatalogProduct, PhysicalStore } from "./model";
 import { normalizeSearch } from "./policy";
 import { productSearch } from "./search";
+import { organicProduct } from "./equivalence";
 export { productSearch } from "./search";
 
 export function compatibleCatalogProduct(
@@ -18,6 +19,11 @@ export function compatibleCatalogProduct(
   product: CatalogProduct,
 ) {
   const source = parseProductEvidence({ ...line, source: "receipt" });
+  if (
+    organicProduct(line.name, line.attributes) !==
+    organicProduct(product.name, product.labels)
+  )
+    return false;
   const target = parseProductEvidence({
     source: "catalog",
     name: product.name,

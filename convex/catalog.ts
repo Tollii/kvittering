@@ -19,6 +19,25 @@ import { catalogDetailsTtl } from "../src/lib/catalog/policy";
 import type { Doc } from "./_generated/dataModel";
 import { retailerCode } from "../src/lib/catalog/matching";
 
+/** Equivalent identities have no provider SKU from which to fetch details or prices. */
+function equivalentResponse(
+  record: Doc<"catalogProducts"> | null,
+  kind: CatalogLookup["kind"],
+): CatalogResponse | null {
+  return record?.product.equivalence
+    ? {
+        ...emptyCatalogResult(),
+        status: "ready",
+        products: kind === "details" ? [record.product] : [],
+        fetchedAt: record.fetchedAt,
+        message:
+          kind === "prices"
+            ? "Velg et bestemt produkt for å hente butikkpriser."
+            : undefined,
+      }
+    : null;
+}
+
 export function requestResponse(
   request: Doc<"catalogRequests">,
 ): CatalogResponse {
@@ -76,6 +95,8 @@ export const prices = mutation({
       .query("catalogProducts")
       .withIndex("by_key", (q) => q.eq("key", args.productKey))
       .unique();
+    const equivalent = equivalentResponse(record, "prices");
+    if (equivalent) return equivalent;
     if (!record)
       return {
         ...emptyCatalogResult(),
@@ -102,6 +123,8 @@ export const product = mutation({
       .query("catalogProducts")
       .withIndex("by_key", (q) => q.eq("key", key))
       .unique();
+    const equivalent = equivalentResponse(record, "details");
+    if (equivalent) return equivalent;
     if (!record)
       return {
         ...emptyCatalogResult(),
@@ -158,13 +181,14 @@ async function lookupContext(ctx: QueryCtx, lookup: CatalogLookup) {
     .withIndex("by_key", (q) => q.eq("key", lookup.productKey))
     .unique();
   return {
-    request: record
-      ? {
-          ...lookup,
-          id: record.product.ids[0],
-          ...(lookup.kind === "prices" ? { ean: record.product.ean } : {}),
-        }
-      : null,
+    request:
+      record && !record.product.equivalence
+        ? {
+            ...lookup,
+            id: record.product.ids[0],
+            ...(lookup.kind === "prices" ? { ean: record.product.ean } : {}),
+          }
+        : null,
     record,
   };
 }
@@ -191,6 +215,8 @@ export const observe = query({
   handler: async (ctx, { lookup, client }) => {
     await requireCompatibleClient(ctx, client, "productLookup");
     const { request, record } = await lookupContext(ctx, lookup);
+    const equivalent = equivalentResponse(record, lookup.kind);
+    if (equivalent) return equivalent;
     if (!request)
       return {
         ...emptyCatalogResult(),

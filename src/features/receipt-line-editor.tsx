@@ -286,7 +286,11 @@ export function ReceiptLineEditor({
                   color: catalogProduct ? colors.accent : colors.secondary,
                 }}
               >
-                {catalogProduct ? "Produkt" : "Finn produkt"}
+                {catalogProduct?.equivalence
+                  ? "Tilsvarende produkt"
+                  : catalogProduct
+                    ? "Produkt"
+                    : "Finn produkt"}
               </Copy>
             </Pressable>
           )}
