@@ -13,11 +13,21 @@ export function BudgetSettings() {
   const client = useConvex();
   const { details, online } = useHousehold();
   const current = details?.household.monthlyBudgetOre ?? null;
+  const [baseline, setBaseline] = useState(current);
+  const [generation, setGeneration] = useState(0);
   const [value, setValue] = useState<number | null>(current);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [pending, setPending] = useState<number | null | undefined>(undefined);
   const [saved, setSaved] = useState(false);
-  const dirty = value !== current;
+  const dirty = value !== baseline || error !== null;
+  if (pending !== undefined && pending === current) setPending(undefined);
+  if (!dirty && !busy && pending === undefined && baseline !== current) {
+    setBaseline(current);
+    setValue(current);
+    setSaved(false);
+    setGeneration(generation + 1);
+  }
   async function save(next: number | null) {
     setBusy(true);
     setError(null);
@@ -26,6 +36,9 @@ export function BudgetSettings() {
         monthlyBudgetOre: next,
       });
       setValue(next);
+      setBaseline(next);
+      setPending(next);
+      setGeneration((value) => value + 1);
       setSaved(true);
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "Kunne ikke lagre.");
@@ -36,15 +49,20 @@ export function BudgetSettings() {
   return (
     <Panel>
       <MoneyField
-        key={current ?? "none"}
+        key={generation}
         label="Månedsbudsjett (kr)"
-        value={current}
+        value={value}
         onChange={(next) => {
           setValue(next);
           setSaved(false);
         }}
         onError={setError}
       />
+      {dirty && baseline !== current && (
+        <Notice tone="warning">
+          Budsjettet er endret på en annen enhet. Din verdi vises fortsatt.
+        </Notice>
+      )}
       {!!error && <Notice error>{error}</Notice>}
       <View style={{ flexDirection: "row", gap: 8 }}>
         <View style={{ flex: 1 }}>

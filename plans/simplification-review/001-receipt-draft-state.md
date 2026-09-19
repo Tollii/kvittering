@@ -4,7 +4,7 @@
 
 ## Status
 
-- Status: TODO
+- Status: DONE
 - Priority: P1
 - Effort: M–L
 - Risk: Medium
@@ -193,3 +193,9 @@ Define the receipt draft responsibility through reduceReceiptDraft(state, action
 ## Maintenance notes
 
 A new editable field must enter the draft and its reset operation together. Do not create a generic form framework.
+
+## Implementation record
+
+Implemented the draft reducer, reactive save completion, edit invalidation, and complete budget reset boundary. The route now contains routing and detail loading. The editor is in `src/features/receipt-editor.tsx`; this additional file gives the controller a clear owner. Footer, line collection, and native toolbar presentation are separate functions. Save still uses the existing backend contract: a successful write increments the submitted revision by one. Plan 006 can replace that known contract with an explicit acknowledgement.
+
+Verification: typecheck, lint, all 156 tests, and diff checks passed. Native interaction is unverified: no development build or device checks were run for approval/edit, delete navigation, or remote budget changes. Pure tests cover save/query ordering, later edits, discard, failure, and deletion.
