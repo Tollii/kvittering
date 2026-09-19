@@ -65,6 +65,7 @@
     "@types/react": "~19.2.2",
     "@types/react-test-renderer": "19.3.0",
     "@typescript-eslint/parser": "8.70.0",
+    "@vitest/coverage-v8": "5.0.1",
     "convex-test": "^0.0.59",
     "eslint": "^9.39.5",
     "eslint-config-expo": "^57.0.2",
@@ -97,8 +98,10 @@
     "lint:eslint": "eslint . --max-warnings 0",
     "lint:fix": "oxlint --fix && oxlint --config oxlint.policy.config.mjs --fix && eslint . --fix",
     "test:rules": "node --test tools/eslint/rules.test.cjs",
+    "test:coverage": "vitest run --coverage",
     "check:fast": "npm run typecheck && npm run lint",
-    "check": "npm run check:fast && npm run test:rules && npm test"
+    "check": "npm run check:fast && npm run test:rules && npm test",
+    "check:ci": "npm run check:fast && npm run test:rules && npm run test:coverage"
   },
   "private": true,
   "overrides": {

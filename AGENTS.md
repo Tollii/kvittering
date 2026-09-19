@@ -51,7 +51,7 @@ The application is built with Expo and React Native, with iOS as the primary pla
 
 - Test domain rules, state transitions, transaction behavior, and meaningful failures. Avoid tests that mirror implementation or only prove deleted code stays absent.
 - Before removing apparently unused code, check generated references, scheduled functions, workflow callbacks, and installed clients.
-- Use `npm run typecheck`, `npm run lint`, and `npm test` as appropriate to the change. Run affected checks after fixes; broaden testing when the change or unresolved risk warrants it.
+- Use `npm run check:fast` for quick feedback and `npm run check` before committing code changes. Use `npm run check:ci` when changing tests or coverage configuration. See [docs/quality.md](docs/quality.md) for the rule policy. Fix findings; do not add a baseline or broad rule suppression.
 - For Expo or React Native changes, use the exact [Expo 57 documentation](https://docs.expo.dev/versions/v57.0.0/). For Convex changes, read [the generated guidelines](convex/_generated/ai/guidelines.md).
 - Use [README.md](README.md) for setup, environment selection, and build commands. `npm run ios:build` builds and opens the native iOS application.
 - For Sentry investigations, use the installed `sentry` CLI and its saved OAuth credentials. Follow [docs/observability.md](docs/observability.md); the source-map token in `.env.local` cannot read issues.

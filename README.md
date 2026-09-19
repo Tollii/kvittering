@@ -4,7 +4,7 @@ An Expo 57 / React Native app for household grocery receipts. iOS is the primary
 
 ## Run on iPhone or the simulator
 
-Use Node.js 22.13 or later and Xcode 26.4 or later.
+Use Node.js 24 and Xcode 26.4 or later.
 
 For Xcode 27, keep `ios.enableSceneSupport` enabled in the `expo-build-properties`
 plugin. This generates the scene lifecycle required to launch on iOS 27.
@@ -144,12 +144,14 @@ Native push subscriptions use the deviceSubscriptions table. Existing browser su
 ## Checks
 
 ```sh
-npm run typecheck
-npm run lint
-npm test
+npm run check:fast # Quick feedback while editing.
+npm run check # Full local checks.
+npm run check:ci # Includes coverage.
 npx expo install --check
 npx expo export --platform ios
 ```
+
+See [Code quality checks](docs/quality.md) for the rule policy, exceptions, and PR checks.
 
 The tests cover receipt accounting, classification, matching, household access, concurrent receipt revisions, notifications, and interrupted uploads. The npm override allows the current Vitest version with Better Auth's older optional test peer range.
 

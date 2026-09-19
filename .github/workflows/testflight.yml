@@ -69,10 +69,7 @@ jobs:
 
       - name: Check application
         if: inputs.operation == 'build-and-submit'
-        run: |
-          npm run typecheck
-          npm run lint
-          npm test
+        run: npm run check
 
       - name: Deploy staging backend
         if: inputs.operation == 'build-and-submit'
