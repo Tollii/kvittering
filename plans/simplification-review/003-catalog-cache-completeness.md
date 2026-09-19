@@ -4,7 +4,7 @@
 
 ## Status
 
-- Status: TODO
+- Status: DONE
 - Priority: P1
 - Effort: S–M
 - Risk: Low–medium
@@ -189,3 +189,9 @@ Make the merge a pure operation over the previous cache entry, a discriminated s
 ## Maintenance notes
 
 When a new catalog endpoint is added, specify which fields and freshness state it owns.
+
+## Implementation record
+
+Added optional detail-fetch time, a pure canonical merge, and short error freshness in the product-detail hook. Only a detail response advances detail freshness. Summary merges preserve richer values even after expiry. A successful detail response with empty nutrition remains complete. Existing data remains available during retries.
+
+Verification: reproduced summary-as-detail freshness failure, then passed typecheck, lint, all 162 tests, and diff checks. Generated types derive directly from the schema; no generated edit or deployment was needed. No live provider calls were made.

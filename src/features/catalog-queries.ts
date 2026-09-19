@@ -5,7 +5,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useConvex } from "convex/react";
 import { api } from "../../convex/_generated/api";
 import type { Id } from "../../convex/_generated/dataModel";
-import { normalizeSearch, day } from "@/lib/catalog/policy";
+import { normalizeSearch, day, catalogDetailsTtl } from "@/lib/catalog/policy";
 import { productSearch } from "@/lib/catalog/search";
 
 export function useCatalogSearch(search: string, receiptId?: Id<"receipts">) {
@@ -51,6 +51,8 @@ export function useCatalogProduct(key: string) {
     queryKey: ["catalog", "product", key],
     enabled: !blocked && policy.features.productLookup,
     queryFn: () => releaseMutation(convex, api.catalog.product, { key }),
+    staleTime: (query) =>
+      query.state.data?.status === "error" ? 60000 : catalogDetailsTtl,
     refetchInterval: (query) =>
       query.state.data?.status === "pending" ? 2000 : false,
   });

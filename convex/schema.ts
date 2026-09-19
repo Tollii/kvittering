@@ -135,6 +135,7 @@ export default defineSchema({
     key: v.string(),
     product: catalogProductValidator,
     fetchedAt: v.number(),
+    detailsFetchedAt: v.number().optional(),
   }).index("by_key", ["key"]),
   catalogStores: defineTable({
     externalId: v.number(),

@@ -242,3 +242,78 @@ it("saves a selected catalog product and prevents background matching from repla
   expect(current.lines[0].catalogProduct?.key).toBe(products[0].key);
   expect(current.lines[0].categoryId).toBe(saved.lines[0].categoryId);
 });
+
+it("fetches details after a summary and retains detail freshness across later summaries", async () => {
+  const { t, first } = await setup();
+  const product = normalizeProducts({
+    data: [{ id: 31, name: "Cola 500ml" }],
+  })[0];
+  await t.run((ctx) =>
+    ctx.db.insert("catalogProducts", {
+      key: product.key,
+      product,
+      fetchedAt: Date.now(),
+    }),
+  );
+  expect(
+    (await first.mutation(api.catalog.product, { key: product.key })).status,
+  ).toBe("pending");
+  await first.mutation(api.catalog.product, { key: product.key });
+  const requests = await t.run((ctx) =>
+    ctx.db.query("catalogRequests").take(10),
+  );
+  expect(requests).toHaveLength(1);
+  await t.mutation(internal.catalogQueue.claim, { id: requests[0]._id });
+  await t.mutation(internal.catalogQueue.succeed, {
+    id: requests[0]._id,
+    result: { ...emptyCatalogResult(), products: [product] },
+  });
+  expect(
+    (await first.mutation(api.catalog.product, { key: product.key })).status,
+  ).toBe("ready");
+  const fetched = await t.run((ctx) => ctx.db.query("catalogProducts").first());
+  vi.setSystemTime(Date.now() + 1000);
+  await first.mutation(api.catalog.searchProducts, { search: "Cola" });
+  const search = (
+    await t.run((ctx) => ctx.db.query("catalogRequests").take(10))
+  ).find((row) => row.request.kind === "products")!;
+  await t.mutation(internal.catalogQueue.claim, { id: search._id });
+  await t.mutation(internal.catalogQueue.succeed, {
+    id: search._id,
+    result: { ...emptyCatalogResult(), products: [product] },
+  });
+  const later = await t.run((ctx) => ctx.db.query("catalogProducts").first());
+  expect(later?.fetchedAt).toBeGreaterThan(fetched!.fetchedAt);
+  expect(later?.detailsFetchedAt).toBe(fetched!.detailsFetchedAt);
+});
+
+it("merges summary fields without erasing rich detail data or mutating inputs", async () => {
+  const { mergeCatalogProduct } = await import("./catalogQueue");
+  const product = normalizeProducts({
+    data: [
+      {
+        id: 31,
+        name: "Cola",
+        nutrition: [{ display_name: "Energy", amount: 10, unit: "kcal" }],
+      },
+    ],
+  })[0];
+  const previous = {
+    key: product.key,
+    product,
+    fetchedAt: 1,
+    detailsFetchedAt: 1,
+  };
+  const before = structuredClone(previous);
+  const summary = { ...product, nutrition: [] };
+  expect(
+    mergeCatalogProduct(previous, { kind: "summary", product: summary }, 100),
+  ).toMatchObject({
+    detailsFetchedAt: 1,
+    product: { nutrition: product.nutrition },
+  });
+  expect(previous).toEqual(before);
+  expect(
+    mergeCatalogProduct(previous, { kind: "details", product: summary }, 100),
+  ).toMatchObject({ detailsFetchedAt: 100, product: { nutrition: [] } });
+});

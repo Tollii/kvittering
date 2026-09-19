@@ -20,9 +20,9 @@ import {
   catalogResultValidator,
   emptyCatalogResult,
   type CatalogRequest,
+  type CatalogProduct,
 } from "../src/lib/catalog/model";
 import {
-  catalogDetailsTtl,
   normalizeRequest,
   requestKey,
   resultLifetime,
@@ -181,26 +181,14 @@ export const succeed = internalMutation({
         .query("catalogProducts")
         .withIndex("by_key", (q) => q.eq("key", product.key))
         .unique();
-      // Search results do not replace recently fetched details with a poorer record.
-      if (
-        existing &&
-        request.request.kind !== "details" &&
-        existing.fetchedAt + catalogDetailsTtl > now
-      ) {
-        await ctx.db.patch("catalogProducts", existing._id, {
-          product: {
-            ...existing.product,
-            ids: [...new Set([...existing.product.ids, ...product.ids])],
-            image: existing.product.image ?? product.image,
-            ingredients: existing.product.ingredients ?? product.ingredients,
-            categories: existing.product.categories.length
-              ? existing.product.categories
-              : product.categories,
-          },
-        });
-        continue;
-      }
-      const value = { key: product.key, product, fetchedAt: now };
+      const value = mergeCatalogProduct(
+        existing,
+        {
+          kind: request.request.kind === "details" ? "details" : "summary",
+          product,
+        },
+        now,
+      );
       if (existing)
         await ctx.db.replace("catalogProducts", existing._id, value);
       else await ctx.db.insert("catalogProducts", value);
@@ -273,3 +261,51 @@ export const completed = internalMutation({
     return null;
   },
 });
+
+type CatalogEntry = Pick<
+  Doc<"catalogProducts">,
+  "key" | "product" | "fetchedAt" | "detailsFetchedAt"
+>;
+
+/** Summary responses can fill gaps but cannot refresh or erase fetched details. */
+export function mergeCatalogProduct(
+  previous: CatalogEntry | null,
+  response: { kind: "summary" | "details"; product: CatalogProduct },
+  fetchedAt: number,
+): CatalogEntry {
+  const product = response.product;
+  if (response.kind === "details")
+    return {
+      key: product.key,
+      product,
+      fetchedAt,
+      detailsFetchedAt: fetchedAt,
+    };
+  if (!previous) return { key: product.key, product, fetchedAt };
+  return {
+    ...previous,
+    fetchedAt,
+    product: {
+      ...product,
+      ...previous.product,
+      ids: [...new Set([...previous.product.ids, ...product.ids])],
+      image: previous.product.image ?? product.image,
+      brand: previous.product.brand ?? product.brand,
+      ean: previous.product.ean ?? product.ean,
+      ingredients: previous.product.ingredients ?? product.ingredients,
+      description: previous.product.description ?? product.description,
+      categories: previous.product.categories.length
+        ? previous.product.categories
+        : product.categories,
+      nutrition: previous.product.nutrition.length
+        ? previous.product.nutrition
+        : product.nutrition,
+      allergens: previous.product.allergens.length
+        ? previous.product.allergens
+        : product.allergens,
+      labels: previous.product.labels.length
+        ? previous.product.labels
+        : product.labels,
+    },
+  };
+}

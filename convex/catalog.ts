@@ -100,12 +100,15 @@ export const product = mutation({
         status: "error" as const,
         message: "Produktet finnes ikke i den lagrede katalogen.",
       };
-    if (record.fetchedAt + catalogDetailsTtl > Date.now())
+    if (
+      record.detailsFetchedAt !== undefined &&
+      record.detailsFetchedAt + catalogDetailsTtl > Date.now()
+    )
       return {
         ...emptyCatalogResult(),
         products: [record.product],
         status: "ready" as const,
-        fetchedAt: record.fetchedAt,
+        fetchedAt: record.detailsFetchedAt,
       };
     const response = requestResponse(
       await ensureRequest(ctx, {
