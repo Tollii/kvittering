@@ -44,7 +44,6 @@ import {
 import { createQueueRunner, type LocalReceipt } from "@/lib/upload-queue";
 import { Loading, Notice, Screen } from "@/components/ui";
 import { CatalogQueryProvider } from "./catalog-query-provider";
-import { ProductAnalysisSync } from "./product-analysis-sync";
 import { SignIn, HouseholdSetup } from "./sign-in";
 
 type Household = NonNullable<FunctionReturnType<typeof api.households.current>>;
@@ -333,16 +332,6 @@ function HouseholdProvider({
         scope={`${owner}:${household.id}`}
         online={online}
       >
-        <ProductAnalysisSync
-          receipts={page.results}
-          enabled={
-            online &&
-            auth.isAuthenticated &&
-            !!details &&
-            !blocked &&
-            policy.features.spendingAnalysis
-          }
-        />
         {children}
       </CatalogQueryProvider>
     </SessionContext.Provider>

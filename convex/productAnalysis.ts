@@ -72,8 +72,13 @@ export const process = manager
     return null;
   });
 
-async function launch(ctx: MutationCtx, receipt: Doc<"receipts">) {
-  if (!(await featureEnabled(ctx, "spendingAnalysis"))) return;
+async function launch(
+  ctx: MutationCtx,
+  receipt: Doc<"receipts">,
+  origin: "automatic" | "manual" = "automatic",
+) {
+  if (!(await featureEnabled(ctx, "spendingAnalysis")))
+    return "disabled" as const;
   if (
     !receipt.data ||
     receipt.excluded ||
@@ -81,15 +86,15 @@ async function launch(ctx: MutationCtx, receipt: Doc<"receipts">) {
     !["reviewed", "needs_review"].includes(receipt.status) ||
     !env.TYPESAFE_API_KEY
   )
-    return;
+    return "ineligible" as const;
   const previous = receipt.productAnalysis;
   if (
     previous?.version === productAnalysisVersion &&
     previous.generation === receipt.generation &&
     previous.revision === receipt.revision &&
-    (previous.state !== "error" || Date.now() - previous.updatedAt < 300000)
+    (previous.state !== "error" || origin === "automatic")
   )
-    return;
+    return "current" as const;
   await manager.start(ctx, internal.productAnalysis.process, {
     id: receipt._id,
     generation: receipt.generation,
@@ -106,6 +111,7 @@ async function launch(ctx: MutationCtx, receipt: Doc<"receipts">) {
       results: [],
     },
   });
+  return "started" as const;
 }
 export const start = internalMutation({
   args: { id: v.id("receipts") },
@@ -117,7 +123,7 @@ export const start = internalMutation({
   },
 });
 
-/** Bring older receipts up to date when the household opens the app. */
+/** Explicit household recovery after bounded workflow attempts are exhausted. */
 export const ensure = mutation({
   service: "spendingAnalysis",
   args: { ids: v.array(v.id("receipts")) },
@@ -126,7 +132,7 @@ export const ensure = mutation({
     if (ids.length > 20) throw new Error("For mange kvitteringer.");
     for (const id of ids) {
       const { receipt } = await requireReceipt(ctx, id);
-      await launch(ctx, receipt);
+      await launch(ctx, receipt, "manual");
     }
     return null;
   },
@@ -327,5 +333,32 @@ export const finish = internalMutation({
     if (args.failed) console.error("product.analysis_failed", fields);
     else console.info("product.analysis_completed", fields);
     return null;
+  },
+});
+
+/** Operator repair for one household and a fixed insertion boundary. No recurring scan. */
+export const repair = internalMutation({
+  args: {
+    householdId: v.id("households"),
+    cursor: v.union(v.string(), v.null()),
+    through: v.number(),
+  },
+  returns: v.object({ isDone: v.boolean(), continueCursor: v.string() }),
+  handler: async (ctx, args) => {
+    const page = await ctx.db
+      .query("receipts")
+      .withIndex("by_householdId", (q) =>
+        q
+          .eq("householdId", args.householdId)
+          .lte("_creationTime", args.through),
+      )
+      .paginate({ cursor: args.cursor, numItems: 10, maximumRowsRead: 10 });
+    for (const receipt of page.page) await launch(ctx, receipt, "manual");
+    if (!page.isDone)
+      await ctx.scheduler.runAfter(0, internal.productAnalysis.repair, {
+        ...args,
+        cursor: page.continueCursor,
+      });
+    return { isDone: page.isDone, continueCursor: page.continueCursor };
   },
 });

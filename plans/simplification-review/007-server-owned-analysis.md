@@ -4,7 +4,7 @@
 
 ## Status
 
-- Status: TODO
+- Status: DONE
 - Priority: P2
 - Effort: M
 - Risk: Medium
@@ -197,3 +197,11 @@ Give catalog completion, disabled work, and retry eligibility explicit domain me
 ## Maintenance notes
 
 Analysis version bumps must include the explicit repair procedure, instead of depending on users opening the app.
+
+## Implementation record
+
+Skipped catalog work schedules analysis. The existing workflow owns three bounded provider attempts; exhaustion remains an error until explicit recovery, so automatic triggers cannot create unlimited retries. `productAnalysis.ensure` is the household manual retry. A receipt toolbar action calls it. `productAnalysis.repair` is an internal operator command with household, cursor, and fixed creation-time boundary; it continues in ten-receipt pages. Version changes use this operation.
+
+Removed the recurring phone analysis worker and the detail-mount enrichment effect after backend tests passed. Upload queue synchronization remains unchanged.
+
+Verification: typecheck, lint, all 180 tests, and diff checks passed. Tests cover skipped/paused catalog, repeated start, exhausted error, manual retry, stale results, and version repair. Workflow scheduling is verified locally; actual closed-app provider completion and native controls remain unverified. No repair command or deployment was run against a live backend.

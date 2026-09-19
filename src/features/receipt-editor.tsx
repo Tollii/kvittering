@@ -1,7 +1,6 @@
-import { useReleasePolicy } from "@/features/release-policy";
 import { releaseMutation } from "@/lib/releases/requests";
 import { usePreventRemove } from "expo-router/react-navigation";
-import { useEffect, useReducer, useRef, useState, type ReactNode } from "react";
+import { useReducer, useRef, useState, type ReactNode } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -72,7 +71,6 @@ export function ReceiptEditor({
   onDeletionChange: (state: "idle" | "deleting" | "deleted") => void;
 }) {
   const client = useConvex();
-  const { policy, blocked } = useReleasePolicy();
   const colors = useTheme();
   const { receipts } = useHousehold();
   const [draft, dispatch] = useReducer(
@@ -124,39 +122,6 @@ export function ReceiptEditor({
   const processing = ["processing", "uploaded", "uploading"].includes(
     receipt.status,
   );
-  const catalogRequested = useRef(false);
-  useEffect(() => {
-    if (
-      !online ||
-      blocked ||
-      !policy.features.automaticProductMatching ||
-      !policy.features.productLookup ||
-      dirty ||
-      processing ||
-      !receipt.data ||
-      receipt.catalogStatus ||
-      catalogRequested.current
-    )
-      return;
-    catalogRequested.current = true;
-    void releaseMutation(client, api.catalogMatching.enrich, {
-      id: receipt._id,
-      onlyIfMissing: true,
-    }).catch(() =>
-      dispatch({ type: "failed", error: "Produktsøket startet ikke." }),
-    );
-  }, [
-    client,
-    blocked,
-    policy.features.automaticProductMatching,
-    policy.features.productLookup,
-    dirty,
-    online,
-    processing,
-    receipt._id,
-    receipt.catalogStatus,
-    receipt.data,
-  ]);
   const totals = data ? reconcile(data) : null;
   const unresolvedDuplicate = !!receipt.duplicateOf && !duplicateResolved;
   const tasks = data ? reviewTasks(data, unresolvedDuplicate) : [];
@@ -533,6 +498,20 @@ export function ReceiptEditor({
             }
           >
             Finn produkter på nytt
+          </Stack.Toolbar.MenuAction>
+          <Stack.Toolbar.MenuAction
+            icon="chart.bar"
+            disabled={processing || !online || busy || dirty}
+            onPress={() =>
+              void run(async () => {
+                await releaseMutation(client, api.productAnalysis.ensure, {
+                  ids: [receipt._id],
+                });
+                setMessage("Analysen er lagt i kø.");
+              })
+            }
+          >
+            Oppdater analyse
           </Stack.Toolbar.MenuAction>
           <Stack.Toolbar.MenuAction
             icon="arrow.clockwise"

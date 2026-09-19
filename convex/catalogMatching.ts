@@ -133,8 +133,12 @@ export const start = internalMutation({
       !env.KASSALAPP_API_KEY ||
       !(await featureEnabled(ctx, "automaticProductMatching")) ||
       !(await featureEnabled(ctx, "productLookup"))
-    )
+    ) {
+      await ctx.scheduler.runAfter(0, internal.productAnalysis.start, {
+        id: args.id,
+      });
       return null;
+    }
     const workflowId = await launch(ctx, args.id, args.generation);
     await ctx.db.patch("receipts", args.id, {
       catalogStatus: "pending",

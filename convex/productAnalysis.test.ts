@@ -10,7 +10,10 @@ import {
   productAnalysisVersion,
 } from "../src/lib/domain/product-families";
 const modules = import.meta.glob("./**/*.ts");
-afterEach(() => vi.unstubAllEnvs());
+afterEach(() => {
+  vi.unstubAllEnvs();
+  vi.useRealTimers();
+});
 async function setup() {
   vi.stubEnv("TYPESAFE_API_KEY", "");
   const t = convexTest(schema, modules);
@@ -115,4 +118,101 @@ it("discards stale results after a receipt edit and records failures separately 
   const receipt = await t.run((ctx) => ctx.db.get("receipts", id));
   expect(receipt?.status).toBe("reviewed");
   expect(receipt?.productAnalysis?.state).toBe("error");
+});
+
+it("continues to analysis when optional catalog work is disabled", async () => {
+  const { t, id } = await setup();
+  vi.stubEnv("KASSALAPP_API_KEY", "");
+  await t.mutation(internal.catalogMatching.start, { id, generation: 0 });
+  const scheduled = await t.run((ctx) =>
+    ctx.db.system.query("_scheduled_functions").collect(),
+  );
+  expect(scheduled.some((job) => job.name === "productAnalysis:start")).toBe(
+    true,
+  );
+});
+
+it("starts once, exposes exhausted failure, and permits an explicit manual retry", async () => {
+  vi.useFakeTimers();
+  const { register } = await import("@convex-dev/workflow/test");
+  const { t, first, id, args } = await setup();
+  register(t, "productAnalysisWorkflow");
+  vi.stubEnv("TYPESAFE_API_KEY", "test-key");
+  await t.mutation(internal.productAnalysis.start, { id });
+  const initial = await t.run((ctx) => ctx.db.get("receipts", id));
+  expect(initial?.productAnalysis?.state).toBe("pending");
+  await t.mutation(internal.productAnalysis.start, { id });
+  expect(
+    (await t.run((ctx) => ctx.db.get("receipts", id)))?.productAnalysis,
+  ).toEqual(initial?.productAnalysis);
+  await t.mutation(internal.productAnalysis.finish, {
+    id,
+    generation: 0,
+    revision: 0,
+    version: args.version,
+    results: [],
+    failed: true,
+  });
+  await t.mutation(internal.productAnalysis.start, { id });
+  expect(
+    (await t.run((ctx) => ctx.db.get("receipts", id)))?.productAnalysis?.state,
+  ).toBe("error");
+  await first.mutation(api.productAnalysis.ensure, { ids: [id] });
+  expect(
+    (await t.run((ctx) => ctx.db.get("receipts", id)))?.productAnalysis?.state,
+  ).toBe("pending");
+});
+
+it("continues past a paused catalog flag without starting catalog work", async () => {
+  const { defaultPolicy } = await import("../src/lib/releases/policy");
+  const { t, id } = await setup();
+  vi.stubEnv("KASSALAPP_API_KEY", "test-key");
+  vi.stubEnv("RELEASE_CHANNEL", "testflight");
+  const policy = defaultPolicy("ios", "testflight");
+  await t.run((ctx) =>
+    ctx.db.insert("releasePolicies", {
+      ...policy,
+      features: { ...policy.features, automaticProductMatching: false },
+    }),
+  );
+  await t.mutation(internal.catalogMatching.start, { id, generation: 0 });
+  expect(
+    (await t.run((ctx) => ctx.db.get("receipts", id)))?.catalogStatus,
+  ).toBe("complete");
+  const scheduled = await t.run((ctx) =>
+    ctx.db.system.query("_scheduled_functions").collect(),
+  );
+  expect(scheduled.some((job) => job.name === "productAnalysis:start")).toBe(
+    true,
+  );
+});
+
+it("repairs an older analysis version through the explicit household operation", async () => {
+  vi.useFakeTimers();
+  const { register } = await import("@convex-dev/workflow/test");
+  const { t, id } = await setup();
+  register(t, "productAnalysisWorkflow");
+  vi.stubEnv("TYPESAFE_API_KEY", "test-key");
+  await t.run((ctx) =>
+    ctx.db.patch("receipts", id, {
+      productAnalysis: {
+        version: productAnalysisVersion - 1,
+        generation: 0,
+        revision: 0,
+        state: "complete",
+        updatedAt: 0,
+        results: [],
+      },
+    }),
+  );
+  const receipt = (await t.run((ctx) => ctx.db.get("receipts", id)))!;
+  const result = await t.mutation(internal.productAnalysis.repair, {
+    householdId: receipt.householdId,
+    cursor: null,
+    through: receipt._creationTime,
+  });
+  expect(result.isDone).toBe(true);
+  expect(
+    (await t.run((ctx) => ctx.db.get("receipts", id)))?.productAnalysis,
+  ).toMatchObject({ version: productAnalysisVersion, state: "pending" });
 });
