@@ -29,6 +29,47 @@ describe("operational diagnostics", () => {
     expect(Sentry.captureException).not.toHaveBeenCalled();
   });
 
+  it.each([
+    "fetch failed: FetchRequestCanceledException: Fetch request has been canceled (at Expo/NativeResponse.swift:63)",
+    "fetch failed: FetchRequestCanceledException: Fetch request has been canceled",
+  ])(
+    "records Expo request cancellation without creating an issue: %s",
+    (message) => {
+      reportError(new Error(message), "release.policy_refresh");
+
+      expect(Sentry.logger.warn).toHaveBeenCalledWith(
+        "release.policy_refresh.failed",
+        expect.objectContaining({ operation: "release.policy_refresh" }),
+      );
+      expect(Sentry.addBreadcrumb).toHaveBeenCalledWith(
+        expect.objectContaining({
+          message: "release.policy_refresh.failed",
+          level: "warning",
+        }),
+      );
+      expect(Sentry.captureException).not.toHaveBeenCalled();
+      expect(Sentry.logger.error).not.toHaveBeenCalled();
+    },
+  );
+
+  it.each([
+    "fetch failed",
+    "fetch failed: FetchUnknownException: Unknown error",
+    "fetch failed: FetchRedirectException: Redirect is not allowed when redirect mode is 'error'",
+    "Invalid release policy: FetchRequestCanceledException",
+  ])("reports unexpected fetch and policy errors: %s", (message) => {
+    const error = new Error(message);
+
+    reportError(error, "release.policy_refresh");
+
+    expect(Sentry.captureException).toHaveBeenCalledWith(
+      error,
+      expect.objectContaining({
+        tags: expect.objectContaining({ operation: "release.policy_refresh" }),
+      }),
+    );
+  });
+
   it("keeps correlation and stack frames without sending receipt or provider payloads", () => {
     const cause = new Error("Native upload failed");
 
