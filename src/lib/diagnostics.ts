@@ -59,6 +59,8 @@ export function errorDetails(cause: unknown): ErrorDetails {
     errorType === "AbortError" ||
     errorType === "TimeoutError" ||
     status === 429 ||
+    // Expo wraps native cancellation in Error and retains its type in the message.
+    message.startsWith("fetch failed: FetchRequestCanceledException:") ||
     /^(Network request failed|Failed to fetch|Load failed)$/.test(message);
 
   const details: ErrorDetails = { errorType, expected };
