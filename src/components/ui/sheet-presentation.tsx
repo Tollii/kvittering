@@ -11,6 +11,7 @@ export type SheetPresentationProps = Readonly<{
 export function SheetPresentation({
   visible,
   onClose,
+  dismissible = true,
   children,
 }: SheetPresentationProps) {
   return (
@@ -18,7 +19,9 @@ export function SheetPresentation({
       visible={visible}
       animationType="slide"
       presentationStyle="pageSheet"
-      onRequestClose={onClose}
+      onRequestClose={() => {
+        if (dismissible) onClose();
+      }}
     >
       {children}
     </Modal>

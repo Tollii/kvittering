@@ -115,6 +115,7 @@ export function Screen({
           paddingBottom: footer ? 16 : 32,
           gap: 12,
           flexGrow: 1,
+          flex: scrollable ? undefined : 1,
         }}
       >
         {children}

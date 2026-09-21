@@ -1,3 +1,4 @@
+import { CaptureReview } from "@/features/capture-review";
 import { recordEvent } from "@/lib/observability";
 import { useVisionKitEnabled } from "@/features/camera-preferences";
 import ReceiptIntelligence from "../../../modules/receipt-intelligence/src/ReceiptIntelligenceModule";
@@ -16,7 +17,6 @@ import {
   Pressable,
   StyleSheet,
   View,
-  useWindowDimensions,
   type ViewStyle,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -31,8 +31,6 @@ import {
   IconButton,
   Notice,
   Panel,
-  Sheet,
-  Toggle,
   pressed,
 } from "@/components/ui";
 import { useHousehold } from "@/features/session";
@@ -63,7 +61,6 @@ const onCameraMuted = "#E3E7FF";
 export default function Capture() {
   const colors = useTheme();
   const visionKit = useVisionKitEnabled();
-  const { width } = useWindowDimensions();
   const { owner, household, online, synchronize, queue } = useHousehold();
   const [permission, requestPermission] = useCameraPermissions();
   const camera = useRef<CameraView>(null);
@@ -297,8 +294,6 @@ export default function Capture() {
 
     return () => clearTimeout(timeout);
   }, [saved, uploading, failed]);
-  // Two tiles per row inside the sheet's 16pt padding and 10pt gap.
-  const tile = Math.floor((width - 32 - 10) / 2);
 
   const overlay = (children: ReactNode, style?: ViewStyle) => (
     <View
@@ -614,130 +609,23 @@ export default function Capture() {
           )}
         </View>
       </SafeAreaView>
-      <Sheet
-        title={
-          photos.length === 1
-            ? "Ett bilde valgt"
-            : `${photos.length} bilder valgt`
-        }
+      <CaptureReview
+        photos={photos}
+        combined={combined}
         visible={review}
-        dismissible={!busy}
-        onClose={() => {
-          if (!busy) setReview(false);
-        }}
-        footer={
-          <>
-            {!!error && <Notice error>{error}</Notice>}
-            {importRecovery}
-            <Button
-              title={
-                combined || photos.length === 1
-                  ? "Lagre kvittering"
-                  : `Lagre som ${photos.length} kvitteringer`
-              }
-              icon="checkmark"
-              disabled={!photos.length}
-              busy={busy}
-              onPress={() => void save()}
-            />
-          </>
-        }
-      >
-        <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 10 }}>
-          {photos.map((uri, index) => (
-            <View key={uri} style={{ width: tile, height: tile * 1.33 }}>
-              <Image
-                source={{ uri }}
-                style={{
-                  width: tile,
-                  height: tile * 1.33,
-                  borderRadius: 14,
-                  backgroundColor: colors.muted,
-                }}
-                resizeMode="cover"
-                accessibilityLabel={`Kvitteringsbilde ${index + 1}`}
-              />
-              <View
-                pointerEvents="none"
-                style={{
-                  position: "absolute",
-                  left: 8,
-                  top: 8,
-                  width: 24,
-                  height: 24,
-                  borderRadius: 12,
-                  backgroundColor: "#101C51CC",
-                  alignItems: "center",
-                  justifyContent: "center",
-                }}
-              >
-                <Copy size={12} weight="700" style={{ color: onCamera }}>
-                  {index + 1}
-                </Copy>
-              </View>
-              <Pressable
-                accessibilityRole="button"
-                accessibilityLabel={`Fjern bilde ${index + 1}`}
-                disabled={busy}
-                hitSlop={8}
-                onPress={() => {
-                  setPhotos((current) =>
-                    current.filter((photo) => photo !== uri),
-                  );
+        busy={busy}
+        error={error}
+        importRecovery={importRecovery}
+        onClose={() => setReview(false)}
+        onSave={() => void save()}
+        onChoosePhotos={() => void choosePhotos()}
+        onCombinedChange={setCombined}
+        onRemovePhoto={(uri) => {
+          setPhotos((current) => current.filter((photo) => photo !== uri));
 
-                  if (photos.length <= 2) setCombined(false);
-                }}
-                style={(state) => [
-                  {
-                    position: "absolute",
-                    right: 8,
-                    top: 8,
-                    width: 28,
-                    height: 28,
-                    borderRadius: 14,
-                    backgroundColor: "#101C51CC",
-                    alignItems: "center",
-                    justifyContent: "center",
-                  },
-                  pressed(state),
-                ]}
-              >
-                <Icon name="xmark" size={12} color={onCamera} />
-              </Pressable>
-            </View>
-          ))}
-        </View>
-        {photos.length > 1 && (
-          <Panel style={{ gap: 4 }}>
-            <Toggle
-              label="Samme kvittering"
-              value={combined}
-              onChange={setCombined}
-              disabled={busy}
-            />
-          </Panel>
-        )}
-        <View style={{ flexDirection: "row", gap: 8 }}>
-          <View style={{ flex: 1 }}>
-            <Button
-              title="Ta flere"
-              secondary
-              icon="camera"
-              disabled={busy || photos.length >= maxReceiptImages}
-              onPress={() => setReview(false)}
-            />
-          </View>
-          <View style={{ flex: 1 }}>
-            <Button
-              title="Velg flere"
-              secondary
-              icon="photo.on.rectangle"
-              disabled={busy || photos.length >= maxReceiptImages}
-              onPress={() => void choosePhotos()}
-            />
-          </View>
-        </View>
-      </Sheet>
+          if (photos.length <= 2) setCombined(false);
+        }}
+      />
     </View>
   );
 }
