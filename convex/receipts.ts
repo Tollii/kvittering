@@ -1,3 +1,4 @@
+import { notifyReceiptActivities } from "./liveActivities";
 import type { Id } from "./_generated/dataModel";
 import {
   productIdentityKey,
@@ -25,6 +26,7 @@ import {
   internalQuery,
   internalMutation,
   type QueryCtx,
+  type MutationCtx,
 } from "./_generated/server";
 import { internal } from "./_generated/api";
 import schema, { statusValidator } from "./schema";
@@ -89,6 +91,7 @@ export const reserve = mutation({
   args: {
     clientId: v.string(),
     imageCount: v.number(),
+    backgroundUpload: v.boolean().optional(),
     householdId: v.id("households"),
   },
   returns: v.id("receipts"),
@@ -113,7 +116,14 @@ export const reserve = mutation({
       )
       .unique();
 
-    if (existing) return existing._id;
+    if (existing) {
+      if (args.backgroundUpload && existing.status === "uploading")
+        await ctx.db.patch("receipts", existing._id, {
+          backgroundUpload: true,
+        });
+
+      return existing._id;
+    }
 
     return ctx.db.insert("receipts", {
       householdId: member.householdId,
@@ -121,6 +131,7 @@ export const reserve = mutation({
       uploaderName: member.name,
       clientId: args.clientId,
       imageCount: args.imageCount,
+      backgroundUpload: args.backgroundUpload,
       status: "uploading",
       revision: 0,
       generation: 0,
@@ -131,6 +142,20 @@ export const reserve = mutation({
     });
   },
 });
+
+async function beginUploadedReceipt(
+  ctx: MutationCtx,
+  id: Id<"receipts">,
+  imageCount: number,
+) {
+  await ctx.db.patch("receipts", id, { status: "uploaded", generation: 1 });
+  await start(ctx, internal.processing.processReceipt, { id, generation: 1 });
+  console.info("receipt.upload_completed", {
+    receiptId: id,
+    generation: 1,
+    imageCount,
+  });
+}
 
 /** All images are in storage: hand the receipt to the server workflow. The phone is done. */
 export const completeUpload = mutation({
@@ -149,13 +174,7 @@ export const completeUpload = mutation({
 
     if (images.length !== receipt.imageCount)
       throw new Error("Noen bilder er ikke lastet opp.");
-    await ctx.db.patch("receipts", id, { status: "uploaded", generation: 1 });
-    await start(ctx, internal.processing.processReceipt, { id, generation: 1 });
-    console.info("receipt.upload_completed", {
-      receiptId: id,
-      generation: 1,
-      imageCount: images.length,
-    });
+    await beginUploadedReceipt(ctx, id, images.length);
 
     return null;
   },
@@ -486,6 +505,16 @@ export const attachImage = internalMutation({
       sha256: metadata.sha256,
     });
 
+    if (receipt.backgroundUpload) {
+      const images = await ctx.db
+        .query("images")
+        .withIndex("by_receiptId", (q) => q.eq("receiptId", receipt._id))
+        .take(8);
+
+      if (images.length === receipt.imageCount)
+        await beginUploadedReceipt(ctx, receipt._id, images.length);
+    }
+
     return null;
   },
 });
@@ -511,6 +540,7 @@ export const remove = mutation({
         "Kvitteringen er endret. Hent siste versjon før du sletter.",
       );
     await ctx.db.delete("receipts", id);
+    await notifyReceiptActivities(ctx, receipt.householdId);
     await ctx.runMutation(internal.receipts.cleanupDeleted, { id });
 
     return null;

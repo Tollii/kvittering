@@ -22,7 +22,8 @@ export function FormSection({
   title,
   children,
 }: Readonly<{ title: string; children: ReactNode }>) {
-  const [width, setWidth] = useState<number>();
+  // Measure the native row before text can establish an unconstrained width.
+  const [width, setWidth] = useState(0);
 
   return (
     <Section title={title}>
@@ -32,9 +33,11 @@ export function FormSection({
           onGeometryChange((geometry) => setWidth(geometry.width)),
         ]}
       >
-        <RNHostView matchContents>
-          <View style={{ width, gap: 12 }}>{children}</View>
-        </RNHostView>
+        {width > 0 && (
+          <RNHostView matchContents>
+            <View style={{ width, gap: 12 }}>{children}</View>
+          </RNHostView>
+        )}
       </VStack>
     </Section>
   );

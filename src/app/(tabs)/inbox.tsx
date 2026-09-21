@@ -1,3 +1,5 @@
+import { ReceiptActivityButton } from "@/features/receipt-activity";
+import { ReceiptTip } from "@/components/receipt-tip";
 import { useCompleteReceipts } from "@/features/receipt-queries";
 import { router } from "expo-router";
 import { ActivityIndicator, View } from "react-native";
@@ -90,6 +92,16 @@ export default function Inbox() {
       {(working.length > 0 || queue.length > 0) && (
         <>
           <SectionTitle title="Under behandling" />
+          <ReceiptActivityButton
+            receiptIds={[
+              ...new Set([
+                ...working.map((receipt) => receipt._id),
+                ...queue.flatMap((entry) =>
+                  entry.receiptId ? [entry.receiptId] : [],
+                ),
+              ]),
+            ]}
+          />
           {queue.map((entry) => {
             const uploaded = entry.uploaded.filter(Boolean).length;
 
@@ -180,6 +192,7 @@ export default function Inbox() {
           message="Alle kvitteringene dine er behandlet."
         />
       )}
+      {productQueue.items.length > 0 && <ReceiptTip kind="matching" />}
       {(productQueue.items.length > 0 || productQueue.loading) && (
         <Panel>
           <Row

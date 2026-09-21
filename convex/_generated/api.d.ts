@@ -80,6 +80,8 @@ import type * as kassalapp_generated_models_validationExceptionResponse from "..
 import type * as kassalapp_generated_models_validationExceptionResponseErrors from "../kassalapp/generated/models/validationExceptionResponseErrors.js";
 import type * as kassalapp_normalize from "../kassalapp/normalize.js";
 import type * as kassalapp_transport from "../kassalapp/transport.js";
+import type * as liveActivities from "../liveActivities.js";
+import type * as liveActivityPush from "../liveActivityPush.js";
 import type * as notifications from "../notifications.js";
 import type * as processing from "../processing.js";
 import type * as productAnalysis from "../productAnalysis.js";
@@ -93,6 +95,7 @@ import type * as pushDelivery from "../pushDelivery.js";
 import type * as receiptChanges from "../receiptChanges.js";
 import type * as receipts from "../receipts.js";
 import type * as releasePolicy from "../releasePolicy.js";
+import type * as spotlight from "../spotlight.js";
 
 import type {
   ApiFromModules,
@@ -173,6 +176,8 @@ declare const fullApi: ApiFromModules<{
   "kassalapp/generated/models/validationExceptionResponseErrors": typeof kassalapp_generated_models_validationExceptionResponseErrors;
   "kassalapp/normalize": typeof kassalapp_normalize;
   "kassalapp/transport": typeof kassalapp_transport;
+  liveActivities: typeof liveActivities;
+  liveActivityPush: typeof liveActivityPush;
   notifications: typeof notifications;
   processing: typeof processing;
   productAnalysis: typeof productAnalysis;
@@ -186,6 +191,7 @@ declare const fullApi: ApiFromModules<{
   receiptChanges: typeof receiptChanges;
   receipts: typeof receipts;
   releasePolicy: typeof releasePolicy;
+  spotlight: typeof spotlight;
 }>;
 
 /**

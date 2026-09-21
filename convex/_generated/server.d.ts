@@ -31,6 +31,9 @@ type Env = {
   readonly CONVEX_CLOUD_URL: string;
   readonly CONVEX_SITE_URL: string;
   readonly ALLOW_EXPO_GO: string | undefined;
+  readonly APNS_KEY_ID: string | undefined;
+  readonly APNS_PRIVATE_KEY: string | undefined;
+  readonly APNS_TEAM_ID: string | undefined;
   readonly BETTER_AUTH_SECRET: string | undefined;
   readonly EXPO_ACCESS_TOKEN: string | undefined;
   readonly KASSALAPP_API_KEY: string | undefined;

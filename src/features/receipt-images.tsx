@@ -1,3 +1,4 @@
+import ReceiptIntelligence from "../../modules/receipt-intelligence/src/ReceiptIntelligenceModule";
 import { useState } from "react";
 import { Image, ScrollView, View } from "react-native";
 import { Button, IconButton, Notice, Sheet } from "@/components/ui";
@@ -25,8 +26,21 @@ export function ReceiptImages({
     setError("");
 
     try {
-      setToken(await fetchAccessToken());
-      setOpen(true);
+      const accessToken = await fetchAccessToken();
+
+      if (ReceiptIntelligence?.previewReceipts) {
+        await ReceiptIntelligence.previewReceipts(
+          Array.from(
+            { length: receipt.imageCount },
+            (_, position) =>
+              `${convexSiteUrl}/receipt-image?receipt=${receipt._id}&position=${position}`,
+          ),
+          accessToken,
+        );
+      } else {
+        setToken(accessToken);
+        setOpen(true);
+      }
     } catch {
       setError("Bildene kunne ikke hentes. Kontroller nettilkoblingen.");
     } finally {

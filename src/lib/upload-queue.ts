@@ -64,16 +64,14 @@ export function createQueueRunner(
             });
           }
 
-          for (let position = 0; position < entry.images.length; position++) {
+          const receiptId = entry.receiptId;
+
+          const uploadImage = async (position: number) => {
             if (!active()) return;
 
-            if (entry.uploaded[position]) continue;
+            if (entry.uploaded[position]) return;
             const started = Date.now();
-            await transport.upload(
-              entry.receiptId,
-              position,
-              entry.images[position],
-            );
+            await transport.upload(receiptId, position, entry.images[position]);
             entry.uploaded[position] = true;
             store.update(entry);
             record("receipt.image_uploaded", {
@@ -81,7 +79,15 @@ export function createQueueRunner(
               position,
               durationMs: Date.now() - started,
             });
-          }
+          };
+
+          const results = await Promise.allSettled(
+            entry.images.map((_, position) => uploadImage(position)),
+          );
+
+          const failed = results.find((result) => result.status === "rejected");
+
+          if (failed) throw failed.reason;
 
           if (!active()) return;
           await transport.complete(entry.receiptId, entry);

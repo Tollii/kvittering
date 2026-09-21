@@ -1,3 +1,4 @@
+import ReceiptIntelligence from "../../modules/receipt-intelligence/src/ReceiptIntelligenceModule";
 import { fetch as nativeFetch } from "expo/fetch";
 import type { ConvexReactClient } from "convex/react";
 import { api } from "../../convex/_generated/api";
@@ -12,6 +13,7 @@ export function receiptUploadTransport(
   convex: ConvexReactClient,
   householdId: Id<"households">,
   active: () => boolean,
+  scope: string,
 ): UploadTransport {
   return {
     reserve: (entry) =>
@@ -19,6 +21,7 @@ export function receiptUploadTransport(
         clientId: entry.id,
         imageCount: entry.images.length,
         householdId,
+        backgroundUpload: !!ReceiptIntelligence?.uploadReceiptImage,
       }),
     upload: async (id, position, name) => {
       const token = await fetchAccessToken();
@@ -26,18 +29,31 @@ export function receiptUploadTransport(
       if (!active())
         throw new Error("Opplastingen fortsetter når du åpner appen med nett.");
 
-      const response = await nativeFetch(
-        `${convexSiteUrl}/receipt-image?receipt=${id}&position=${position}`,
-        {
-          method: "POST",
-          headers: {
-            Authorization: `Bearer ${token}`,
-            "Content-Type": "image/jpeg",
-            "X-Kvitto-Client": JSON.stringify(installedRelease),
-          },
-          body: imageFile(name),
-          signal: AbortSignal.timeout(60000),
-        },
+      const address = `${convexSiteUrl}/receipt-image?receipt=${id}&position=${position}`;
+
+      const headers = {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "image/jpeg",
+        "X-Kvitto-Client": JSON.stringify(installedRelease),
+      };
+
+      const response = await (
+        ReceiptIntelligence?.uploadReceiptImage
+          ? ReceiptIntelligence.uploadReceiptImage(
+              `${scope}:${id}:${position}`,
+              imageFile(name).uri,
+              address,
+              headers,
+            )
+          : nativeFetch(address, {
+              method: "POST",
+              headers,
+              body: imageFile(name),
+              signal: AbortSignal.timeout(60000),
+            }).then(async (result) => ({
+              status: result.status,
+              body: await result.text(),
+            }))
       ).catch((error) => {
         throw releaseError(error, "receipt.image_upload", {
           receiptId: id,
@@ -45,24 +61,31 @@ export function receiptUploadTransport(
         });
       });
 
-      if (!response.ok) {
-        const data = await response.json().catch(() => null);
+      if (response.status < 200 || response.status >= 300) {
+        let data: unknown;
 
-        if (data?.code)
-          throw releaseError({ data }, "receipt.image_upload", {
-            receiptId: id,
-            position,
-            status: response.status,
-          });
-        throw releaseError(
-          new Error("Bildet kunne ikke lastes opp. Prøv igjen med nett."),
-          "receipt.image_upload",
-          { receiptId: id, position, status: response.status },
-        );
+        try {
+          data = JSON.parse(response.body);
+        } catch {
+          throw releaseError(
+            new Error("Bildet kunne ikke lastes opp. Prøv igjen med nett."),
+            "receipt.image_upload",
+            { receiptId: id, position, status: response.status },
+          );
+        }
+
+        throw releaseError({ data }, "receipt.image_upload", {
+          receiptId: id,
+          position,
+          status: response.status,
+        });
       }
     },
-    complete: async (id) => {
+    complete: async (id, entry) => {
       await releaseMutation(convex, api.receipts.completeUpload, { id });
+      ReceiptIntelligence?.forgetUploads?.(
+        entry.images.map((_, position) => `${scope}:${id}:${position}`),
+      );
     },
   };
 }

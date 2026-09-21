@@ -1,4 +1,6 @@
-import { setPurchaseWidgetScope } from "@/lib/purchase-widget";
+import { ReceiptActivityTracking } from "./receipt-activity";
+import { ReceiptSearchIndex } from "./spotlight";
+import { retainReceiptSystemScope } from "./receipt-system-scope";
 import { storageSuffix } from "@/lib/deployment-storage";
 import { FeatureFlagsProvider, useFeatureFlag } from "./featureFlags";
 import { removeAccountCatalogCache } from "@/lib/catalog-cache";
@@ -130,7 +132,8 @@ function SessionGate({ children }: Readonly<{ children: ReactNode }>) {
 
     if (removed) removeAccountCatalogCache(removed);
 
-    if (!owner || removed) setPurchaseWidgetScope(null);
+    if (!owner) retainReceiptSystemScope(null);
+
     previousOwner.current = owner;
   }, [owner, session.isPending]);
 
@@ -215,10 +218,10 @@ function HouseholdProvider({
   }, [details, owner]);
   const householdId = household?.id;
   useEffect(() => {
-    if (householdId)
-      setPurchaseWidgetScope(`${storageSuffix}:${owner}:${householdId}`);
-    else if (details === null) setPurchaseWidgetScope(null);
-  }, [householdId, owner, details]);
+    retainReceiptSystemScope(
+      householdId ? `${storageSuffix}:${owner}:${householdId}` : null,
+    );
+  }, [householdId, owner]);
 
   const synchronize = useCallback(
     async (retryFailed = false) => {
@@ -240,6 +243,7 @@ function HouseholdProvider({
             convex,
             householdId,
             () => active.current && canUpload.current,
+            `${storageSuffix}:${owner}:${householdId}`,
           ),
           () =>
             active.current &&
@@ -302,7 +306,13 @@ function HouseholdProvider({
         synchronize,
       }}
     >
-      {auth.isAuthenticated && <ReleaseDiagnostics />}
+      {auth.isAuthenticated && (
+        <>
+          <ReleaseDiagnostics />
+          <ReceiptSearchIndex />
+          <ReceiptActivityTracking />
+        </>
+      )}
       {!receiptProcessing && (
         <Notice>
           {policy.message ||

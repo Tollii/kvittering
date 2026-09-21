@@ -1,18 +1,6 @@
 import AppIntents
 import UIKit
 
-struct ScanReceiptIntent: AppIntent {
-  static let title: LocalizedStringResource = "Skann kvittering"
-  static let description = IntentDescription("Åpner valgt kvitteringskamera i Kvitto.")
-  static let openAppWhenRun = true
-
-  @MainActor
-  func perform() async throws -> some IntentResult {
-    await UIApplication.shared.open(URL(string: "kvitto:///(tabs)")!)
-    return .result()
-  }
-}
-
 struct OpenInboxIntent: AppIntent {
   static let title: LocalizedStringResource = "Åpne innboks"
   static let description = IntentDescription("Åpner kvitteringer som trenger kontroll i Kvitto.")
