@@ -73,6 +73,7 @@ export default defineSchema({
     token: v.optional(v.string()),
     updatedAt: v.number(),
     expiresAt: v.number(),
+    /** The scheduled expiry updates subscriptions; older registrations omit this field. */
     expired: v.optional(v.boolean()),
   })
     .index("by_activityId", ["activityId"])

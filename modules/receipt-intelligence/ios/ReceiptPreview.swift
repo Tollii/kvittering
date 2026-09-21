@@ -40,6 +40,11 @@ final class ReceiptPreview: NSObject, QLPreviewControllerDataSource, QLPreviewCo
 
   func numberOfPreviewItems(in controller: QLPreviewController) -> Int { files.count }
   func previewController(_ controller: QLPreviewController, previewItemAt index: Int) -> QLPreviewItem { files[index] as NSURL }
-  func previewControllerDidDismiss(_ controller: QLPreviewController) { cleanUp(); completion() }
+  nonisolated func previewControllerDidDismiss(_ controller: QLPreviewController) {
+    Task { @MainActor in
+      self.cleanUp()
+      self.completion()
+    }
+  }
   private func cleanUp() { try? FileManager.default.removeItem(at: directory) }
 }

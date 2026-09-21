@@ -25,4 +25,3 @@ struct ScanReceiptIntent: OpenIntent {
     return .result()
   }
 }
-
