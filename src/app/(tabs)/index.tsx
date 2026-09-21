@@ -1,3 +1,6 @@
+import { recordEvent } from "@/lib/observability";
+import { useVisionKitEnabled } from "@/features/camera-preferences";
+import ReceiptIntelligence from "../../../modules/receipt-intelligence/src/ReceiptIntelligenceModule";
 import {
   useCallback,
   useEffect,
@@ -59,6 +62,7 @@ const onCameraMuted = "#E3E7FF";
 
 export default function Capture() {
   const colors = useTheme();
+  const visionKit = useVisionKitEnabled();
   const { width } = useWindowDimensions();
   const { owner, household, online, synchronize, queue } = useHousehold();
   const [permission, requestPermission] = useCameraPermissions();
@@ -151,11 +155,43 @@ export default function Capture() {
 
       if (photos.length >= maxReceiptImages)
         throw new Error(`Maks ${maxReceiptImages} bilder`);
+      recordEvent("receipt.capture", { operation: "camera" });
       const result = await camera.current.takePictureAsync({ quality: 0.9 });
 
       if (!result) throw new Error("Kameraet kunne ikke ta et bilde.");
       const uri = await prepareImage(result.uri, result.width, result.height);
       setPhotos((current) => [...current, uri]);
+      setReview(true);
+    });
+
+  const scanDocument = () =>
+    run(async () => {
+      if (!ReceiptIntelligence?.scanDocument)
+        throw new Error("Oppdater appen for å bruke VisionKit.");
+
+      const cameraPermission = permission?.granted
+        ? permission
+        : await requestPermission();
+
+      if (!cameraPermission.granted)
+        throw new Error("Tillat kamera i Innstillinger for å skanne.");
+      const room = maxReceiptImages - photos.length;
+
+      if (room <= 0) throw new Error(`Maks ${maxReceiptImages} bilder`);
+      recordEvent("receipt.capture", { operation: "visionkit" });
+      const pages = await ReceiptIntelligence.scanDocument(room);
+
+      if (!pages || !mounted.current) return;
+
+      const imported = await importReceiptFiles(
+        pages.map((uri) => ({ uri, mimeType: "image/jpeg" })),
+        room,
+      );
+
+      if (!mounted.current) return;
+      setPhotos((current) => [...current, ...imported.uris]);
+
+      if (photos.length === 0) setCombined(true);
       setReview(true);
     });
 
@@ -249,7 +285,9 @@ export default function Capture() {
       void synchronize();
     });
 
-  const live = permission?.granted && focused && foreground && !review;
+  const live =
+    permission?.granted && focused && foreground && !review && !visionKit;
+
   const uploading = queue.some((entry) => !entry.error);
   const failed = queue.some((entry) => !!entry.error);
   // Let the success note fade away on its own once the upload has landed.
@@ -306,7 +344,7 @@ export default function Capture() {
           {overlay(
             <>
               <Copy size={15} weight="700" style={{ color: onCamera }}>
-                Ny kvittering
+                {visionKit ? "VisionKit-skanner" : "Ny kvittering"}
               </Copy>
               <Copy
                 size={13}
@@ -439,10 +477,15 @@ export default function Capture() {
             !review && (
               <View style={{ padding: 28, gap: 14, alignItems: "center" }}>
                 <Icon
-                  name="camera.viewfinder"
+                  name={visionKit ? "doc.viewfinder" : "camera.viewfinder"}
                   size={52}
                   color={onCameraMuted}
                 />
+                {visionKit && (
+                  <Copy style={{ color: onCamera, textAlign: "center" }}>
+                    Trykk på skanneknappen for å åpne VisionKit.
+                  </Copy>
+                )}
                 {!permission?.granted && (
                   <Button
                     title={
@@ -494,9 +537,13 @@ export default function Capture() {
           </Pressable>
           <Pressable
             accessibilityRole="button"
-            accessibilityLabel="Ta bilde av kvitteringen"
-            disabled={!ready || busy || !live}
-            onPress={() => void takePhoto()}
+            accessibilityLabel={
+              visionKit
+                ? "Skann kvittering med VisionKit"
+                : "Ta bilde av kvitteringen"
+            }
+            disabled={busy || (!visionKit && (!ready || !live))}
+            onPress={() => void (visionKit ? scanDocument() : takePhoto())}
             style={(state) => [
               {
                 width: 78,
@@ -505,9 +552,9 @@ export default function Capture() {
                 borderRadius: 39,
                 borderWidth: 3,
                 borderColor: "white",
-                opacity: !ready || busy || !live ? 0.4 : 1,
+                opacity: busy || (!visionKit && (!ready || !live)) ? 0.4 : 1,
               },
-              state.pressed && { transform: [{ scale: 0.94 }] },
+              state.pressed && { opacity: 0.7 },
             ]}
           >
             <View
@@ -574,6 +621,7 @@ export default function Capture() {
             : `${photos.length} bilder valgt`
         }
         visible={review}
+        dismissible={!busy}
         onClose={() => {
           if (!busy) setReview(false);
         }}

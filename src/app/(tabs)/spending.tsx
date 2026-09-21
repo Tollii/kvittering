@@ -1,3 +1,5 @@
+import { usePurchaseWidget } from "@/features/purchase-widget";
+import { PeriodMenu } from "@/components/period-menu";
 import {
   useSpendingReports,
   reportIds,
@@ -81,6 +83,23 @@ export default function Spending() {
 
   const comparison = comparisonInsights(receipts, month, reviewedOnly);
   const totals = comparison.current;
+
+  const widgetTotals = reviewedOnly
+    ? comparisonInsights(receipts, month, false).current
+    : totals;
+
+  usePurchaseWidget({
+    ready: completeReceipts && month === currentMonth,
+    month,
+    amountOre: widgetTotals.products,
+    provisional: widgetTotals.provisional,
+  });
+
+  const monthLabel = new Intl.DateTimeFormat("nb-NO", {
+    month: "long",
+    year: "numeric",
+  }).format(new Date(`${month}-01T12:00:00Z`));
+
   const coverage = receiptCoverage([...receipts, ...undated.receipts]);
   const catalog = catalogInsights(totals.selected);
 
@@ -151,14 +170,6 @@ export default function Spending() {
         "meat-fish.fish",
       ].includes(category.id) && category.amountOre !== 0,
   );
-
-  const rawMonth = new Intl.DateTimeFormat("nb-NO", {
-    month: "long",
-    year: "numeric",
-  }).format(new Date(`${month}-01T12:00:00Z`));
-
-  const monthLabel =
-    rawMonth.charAt(0).toLocaleUpperCase("nb-NO") + rawMonth.slice(1);
 
   const history = useCompleteReceipts(
     { kind: "allProducts" },
@@ -283,13 +294,14 @@ export default function Spending() {
             }}
           >
             <View style={{ flexDirection: "row", alignItems: "center" }}>
-              <Copy
-                size={22}
-                weight="600"
-                style={{ color: colors.onHero, flex: 1 }}
-              >
-                {monthLabel}
-              </Copy>
+              <PeriodMenu
+                value={month}
+                latest={currentMonth}
+                onChange={(value) => {
+                  setMonth(value);
+                  setGroup(null);
+                }}
+              />
               <IconButton
                 name="chevron.left"
                 label="Forrige måned"

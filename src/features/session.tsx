@@ -1,3 +1,5 @@
+import { setPurchaseWidgetScope } from "@/lib/purchase-widget";
+import { storageSuffix } from "@/lib/deployment-storage";
 import { FeatureFlagsProvider, useFeatureFlag } from "./featureFlags";
 import { removeAccountCatalogCache } from "@/lib/catalog-cache";
 import { removedAccount, useQueryLifecycle } from "./query-lifecycle";
@@ -127,6 +129,8 @@ function SessionGate({ children }: Readonly<{ children: ReactNode }>) {
     const removed = removedAccount(previousOwner.current, owner);
 
     if (removed) removeAccountCatalogCache(removed);
+
+    if (!owner || removed) setPurchaseWidgetScope(null);
     previousOwner.current = owner;
   }, [owner, session.isPending]);
 
@@ -210,6 +214,11 @@ function HouseholdProvider({
     cacheHousehold(owner, value);
   }, [details, owner]);
   const householdId = household?.id;
+  useEffect(() => {
+    if (householdId)
+      setPurchaseWidgetScope(`${storageSuffix}:${owner}:${householdId}`);
+    else if (details === null) setPurchaseWidgetScope(null);
+  }, [householdId, owner, details]);
 
   const synchronize = useCallback(
     async (retryFailed = false) => {

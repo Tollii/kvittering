@@ -108,6 +108,8 @@ are isolated by backend address; existing personal device storage is preserved.
 Backend deployment does not change an installed TestFlight binary. A new TestFlight build
 is required to switch it to staging.
 
+See [native iOS integration](docs/native-ios.md) for the VisionKit switch, Home Screen widget, and App Shortcuts. These features require a new native build.
+
 ## App functions
 
 - Email and password sign-in. Sessions use iOS Keychain through Expo SecureStore.

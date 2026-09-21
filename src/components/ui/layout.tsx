@@ -1,7 +1,6 @@
 import { type ReactNode } from "react";
 import {
   KeyboardAvoidingView,
-  Modal,
   Platform,
   Pressable,
   ScrollView,
@@ -18,6 +17,7 @@ import { ArchMark } from "../monument-artwork";
 import { useTheme } from "@/constants/theme";
 import { Copy, Icon, pressed, styles } from "./typography";
 import { IconButton } from "./controls";
+import { SheetPresentation } from "./sheet-presentation";
 
 export function Screen({
   children,
@@ -29,6 +29,7 @@ export function Screen({
   headerRight,
   summary,
   statusBarStyle,
+  scrollable = true,
 }: Readonly<{
   children: ReactNode;
   title?: string;
@@ -39,6 +40,7 @@ export function Screen({
   headerRight?: ReactNode;
   summary?: ReactNode;
   statusBarStyle?: "auto" | "light" | "dark";
+  scrollable?: boolean;
 }>) {
   const colors = useTheme();
   const insets = useSafeAreaInsets();
@@ -101,6 +103,7 @@ export function Screen({
         width: "100%",
         alignSelf: "center",
         flexGrow: 1,
+        flex: scrollable ? undefined : 1,
       }}
     >
       {header}
@@ -132,15 +135,19 @@ export function Screen({
         behavior={Platform.OS === "ios" ? "padding" : undefined}
         style={{ flex: 1, backgroundColor: colors.background }}
       >
-        <ScrollView
-          style={{ flex: 1 }}
-          keyboardShouldPersistTaps="handled"
-          keyboardDismissMode="interactive"
-          contentInsetAdjustmentBehavior="automatic"
-          contentContainerStyle={{ flexGrow: 1 }}
-        >
-          {content}
-        </ScrollView>
+        {scrollable ? (
+          <ScrollView
+            style={{ flex: 1 }}
+            keyboardShouldPersistTaps="handled"
+            keyboardDismissMode="interactive"
+            contentInsetAdjustmentBehavior="automatic"
+            contentContainerStyle={{ flexGrow: 1 }}
+          >
+            {content}
+          </ScrollView>
+        ) : (
+          content
+        )}
         {footer && (
           <View
             style={{
@@ -168,9 +175,13 @@ export function Sheet({
   children,
   header,
   footer,
+  dismissible = true,
+  scrollable = true,
 }: Readonly<{
   title: string;
   visible: boolean;
+  dismissible?: boolean;
+  scrollable?: boolean;
   onClose: () => void;
   children: ReactNode;
   header?: ReactNode;
@@ -179,11 +190,10 @@ export function Sheet({
   const colors = useTheme();
 
   return (
-    <Modal
+    <SheetPresentation
       visible={visible}
-      animationType="slide"
-      presentationStyle="pageSheet"
-      onRequestClose={onClose}
+      onClose={onClose}
+      dismissible={dismissible}
     >
       <SafeAreaView style={{ flex: 1, backgroundColor: colors.background }}>
         <View
@@ -213,18 +223,22 @@ export function Sheet({
           style={{ flex: 1 }}
           behavior={Platform.OS === "ios" ? "padding" : undefined}
         >
-          <ScrollView
-            keyboardShouldPersistTaps="handled"
-            keyboardDismissMode="interactive"
-            contentContainerStyle={{
-              padding: 16,
-              paddingTop: 4,
-              gap: 10,
-              paddingBottom: 24,
-            }}
-          >
-            {children}
-          </ScrollView>
+          {scrollable ? (
+            <ScrollView
+              keyboardShouldPersistTaps="handled"
+              keyboardDismissMode="interactive"
+              contentContainerStyle={{
+                padding: 16,
+                paddingTop: 4,
+                gap: 10,
+                paddingBottom: 24,
+              }}
+            >
+              {children}
+            </ScrollView>
+          ) : (
+            children
+          )}
           {footer && (
             <View
               style={{
@@ -241,6 +255,6 @@ export function Sheet({
           )}
         </KeyboardAvoidingView>
       </SafeAreaView>
-    </Modal>
+    </SheetPresentation>
   );
 }

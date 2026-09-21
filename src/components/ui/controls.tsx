@@ -1,4 +1,11 @@
-import { useState } from "react";
+import { SegmentedControl } from "@expo/ui/community/segmented-control";
+import {
+  InputAccessoryView,
+  Keyboard,
+  Platform,
+  useWindowDimensions,
+} from "react-native";
+import { useId, useState } from "react";
 import {
   ActivityIndicator,
   Pressable,
@@ -207,6 +214,7 @@ export function Field({
 }: TextInputProps & { label: string; hint?: string }) {
   const colors = useTheme();
   const [focused, setFocused] = useState(false);
+  const accessoryId = useId();
 
   return (
     <View style={{ gap: 6 }}>
@@ -214,6 +222,7 @@ export function Field({
         {label}
       </Copy>
       <TextInput
+        inputAccessoryViewID={Platform.OS === "ios" ? accessoryId : undefined}
         accessibilityLabel={label}
         placeholderTextColor={colors.secondary}
         selectionColor={colors.primary}
@@ -242,6 +251,21 @@ export function Field({
           style,
         ]}
       />
+      {Platform.OS === "ios" && (
+        <InputAccessoryView
+          nativeID={accessoryId}
+          backgroundColor={colors.surface}
+        >
+          <View style={{ alignItems: "flex-end", paddingHorizontal: 12 }}>
+            <Button
+              title="Ferdig"
+              compact
+              secondary
+              onPress={Keyboard.dismiss}
+            />
+          </View>
+        </InputAccessoryView>
+      )}
       {!!hint && (
         <Copy size={12} muted>
           {hint}
@@ -297,6 +321,25 @@ export function Segments<T extends string>({
   onChange: (value: T) => void;
 }>) {
   const colors = useTheme();
+
+  const { fontScale } = useWindowDimensions();
+
+  if (Platform.OS === "ios" && fontScale <= 1.3)
+    return (
+      <View style={{ minHeight: 44, justifyContent: "center" }}>
+        <SegmentedControl
+          values={options.map((option) => option.label)}
+          selectedIndex={options.findIndex((option) => option.value === value)}
+          onChange={(event) => {
+            const option = options[event.nativeEvent.selectedSegmentIndex];
+
+            if (option) onChange(option.value);
+          }}
+          tintColor={colors.primary}
+          style={{ height: 36 }}
+        />
+      </View>
+    );
 
   return (
     <View
