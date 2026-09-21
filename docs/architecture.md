@@ -1,6 +1,20 @@
 # Application structure
 
+Use this map for ownership and data-flow changes. [Design principles](principles.md) explain the design preferences; [AGENTS.md](../AGENTS.md) lists task-specific references and checks.
+
+Users capture or import receipts, review uncertain readings, and correct items and categories. Saved decisions reduce repeated work. Extraction turns images into purchases; Kassalapp supplies product and store information. Product families and quantity normalization support comparisons. Missing evidence remains explicit.
+
 The Expo application starts in `src/app/_layout.tsx`. Session context contains account, household, connectivity, and local upload state. Active screens declare their receipt reads in `src/features/receipt-queries.ts`. History pages contain summaries. Reports wait until all pages in their purchase-date range are loaded. Product price history is a separate, explicit read.
+
+## State and data contracts
+
+- Convex queries return persisted data. Mutations write and return `null`, an ID, or a small acknowledgement. Existing subscriptions deliver changes; background work can use focused read queries. Live reads need no polling, manual refetch, or cache invalidation.
+- Server completion and retries belong to the backend. Opening a screen must not be required to finish accepted work.
+- Keep editable drafts separate from persisted data. Incoming query updates must preserve unsaved changes and revision checks. Derive other UI values from their source instead of keeping synchronized copies.
+- Use React effects for external synchronization, event handlers for user actions, and render or pure functions for calculations. Give subscriptions, timers, persistence, and lifecycle listeners an owner and cleanup path.
+- Read only the scope and fields needed. Avoid complete household history in root providers. Growing collections use indexes and pagination; background work uses bounded batches with continuation, not silent truncation.
+- Persistent caches serve startup, offline use, or external providers. Their validity includes account/household scope, source, and completeness. A cached product summary is not a complete product record. Transport and cache policy belong behind feature interfaces; callers do not manage freshness.
+- Separate tables when lifecycle, ownership, or retention differs. Table count alone does not justify merging them.
 
 ## Receipt flow
 
@@ -39,10 +53,10 @@ Add receipt issues in `receipt-issues.ts`; display text belongs in its mapper. P
 | releasePolicies, releasePolicyHistory  | Native/API version controls and operator history                            |
 | featureFlags, featureFlagHistory       | Platform-scoped service configuration and operator history                  |
 
-Convex components own their workflow, workpool, and authentication tables. There is no sample table. Revision retention is a separate operator decision; this refactor does not remove history.
+Convex components own their workflow, workpool, and authentication tables. Revision retention is a separate operator decision.
 
 ## Presentation and checks
 
 `src/components/ui.tsx` is an import facade. Typography, controls, surfaces, layout, and selection views have separate modules. Feature screens own state and use these components directly.
 
-Run `npm run typecheck`, `npm run lint`, and `npm test`. Native camera, PDF import, sheets, large text, light/dark mode, offline restart, and old-client upgrades require development-build checks. Source tests do not prove those device behaviors. Follow `docs/releases.md` before deployment or publication.
+Native camera, PDF import, sheets, large text, light/dark mode, offline restart, and old-client upgrades require device checks. Source tests do not prove those behaviors. See [quality checks](quality.md) and [release policy](releases.md) for verification procedures.

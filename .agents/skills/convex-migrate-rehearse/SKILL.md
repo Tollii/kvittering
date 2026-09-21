@@ -1,31 +1,31 @@
 ---
 name: convex-migrate-rehearse
-description: "Rehearse a live-app schema change + backfill on a snapshot-seeded preview deployment, verify, then promote the proven change to prod with the snapshot as rollback."
+description: Rehearse Kvitto schema changes and backfills against representative existing data before an authorized deployment. Use when persisted data or installed-client contracts must migrate.
 ---
 
-<!-- GENERATED from convex-agents content/capabilities/migrate-rehearse.json — do not edit by hand. -->
+# Schema migration rehearsal
 
-# Rehearse a schema change on a preview before prod
+Read [backend operations](../../../docs/backend-operations.md) and the affected [release contracts](../../../docs/releases.md). Identify old and new data shapes, supported clients, persisted workflow arguments, and concurrent writers. A schema-valid document can still violate a business or replay contract.
 
-A schema push on Convex validates every existing document against the new schema and FAILS the push if any row doesn't conform — a real data-conformance gate. The safe way to use that gate is to let it fail on a rehearsal copy, not on prod. This capability turns a preview deployment into that copy: seed it with a prod snapshot, push the new schema + run the backfill there, watch the gate, and only promote once it's green. It composes deploy-guard (target classification), migrate (the optional-then-tighten pattern), and @convex-dev/migrations (the batched, resumable backfill).
+1. Define the compatible transition, resumable backfill, verification, and recovery plan. Prefer additive fields or endpoints while old clients remain supported. Do not make a field required merely because a backfill finished if old writers can still omit it.
+2. Export an authorized snapshot with the required scope. Record its code/schema revision and retain it in protected storage. State which later writes a replacement restore would lose.
+3. Create an isolated rehearsal deployment from the pre-change code, then import the snapshot. Confirm the target and CLI options. If previews are unavailable, use a new disposable development deployment; do not replace an existing development database.
+4. Apply the compatible schema, run a bounded and resumable backfill, and verify all intended records and relationships. Use an existing migration mechanism if suitable; install a component only when its guarantees are needed. Check retries, interrupted batches, and writes that arrive during migration.
+5. Tighten the schema only when migrated data and all supported writers permit it. Test relevant old and new requests plus persisted workflow replay. Record the exact code and migration sequence that passed.
+6. Promote that sequence only within the user's deployment authorization. Recheck live results. If verification fails, stop dependent operations and use the agreed recovery plan; do not automatically run a destructive snapshot replacement.
 
-## Workflow
+Retain the recovery artifact for the agreed window. Delete temporary local snapshots only after verifying the retained copy. Clean up rehearsal resources within scope. Report the source/target, tested revision, migration progress, compatibility evidence, and remaining gaps.
 
-0. PRECONDITION: preview deployments need a Preview Deploy Key (dashboard → Project Settings → Deploy Keys → Preview) exported as `CONVEX_DEPLOY_KEY` before any `--preview-create`/`--preview-name` deploy — a plain `npx convex login` session cannot create previews, and this is a paid-tier feature. If no preview key is available, fall back to rehearsing on the personal dev deployment seeded with the snapshot, and say so.
-1. GUARD: deploy-guard — classify + announce the SOURCE (prod, being read) and the eventual TARGET (prod, being changed); get the fresh explicit yes for the prod promote up front and confirm the plan.
-2. SNAPSHOT the source data read-only: `npx convex export --path snapshot.zip` (from the deployment holding the real data; add `--include-file-storage` only if the migration touches files). This is a read; it changes nothing.
-3. CREATE the preview FROM THE PRE-CHANGE CODE — do this BEFORE editing schema.ts, so the preview starts on the schema the snapshot data already conforms to: `npx convex deploy --preview-create migrate-<slug>` (needs the preview key; auto-expires ~5 days). Seed it: `npx convex import snapshot.zip --deployment migrate-<slug>` (import targets a deployment by NAME with `--deployment`; there is no `--preview-name` flag on import). The import succeeds because the data still matches the old schema.
-4. REHEARSE on the preview, in the migrate order — each push is `npx convex deploy --preview-name migrate-<slug>` (re-deploys to the SAME preview, keeping its data; NOT `convex dev`, which targets personal dev): (a) make the new/changed field OPTIONAL and deploy — if existing rows violate it the push FAILS HERE on the copy with the offending shape; fix and re-push until green. (b) write a @convex-dev/migrations backfill and run it against the preview; verify every row is now valid. (c) tighten the validator (required / narrowed union) and deploy again — the gate now passes because the backfill ran.
-5. VERIFY on the preview: run the app's functions against the migrated data (MCP `run`/`runOneoffQuery` pointed at the preview, or a smoke query) to confirm behavior and shape.
-6. PROMOTE only on the fresh explicit yes from step 1: apply the SAME sequence to prod (optional schema → backfill → tighten). Because it already succeeded on prod-shaped data, the prod push repeats a proven run. Keep the snapshot as the rollback artifact (`npx convex import snapshot.zip --replace --prod`); state plainly that data written after the snapshot is lost, so keep the promote window short.
-7. CLEAN UP: the preview auto-expires; delete the local snapshot when done (it holds real data — treat it as sensitive, never commit it).
+## Rehearsal and promotion sequence
 
-## Rules
+Use for a migration touching existing persisted data. Select the source, rehearsal target, and eventual live target explicitly and follow backend operations.
 
-- Create the preview from the PRE-CHANGE code and seed the snapshot BEFORE editing schema.ts — so the import conforms and the conformance gate then fails on the copy (not prod) when you push the change; each preview push is `deploy --preview-name`, import targets it with `--deployment`.
-- Follow the migrate order every time: optional field → push → backfill → verify → tighten → push; skipping 'optional first' makes the very first push reject existing rows.
-- The prod promote needs a fresh explicit yes (deploy-guard) and is a REPEAT of the proven preview run, not a new attempt.
-- Keep the prod snapshot as the rollback artifact; state plainly that a snapshot-restore loses data written after the snapshot, so keep the promote window short.
-- Treat the exported snapshot as sensitive real data: delete it locally when finished; never commit it.
-- Backfills go through @convex-dev/migrations (batched, resumable, dry-runnable), not ad-hoc one-shot mutations over a whole table.
-- This is the rehearsal-and-promote flow; for the plain 'explain optional-then-tighten' guidance with no live data, that's migrate.
+1. Identify the pre-change code/schema revision and export an authorized snapshot. Include file storage when the migration or recovery depends on it. Protect and retain the recovery artifact.
+2. Create an isolated rehearsal deployment from pre-change code before importing. This ensures the snapshot initially conforms. The original preview workflow used `deploy --preview-create <name>` and then `deploy --preview-name <name>` for later changes; check the installed CLI and preview-key requirements. Never substitute `convex dev` and accidentally modify a different deployment.
+3. Import using the actual deployment name and the import command's supported selector. Do not assume the deploy command's preview options also work on import.
+4. Deploy a compatible expanded schema. Existing documents may need optional fields or a transitional union before backfill. Run a bounded, resumable, idempotent transformation; consider the migrations component when no existing mechanism supplies these guarantees.
+5. Verify transformed data, relationships, behavior, and concurrent writes. Resume an interrupted batch and confirm it does not duplicate work. Only tighten validators once both stored data and every supported writer conform.
+6. Verify relevant old/new application requests and persisted workflow replay against the rehearsed result. Record exact revisions and commands.
+7. Repeat the proven sequence on the live target only within the user's authorization. Do not treat permission for rehearsal as permission to replace live data. Monitor the affected behavior after promotion.
+
+A snapshot replacement loses later writes. Prefer a compatible forward repair when appropriate; use destructive recovery only under the agreed plan. Keep the recovery copy for the required window and remove temporary snapshots only after confirming retained storage. Clean up isolated targets within scope and report if any resources remain.

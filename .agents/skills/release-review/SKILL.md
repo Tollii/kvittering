@@ -1,11 +1,13 @@
 ---
 name: release-review
-description: Review native app releases and Expo OTA updates for compatibility with installed clients, Convex contracts, local data, and release policy. Use before publishing a native build, OTA update, or backend change that can affect older app versions, or when asked to identify breaking changes. Produce findings; do not publish or change policy unless requested.
+description: Review Kvitto native releases, OTA updates, and backend changes for installed-client, persisted-data, and policy compatibility. Use before publishing or assessing breaking changes.
 ---
 
 # Native release review
 
 Review the proposed change as an upgrade from an installed app. The latest source tree alone is not the compatibility boundary.
+
+Use [backend operations](../../../docs/backend-operations.md) before any authorized deployment or data operation. This review does not itself authorize publication.
 
 ## Establish the comparison
 
@@ -52,7 +54,7 @@ Review the proposed change as an upgrade from an installed app. The latest sourc
 
 ## Verify and report
 
-Run `npm run typecheck`, `npm run lint`, and `npm test` when source changes are in scope. Add focused verification only if implementation is requested. Existing legacy-contract tests are evidence for the current support window, not permission to change their fixtures to make a breaking change pass.
+Run the applicable [project checks](../../../docs/quality.md) when source changes are in scope. Add focused verification only if implementation is requested. Existing legacy-contract tests are evidence for the current support window, not permission to change their fixtures to make a breaking change pass.
 
 Report:
 

@@ -12,6 +12,8 @@ The backend must support installed clients while a new app is built, reviewed an
 
 Changing the API constant does not implement compatibility. Preserve old argument and return contracts until retired, and preserve fields that an old editor does not know about. Add a new endpoint for a truly incompatible contract if both must operate together.
 
+Use [backend operations](backend-operations.md) to select the target and handle deployment authorization, secrets, and data operations.
+
 ## Environments
 
 | Builds/channel | EAS environment | Convex deployment | Server RELEASE_CHANNEL |
@@ -81,4 +83,4 @@ Native code, native packages, permissions, plugins or entitlements require a new
 
 ## Verification
 
-Run `npm run typecheck`, `npm run lint`, and `npm test`. Focused tests cover numeric version ordering, anonymous policy reads, legacy request compatibility and retirement, stale-policy writes, service pauses, policy history, and actual SQLite migration rollback. Before a public release, additionally test update links, offline startup, returning from the store, an OTA download/restart, and native upgrade with unsent images on a device.
+Run the applicable [project checks](quality.md). Focused tests cover numeric version ordering, anonymous policy reads, legacy request compatibility and retirement, stale-policy writes, service pauses, policy history, and actual SQLite migration rollback. Before a public release, additionally test update links, offline startup, returning from the store, an OTA download/restart, and native upgrade with unsent images on a device.

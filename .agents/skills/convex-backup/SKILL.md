@@ -1,33 +1,32 @@
 ---
 name: convex-backup
-description: "Set up Convex backups and run a restore DRILL that proves recovery — snapshot, restore into a throwaway preview, assert the data came back — plus a schedule matched to your RPO and a gated recovery runbook."
+description: Back up Kvitto data and verify recovery in an isolated deployment. Use for backup schedules, recovery planning, or a requested restore exercise.
 ---
 
-<!-- GENERATED from convex-agents content/capabilities/convex-backup.json — do not edit by hand. -->
+# Backup and recovery
 
-# Back up — and prove the restore works
+Read [backend operations](../../../docs/backend-operations.md). Establish the source, authorized scope, acceptable data loss, retention period, and protected storage destination. Verify current CLI options with installed help before constructing export or import commands.
 
-Every backup story has two halves and most people only do the first: taking the backup, and proving you can get it back. This capability does both — it sets up regular snapshot exports and then runs a RESTORE DRILL that actually recovers the data into a disposable preview and asserts it's intact. The drill reuses migrate-rehearse's exact primitives (snapshot export → preview deploy → snapshot import) pointed at recovery instead of a forward change, so the safety net is tested, not assumed.
+Export the required data and include file storage when recovery needs it. Treat snapshots as sensitive household data. Record the source deployment, code/schema revision, time, scope, and checksum without exposing record contents.
 
-## Workflow
+Verify restoration in a new, isolated deployment running compatible code. Confirm the target is disposable before importing. If an isolated target is unavailable, report the backup as unverified; do not overwrite an existing development deployment as a fallback.
 
-1. GUARD: deploy-guard — classify + announce the deployment being backed up (reading/exporting is safe; the drill's restore target is a throwaway preview, never prod).
-2. TAKE the snapshot: `npx convex export --path backup-<date>.zip` (add `--include-file-storage` if the app stores files). This is the backup artifact; treat it as sensitive real data.
-3. SCHEDULE it (the ongoing half): recommend a cadence matched to how fast the data changes and how much loss is tolerable (RPO) — e.g. a daily `npx convex export` via CI/cron to durable storage the user controls, with a retention window. Convex's own platform backups exist; this adds a user-owned, portable copy.
-4. RESTORE DRILL (the half almost nobody does — this is the point):
-   (a) PRECONDITION: a Preview Deploy Key as `CONVEX_DEPLOY_KEY` (same requirement as migrate-rehearse; a paid-tier feature). If unavailable, drill against a fresh personal dev deployment instead and say so.
-   (b) create a throwaway preview from the CURRENT code: `npx convex deploy --preview-create restore-drill-<date>`.
-   (c) restore the snapshot into it: `npx convex import backup-<date>.zip --deployment restore-drill-<date> --replace` (import targets a deployment by NAME with `--deployment`; there is no `--preview-name` on import).
-   (d) ASSERT recovery: read the restored data back (MCP `tables` for row counts, `data`/`runOneoffQuery` for spot-checks) and confirm the critical tables came back with the expected row counts and a sample of real records — a restore that 'succeeds' but lands 0 rows is a FAILED drill. Compare against the source's counts where available.
-5. REPORT the drill result plainly: what was backed up, that the restore was ACTUALLY performed and verified (or that it FAILED and why — a failed drill is the most valuable output, found before a real disaster), the recommended schedule + retention, and the recovery runbook (the exact commands to restore to prod: `npx convex import backup.zip --replace --prod`, gated by deploy-guard, with the post-snapshot-write-loss caveat stated).
-6. HYGIENE: delete local snapshot copies when done (real data); the drill preview auto-expires. Never commit a backup file.
+Compare critical table counts and relationships and inspect representative behavior. Check stored files when included. A successful import command alone does not prove recovery; zero rows are valid only if the source was also empty.
 
-## Rules
+Keep a verified recovery copy in the agreed protected location for its retention period. Remove temporary local copies only after confirming durable storage. Never commit snapshots. Clean up disposable resources within the authorized scope.
 
-- A backup you have never restored is a hope, not a backup — always run (or offer to run) the restore DRILL, don't just take the export.
-- The drill restores into a THROWAWAY preview (or dev), never prod; the restore target and the backup source are different deployments.
-- Assert recovery, don't assume it: a restore that lands 0 rows is a FAILED drill — check critical-table row counts + a real-record sample against the source.
-- A FAILED drill is the most valuable output — surface it loudly; that's the whole reason to drill before a real disaster.
-- Schedule matched to RPO (how much data loss is tolerable); keep a user-owned portable copy alongside Convex's platform backups, with a retention window.
-- Snapshots are sensitive real data: delete local copies when done, never commit them; the restore-to-prod runbook is deploy-guard-gated with the post-snapshot-write-loss caveat stated.
-- Shares migrate-rehearse's snapshot+preview mechanics but aims them at RECOVERY, not a forward change — a forward schema change is migrate-rehearse.
+Document the recovery commands for the actual target, validation, access requirements, and data-loss window. Production replacement can discard writes since the snapshot and requires authorization for that concrete restore. A backup request does not authorize that restore. Configure a recurring schedule only when requested, and report whether both export and restoration were tested.
+
+## Export and restore procedure
+
+Use for an authorized backup or restore exercise. Check installed CLI help before running examples; pass an explicit selector for the intended deployment. Do not infer a target from the shell's default environment.
+
+The original workflow used `npx convex export --path <snapshot.zip>` and added `--include-file-storage` when recovery needed stored files. Record source, revision, export time, scope, and checksum. Store the artifact in a protected retained location before removing temporary copies.
+
+Rehearse against a newly created isolated deployment on compatible code. Preview creation may require a preview deployment key and an eligible plan; verify current access instead of assuming ordinary CLI login is sufficient. If previews are unavailable, create a disposable development target rather than replacing an existing one.
+
+Import the snapshot into that explicit target using the installed CLI's deployment selector. The original import API selected a deployment name, not the preview-name option used by deploy. Verify current help instead of transferring flags between commands. Do not use replacement mode unless the target is confirmed disposable or the specific destructive restore is authorized.
+
+Compare critical source and restored table counts, identifier relationships, representative records, and file availability without exposing household data in reports. Exercise the operations that depend on those records. An import that exits successfully but restores an unexpectedly empty table fails the exercise.
+
+For a requested schedule, choose cadence from acceptable data loss and retention needs. Store user-controlled portable copies durably, with access controls and recovery instructions; platform backups and portable exports can serve different recovery needs. Verify the scheduled export separately from the restore test. Report what was actually performed, failures, remaining gaps, and the intended retention/cleanup dates.
