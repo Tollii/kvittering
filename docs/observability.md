@@ -4,12 +4,12 @@ Sentry receives app diagnostics. Convex logs record backend processing, includin
 
 ## Sentry
 
-The SDK starts in `src/lib/sentry.ts`. The DSN is a public ingestion address, not a credential. `SENTRY_AUTH_TOKEN` is a build credential for source maps; it must never be included in the app bundle.
+The SDK starts in `src/lib/sentry.ts` only for non-development bundles on the `testflight` or `production` release channel. TestFlight uses the staging backend. Local development and the `development` channel skip SDK initialization and the root wrapper, so they do not send errors, logs, or replays. Restart the development app after changing this configuration; Fast Refresh does not stop an SDK instance that already started. The DSN is a public ingestion address, not a credential. `SENTRY_AUTH_TOKEN` is a build credential for source maps; it must never be included in the app bundle.
 
 The token is stored locally and in GitHub repository secrets, and the GitHub release workflows expose it as an environment variable. Remote EAS builders require their own configured environment variable; GitHub runner variables are not automatically forwarded. The Expo plugin uploads native build source maps. The GitHub OTA workflow and the `postupdate:testflight` npm hook upload the matching `dist` source maps through `npm run sentry:sourcemaps`. An upload failure fails the command, although an OTA already published remains published. Retry the source-map upload from the same export directory. Event ingestion through the public DSN works independently of these build credentials.
 
 - **Issues** group unexpected failures. Open an issue to see the original error type, redacted message, stack, causes and preceding breadcrumbs. Handled failures have an `operation` tag and an operation context with receipt ID, SDK error code and Convex request ID when available. Update errors also identify the failed phase: policy refresh, update check or download.
-- **Explore → Logs** shows deliberate milestones, including successful uploads, mutations, policy changes, and update downloads. Filter by `environment:development` or `environment:testflight` and inspect `receiptId` to find related backend logs.
+- **Explore → Logs** shows deliberate milestones, including successful uploads, mutations, policy changes, and update downloads. Filter by `environment:testflight` or `environment:production` and inspect `receiptId` to find related backend logs.
 - **Breadcrumbs** show the last 60 app milestones and HTTP results before an error. HTTP entries retain method, endpoint and status without query parameters or bodies. They explain the sequence without creating an issue for every action.
 - Release context includes native version/build, API version, OTA update ID, runtime version, backend address, and policy revision. This separates failures in different installed versions.
 
@@ -19,7 +19,7 @@ Automatic console collection and UI breadcrumbs are disabled. Explicit milestone
 
 ### Session Replay
 
-Session Replay records all local development sessions (`__DEV__`) and samples 10% of release sessions, including TestFlight. Error sampling is 100%: sessions outside the full-session sample buffer up to one minute before a reported error, then continue recording. Errors suppressed by the app are not sent to Sentry and do not trigger an error replay.
+Session Replay is disabled for local development. It samples 10% of enabled release sessions, including TestFlight and production. Error sampling is 100%: sessions outside the full-session sample buffer up to one minute before a reported error, then continue recording. Errors suppressed by the app are not sent to Sentry and do not trigger an error replay.
 
 Text, images and vectors are masked. Request and response body capture is disabled, and no URLs are allowed for detailed network capture. The existing breadcrumb filter remains active. Do not add unmasked views for receipt data or account details.
 
@@ -27,7 +27,7 @@ Open **Replays** in Sentry, or follow the replay link from an error. Filter by t
 
 Sentry processes original errors and their JavaScript/native causes. The app no longer filters stack lines itself. If the primary error has no frames, it receives a capture-location stack labelled `diagnostics.stack_source=capture`; this identifies the reporting call, not the missing original throw location. Existing stacks use `original`. An old event cannot recover details that were never sent.
 
-The root wrapper still provides Sentry's normal crash reporting. Native crashes and SDK-captured unhandled errors are distinct from the explicit handled reports described above.
+The root wrapper provides Sentry's normal crash reporting in enabled release builds. Native crashes and SDK-captured unhandled errors are distinct from the explicit handled reports described above.
 
 ### Read issues from the command line
 

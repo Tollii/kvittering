@@ -1,4 +1,4 @@
-import "@/lib/sentry";
+import { sentryEnabled } from "@/lib/sentry";
 import { reportError } from "@/lib/observability";
 import { ReceiptMigrationError } from "@/lib/receipt-migrations";
 import { useEffect } from "react";
@@ -101,4 +101,4 @@ function RootLayout() {
   );
 }
 
-export default Sentry.wrap(RootLayout);
+export default sentryEnabled ? Sentry.wrap(RootLayout) : RootLayout;
