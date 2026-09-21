@@ -95,6 +95,41 @@ export default function ProductLinking() {
 
   return (
     <Screen
+      summary={
+        item && (
+          <Panel
+            tone="primary"
+            style={{
+              borderRadius: 0,
+              paddingHorizontal: 20,
+            }}
+          >
+            <Copy size={13} style={{ color: colors.onHeroMuted }}>
+              {item.store} · {formatDate(item.date)}
+            </Copy>
+            <Copy size={24} weight="600" style={{ color: colors.onHero }}>
+              {item.line.name}
+            </Copy>
+            {item.line.receiptName &&
+              item.line.receiptName !== item.line.name && (
+                <Copy size={13} style={{ color: colors.onHeroMuted }}>
+                  På kvitteringen: {item.line.receiptName}
+                </Copy>
+              )}
+            <Copy size={14} style={{ color: colors.onHero }}>
+              {[
+                item.line.brand,
+                item.line.packageSize && item.line.packageUnit
+                  ? `${item.line.packageSize} ${item.line.packageUnit}`
+                  : null,
+                formatMoney(item.line.amountOre),
+              ]
+                .filter(Boolean)
+                .join(" · ")}
+            </Copy>
+          </Panel>
+        )
+      }
       key={itemKey ?? "empty"}
       insetTop={false}
       statusBarStyle="light"
@@ -153,39 +188,6 @@ export default function ProductLinking() {
       {busy && <ActivityIndicator accessibilityLabel="Lagrer produktvalg" />}
       {item ? (
         <>
-          <Panel
-            tone="primary"
-            style={{
-              borderRadius: 0,
-              marginHorizontal: -20,
-              marginTop: online && !error && !busy ? -16 : 0,
-              paddingHorizontal: 20,
-            }}
-          >
-            <Copy size={13} style={{ color: colors.onHeroMuted }}>
-              {item.store} · {formatDate(item.date)}
-            </Copy>
-            <Copy size={24} weight="600" style={{ color: colors.onHero }}>
-              {item.line.name}
-            </Copy>
-            {item.line.receiptName &&
-              item.line.receiptName !== item.line.name && (
-                <Copy size={13} style={{ color: colors.onHeroMuted }}>
-                  På kvitteringen: {item.line.receiptName}
-                </Copy>
-              )}
-            <Copy size={14} style={{ color: colors.onHero }}>
-              {[
-                item.line.brand,
-                item.line.packageSize && item.line.packageUnit
-                  ? `${item.line.packageSize} ${item.line.packageUnit}`
-                  : null,
-                formatMoney(item.line.amountOre),
-              ]
-                .filter(Boolean)
-                .join(" · ")}
-            </Copy>
-          </Panel>
           <Copy size={13} muted>
             {queue.complete ? queue.items.length : `${queue.items.length}+`}{" "}
             varer igjen

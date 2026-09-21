@@ -29,7 +29,7 @@ export function SpendingCalendar({
 
   const offset = (new Date(`${month}-01T12:00:00Z`).getUTCDay() + 6) % 7;
 
-  // Deeper violet for heavier shopping days, like the mosaic bands on the note.
+  // Use a stronger colour for days with more purchases.
   const shade = (level: number) =>
     level <= 0 ? colors.muted : colors.chart[Math.max(0, 4 - level)];
 

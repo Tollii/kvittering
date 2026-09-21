@@ -271,32 +271,14 @@ export default function Spending() {
 
   return (
     <Screen
-      title="Forbruk"
-      settings
-      headerRight={
-        <IconButton
-          name="line.3.horizontal.decrease"
-          label="Filtrer forbruk"
-          filled="#FFFFFF22"
-          color={colors.onHero}
-          size={17}
-          onPress={() => setFilters(true)}
-        />
-      }
-    >
-      {!online && <Notice icon="wifi.slash">Uten nett</Notice>}
-      {loadingReceipts ? (
-        <Loading />
-      ) : (
-        <>
+      summary={
+        !loadingReceipts && (
           <Panel
             tone="primary"
             style={{
               padding: 20,
               paddingTop: 0,
               gap: 8,
-              marginHorizontal: -20,
-              marginTop: online ? -12 : 0,
               borderRadius: 0,
             }}
           >
@@ -399,6 +381,26 @@ export default function Spending() {
               </View>
             )}
           </Panel>
+        )
+      }
+      title="Forbruk"
+      settings
+      headerRight={
+        <IconButton
+          name="line.3.horizontal.decrease"
+          label="Filtrer forbruk"
+          filled="#FFFFFF22"
+          color={colors.onHero}
+          size={17}
+          onPress={() => setFilters(true)}
+        />
+      }
+    >
+      {!online && <Notice icon="wifi.slash">Uten nett</Notice>}
+      {loadingReceipts ? (
+        <Loading />
+      ) : (
+        <>
           {!completeReceipts && <Notice>Henter kvitteringer …</Notice>}
           {coverage.pending.length > 0 && (
             <Pressable

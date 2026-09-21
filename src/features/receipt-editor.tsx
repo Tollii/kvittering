@@ -567,6 +567,103 @@ export function ReceiptEditor({
         </Stack.Toolbar.Menu>
       </ReceiptToolbar>
       <Screen
+        summary={
+          <Panel
+            tone="primary"
+            style={{
+              padding: 0,
+              gap: 0,
+              borderRadius: 0,
+            }}
+          >
+            <View style={{ padding: 20, gap: 12 }}>
+              <View
+                style={{
+                  flexDirection: "row",
+                  alignItems: "flex-start",
+                  gap: 8,
+                }}
+              >
+                <View style={{ flex: 1, gap: 4 }}>
+                  <Copy
+                    size={13}
+                    weight="600"
+                    style={{ color: colors.onHeroMuted }}
+                  >
+                    {formatDate(data?.purchaseDate)}
+                    {data?.purchaseDate && data.purchaseTime
+                      ? ` kl. ${data.purchaseTime}`
+                      : ""}
+                    {data?.branch ? ` · ${data.branch}` : ""}
+                  </Copy>
+                  <Copy
+                    size={36}
+                    weight="600"
+                    selectable
+                    style={{ color: colors.onHero }}
+                  >
+                    {formatMoney(data?.totalOre ?? null)}
+                  </Copy>
+                </View>
+                <View style={{ flexDirection: "row", gap: 6 }}>
+                  <ReceiptImages
+                    receipt={receipt}
+                    compact
+                    color={colors.onHero}
+                    background="#FFFFFF22"
+                  />
+                  <IconButton
+                    name="pencil"
+                    label="Rediger kvitteringsdetaljer"
+                    filled="#FFFFFF22"
+                    size={17}
+                    color={colors.onHero}
+                    disabled={!data || busy}
+                    onPress={() => setFields(true)}
+                  />
+                </View>
+              </View>
+              <View
+                style={{
+                  flexDirection: "row",
+                  gap: 6,
+                  flexWrap: "wrap",
+                  alignItems: "center",
+                }}
+              >
+                <Chip
+                  label={
+                    dirty ? "Ulagrede endringer" : receiptStatusLabel(receipt)
+                  }
+                  tone={
+                    dirty
+                      ? "warning"
+                      : receipt.status === "reviewed"
+                        ? "success"
+                        : "muted"
+                  }
+                  icon={
+                    receipt.status === "reviewed"
+                      ? "checkmark.seal"
+                      : processing
+                        ? "hourglass"
+                        : receipt.status === "failed"
+                          ? "exclamationmark.triangle"
+                          : "doc.text.magnifyingglass"
+                  }
+                />
+                {excluded && <Chip label="Utelatt" icon="eye.slash" />}
+                {!approved && tasks.map(taskChip)}
+              </View>
+              {receipt.status === "reviewed" && !dirty && !excluded && (
+                <Copy size={14} style={{ color: colors.onHeroMuted }}>
+                  Kvitteringen er med i forbruket. Du trenger ikke kontrollere
+                  hver vare. Produktkobling er valgfritt.
+                </Copy>
+              )}
+            </View>
+          </Panel>
+        }
         insetTop={false}
         statusBarStyle="light"
         footer={
@@ -615,99 +712,7 @@ export function ReceiptEditor({
             />
           </Panel>
         )}
-        <Panel
-          tone="primary"
-          style={{
-            padding: 0,
-            gap: 0,
-            borderRadius: 0,
-            marginHorizontal: -20,
-            marginTop: online && receipt.revision === revision ? -16 : 0,
-          }}
-        >
-          <View style={{ padding: 20, gap: 12 }}>
-            <View
-              style={{ flexDirection: "row", alignItems: "flex-start", gap: 8 }}
-            >
-              <View style={{ flex: 1, gap: 4 }}>
-                <Copy
-                  size={13}
-                  weight="600"
-                  style={{ color: colors.onHeroMuted }}
-                >
-                  {formatDate(data?.purchaseDate)}
-                  {data?.purchaseDate && data.purchaseTime
-                    ? ` kl. ${data.purchaseTime}`
-                    : ""}
-                  {data?.branch ? ` · ${data.branch}` : ""}
-                </Copy>
-                <Copy
-                  size={36}
-                  weight="600"
-                  selectable
-                  style={{ color: colors.onHero }}
-                >
-                  {formatMoney(data?.totalOre ?? null)}
-                </Copy>
-              </View>
-              <View style={{ flexDirection: "row", gap: 6 }}>
-                <ReceiptImages
-                  receipt={receipt}
-                  compact
-                  color={colors.onHero}
-                  background="#FFFFFF22"
-                />
-                <IconButton
-                  name="pencil"
-                  label="Rediger kvitteringsdetaljer"
-                  filled="#FFFFFF22"
-                  size={17}
-                  color={colors.onHero}
-                  disabled={!data || busy}
-                  onPress={() => setFields(true)}
-                />
-              </View>
-            </View>
-            <View
-              style={{
-                flexDirection: "row",
-                gap: 6,
-                flexWrap: "wrap",
-                alignItems: "center",
-              }}
-            >
-              <Chip
-                label={
-                  dirty ? "Ulagrede endringer" : receiptStatusLabel(receipt)
-                }
-                tone={
-                  dirty
-                    ? "warning"
-                    : receipt.status === "reviewed"
-                      ? "success"
-                      : "muted"
-                }
-                icon={
-                  receipt.status === "reviewed"
-                    ? "checkmark.seal"
-                    : processing
-                      ? "hourglass"
-                      : receipt.status === "failed"
-                        ? "exclamationmark.triangle"
-                        : "doc.text.magnifyingglass"
-                }
-              />
-              {excluded && <Chip label="Utelatt" icon="eye.slash" />}
-              {!approved && tasks.map(taskChip)}
-            </View>
-            {receipt.status === "reviewed" && !dirty && !excluded && (
-              <Copy size={14} style={{ color: colors.onHeroMuted }}>
-                Kvitteringen er med i forbruket. Du trenger ikke kontrollere
-                hver vare. Produktkobling er valgfritt.
-              </Copy>
-            )}
-          </View>
-        </Panel>
+
         {receipt.provider.includes("mock") && <Notice>Demodata</Notice>}
         {!!receipt.error && <Notice error>{receipt.error}</Notice>}
         {receipt.status === "failed" && !processing && (

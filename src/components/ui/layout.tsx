@@ -27,6 +27,7 @@ export function Screen({
   insetTop = true,
   footer,
   headerRight,
+  summary,
   statusBarStyle,
 }: Readonly<{
   children: ReactNode;
@@ -36,6 +37,7 @@ export function Screen({
   insetTop?: boolean;
   footer?: ReactNode;
   headerRight?: ReactNode;
+  summary?: ReactNode;
   statusBarStyle?: "auto" | "light" | "dark";
 }>) {
   const colors = useTheme();
@@ -47,7 +49,6 @@ export function Screen({
         styles.row,
         {
           backgroundColor: colors.hero,
-          marginHorizontal: -20,
           paddingHorizontal: 20,
           paddingVertical: 14,
         },
@@ -96,10 +97,6 @@ export function Screen({
   const content = (
     <View
       style={{
-        paddingHorizontal: 20,
-        paddingTop: title ? 0 : 16,
-        paddingBottom: footer ? 16 : 32,
-        gap: 12,
         maxWidth: 760,
         width: "100%",
         alignSelf: "center",
@@ -107,7 +104,18 @@ export function Screen({
       }}
     >
       {header}
-      {children}
+      {summary}
+      <View
+        style={{
+          paddingHorizontal: 20,
+          paddingTop: title || summary ? 12 : 16,
+          paddingBottom: footer ? 16 : 32,
+          gap: 12,
+          flexGrow: 1,
+        }}
+      >
+        {children}
+      </View>
     </View>
   );
 
