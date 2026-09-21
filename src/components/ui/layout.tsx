@@ -113,7 +113,7 @@ export function Screen({
           paddingHorizontal: 20,
           paddingTop: title || summary ? 12 : 16,
           paddingBottom: footer ? 16 : 32,
-          gap: 12,
+          gap: 16,
           flexGrow: 1,
           flex: scrollable ? undefined : 1,
         }}
@@ -203,7 +203,12 @@ export function Sheet({
             { paddingHorizontal: 16, paddingTop: 12, paddingBottom: 8 },
           ]}
         >
-          <Copy size={20} weight="700" style={{ flex: 1 }}>
+          <Copy
+            accessibilityRole="header"
+            size={20}
+            weight="700"
+            style={{ flex: 1 }}
+          >
             {title}
           </Copy>
           <IconButton
@@ -211,6 +216,7 @@ export function Sheet({
             label="Lukk"
             size={15}
             filled
+            disabled={!dismissible}
             color={colors.text}
             onPress={onClose}
           />
@@ -231,7 +237,7 @@ export function Sheet({
               contentContainerStyle={{
                 padding: 16,
                 paddingTop: 4,
-                gap: 10,
+                gap: 16,
                 paddingBottom: 24,
               }}
             >

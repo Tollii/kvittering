@@ -11,15 +11,7 @@ import * as Clipboard from "expo-clipboard";
 import { randomUUID } from "expo-crypto";
 import { api } from "../../convex/_generated/api";
 import { authClient } from "@/lib/auth-client";
-import {
-  Button,
-  Copy,
-  Icon,
-  Notice,
-  Panel,
-  Row,
-  Screen,
-} from "@/components/ui";
+import { Button, Copy, Icon, Notice, Row, Screen } from "@/components/ui";
 import { useHousehold } from "@/features/session";
 import { BudgetSettings } from "@/features/budget-settings";
 import {
@@ -71,7 +63,7 @@ export default function Settings() {
       )}
       <NativeForm>
         <FormSection title={household.name}>
-          <Panel style={{ gap: 0, paddingVertical: 4 }}>
+          <View>
             {details?.members.map((member, index) => (
               <View
                 key={member._id}
@@ -88,12 +80,12 @@ export default function Settings() {
                 Koble til nettet for å se medlemmene.
               </Copy>
             )}
-          </Panel>
+          </View>
         </FormSection>
         {!full && (
           <>
             <FormSection title="Inviter partneren din">
-              <Panel>
+              <View style={{ gap: 12 }}>
                 <View
                   style={{
                     flexDirection: "row",
@@ -186,7 +178,7 @@ export default function Settings() {
                           )
                   }
                 />
-              </Panel>
+              </View>
             </FormSection>
           </>
         )}
@@ -211,12 +203,12 @@ export default function Settings() {
           <ReceiptSearchSettings />
         </FormSection>
         <FormSection title="Kamera">
-          <Panel>
+          <View style={{ gap: 12 }}>
             <CameraPreferences />
-          </Panel>
+          </View>
         </FormSection>
         <FormSection title="På denne enheten">
-          <Panel>
+          <View style={{ gap: 12 }}>
             <Copy muted size={14}>
               {queue.length === 0
                 ? "Ingenting venter på opplasting"
@@ -236,7 +228,7 @@ export default function Settings() {
                 })
               }
             />
-          </Panel>
+          </View>
           {!!error && <Notice error>{error}</Notice>}
         </FormSection>
       </NativeForm>

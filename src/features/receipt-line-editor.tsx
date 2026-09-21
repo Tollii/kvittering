@@ -5,7 +5,7 @@ import {
   type ProductSelection,
 } from "@/lib/domain/product-reference";
 import { useState } from "react";
-import { Pressable, View } from "react-native";
+import { Pressable, View, useWindowDimensions } from "react-native";
 import { useQuery } from "convex-helpers/react/cache";
 import { api } from "../../convex/_generated/api";
 import type { Id } from "../../convex/_generated/dataModel";
@@ -97,6 +97,7 @@ export function ReceiptLineEditor({
   onMoneyError,
 }: Readonly<Props>) {
   const colors = useTheme();
+  const { fontScale } = useWindowDimensions();
   const issues = lineReviewIssues(line);
   const categoryUncertain = line.issues.some(isCategoryUncertain);
   const otherIssues = issues.filter((issue) => !isCategoryUncertain(issue));
@@ -160,8 +161,6 @@ export function ReceiptLineEditor({
   return (
     <View
       style={{
-        borderBottomWidth: 1,
-        borderBottomColor: colors.line,
         paddingVertical: 12,
         gap: 8,
       }}
@@ -180,7 +179,11 @@ export function ReceiptLineEditor({
         })}
       >
         <View style={{ flex: 1, gap: 1 }}>
-          <Copy size={16} weight="600" numberOfLines={2}>
+          <Copy
+            size={16}
+            weight="600"
+            numberOfLines={fontScale > 1.3 ? undefined : 2}
+          >
             {line.name || (missingName ? "Navn mangler" : "Ny vare")}
           </Copy>
           {(kindLabel || (line.quantity && line.quantity !== 1)) && (
@@ -200,7 +203,9 @@ export function ReceiptLineEditor({
           size={16}
           weight="600"
           style={{
-            flexShrink: 0,
+            flexShrink: 1,
+            maxWidth: "45%",
+            textAlign: "right",
             color: missingAmount ? colors.warning : colors.text,
           }}
         >

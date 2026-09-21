@@ -10,6 +10,7 @@ import type { EvaluationResult } from "../../convex/correctionEvaluation";
 import {
   Button,
   Copy,
+  Empty,
   Loading,
   Notice,
   Panel,
@@ -149,10 +150,11 @@ export default function Corrections() {
           {!!error && <Notice error>{error}</Notice>}
           <SectionTitle title="Siste beslutninger" />
           {!history.entries.length && (
-            <Copy muted>
-              Rett en kategori eller produktkobling på en kvittering.
-              Beslutningen blir synlig her når du lagrer.
-            </Copy>
+            <Empty
+              title="Ingen rettelser ennå"
+              message="Rett en kategori eller produktkobling på en kvittering. Valget vises her når du lagrer."
+              icon="checkmark.circle"
+            />
           )}
           {history.entries.map((entry) => (
             <Row

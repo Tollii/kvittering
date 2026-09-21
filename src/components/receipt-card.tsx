@@ -1,7 +1,12 @@
 import { router } from "expo-router";
-import { ActivityIndicator, Pressable, View } from "react-native";
+import {
+  ActivityIndicator,
+  Pressable,
+  View,
+  useWindowDimensions,
+} from "react-native";
 import { Copy, Icon, pressed } from "./ui";
-import { useTheme } from "@/constants/theme";
+import { radius, useTheme } from "@/constants/theme";
 import { formatDate } from "@/lib/format-date";
 import { reviewSummary } from "@/lib/domain/receipt-review";
 import type { Receipt } from "@/lib/domain/insights";
@@ -43,6 +48,8 @@ export function ReceiptCard({
   compact?: boolean;
 }>) {
   const colors = useTheme();
+  const { fontScale } = useWindowDimensions();
+  const stacked = fontScale > 1.3;
   const busy = ["uploading", "uploaded", "processing"].includes(receipt.status);
   const needs = receipt.status === "needs_review" ? receiptNeeds(receipt) : [];
 
@@ -56,9 +63,8 @@ export function ReceiptCard({
       onPress={() => openReceipt(receipt)}
       style={(state) => [
         {
-          backgroundColor: colors.background,
-          borderBottomWidth: 1,
-          borderBottomColor: colors.line,
+          backgroundColor: colors.surface,
+          borderRadius: radius.card,
           borderCurve: "continuous",
           overflow: "hidden",
           flexDirection: "row",
@@ -66,22 +72,39 @@ export function ReceiptCard({
         pressed(state),
       ]}
     >
-      <View style={{ flex: 1, paddingVertical: compact ? 12 : 16, gap: 6 }}>
+      <View
+        style={{
+          flex: 1,
+          padding: 16,
+          paddingVertical: compact ? 12 : 16,
+          gap: 10,
+        }}
+      >
         <View style={{ flexDirection: "row", alignItems: "center", gap: 10 }}>
           <View style={{ flex: 1, gap: 2 }}>
-            <Copy weight="600" size={16} numberOfLines={1}>
+            <Copy weight="600" size={17}>
               {receipt.data?.store || "Ny kvittering"}
             </Copy>
-            <Copy size={13} muted numberOfLines={1}>
+            <Copy size={13} muted>
               {formatDate(receipt.data?.purchaseDate)}
               {receipt.data?.branch ? ` · ${receipt.data.branch}` : ""}
             </Copy>
+            {stacked && !busy && receipt.data && (
+              <Copy weight="700" size={17}>
+                {formatMoney(receipt.data.totalOre)}
+              </Copy>
+            )}
           </View>
           {busy ? (
             <ActivityIndicator color={colors.accent} />
           ) : (
+            !stacked &&
             receipt.data && (
-              <Copy weight="700" size={17}>
+              <Copy
+                weight="700"
+                size={17}
+                style={{ flexShrink: 1, textAlign: "right" }}
+              >
                 {formatMoney(receipt.data.totalOre)}
               </Copy>
             )
@@ -89,16 +112,16 @@ export function ReceiptCard({
           <Icon name="chevron.right" size={12} color={colors.secondary} />
         </View>
         {(!compact || needs.length > 0 || receipt.error) && (
-          <Copy size={12} weight="500" numberOfLines={2} muted>
+          <Copy size={13} weight="500" muted>
             <Copy
-              size={12}
+              size={13}
               weight="600"
               style={{
                 color:
                   receipt.status === "failed"
                     ? colors.danger
                     : receipt.status === "needs_review"
-                      ? colors.primary
+                      ? colors.warning
                       : colors.secondary,
               }}
             >
@@ -110,7 +133,7 @@ export function ReceiptCard({
           </Copy>
         )}
         {!!receipt.error && (
-          <Copy size={12} style={{ color: colors.danger }}>
+          <Copy size={13} style={{ color: colors.danger }}>
             {receipt.error}
           </Copy>
         )}

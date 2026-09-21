@@ -1,6 +1,14 @@
 import { useFeatureFlag } from "@/features/featureFlags";
 import { useState } from "react";
-import { Copy, Field, Loading, Notice, Row, Sheet } from "@/components/ui";
+import {
+  Copy,
+  Empty,
+  Field,
+  Loading,
+  Notice,
+  Row,
+  Sheet,
+} from "@/components/ui";
 import { useCatalogSearch } from "./catalog-queries";
 import type { PhysicalStore } from "@/lib/catalog/model";
 import type { Id } from "../../convex/_generated/dataModel";
@@ -31,6 +39,8 @@ export function CatalogStorePicker({
           value={search}
           onChangeText={setSearch}
           autoCorrect={false}
+          clearButtonMode="while-editing"
+          hint="Skriv minst 3 tegn for å søke."
         />
       }
     >
@@ -42,7 +52,7 @@ export function CatalogStorePicker({
         <Loading title="Henter butikker …" />
       )}
       {(query.isError || query.data?.status === "error") && (
-        <Notice>
+        <Notice error>
           {query.data?.message ?? "Butikkene kunne ikke hentes nå."}
         </Notice>
       )}
@@ -58,7 +68,11 @@ export function CatalogStorePicker({
         />
       ))}
       {query.data?.status === "ready" && !query.data.stores.length && (
-        <Copy muted>Ingen treff</Copy>
+        <Empty
+          title="Ingen butikker funnet"
+          message="Prøv et butikknavn eller et annet sted."
+          icon="magnifyingglass"
+        />
       )}
       <Row
         title="Ingen av disse"

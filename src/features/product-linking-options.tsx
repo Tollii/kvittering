@@ -4,7 +4,7 @@ import { Image } from "expo-image";
 import { useQuery } from "convex-helpers/react/cache";
 import { api } from "../../convex/_generated/api";
 import { Copy, Icon, Loading, Notice, pressed } from "@/components/ui";
-import { useTheme } from "@/constants/theme";
+import { radius, useTheme } from "@/constants/theme";
 import { useCatalogSearch } from "./catalog-queries";
 import { useFeatureFlag } from "./featureFlags";
 import { catalogImageSources } from "@/lib/catalog/images";
@@ -21,6 +21,7 @@ import type {
 
 function ProductImage({ product }: Readonly<{ product: CatalogProduct }>) {
   const [index, setIndex] = useState(0);
+  const colors = useTheme();
   const sources = catalogImageSources(product);
 
   return (
@@ -31,7 +32,10 @@ function ProductImage({ product }: Readonly<{ product: CatalogProduct }>) {
         alignItems: "center",
         justifyContent: "center",
         backgroundColor: "#FFFFFF",
-        borderRadius: 4,
+        borderRadius: radius.inner,
+        borderWidth: 1,
+        borderColor: colors.imageOutline,
+        overflow: "hidden",
       }}
     >
       {sources[index] ? (
@@ -148,16 +152,14 @@ export function ProductLinkingOptions({
               {
                 flexDirection: "row",
                 alignItems: "center",
-                padding: 12,
-                borderRadius: 8,
+                padding: 16,
+                borderRadius: radius.card,
                 borderCurve: "continuous",
                 backgroundColor: colors.surface,
-                borderWidth: 1,
-                borderColor: colors.line,
                 gap: 16,
-                opacity: disabled ? 0.5 : 1,
               },
               pressed(state),
+              disabled && { opacity: 0.45 },
             ]}
           >
             <ProductImage product={product} />
@@ -179,7 +181,7 @@ export function ProductLinkingOptions({
         (pending ? (
           <Loading title="Finner forslag …" />
         ) : (
-          <Notice>
+          <Notice error={failed}>
             {failed
               ? "Kunne ikke hente forslag. Du kan prøve et nytt søk."
               : "Ingen forslag funnet. Søk etter et annet navn, eller velg Ingen passer."}

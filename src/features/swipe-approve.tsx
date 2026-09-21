@@ -94,14 +94,14 @@ export function SwipeToApprove({
             marginLeft: 8,
             borderRadius: radius.card,
             borderCurve: "continuous",
-            backgroundColor: colors.success,
+            backgroundColor: colors.successSoft,
             alignItems: "center",
             justifyContent: "center",
             gap: 4,
           }}
         >
-          <Icon name="checkmark.seal" size={22} color="#FFFFFF" />
-          <Copy size={13} weight="700" style={{ color: "#FFFFFF" }}>
+          <Icon name="checkmark.seal" size={22} color={colors.success} />
+          <Copy size={13} weight="700" style={{ color: colors.success }}>
             Godkjenn
           </Copy>
         </View>

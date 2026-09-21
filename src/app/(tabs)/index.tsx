@@ -356,13 +356,13 @@ export default function Capture() {
             accessibilityRole="button"
             accessibilityLabel="Importer PDF eller bilde fra Filer"
             disabled={busy}
+            accessibilityState={{ disabled: busy, busy }}
             onPress={() => void chooseFiles()}
-            hitSlop={6}
             style={(state) => [
               {
-                width: 40,
-                height: 40,
-                borderRadius: 20,
+                width: 44,
+                height: 44,
+                borderRadius: 22,
                 backgroundColor: "#101C51B3",
                 alignItems: "center",
                 justifyContent: "center",
@@ -376,12 +376,11 @@ export default function Capture() {
             accessibilityRole="button"
             accessibilityLabel="Husstanden og innstillinger"
             onPress={() => router.push("/settings")}
-            hitSlop={6}
             style={(state) => [
               {
-                width: 40,
-                height: 40,
-                borderRadius: 20,
+                width: 44,
+                height: 44,
+                borderRadius: 22,
                 backgroundColor: "#101C51B3",
                 alignItems: "center",
                 justifyContent: "center",
@@ -476,6 +475,21 @@ export default function Capture() {
                   size={52}
                   color={onCameraMuted}
                 />
+                <Copy
+                  accessibilityRole="header"
+                  size={24}
+                  weight="600"
+                  style={{ color: onCamera, textAlign: "center" }}
+                >
+                  Ta vare på kvitteringen
+                </Copy>
+                <Copy
+                  size={15}
+                  style={{ color: onCameraMuted, textAlign: "center" }}
+                >
+                  Ta et bilde, eller importer en kvittering fra Bilder eller
+                  Filer.
+                </Copy>
                 {visionKit && (
                   <Copy style={{ color: onCamera, textAlign: "center" }}>
                     Trykk på skanneknappen for å åpne VisionKit.
@@ -514,6 +528,7 @@ export default function Capture() {
             accessibilityRole="button"
             accessibilityLabel="Velg fra bilder"
             disabled={busy}
+            accessibilityState={{ disabled: busy, busy }}
             onPress={() => void choosePhotos()}
             style={(state) => [
               {
@@ -538,6 +553,10 @@ export default function Capture() {
                 : "Ta bilde av kvitteringen"
             }
             disabled={busy || (!visionKit && (!ready || !live))}
+            accessibilityState={{
+              disabled: busy || (!visionKit && (!ready || !live)),
+              busy,
+            }}
             onPress={() => void (visionKit ? scanDocument() : takePhoto())}
             style={(state) => [
               {

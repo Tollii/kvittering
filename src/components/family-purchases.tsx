@@ -38,7 +38,7 @@ export function FamilyPurchases({
               flexDirection: "row",
               alignItems: "center",
               gap: 6,
-              minHeight: 36,
+              minHeight: 44,
             },
             pressed(state),
           ]}

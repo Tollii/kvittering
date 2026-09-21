@@ -251,7 +251,9 @@ export function StoreSpendingSheet({
             label="Forrige måned"
             onPress={onPreviousMonth}
           />
-          <Copy weight="600">{monthLabel}</Copy>
+          <Copy weight="600" style={{ flex: 1, textAlign: "center" }}>
+            {monthLabel}
+          </Copy>
           <IconButton
             name="chevron.right"
             label="Neste måned"

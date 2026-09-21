@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { Image, Pressable, View, useWindowDimensions } from "react-native";
+import { Image, Pressable, View } from "react-native";
 import {
   Button,
   Copy,
@@ -42,8 +42,6 @@ export function CaptureReview({
   onCombinedChange: (value: boolean) => void;
 }>) {
   const colors = useTheme();
-  const { width } = useWindowDimensions();
-  const tile = Math.floor((width - 32 - 10) / 2);
 
   return (
     <Sheet
@@ -75,15 +73,24 @@ export function CaptureReview({
         </>
       }
     >
-      <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 10 }}>
+      <View
+        style={{
+          flexDirection: "row",
+          flexWrap: "wrap",
+          justifyContent: "space-between",
+          rowGap: 12,
+        }}
+      >
         {photos.map((uri, index) => (
-          <View key={uri} style={{ width: tile, height: tile * 1.33 }}>
+          <View key={uri} style={{ width: "48%", aspectRatio: 0.75 }}>
             <Image
               source={{ uri }}
               style={{
-                width: tile,
-                height: tile * 1.33,
+                width: "100%",
+                height: "100%",
                 borderRadius: 14,
+                borderWidth: 1,
+                borderColor: colors.imageOutline,
                 backgroundColor: colors.muted,
               }}
               resizeMode="cover"
@@ -111,16 +118,16 @@ export function CaptureReview({
               accessibilityRole="button"
               accessibilityLabel={`Fjern bilde ${index + 1}`}
               disabled={busy}
-              hitSlop={8}
+              accessibilityState={{ disabled: busy }}
               onPress={() => onRemovePhoto(uri)}
               style={(state) => [
                 {
                   position: "absolute",
-                  right: 8,
-                  top: 8,
-                  width: 28,
-                  height: 28,
-                  borderRadius: 14,
+                  right: 4,
+                  top: 4,
+                  width: 44,
+                  height: 44,
+                  borderRadius: 22,
                   backgroundColor: "#101C51CC",
                   alignItems: "center",
                   justifyContent: "center",
@@ -137,6 +144,7 @@ export function CaptureReview({
         <Panel style={{ gap: 4 }}>
           <Toggle
             label="Samme kvittering"
+            detail="Slå på hvis bildene viser deler av én lang kvittering."
             value={combined}
             onChange={onCombinedChange}
             disabled={busy}

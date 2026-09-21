@@ -3,7 +3,7 @@ import { useState } from "react";
 import { View } from "react-native";
 import { useConvex } from "convex/react";
 import { api } from "../../convex/_generated/api";
-import { Button, Copy, Notice, Panel } from "@/components/ui";
+import { Button, Copy, Notice } from "@/components/ui";
 import { MoneyField } from "@/components/money-field";
 import { useHousehold } from "./session";
 import { formatMoney } from "@/lib/domain/receipt";
@@ -52,7 +52,7 @@ export function BudgetSettings() {
   }
 
   return (
-    <Panel>
+    <View style={{ gap: 12 }}>
       <MoneyField
         key={generation}
         label="Månedsbudsjett (kr)"
@@ -94,6 +94,6 @@ export function BudgetSettings() {
           {formatMoney(current)} per måned
         </Copy>
       )}
-    </Panel>
+    </View>
   );
 }

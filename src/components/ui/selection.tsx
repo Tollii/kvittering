@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Field } from "./controls";
-import { Panel, Row } from "./surfaces";
+import { Empty, Panel, Row } from "./surfaces";
 import { Sheet } from "./layout";
 
 export function Select<Value extends string>({
@@ -17,6 +17,12 @@ export function Select<Value extends string>({
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState("");
 
+  const results = options.filter((option) =>
+    option.label
+      .toLocaleLowerCase("nb-NO")
+      .includes(search.trim().toLocaleLowerCase("nb-NO")),
+  );
+
   return (
     <>
       <Row
@@ -25,20 +31,24 @@ export function Select<Value extends string>({
           options.find((option) => option.value === value)?.label ??
           "Ikke valgt"
         }
-        onPress={() => setOpen(true)}
+        onPress={() => {
+          setSearch("");
+          setOpen(true);
+        }}
       />
       <Sheet title={label} visible={open} onClose={() => setOpen(false)}>
         {options.length > 12 && (
-          <Field label="Søk" value={search} onChangeText={setSearch} />
+          <Field
+            label="Søk"
+            value={search}
+            onChangeText={setSearch}
+            clearButtonMode="while-editing"
+            autoCorrect={false}
+          />
         )}
-        <Panel style={{ gap: 2 }}>
-          {options
-            .filter((option) =>
-              option.label
-                .toLocaleLowerCase("nb-NO")
-                .includes(search.toLocaleLowerCase("nb-NO")),
-            )
-            .map((option) => (
+        {!!results.length && (
+          <Panel style={{ gap: 2 }}>
+            {results.map((option) => (
               <Row
                 key={option.value}
                 title={option.label}
@@ -50,7 +60,15 @@ export function Select<Value extends string>({
                 }}
               />
             ))}
-        </Panel>
+          </Panel>
+        )}
+        {!results.length && (
+          <Empty
+            title="Ingen treff"
+            message="Prøv et annet søkeord."
+            icon="magnifyingglass"
+          />
+        )}
       </Sheet>
     </>
   );

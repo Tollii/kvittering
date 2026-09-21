@@ -32,7 +32,12 @@ function Brand({ tagline }: Readonly<{ tagline: string }>) {
           Kvitto
         </Copy>
       </View>
-      <Copy size={44} weight="800" style={{ color: colors.primary }}>
+      <Copy
+        accessibilityRole="header"
+        size={40}
+        weight="700"
+        style={{ color: colors.primary }}
+      >
         Dagligvarene.{"\n"}Samlet.
       </Copy>
       <Copy muted size={16}>
@@ -50,7 +55,13 @@ export function SignIn() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
 
+  const canSubmit =
+    !!email.trim() &&
+    password.length >= (register ? 12 : 1) &&
+    (!register || !!name.trim());
+
   async function submit() {
+    if (busy || !canSubmit) return;
     setBusy(true);
     setError("");
 
@@ -78,8 +89,8 @@ export function SignIn() {
   return (
     <Screen statusBarStyle="auto">
       <Brand tagline="Handle. Ta et bilde. Ferdig." />
-      <Panel style={{ gap: 12 }}>
-        <Copy size={22} weight="700">
+      <Panel style={{ gap: 16 }}>
+        <Copy accessibilityRole="header" size={22} weight="700">
           {register ? "Opprett konto" : "Velkommen hjem"}
         </Copy>
         {register && (
@@ -89,6 +100,7 @@ export function SignIn() {
             onChangeText={setName}
             autoComplete="name"
             textContentType="name"
+            editable={!busy}
           />
         )}
         <Field
@@ -100,11 +112,14 @@ export function SignIn() {
           keyboardType="email-address"
           autoComplete="email"
           textContentType="emailAddress"
+          editable={!busy}
         />
         <Field
           label="Passord"
           value={password}
           onChangeText={setPassword}
+          editable={!busy}
+          returnKeyType={register ? "done" : "go"}
           secureTextEntry
           autoCapitalize="none"
           autoComplete={register ? "new-password" : "current-password"}
@@ -116,11 +131,7 @@ export function SignIn() {
         <Button
           title={register ? "Opprett konto" : "Logg inn"}
           busy={busy}
-          disabled={
-            !email.trim() ||
-            password.length < (register ? 12 : 1) ||
-            (register && !name.trim())
-          }
+          disabled={!canSubmit}
           onPress={() => void submit()}
         />
         <Button
@@ -145,8 +156,10 @@ export function HouseholdSetup() {
   const [busy, setBusy] = useState(false);
   const create = useReleaseMutation(api.households.create);
   const joinHousehold = useReleaseMutation(api.households.join);
+  const canSubmit = join ? !!invitation.trim() : !!name.trim();
 
   async function submit() {
+    if (busy || !canSubmit) return;
     setBusy(true);
     setError("");
 
@@ -167,8 +180,13 @@ export function HouseholdSetup() {
   }
 
   return (
-    <Screen title={join ? "Bli med hjem." : "En husstand for to."}>
-      <Panel style={{ gap: 12 }}>
+    <Screen title={join ? "Bli med i husstanden" : "Opprett husstand"}>
+      <Copy muted>
+        {join
+          ? "Bruk invitasjonskoden fra den du deler husstand med."
+          : "Samle kvitteringene deres på ett sted. Du kan invitere én person etterpå."}
+      </Copy>
+      <Panel style={{ gap: 16 }}>
         {join ? (
           <Field
             label="Invitasjonskode"
@@ -176,6 +194,7 @@ export function HouseholdSetup() {
             onChangeText={setInvitation}
             autoCapitalize="none"
             autoCorrect={false}
+            editable={!busy}
           />
         ) : (
           <Field
@@ -183,17 +202,19 @@ export function HouseholdSetup() {
             value={name}
             onChangeText={setName}
             maxLength={80}
+            editable={!busy}
           />
         )}
         {!!error && <Notice error>{error}</Notice>}
         <Button
           title={join ? "Bli med" : "Opprett husstand"}
           busy={busy}
-          disabled={join ? !invitation.trim() : !name.trim()}
+          disabled={!canSubmit}
           onPress={() => void submit()}
         />
         <Button
           secondary
+          disabled={busy}
           title={join ? "Opprett en ny husstand" : "Jeg har en invitasjonskode"}
           onPress={() => {
             setJoin(!join);
@@ -204,6 +225,7 @@ export function HouseholdSetup() {
       <Button
         secondary
         title="Logg ut"
+        disabled={busy}
         onPress={() => {
           void authClient
             .signOut()

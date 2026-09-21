@@ -19,6 +19,8 @@ const light = {
   accentSoft: "#E6E9FA",
   line: "#D6D5CF",
   chart: ["#263CC7", "#4055CF", "#6375DC", "#8998E7"],
+  onChart: ["#FFFFFF", "#FFFFFF", "#000000", "#101C51"],
+  imageOutline: "rgba(0, 0, 0, 0.1)",
   muted: "#EAE8DF",
   success: "#2F7A6A",
   successSoft: "#DFF0EA",
@@ -47,6 +49,8 @@ const dark: typeof light = {
   accentSoft: "#243261",
   line: "#35415D",
   chart: ["#A5B7FF", "#859BEE", "#687DD2", "#5065B5"],
+  onChart: ["#101C51", "#101C51", "#000000", "#FFFFFF"],
+  imageOutline: "rgba(255, 255, 255, 0.1)",
   muted: "#222D48",
   success: "#7FD1BD",
   successSoft: "#1E3B35",
@@ -68,7 +72,7 @@ export const themes = { light, dark };
 
 export const radius = {
   sheet: 24,
-  card: 8,
+  card: 24,
   control: 8,
   chip: 6,
   inner: 8,

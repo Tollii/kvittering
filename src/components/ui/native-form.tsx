@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import { ScrollView, View } from "react-native";
 import { Copy } from "./typography";
+import { Panel } from "./surfaces";
 
 export function NativeForm({ children }: Readonly<{ children: ReactNode }>) {
   return (
@@ -23,7 +24,7 @@ export function FormSection({
       <Copy accessibilityRole="header" weight="600">
         {title}
       </Copy>
-      {children}
+      <Panel style={{ gap: 12 }}>{children}</Panel>
     </View>
   );
 }
