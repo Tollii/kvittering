@@ -70,7 +70,7 @@ export function Icon({
 /** Instant press feedback: a small scale plus a dim, no animation cost. */
 export const pressed = (state: PressableStateCallbackType): ViewStyle =>
   state.pressed
-    ? { opacity: 0.72, transform: [{ scale: 0.97 }] }
+    ? { opacity: 0.72, transform: [{ scale: 0.96 }] }
     : { opacity: 1 };
 
 export const styles = StyleSheet.create({

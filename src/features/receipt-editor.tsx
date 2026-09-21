@@ -39,7 +39,6 @@ import {
   Toggle,
   pressed,
 } from "@/components/ui";
-import { Mosaic } from "@/components/mosaic";
 import { ReceiptLineEditor } from "@/features/receipt-line-editor";
 import { ReceiptFields } from "@/features/receipt-fields";
 import { ReceiptImages } from "@/features/receipt-images";
@@ -462,6 +461,9 @@ export function ReceiptEditor({
 
   const screenOptions: ComponentProps<typeof Stack.Screen>["options"] = {
     title: data?.store || receipt.data?.store || "Kvittering",
+    headerStyle: { backgroundColor: colors.hero },
+    headerTintColor: colors.onHero,
+    headerTitleStyle: { color: colors.onHero, fontWeight: "600" },
   };
 
   if (Platform.OS !== "ios")
@@ -566,6 +568,7 @@ export function ReceiptEditor({
       </ReceiptToolbar>
       <Screen
         insetTop={false}
+        statusBarStyle="light"
         footer={
           data && !processing ? (
             <ReceiptFooter
@@ -612,15 +615,17 @@ export function ReceiptEditor({
             />
           </Panel>
         )}
-        <Panel tone="primary" style={{ padding: 0, gap: 0 }}>
-          <Mosaic
-            seed={receipt._creationTime % 9973}
-            height={6}
-            block={5}
-            columns={80}
-            fade={false}
-          />
-          <View style={{ padding: 16, gap: 10 }}>
+        <Panel
+          tone="primary"
+          style={{
+            padding: 0,
+            gap: 0,
+            borderRadius: 0,
+            marginHorizontal: -20,
+            marginTop: online && receipt.revision === revision ? -16 : 0,
+          }}
+        >
+          <View style={{ padding: 20, gap: 12 }}>
             <View
               style={{ flexDirection: "row", alignItems: "flex-start", gap: 8 }}
             >
@@ -628,7 +633,7 @@ export function ReceiptEditor({
                 <Copy
                   size={13}
                   weight="600"
-                  style={{ color: colors.onHero, opacity: 0.8 }}
+                  style={{ color: colors.onHeroMuted }}
                 >
                   {formatDate(data?.purchaseDate)}
                   {data?.purchaseDate && data.purchaseTime
@@ -636,7 +641,12 @@ export function ReceiptEditor({
                     : ""}
                   {data?.branch ? ` · ${data.branch}` : ""}
                 </Copy>
-                <Copy size={40} weight="800" style={{ color: colors.onHero }}>
+                <Copy
+                  size={36}
+                  weight="600"
+                  selectable
+                  style={{ color: colors.onHero }}
+                >
                   {formatMoney(data?.totalOre ?? null)}
                 </Copy>
               </View>
@@ -667,8 +677,16 @@ export function ReceiptEditor({
               }}
             >
               <Chip
-                label={receiptStatusLabel(receipt)}
-                tone={receipt.status === "reviewed" ? "success" : "muted"}
+                label={
+                  dirty ? "Ulagrede endringer" : receiptStatusLabel(receipt)
+                }
+                tone={
+                  dirty
+                    ? "warning"
+                    : receipt.status === "reviewed"
+                      ? "success"
+                      : "muted"
+                }
                 icon={
                   receipt.status === "reviewed"
                     ? "checkmark.seal"
@@ -682,6 +700,12 @@ export function ReceiptEditor({
               {excluded && <Chip label="Utelatt" icon="eye.slash" />}
               {!approved && tasks.map(taskChip)}
             </View>
+            {receipt.status === "reviewed" && !dirty && !excluded && (
+              <Copy size={14} style={{ color: colors.onHeroMuted }}>
+                Kvitteringen er med i forbruket. Du trenger ikke kontrollere
+                hver vare. Produktkobling er valgfritt.
+              </Copy>
+            )}
           </View>
         </Panel>
         {receipt.provider.includes("mock") && <Notice>Demodata</Notice>}
@@ -810,6 +834,11 @@ export function ReceiptEditor({
                   {tasks.length ? "Varene er avklart" : "Klar til godkjenning"}
                 </Copy>
               </Panel>
+            )}
+            {allLines && (
+              <Copy accessibilityRole="header" size={19} weight="600">
+                Varelinjer
+              </Copy>
             )}
             <ReceiptLineList
               lines={visibleLines}
@@ -1094,7 +1123,7 @@ function ReceiptLineList({
   renderLine: (line: ReceiptData["lines"][number]) => ReactNode;
 }) {
   return lines.length ? (
-    <Panel style={{ gap: 0, paddingVertical: 2, paddingHorizontal: 14 }}>
+    <Panel style={{ gap: 0, paddingVertical: 2, paddingHorizontal: 0 }}>
       {lines.map(renderLine)}
     </Panel>
   ) : null;

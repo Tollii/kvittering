@@ -26,18 +26,19 @@ function ProductImage({ product }: Readonly<{ product: CatalogProduct }>) {
   return (
     <View
       style={{
-        height: 108,
+        height: 84,
+        width: 68,
         alignItems: "center",
         justifyContent: "center",
         backgroundColor: "#FFFFFF",
-        borderRadius: 12,
+        borderRadius: 4,
       }}
     >
       {sources[index] ? (
         <Image
           source={sources[index]}
           contentFit="contain"
-          style={{ width: "100%", height: 100 }}
+          style={{ width: "100%", height: 80 }}
           recyclingKey={product.key}
           onError={() => setIndex((value) => value + 1)}
           accessible={false}
@@ -134,7 +135,7 @@ export function ProductLinkingOptions({
           fortsatt.
         </Notice>
       )}
-      <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 12 }}>
+      <View style={{ gap: 10 }}>
         {candidates.map((product) => (
           <Pressable
             key={product.key}
@@ -145,30 +146,32 @@ export function ProductLinkingOptions({
             onPress={() => onSelect(product)}
             style={(state) => [
               {
-                width: "47.8%",
-                flexGrow: 1,
-                maxWidth: "49%",
+                flexDirection: "row",
+                alignItems: "center",
                 padding: 12,
-                borderRadius: 18,
+                borderRadius: 8,
                 borderCurve: "continuous",
                 backgroundColor: colors.surface,
                 borderWidth: 1,
                 borderColor: colors.line,
-                gap: 8,
+                gap: 16,
                 opacity: disabled ? 0.5 : 1,
               },
               pressed(state),
             ]}
           >
             <ProductImage product={product} />
-            <Copy size={15} weight="600">
-              {product.name}
-            </Copy>
-            {!!product.brand && (
-              <Copy size={12} muted>
-                {product.brand}
+            <View style={{ flex: 1, gap: 4 }}>
+              <Copy size={16} weight="600">
+                {product.name}
               </Copy>
-            )}
+              {!!product.brand && (
+                <Copy size={12} muted>
+                  {product.brand}
+                </Copy>
+              )}
+            </View>
+            <Icon name="chevron.right" size={14} color={colors.secondary} />
           </Pressable>
         ))}
       </View>

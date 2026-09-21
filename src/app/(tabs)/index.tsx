@@ -32,7 +32,6 @@ import {
   Toggle,
   pressed,
 } from "@/components/ui";
-import { Mosaic } from "@/components/mosaic";
 import { useHousehold } from "@/features/session";
 import { saveLocalReceipts } from "@/lib/receipt-storage";
 import {
@@ -52,11 +51,11 @@ import {
 import { nextImport, type ImportOutcome } from "@/features/capture-import";
 import { useTheme } from "@/constants/theme";
 
-const cameraBackground = "#1B1543";
+const cameraBackground = "#101C51";
 
-const onCamera = "#F1EDFB";
+const onCamera = "#F6F3EA";
 
-const onCameraMuted = "#C9C0EA";
+const onCameraMuted = "#E3E7FF";
 
 export default function Capture() {
   const colors = useTheme();
@@ -274,7 +273,7 @@ export default function Capture() {
           paddingVertical: 8,
           borderRadius: 14,
           borderCurve: "continuous",
-          backgroundColor: "#1B1543B3",
+          backgroundColor: "#101C51B3",
         },
         style,
       ]}
@@ -303,15 +302,6 @@ export default function Capture() {
         edges={["top", "left", "right", "bottom"]}
         style={{ flex: 1, padding: 16, gap: 12 }}
       >
-        <Mosaic
-          seed={1000}
-          height={4}
-          block={5}
-          columns={90}
-          fade={false}
-          opacity={0.9}
-          style={{ position: "absolute", top: 0, left: 0, right: 0 }}
-        />
         <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
           {overlay(
             <>
@@ -340,7 +330,7 @@ export default function Capture() {
                 width: 40,
                 height: 40,
                 borderRadius: 20,
-                backgroundColor: "#1B1543B3",
+                backgroundColor: "#101C51B3",
                 alignItems: "center",
                 justifyContent: "center",
               },
@@ -359,7 +349,7 @@ export default function Capture() {
                 width: 40,
                 height: 40,
                 borderRadius: 20,
-                backgroundColor: "#1B1543B3",
+                backgroundColor: "#101C51B3",
                 alignItems: "center",
                 justifyContent: "center",
               },
@@ -493,7 +483,7 @@ export default function Capture() {
                 height: 54,
                 borderRadius: 18,
                 borderCurve: "continuous",
-                backgroundColor: "#1B1543B3",
+                backgroundColor: "#101C51B3",
                 alignItems: "center",
                 justifyContent: "center",
               },
@@ -536,7 +526,7 @@ export default function Capture() {
                   borderRadius: 18,
                   borderCurve: "continuous",
                   overflow: "hidden",
-                  backgroundColor: "#1B1543B3",
+                  backgroundColor: "#101C51B3",
                   alignItems: "center",
                   justifyContent: "center",
                 },
@@ -628,7 +618,7 @@ export default function Capture() {
                   width: 24,
                   height: 24,
                   borderRadius: 12,
-                  backgroundColor: "#1B1543CC",
+                  backgroundColor: "#101C51CC",
                   alignItems: "center",
                   justifyContent: "center",
                 }}
@@ -657,7 +647,7 @@ export default function Capture() {
                     width: 28,
                     height: 28,
                     borderRadius: 14,
-                    backgroundColor: "#1B1543CC",
+                    backgroundColor: "#101C51CC",
                     alignItems: "center",
                     justifyContent: "center",
                   },

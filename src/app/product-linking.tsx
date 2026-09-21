@@ -1,3 +1,4 @@
+import { useTheme } from "@/constants/theme";
 import { useRef, useState } from "react";
 import { Stack, router } from "expo-router";
 import { ActivityIndicator, View } from "react-native";
@@ -22,6 +23,7 @@ import { errorFeedback, successFeedback } from "@/lib/haptics";
 import type { ReceiptCommitAcknowledgement } from "../../convex/receiptChanges";
 
 export default function ProductLinking() {
+  const colors = useTheme();
   const queue = useProductLinkingQueue();
   const { online } = useHousehold();
   const choose = useReleaseMutation(api.productLinking.choose);
@@ -95,6 +97,7 @@ export default function ProductLinking() {
     <Screen
       key={itemKey ?? "empty"}
       insetTop={false}
+      statusBarStyle="light"
       footer={
         last || item ? (
           <View style={{ flexDirection: "row", gap: 8 }}>
@@ -133,7 +136,14 @@ export default function ProductLinking() {
         ) : undefined
       }
     >
-      <Stack.Screen options={{ title: "Koble produkter" }} />
+      <Stack.Screen
+        options={{
+          title: "Koble produkter",
+          headerStyle: { backgroundColor: colors.hero },
+          headerTintColor: colors.onHero,
+          headerTitleStyle: { color: colors.onHero },
+        }}
+      />
       {!online && (
         <Notice icon="wifi.slash">
           Koble til nettet for å lagre produktvalg.
@@ -143,24 +153,28 @@ export default function ProductLinking() {
       {busy && <ActivityIndicator accessibilityLabel="Lagrer produktvalg" />}
       {item ? (
         <>
-          <Copy size={13} muted>
-            {queue.complete ? queue.items.length : `${queue.items.length}+`}{" "}
-            varer igjen
-          </Copy>
-          <Panel tone="soft">
-            <Copy size={13} muted>
+          <Panel
+            tone="primary"
+            style={{
+              borderRadius: 0,
+              marginHorizontal: -20,
+              marginTop: online && !error && !busy ? -16 : 0,
+              paddingHorizontal: 20,
+            }}
+          >
+            <Copy size={13} style={{ color: colors.onHeroMuted }}>
               {item.store} · {formatDate(item.date)}
             </Copy>
-            <Copy size={24} weight="700">
+            <Copy size={24} weight="600" style={{ color: colors.onHero }}>
               {item.line.name}
             </Copy>
             {item.line.receiptName &&
               item.line.receiptName !== item.line.name && (
-                <Copy size={13} muted>
+                <Copy size={13} style={{ color: colors.onHeroMuted }}>
                   På kvitteringen: {item.line.receiptName}
                 </Copy>
               )}
-            <Copy size={14}>
+            <Copy size={14} style={{ color: colors.onHero }}>
               {[
                 item.line.brand,
                 item.line.packageSize && item.line.packageUnit
@@ -172,6 +186,10 @@ export default function ProductLinking() {
                 .join(" · ")}
             </Copy>
           </Panel>
+          <Copy size={13} muted>
+            {queue.complete ? queue.items.length : `${queue.items.length}+`}{" "}
+            varer igjen
+          </Copy>
           <Copy weight="600">Hvilket produkt kjøpte dere?</Copy>
           <ProductLinkingOptions
             key={itemKey}

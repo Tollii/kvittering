@@ -1,7 +1,7 @@
 import { router } from "expo-router";
 import { ActivityIndicator, Pressable, View } from "react-native";
 import { Copy, Icon, pressed } from "./ui";
-import { radius, useTheme } from "@/constants/theme";
+import { useTheme } from "@/constants/theme";
 import { formatDate } from "@/lib/format-date";
 import { reviewSummary } from "@/lib/domain/receipt-review";
 import type { Receipt } from "@/lib/domain/insights";
@@ -56,17 +56,17 @@ export function ReceiptCard({
       onPress={() => openReceipt(receipt)}
       style={(state) => [
         {
-          backgroundColor: colors.surface,
-          borderRadius: radius.card,
+          backgroundColor: colors.background,
+          borderBottomWidth: 1,
+          borderBottomColor: colors.line,
           borderCurve: "continuous",
           overflow: "hidden",
           flexDirection: "row",
-          boxShadow: `0 1px 2px ${colors.shadow}, 0 6px 16px ${colors.shadow}`,
         },
         pressed(state),
       ]}
     >
-      <View style={{ flex: 1, padding: compact ? 12 : 14, gap: 6 }}>
+      <View style={{ flex: 1, paddingVertical: compact ? 12 : 16, gap: 6 }}>
         <View style={{ flexDirection: "row", alignItems: "center", gap: 10 }}>
           <View style={{ flex: 1, gap: 2 }}>
             <Copy weight="600" size={16} numberOfLines={1}>

@@ -13,6 +13,8 @@ module.exports = defineConfig([
   {
     ignores: [
       "sveltemo/**",
+      // Standalone design studies are archived references, not application code.
+      "plans/cobalt-design-prototype/**",
       "convex/_generated/**",
       "convex/kassalapp/generated/**",
       "tools/oxlint/anti-slop/**",

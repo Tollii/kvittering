@@ -30,7 +30,7 @@ import {
   Toggle,
   pressed,
 } from "@/components/ui";
-import { Mosaic } from "@/components/mosaic";
+import { MonumentArtwork } from "@/components/monument-artwork";
 import { SpendingBars, SpendingDetails } from "@/components/spending-details";
 import { useHousehold } from "@/features/session";
 import {
@@ -40,11 +40,10 @@ import {
 } from "@/lib/domain/insights";
 import { formatMoney, osloDate } from "@/lib/domain/receipt";
 import { categoryById } from "@/lib/domain/categories";
-import { openReceipt, receiptNeeds } from "@/components/receipt-card";
-import { mosaicHighlight, useTheme } from "@/constants/theme";
+import { receiptNeeds } from "@/components/receipt-card";
+import { useTheme } from "@/constants/theme";
 import { budgetPace, paceLabel } from "@/lib/domain/budget";
 import { monthPriceSignals } from "@/lib/domain/price-signals";
-import { formatDate } from "@/lib/format-date";
 import { catalogInsights } from "@/lib/catalog/insights";
 import { router } from "expo-router";
 import { StoreSpendingSheet } from "@/features/spending-reports/stores";
@@ -153,15 +152,6 @@ export default function Spending() {
       ].includes(category.id) && category.amountOre !== 0,
   );
 
-  const recentReceipts = [...totals.selected]
-    .sort(
-      (a, b) =>
-        (b.data?.purchaseDate ?? "").localeCompare(
-          a.data?.purchaseDate ?? "",
-        ) || b._creationTime - a._creationTime,
-    )
-    .slice(0, 3);
-
   const rawMonth = new Intl.DateTimeFormat("nb-NO", {
     month: "long",
     year: "numeric",
@@ -185,10 +175,6 @@ export default function Spending() {
     budgetOre && budgetOre > 0
       ? budgetPace(budgetOre, totals.products, month)
       : null;
-
-  const [whole, fraction] = formatMoney(totals.products)
-    .replace(/\s?kr$/, "")
-    .split(",");
 
   const selected = resolveSpendingSelection(selection, periodKey, {
     group: totals.groups,
@@ -291,7 +277,8 @@ export default function Spending() {
         <IconButton
           name="line.3.horizontal.decrease"
           label="Filtrer forbruk"
-          filled
+          filled="#FFFFFF22"
+          color={colors.onHero}
           size={17}
           onPress={() => setFilters(true)}
         />
@@ -302,136 +289,115 @@ export default function Spending() {
         <Loading />
       ) : (
         <>
-          <Panel tone="primary" style={{ padding: 0, gap: 0 }}>
-            <Mosaic
-              seed={1000}
-              height={7}
-              block={5}
-              columns={80}
-              fade={false}
-            />
-            <View style={{ padding: 18, paddingTop: 14, gap: 4 }}>
-              <View
-                style={{
-                  flexDirection: "row",
-                  alignItems: "center",
-                  gap: 4,
-                }}
+          <Panel
+            tone="primary"
+            style={{
+              padding: 20,
+              paddingTop: 0,
+              gap: 8,
+              marginHorizontal: -20,
+              marginTop: online ? -12 : 0,
+              borderRadius: 0,
+            }}
+          >
+            <View style={{ flexDirection: "row", alignItems: "center" }}>
+              <Copy
+                size={22}
+                weight="600"
+                style={{ color: colors.onHero, flex: 1 }}
               >
+                {monthLabel}
+              </Copy>
+              <IconButton
+                name="chevron.left"
+                label="Forrige måned"
+                size={16}
+                color={colors.onHero}
+                onPress={() => moveMonth(-1)}
+              />
+              <IconButton
+                name="chevron.right"
+                label="Neste måned"
+                size={16}
+                color={colors.onHero}
+                disabled={month >= currentMonth}
+                onPress={() => moveMonth(1)}
+              />
+            </View>
+            <View
+              style={{ flexDirection: "row", alignItems: "center", gap: 12 }}
+            >
+              <View style={{ flex: 1, gap: 8 }}>
                 <Copy
-                  size={13}
+                  size={12}
                   weight="600"
+                  style={{ color: colors.onHeroMuted }}
+                >
+                  DAGLIGVARER
+                </Copy>
+                <Copy
+                  size={36}
+                  weight="600"
+                  selectable
+                  style={{ color: colors.onHero }}
+                >
+                  {formatMoney(totals.products)}
+                </Copy>
+                <Copy size={13} style={{ color: colors.onHeroMuted }}>
+                  {totals.selected.length}{" "}
+                  {totals.selected.length === 1 ? "kvittering" : "kvitteringer"}
+                  {totals.provisional
+                    ? ` · ${totals.provisional} foreløpige`
+                    : ""}
+                  {reviewedOnly ? " · bare godkjente" : ""}
+                  {change !== null
+                    ? ` · ${Math.abs(change)} % ${change > 0 ? "mer" : "mindre"} enn ${comparison.partial ? "samme del av forrige måned" : "forrige måned"}`
+                    : ""}
+                </Copy>
+              </View>
+              <MonumentArtwork scene="inbox" compact />
+            </View>
+            {pace && (
+              <View style={{ gap: 6, paddingTop: 6 }}>
+                <View
                   style={{
-                    color: colors.onHero,
-                    opacity: 0.8,
-                    flex: 1,
+                    height: 6,
+                    borderRadius: 3,
+                    backgroundColor: "#FFFFFF33",
+                    overflow: "hidden",
                   }}
                 >
-                  {monthLabel}
-                </Copy>
-                <IconButton
-                  name="chevron.left"
-                  label="Forrige måned"
-                  size={16}
-                  color={colors.onHero}
-                  onPress={() => moveMonth(-1)}
-                />
-                <IconButton
-                  name="chevron.right"
-                  label="Neste måned"
-                  size={16}
-                  color={colors.onHero}
-                  disabled={month >= currentMonth}
-                  onPress={() => moveMonth(1)}
-                />
-              </View>
-              <View
-                style={{
-                  flexDirection: "row",
-                  alignItems: "flex-end",
-                  gap: 6,
-                }}
-              >
-                <Copy
-                  size={46}
-                  weight="800"
-                  style={{ color: colors.onHero }}
-                  accessibilityLabel={formatMoney(totals.products)}
-                >
-                  {whole}
-                </Copy>
-                {!!fraction && (
-                  <Copy
-                    size={22}
-                    weight="700"
-                    style={{
-                      color: colors.onHero,
-                      opacity: 0.75,
-                      paddingBottom: 6,
-                    }}
-                    accessibilityElementsHidden
-                  >
-                    ,{fraction} kr
-                  </Copy>
-                )}
-              </View>
-              <Copy size={13} style={{ color: colors.onHero, opacity: 0.8 }}>
-                {totals.selected.length}{" "}
-                {totals.selected.length === 1 ? "kvittering" : "kvitteringer"}
-                {totals.provisional
-                  ? ` · ${totals.provisional} foreløpige`
-                  : ""}
-                {reviewedOnly ? " · bare godkjente" : ""}
-                {change !== null
-                  ? ` · ${Math.abs(change)} % ${change > 0 ? "mer" : "mindre"} enn ${
-                      comparison.partial
-                        ? "samme del av forrige måned"
-                        : "forrige måned"
-                    }`
-                  : ""}
-              </Copy>
-              {pace && (
-                <View style={{ gap: 6, paddingTop: 6 }}>
                   <View
                     style={{
                       height: 6,
                       borderRadius: 3,
-                      backgroundColor: "#FFFFFF33",
-                      overflow: "hidden",
+                      width: `${Math.min(100, pace.spentShare * 100)}%`,
+                      backgroundColor:
+                        pace.status === "over" ? "#FFE3A1" : colors.onHero,
                     }}
-                  >
+                  />
+                  {pace.elapsedShare > 0 && pace.elapsedShare < 1 && (
                     <View
                       style={{
-                        height: 6,
-                        borderRadius: 3,
-                        width: `${Math.min(100, pace.spentShare * 100)}%`,
-                        backgroundColor:
-                          pace.status === "over" ? mosaicHighlight : "#FFFFFF",
+                        position: "absolute",
+                        left: `${pace.elapsedShare * 100}%`,
+                        top: -2,
+                        width: 2,
+                        height: 10,
+                        backgroundColor: "#FFFFFFAA",
                       }}
                     />
-                    {pace.elapsedShare > 0 && pace.elapsedShare < 1 && (
-                      <View
-                        style={{
-                          position: "absolute",
-                          left: `${pace.elapsedShare * 100}%`,
-                          top: -2,
-                          width: 2,
-                          height: 10,
-                          backgroundColor: "#FFFFFFAA",
-                        }}
-                      />
-                    )}
-                  </View>
-                  <Copy
-                    size={13}
-                    weight="600"
-                    style={{ color: colors.onHero, opacity: 0.9 }}
-                  >
-                    {paceLabel(pace)}
-                  </Copy>
+                  )}
                 </View>
-              )}
-            </View>
+                <Copy
+                  size={13}
+                  weight="600"
+                  style={{ color: colors.onHero, opacity: 0.9 }}
+                >
+                  {paceLabel(pace)}
+                </Copy>
+              </View>
+            )}
           </Panel>
           {!completeReceipts && <Notice>Henter kvitteringer …</Notice>}
           {coverage.pending.length > 0 && (
@@ -467,7 +433,8 @@ export default function Spending() {
               <Icon name="chevron.right" size={12} color={colors.secondary} />
             </Pressable>
           )}
-          <Panel>
+          <View style={{ gap: 4 }}>
+            <SectionTitle title="Fordeling" />
             <Segments
               value={breakdown}
               onChange={(value) => {
@@ -533,8 +500,8 @@ export default function Spending() {
             {!rows.length && (
               <Empty title="Ingen kjøp denne måneden" icon="cart" />
             )}
-          </Panel>
-          <Panel tone="soft">
+          </View>
+          <Panel>
             <Row
               title="Butikker"
               detail="Se hvor dere handler, og hva dere bruker per butikk"
@@ -542,40 +509,6 @@ export default function Spending() {
               onPress={() => setStoresOpen(true)}
             />
           </Panel>
-          {recentReceipts.length > 0 && (
-            <>
-              <SectionTitle
-                title="Siste kjøp"
-                action="Se alle"
-                onAction={() => router.navigate("/history")}
-              />
-              <Panel style={{ gap: 0, paddingVertical: 4 }}>
-                {recentReceipts.map((receipt, index) => (
-                  <View
-                    key={receipt._id}
-                    style={{
-                      borderTopWidth: index ? 1 : 0,
-                      borderTopColor: colors.line,
-                      paddingVertical: 4,
-                    }}
-                  >
-                    <Row
-                      title={receipt.data?.store ?? "Kvittering"}
-                      detail={[
-                        formatDate(receipt.data?.purchaseDate),
-                        receipt.data?.branch,
-                        receipt.status !== "reviewed" ? "Til kontroll" : null,
-                      ]
-                        .filter(Boolean)
-                        .join(" · ")}
-                      value={formatMoney(receipt.data?.totalOre ?? null)}
-                      onPress={() => openReceipt(receipt)}
-                    />
-                  </View>
-                ))}
-              </Panel>
-            </>
-          )}
           <SectionTitle title="Betaling" />
           <Panel style={{ gap: 0, paddingVertical: 4 }}>
             <Row

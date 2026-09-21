@@ -5,16 +5,8 @@ import { View } from "react-native";
 import { randomUUID } from "expo-crypto";
 import { api } from "../../convex/_generated/api";
 import { authClient } from "@/lib/auth-client";
-import {
-  Button,
-  Copy,
-  Field,
-  Icon,
-  Notice,
-  Panel,
-  Screen,
-} from "@/components/ui";
-import { Mosaic } from "@/components/mosaic";
+import { Button, Copy, Field, Notice, Panel, Screen } from "@/components/ui";
+import { ArchMark } from "@/components/monument-artwork";
 import { useTheme } from "@/constants/theme";
 
 function Brand({ tagline }: Readonly<{ tagline: string }>) {
@@ -34,7 +26,7 @@ function Brand({ tagline }: Readonly<{ tagline: string }>) {
             justifyContent: "center",
           }}
         >
-          <Icon name="receipt" size={20} color={colors.onPrimary} />
+          <ArchMark color={colors.onPrimary} />
         </View>
         <Copy size={20} weight="700">
           Kvitto
@@ -43,7 +35,6 @@ function Brand({ tagline }: Readonly<{ tagline: string }>) {
       <Copy size={44} weight="800" style={{ color: colors.primary }}>
         Dagligvarene.{"\n"}Samlet.
       </Copy>
-      <Mosaic seed={1000} height={5} block={5} columns={44} />
       <Copy muted size={16}>
         {tagline}
       </Copy>
@@ -85,7 +76,7 @@ export function SignIn() {
   }
 
   return (
-    <Screen>
+    <Screen statusBarStyle="auto">
       <Brand tagline="Handle. Ta et bilde. Ferdig." />
       <Panel style={{ gap: 12 }}>
         <Copy size={22} weight="700">

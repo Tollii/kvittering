@@ -13,6 +13,8 @@ import {
   useSafeAreaInsets,
 } from "react-native-safe-area-context";
 import { router } from "expo-router";
+import { StatusBar } from "expo-status-bar";
+import { ArchMark } from "../monument-artwork";
 import { useTheme } from "@/constants/theme";
 import { Copy, Icon, pressed, styles } from "./typography";
 import { IconButton } from "./controls";
@@ -25,6 +27,7 @@ export function Screen({
   insetTop = true,
   footer,
   headerRight,
+  statusBarStyle,
 }: Readonly<{
   children: ReactNode;
   title?: string;
@@ -33,18 +36,35 @@ export function Screen({
   insetTop?: boolean;
   footer?: ReactNode;
   headerRight?: ReactNode;
+  statusBarStyle?: "auto" | "light" | "dark";
 }>) {
   const colors = useTheme();
   const insets = useSafeAreaInsets();
 
   const header = !!title && (
-    <View style={[styles.row, { alignItems: "flex-end", paddingBottom: 4 }]}>
+    <View
+      style={[
+        styles.row,
+        {
+          backgroundColor: colors.hero,
+          marginHorizontal: -20,
+          paddingHorizontal: 20,
+          paddingVertical: 14,
+        },
+      ]}
+    >
+      <ArchMark color={colors.onHero} />
       <View style={{ flex: 1, gap: 2 }}>
-        <Copy accessibilityRole="header" size={30} weight="800">
+        <Copy
+          accessibilityRole="header"
+          size={24}
+          weight="600"
+          style={{ color: colors.onHero }}
+        >
           {title}
         </Copy>
         {!!subtitle && (
-          <Copy muted size={14} weight="500">
+          <Copy size={14} weight="500" style={{ color: colors.onHeroMuted }}>
             {subtitle}
           </Copy>
         )}
@@ -59,15 +79,15 @@ export function Screen({
           style={(state) => [
             styles.iconButton,
             {
-              backgroundColor: colors.muted,
+              backgroundColor: "#FFFFFF22",
               borderRadius: 20,
-              minWidth: 40,
-              minHeight: 40,
+              minWidth: 44,
+              minHeight: 44,
             },
             pressed(state),
           ]}
         >
-          <Icon name="person.2" size={18} color={colors.primary} />
+          <Icon name="person.2" size={18} color={colors.onHero} />
         </Pressable>
       )}
     </View>
@@ -76,7 +96,8 @@ export function Screen({
   const content = (
     <View
       style={{
-        padding: 16,
+        paddingHorizontal: 20,
+        paddingTop: title ? 0 : 16,
         paddingBottom: footer ? 16 : 32,
         gap: 12,
         maxWidth: 760,
@@ -93,11 +114,15 @@ export function Screen({
   return (
     <SafeAreaView
       edges={insetTop ? ["top", "left", "right"] : ["left", "right"]}
-      style={{ flex: 1, backgroundColor: colors.background }}
+      style={{
+        flex: 1,
+        backgroundColor: title ? colors.hero : colors.background,
+      }}
     >
+      {statusBarStyle && <StatusBar style={statusBarStyle} />}
       <KeyboardAvoidingView
         behavior={Platform.OS === "ios" ? "padding" : undefined}
-        style={{ flex: 1 }}
+        style={{ flex: 1, backgroundColor: colors.background }}
       >
         <ScrollView
           style={{ flex: 1 }}
