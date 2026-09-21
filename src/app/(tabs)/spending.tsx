@@ -1,3 +1,4 @@
+import { WidgetTip } from "@/features/widget-tip";
 import { usePurchaseWidget } from "@/features/purchase-widget";
 import { PeriodMenu } from "@/components/period-menu";
 import {
@@ -603,6 +604,7 @@ export default function Spending() {
         nextDisabled={month >= currentMonth}
         loading={loadingReceipts}
       />
+      <WidgetTip />
       <Sheet
         title={report ? reports[report].title : ""}
         visible={report !== null}

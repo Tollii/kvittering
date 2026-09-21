@@ -40,6 +40,7 @@ export const receiptFields = {
   uploaderName: v.string(),
   clientId: v.string(),
   imageCount: v.number(),
+  backgroundUpload: v.boolean().optional(),
   status: statusValidator,
   revision: v.number(),
   generation: v.number(),
@@ -61,6 +62,21 @@ export const receiptFields = {
 };
 
 export default defineSchema({
+  receiptActivities: defineTable({
+    identity: v.string(),
+    householdId: v.id("households"),
+    activityId: v.string(),
+    environment: v.optional(
+      v.union(v.literal("development"), v.literal("production")),
+    ),
+    receiptIds: v.array(v.id("receipts")),
+    token: v.optional(v.string()),
+    updatedAt: v.number(),
+    expiresAt: v.number(),
+  })
+    .index("by_activityId", ["activityId"])
+    .index("by_identity", ["identity"])
+    .index("by_householdId", ["householdId"]),
   clientReleases: defineTable({
     identity: v.string(),
     installationId: v.string(),

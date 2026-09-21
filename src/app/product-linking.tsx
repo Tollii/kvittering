@@ -1,3 +1,4 @@
+import { completeReceiptTip } from "@/components/receipt-tip";
 import { useTheme } from "@/constants/theme";
 import { useRef, useState } from "react";
 import { Stack, router } from "expo-router";
@@ -58,6 +59,7 @@ export default function ProductLinking() {
       });
 
       setLast(result);
+      completeReceiptTip("matching");
       successFeedback();
     } catch (cause) {
       errorFeedback();

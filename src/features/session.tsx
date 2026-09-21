@@ -1,3 +1,10 @@
+import {
+  clearReceiptActivity,
+  ReceiptActivityTracking,
+} from "./receipt-activity";
+import Storage from "expo-sqlite/kv-store";
+import { clearReceiptSearch, ReceiptSearchIndex } from "./spotlight";
+import ReceiptIntelligence from "../../modules/receipt-intelligence/src/ReceiptIntelligenceModule";
 import { setPurchaseWidgetScope } from "@/lib/purchase-widget";
 import { storageSuffix } from "@/lib/deployment-storage";
 import { FeatureFlagsProvider, useFeatureFlag } from "./featureFlags";
@@ -130,7 +137,13 @@ function SessionGate({ children }: Readonly<{ children: ReactNode }>) {
 
     if (removed) removeAccountCatalogCache(removed);
 
-    if (!owner || removed) setPurchaseWidgetScope(null);
+    if (!owner || removed) {
+      setPurchaseWidgetScope(null);
+      clearReceiptSearch();
+      clearReceiptActivity();
+      ReceiptIntelligence?.retainUploadScope?.(null);
+    }
+
     previousOwner.current = owner;
   }, [owner, session.isPending]);
 
@@ -215,9 +228,24 @@ function HouseholdProvider({
   }, [details, owner]);
   const householdId = household?.id;
   useEffect(() => {
-    if (householdId)
-      setPurchaseWidgetScope(`${storageSuffix}:${owner}:${householdId}`);
-    else if (details === null) setPurchaseWidgetScope(null);
+    if (householdId) {
+      const scope = `${storageSuffix}:${owner}:${householdId}`;
+      const previousScope = Storage.getItemSync("receipt-system-scope");
+
+      if (previousScope !== scope) {
+        clearReceiptSearch();
+        clearReceiptActivity();
+      }
+
+      Storage.setItemSync("receipt-system-scope", scope);
+      setPurchaseWidgetScope(scope);
+      ReceiptIntelligence?.retainUploadScope?.(scope);
+    } else if (details === null) {
+      setPurchaseWidgetScope(null);
+      clearReceiptSearch();
+      clearReceiptActivity();
+      ReceiptIntelligence?.retainUploadScope?.(null);
+    }
   }, [householdId, owner, details]);
 
   const synchronize = useCallback(
@@ -240,6 +268,7 @@ function HouseholdProvider({
             convex,
             householdId,
             () => active.current && canUpload.current,
+            `${storageSuffix}:${owner}:${householdId}`,
           ),
           () =>
             active.current &&
@@ -302,7 +331,13 @@ function HouseholdProvider({
         synchronize,
       }}
     >
-      {auth.isAuthenticated && <ReleaseDiagnostics />}
+      {auth.isAuthenticated && (
+        <>
+          <ReleaseDiagnostics />
+          <ReceiptSearchIndex />
+          <ReceiptActivityTracking />
+        </>
+      )}
       {!receiptProcessing && (
         <Notice>
           {policy.message ||

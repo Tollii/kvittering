@@ -1,3 +1,4 @@
+import { notifyReceiptActivities } from "./liveActivities";
 import {
   parseReceiptIssue,
   receiptIssueText,
@@ -165,6 +166,9 @@ export async function commitReceiptChange(
   }
 
   await ctx.db.patch("receipts", previous._id, patch);
+
+  if (decision.status !== previous.status)
+    await notifyReceiptActivities(ctx, previous.householdId);
 
   if (input.origin.kind === "extraction" && input.origin.next === "catalog")
     await ctx.scheduler.runAfter(0, internal.catalogMatching.start, {

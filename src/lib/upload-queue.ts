@@ -20,6 +20,7 @@ export interface QueueStore {
 }
 
 export interface UploadTransport {
+  concurrentImages?: boolean;
   reserve(entry: LocalReceipt): Promise<Id<"receipts">>;
   upload(id: Id<"receipts">, position: number, uri: string): Promise<void>;
   complete(id: Id<"receipts">, entry: LocalReceipt): Promise<void>;
@@ -64,13 +65,13 @@ export function createQueueRunner(
             });
           }
 
-          for (let position = 0; position < entry.images.length; position++) {
+          const uploadImage = async (position: number) => {
             if (!active()) return;
 
-            if (entry.uploaded[position]) continue;
+            if (entry.uploaded[position]) return;
             const started = Date.now();
             await transport.upload(
-              entry.receiptId,
+              entry.receiptId!,
               position,
               entry.images[position],
             );
@@ -81,6 +82,21 @@ export function createQueueRunner(
               position,
               durationMs: Date.now() - started,
             });
+          };
+
+          if (transport.concurrentImages) {
+            const results = await Promise.allSettled(
+              entry.images.map((_, position) => uploadImage(position)),
+            );
+
+            const failed = results.find(
+              (result) => result.status === "rejected",
+            );
+
+            if (failed?.status === "rejected") throw failed.reason;
+          } else {
+            for (let position = 0; position < entry.images.length; position++)
+              await uploadImage(position);
           }
 
           if (!active()) return;

@@ -128,3 +128,33 @@ describe("durable receipt upload", () => {
     expect(rows()[0].uploaded).toEqual([false, false]);
   });
 });
+
+it("schedules every background image before waiting and retains each successful result on failure", async () => {
+  const { run, rows } = fixture();
+  const first = Promise.withResolvers<void>();
+  const second = Promise.withResolvers<void>();
+  const scheduled: number[] = [];
+  let committed = false;
+
+  const transport: UploadTransport = {
+    concurrentImages: true,
+    reserve: async () => receiptId,
+    upload: async (_id, position) => {
+      scheduled.push(position);
+
+      return position === 0 ? first.promise : second.promise;
+    },
+    complete: async () => {
+      committed = true;
+    },
+  };
+
+  const running = run("user", household, transport, () => true);
+  await Promise.resolve();
+  expect(scheduled).toEqual([0, 1]);
+  second.resolve();
+  first.reject(new Error("Offline"));
+  await running;
+  expect(rows()[0].uploaded).toEqual([false, true]);
+  expect(committed).toBe(false);
+});

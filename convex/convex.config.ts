@@ -15,6 +15,9 @@ const app = defineApp({
     SITE_URL: v.string().optional(),
     ALLOW_EXPO_GO: v.string().optional(),
     RECEIPT_PROVIDER: v.string().optional(),
+    APNS_KEY_ID: v.string().optional(),
+    APNS_TEAM_ID: v.string().optional(),
+    APNS_PRIVATE_KEY: v.string().optional(),
     EXPO_ACCESS_TOKEN: v.string().optional(),
   },
 });

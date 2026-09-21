@@ -1,3 +1,4 @@
+import { notifyReceiptActivities } from "./liveActivities";
 import { linkCatalogProduct } from "./catalogLinks";
 import { compatibleCatalogProduct } from "../src/lib/catalog/matching";
 import { commitReceiptChange } from "./receiptChanges";
@@ -147,6 +148,7 @@ export const begin = internalMutation({
     )
       return null;
     await ctx.db.patch("receipts", args.id, { status: "processing" });
+    await notifyReceiptActivities(ctx, receipt.householdId);
 
     const images = await ctx.db
       .query("images")
@@ -468,6 +470,7 @@ export const fail = internalMutation({
         status: "failed",
         error: args.error.slice(0, 400),
       });
+      await notifyReceiptActivities(ctx, receipt.householdId);
     }
 
     return null;

@@ -1,3 +1,4 @@
+import { ReceiptSearchSettings } from "@/features/spotlight";
 import { FormSection, NativeForm } from "@/components/ui/native-form";
 import { CameraPreferences } from "@/features/camera-preferences";
 import { ReleaseSettings } from "@/features/release-settings";
@@ -205,6 +206,9 @@ export default function Settings() {
         </FormSection>
         <FormSection title="App og oppdateringer">
           <ReleaseSettings />
+        </FormSection>
+        <FormSection title="Spotlight">
+          <ReceiptSearchSettings />
         </FormSection>
         <FormSection title="Kamera">
           <Panel>

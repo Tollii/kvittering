@@ -80,6 +80,7 @@
           "organization": "andreas-tolnes"
         }
       ],
+      "./plugins/with-app-shortcuts",
       [
         "expo-widgets",
         {
@@ -93,10 +94,10 @@
                 "supportedFamilies": ["systemSmall", "systemMedium"]
               }
             }
-          ]
+          ],
+          "enablePushNotifications": true
         }
-      ],
-      "./plugins/with-app-shortcuts"
+      ]
     ],
     "experiments": {
       "typedRoutes": true,

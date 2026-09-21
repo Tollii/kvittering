@@ -2,12 +2,56 @@ import ExpoModulesCore
 import PDFKit
 import UIKit
 import VisionKit
+import TipKit
+import WidgetKit
 
 /// Renders PDF receipts to images on the device. Reading happens on the server.
 public class ReceiptIntelligenceModule: Module {
   private var scanner: ReceiptDocumentScanner?
+  private var preview: ReceiptPreview?
   public func definition() -> ModuleDefinition {
     Name("ReceiptIntelligence")
+    AsyncFunction("hasPurchaseWidget") { (promise: Promise) in
+      WidgetCenter.shared.getCurrentConfigurations { result in
+        promise.resolve((try? result.get().contains { $0.kind == "PurchaseWidget" }) ?? false)
+      }
+    }
+    Function("supportsReceiptTips") { if #available(iOS 17.0, *) { return true }; return false }
+    Function("completeReceiptTip") { (kind: String) in
+      if #available(iOS 17.0, *) {
+        if kind == "matching" { ProductMatchTip().invalidate(reason: .actionPerformed) }
+        else { SpendingWidgetTip().invalidate(reason: .actionPerformed) }
+      }
+    }
+    View(ReceiptTipView.self) {
+      Prop("kind") { (view: ReceiptTipView, kind: String) in view.kind = kind }
+      Events("onHeightChange")
+    }
+
+
+    AsyncFunction("uploadReceiptImage") { (key: String, uri: String, address: String, headers: [String: String], promise: Promise) in
+      ReceiptBackgroundUploads.shared.upload(key: key, uri: uri, address: address, headers: headers, promise: promise)
+    }.runOnQueue(.main)
+    Function("retainUploadScope") { (scope: String?) in DispatchQueue.main.async { ReceiptBackgroundUploads.shared.retainScope(scope) } }
+    Function("forgetUploads") { (keys: [String]) in DispatchQueue.main.async { ReceiptBackgroundUploads.shared.forget(keys) } }
+
+
+    AsyncFunction("indexReceipts") { (receipts: [SearchReceipt], promise: Promise) in
+      ReceiptSearch.shared.replace(receipts, promise: promise)
+    }
+
+    AsyncFunction("previewReceipts") { (urls: [String], token: String, promise: Promise) in
+      Task { @MainActor in
+        guard self.preview == nil, let presenter = self.appContext?.utilities?.currentViewController() else {
+          promise.reject("PREVIEW_UNAVAILABLE", "Forhåndsvisningen er allerede åpen.")
+          return
+        }
+        let preview = ReceiptPreview { self.preview = nil }
+        self.preview = preview
+        do { try await preview.present(urls: urls, token: token, from: presenter); promise.resolve(nil) }
+        catch { self.preview = nil; promise.reject("PREVIEW_FAILED", error.localizedDescription) }
+      }
+    }.runOnQueue(.main)
 
     Function("isDocumentScannerSupported") { VNDocumentCameraViewController.isSupported }
 

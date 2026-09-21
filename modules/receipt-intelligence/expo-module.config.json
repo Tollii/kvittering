@@ -1,4 +1,7 @@
 {
   "platforms": ["apple"],
-  "apple": { "modules": ["ReceiptIntelligenceModule"] }
+  "apple": {
+    "modules": ["ReceiptIntelligenceModule"],
+    "appDelegateSubscribers": ["ReceiptAppDelegate"]
+  }
 }
