@@ -33,17 +33,17 @@ export function Panel({
                 ? colors.primarySoft
                 : tone === "plain"
                   ? colors.surfaceRaised
-                  : colors.surface,
-          borderRadius: radius.card,
+                  : "transparent",
+          borderRadius: tone === "surface" ? 0 : radius.card,
           borderCurve: "continuous",
-          padding: 16,
+          paddingVertical: 16,
+          paddingHorizontal: tone === "surface" ? 0 : 16,
           gap: 10,
           overflow: "hidden",
         },
         tone === "surface" && {
-          borderWidth: StyleSheet.hairlineWidth,
+          borderBottomWidth: 1,
           borderColor: colors.line,
-          boxShadow: `0 1px 2px ${colors.shadow}, 0 6px 16px ${colors.shadow}`,
         },
         style,
       ]}
@@ -84,7 +84,7 @@ export function SectionTitle({
           onPress={onAction}
           hitSlop={8}
           style={(state) => [
-            { minHeight: 36, justifyContent: "center", paddingLeft: 12 },
+            { minHeight: 44, justifyContent: "center", paddingLeft: 12 },
             pressed(state),
           ]}
         >

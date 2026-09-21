@@ -1,6 +1,9 @@
 import { useDebouncedSearch } from "./catalog-queries";
 import { productSearch } from "@/lib/catalog/search";
-import type { ProductSelection } from "@/lib/domain/product-reference";
+import {
+  productReference,
+  type ProductSelection,
+} from "@/lib/domain/product-reference";
 import { useState } from "react";
 import { Pressable, View } from "react-native";
 import { useQuery } from "convex-helpers/react/cache";
@@ -123,6 +126,20 @@ export function ReceiptLineEditor({
   const patch = (value: Partial<ReceiptLine>) =>
     onChange({ ...line, ...value, manual: true });
 
+  const reference = productReference(line);
+  const productKind = productChoice?.kind ?? reference.kind;
+  const productMissing = productKind === "unresolved";
+
+  const productLabel = productMissing
+    ? "Mangler produkt"
+    : productKind === "separate"
+      ? "Holdes separat"
+      : productKind === "household" || productKind === "new_household"
+        ? "Eget produkt"
+        : catalogProduct?.equivalence
+          ? "Tilsvarende produkt"
+          : "Produkt";
+
   const category = categoryById.get(line.categoryId ?? "");
   const categoryLabel = category?.name ?? "Velg kategori";
 
@@ -145,8 +162,8 @@ export function ReceiptLineEditor({
       style={{
         borderBottomWidth: 1,
         borderBottomColor: colors.line,
-        paddingVertical: review ? 10 : 4,
-        gap: review ? 8 : 0,
+        paddingVertical: 12,
+        gap: 8,
       }}
     >
       <Pressable
@@ -155,7 +172,7 @@ export function ReceiptLineEditor({
         accessibilityState={{ expanded }}
         onPress={() => setExpanded(!expanded)}
         style={({ pressed: down }) => ({
-          minHeight: 40,
+          minHeight: 44,
           flexDirection: "row",
           alignItems: "center",
           gap: 10,
@@ -225,13 +242,12 @@ export function ReceiptLineEditor({
                   tapFeedback();
                   onChange(confirmLineCategory(line, line.categoryId!));
                 }}
-                hitSlop={6}
                 style={(state) => [
                   {
                     flexDirection: "row",
                     alignItems: "center",
                     gap: 5,
-                    minHeight: 30,
+                    minHeight: 44,
                     paddingHorizontal: 11,
                     borderRadius: 10,
                     borderCurve: "continuous",
@@ -242,11 +258,11 @@ export function ReceiptLineEditor({
               >
                 <Icon name="checkmark" size={11} color={colors.onPrimary} />
                 <Copy
-                  size={13}
-                  weight="700"
+                  size={15}
+                  weight="600"
                   style={{ color: colors.onPrimary }}
                 >
-                  Riktig
+                  Bekreft kategori
                 </Copy>
               </Pressable>
             </>
@@ -257,7 +273,7 @@ export function ReceiptLineEditor({
                   ? "Velg kategori"
                   : categoryLabel
               }
-              icon="tag"
+              icon={categoryUncertain ? "tag" : "checkmark.circle"}
               tone={categoryUncertain ? "warning" : "muted"}
               accessibilityLabel={`Kategori for ${line.name}: ${categoryLabel}. Trykk for å endre`}
               onPress={() => setCategoryOpen(true)}
@@ -271,47 +287,40 @@ export function ReceiptLineEditor({
               accessibilityLabel={`${priceSignalLabel(priceSignal)}. Vanlig pris ${formatMoney(priceSignal.typicalOre)}`}
             />
           )}
-          {!review && (
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel={
-                catalogProduct
-                  ? `Produktinformasjon for ${catalogProduct.name}`
-                  : `Finn produkt for ${line.name}`
-              }
-              onPress={() =>
-                setCatalogScreen(catalogProduct ? "details" : "search")
-              }
-              hitSlop={6}
-              style={({ pressed: down }) => ({
-                minHeight: 30,
-                flexDirection: "row",
-                alignItems: "center",
-                gap: 5,
-                marginLeft: "auto",
-                opacity: down ? 0.6 : 1,
-              })}
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={
+              catalogProduct
+                ? `Produktinformasjon for ${catalogProduct.name}`
+                : `${productLabel} for ${line.name}. Endre produktkobling`
+            }
+            onPress={() =>
+              setCatalogScreen(catalogProduct ? "details" : "search")
+            }
+            style={({ pressed: down }) => ({
+              minHeight: 44,
+              flexDirection: "row",
+              alignItems: "center",
+              gap: 5,
+              marginLeft: "auto",
+              opacity: down ? 0.6 : 1,
+            })}
+          >
+            <Icon
+              name={productMissing ? "link" : "checkmark.circle"}
+              size={13}
+              color={colors.primary}
+            />
+            <Copy
+              size={14}
+              weight="600"
+              style={{
+                color: colors.primary,
+              }}
             >
-              <Icon
-                name={catalogProduct ? "checkmark.seal" : "magnifyingglass"}
-                size={13}
-                color={catalogProduct ? colors.accent : colors.secondary}
-              />
-              <Copy
-                size={13}
-                weight="500"
-                style={{
-                  color: catalogProduct ? colors.accent : colors.secondary,
-                }}
-              >
-                {catalogProduct?.equivalence
-                  ? "Tilsvarende produkt"
-                  : catalogProduct
-                    ? "Produkt"
-                    : "Finn produkt"}
-              </Copy>
-            </Pressable>
-          )}
+              {productLabel}
+            </Copy>
+          </Pressable>
         </View>
       )}
       {categoryOpen && (

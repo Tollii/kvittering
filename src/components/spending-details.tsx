@@ -1,5 +1,5 @@
 import { Pressable, View } from "react-native";
-import { mosaicPalette, useTheme } from "@/constants/theme";
+import { useTheme } from "@/constants/theme";
 import { Copy, Panel, Row, Sheet } from "./ui";
 import { openReceipt, receiptStatusLabel } from "./receipt-card";
 import { formatMoney } from "@/lib/domain/receipt";
@@ -20,7 +20,7 @@ export function SpendingBars({
   const maximum = Math.max(1, ...rows.map((row) => Math.abs(row.amountOre)));
 
   return (
-    <View style={{ gap: 4 }}>
+    <View>
       {rows.map((row, index) => {
         const share =
           total && total > 0
@@ -36,10 +36,12 @@ export function SpendingBars({
             accessibilityLabel={`${row.name}, ${formatMoney(row.amountOre)}${shareLabel}`}
             onPress={() => onSelect(row)}
             style={({ pressed }) => ({
-              minHeight: 46,
+              minHeight: 62,
+              borderBottomWidth: 1,
+              borderBottomColor: colors.line,
               gap: 6,
               justifyContent: "center",
-              paddingVertical: 4,
+              paddingVertical: 10,
               opacity: pressed ? 0.6 : 1,
             })}
           >
@@ -50,12 +52,7 @@ export function SpendingBars({
                 gap: 12,
               }}
             >
-              <Copy
-                size={15}
-                weight="500"
-                style={{ flex: 1 }}
-                numberOfLines={1}
-              >
+              <Copy size={15} weight="500" style={{ flex: 1 }}>
                 {row.name}
               </Copy>
               {share !== null && (
@@ -69,21 +66,21 @@ export function SpendingBars({
             </View>
             <View
               style={{
-                height: 6,
+                height: 3,
                 backgroundColor: colors.muted,
-                borderRadius: 3,
+                borderRadius: 0,
                 overflow: "hidden",
               }}
             >
               <View
                 style={{
-                  height: 6,
-                  borderRadius: 3,
+                  height: 3,
+                  borderRadius: 0,
                   width: `${Math.max(2, (Math.abs(row.amountOre) / maximum) * 100)}%`,
                   backgroundColor:
                     row.amountOre < 0
                       ? colors.warning
-                      : mosaicPalette[Math.min(index, 3)],
+                      : colors.chart[Math.min(index, 3)],
                 }}
               />
             </View>

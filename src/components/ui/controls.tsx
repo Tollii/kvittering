@@ -38,14 +38,13 @@ export function IconButton({
       accessibilityState={{ disabled }}
       disabled={disabled}
       onPress={onPress}
-      hitSlop={6}
       style={(state) => [
         styles.iconButton,
         !!filled && {
           backgroundColor: filled === true ? colors.muted : filled,
           borderRadius: 22,
-          minWidth: 40,
-          minHeight: 40,
+          minWidth: 44,
+          minHeight: 44,
         },
         { opacity: disabled ? 0.35 : state.pressed ? 0.6 : 1 },
       ]}
@@ -69,7 +68,7 @@ export function Button({
   title: string;
   onPress: () => void;
   secondary?: boolean;
-  /** Soft primary: a lilac field with violet text, for the second-most important action. */
+  /** Soft cobalt background for a secondary action. */
   tint?: boolean;
   danger?: boolean;
   disabled?: boolean;
@@ -103,10 +102,10 @@ export function Button({
       onPress={onPress}
       style={(state) => [
         {
-          minHeight: compact ? 40 : 50,
+          minHeight: compact ? 44 : 50,
           paddingVertical: compact ? 8 : 12,
           paddingHorizontal: compact ? 14 : 18,
-          borderRadius: compact ? 12 : radius.control,
+          borderRadius: radius.control,
           borderCurve: "continuous",
           backgroundColor: background,
           flexDirection: "row",
@@ -166,13 +165,12 @@ export function Chip({
       accessibilityLabel={accessibilityLabel ?? label}
       disabled={!onPress}
       onPress={onPress}
-      hitSlop={6}
       style={(state) => [
         {
           flexDirection: "row",
           alignItems: "center",
           gap: 5,
-          minHeight: 30,
+          minHeight: onPress ? 44 : 30,
           paddingHorizontal: 10,
           paddingVertical: 5,
           borderRadius: radius.chip,
@@ -186,9 +184,8 @@ export function Chip({
     >
       {icon && <Icon name={icon} size={12} color={palette.text} />}
       <Copy
-        size={13}
+        size={14}
         weight="600"
-        numberOfLines={1}
         style={{ color: palette.text, flexShrink: 1 }}
       >
         {label}
@@ -234,7 +231,7 @@ export function Field({
             minHeight: 48,
             borderWidth: 1.5,
             borderColor: focused ? colors.primary : colors.line,
-            borderRadius: 12,
+            borderRadius: radius.control,
             borderCurve: "continuous",
             paddingHorizontal: 12,
             paddingVertical: 10,
@@ -305,10 +302,10 @@ export function Segments<T extends string>({
     <View
       style={{
         flexDirection: "row",
-        backgroundColor: colors.muted,
-        borderRadius: 12,
+        borderBottomWidth: 1,
+        borderBottomColor: colors.line,
         borderCurve: "continuous",
-        padding: 3,
+        gap: 8,
       }}
     >
       {options.map((option) => {
@@ -322,20 +319,19 @@ export function Segments<T extends string>({
             onPress={() => onChange(option.value)}
             style={{
               flex: 1,
-              minHeight: 40,
+              minHeight: 44,
               justifyContent: "center",
               alignItems: "center",
-              borderRadius: 9,
+              borderBottomWidth: 2,
+              borderBottomColor: active ? colors.primary : "transparent",
               borderCurve: "continuous",
               padding: 6,
-              backgroundColor: active ? colors.surface : "transparent",
-              boxShadow: active ? `0 1px 3px ${colors.shadow}` : undefined,
             }}
           >
             <Copy
               size={14}
               weight="600"
-              style={{ color: active ? colors.text : colors.secondary }}
+              style={{ color: active ? colors.primary : colors.secondary }}
             >
               {option.label}
             </Copy>

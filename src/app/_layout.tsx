@@ -62,15 +62,18 @@ function RootLayout() {
       <GestureHandlerRootView style={{ flex: 1 }}>
         <SafeAreaProvider>
           <ThemeProvider value={navigationTheme}>
-            <StatusBar style="auto" />
+            <StatusBar style="light" />
             <ShareIntentRouting />
             <QueryLifecycleProvider>
               <SessionProvider>
                 <Stack
                   screenOptions={{
-                    headerTintColor: colors.primary,
-                    headerStyle: { backgroundColor: colors.background },
-                    headerTitleStyle: { color: colors.text, fontWeight: "700" },
+                    headerTintColor: colors.onHero,
+                    headerStyle: { backgroundColor: colors.hero },
+                    headerTitleStyle: {
+                      color: colors.onHero,
+                      fontWeight: "600",
+                    },
                     contentStyle: { backgroundColor: colors.background },
                     headerShadowVisible: false,
                     headerBackButtonDisplayMode: "minimal",

@@ -19,6 +19,7 @@ import {
   Segments,
   Sheet,
 } from "@/components/ui";
+import { IllustratedEmpty } from "@/components/monument-artwork";
 import { openReceipt } from "@/components/receipt-card";
 import { SpendingBars } from "@/components/spending-details";
 import {
@@ -125,13 +126,17 @@ export default function History() {
               );
 
               return (
-                <View key={key} style={{ gap: 8 }}>
+                <View key={key} style={{ gap: 0 }}>
                   <View
                     style={{
                       flexDirection: "row",
                       alignItems: "baseline",
-                      paddingTop: 8,
-                      paddingHorizontal: 2,
+                      paddingTop: 16,
+                      paddingBottom: 12,
+                      borderBottomWidth: 1,
+                      borderBottomColor: colors.text,
+                      gap: 8,
+                      flexWrap: "wrap",
                     }}
                   >
                     <Copy
@@ -149,18 +154,26 @@ export default function History() {
                     </Copy>
                   </View>
                   {items.map((receipt) => (
-                    <Row
+                    <View
                       key={receipt._id}
-                      title={receipt.store || "Ny kvittering"}
-                      detail={formatDate(receipt.purchaseDate)}
-                      value={formatMoney(receipt.totalOre)}
-                      onPress={() =>
-                        router.push({
-                          pathname: "/receipt/[id]",
-                          params: { id: receipt._id },
-                        })
-                      }
-                    />
+                      style={{
+                        borderBottomWidth: 1,
+                        borderBottomColor: colors.line,
+                        paddingVertical: 12,
+                      }}
+                    >
+                      <Row
+                        title={receipt.store || "Ny kvittering"}
+                        detail={formatDate(receipt.purchaseDate)}
+                        value={formatMoney(receipt.totalOre)}
+                        onPress={() =>
+                          router.push({
+                            pathname: "/receipt/[id]",
+                            params: { id: receipt._id },
+                          })
+                        }
+                      />
+                    </View>
                   ))}
                 </View>
               );
@@ -185,9 +198,16 @@ export default function History() {
               ))}
             </Panel>
           )}
-          {(tab === "receipts" ? filtered : products).length === 0 && (
-            <Empty title="Ingen treff" icon="magnifyingglass" />
-          )}
+          {(tab === "receipts" ? filtered : products).length === 0 &&
+            (search.trim() || tab === "products" ? (
+              <Empty title="Ingen treff" icon="magnifyingglass" />
+            ) : (
+              <IllustratedEmpty
+                scene="history"
+                title="Historikken begynner her"
+                message="Lagrede kvitteringer vises her når de er behandlet."
+              />
+            ))}
         </>
       )}
       {tab === "receipts" && history.status === "CanLoadMore" && !term && (

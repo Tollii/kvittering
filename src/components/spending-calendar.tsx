@@ -1,6 +1,6 @@
 import { Pressable, View } from "react-native";
 import { Copy } from "./ui";
-import { mosaicPalette, useTheme } from "@/constants/theme";
+import { useTheme } from "@/constants/theme";
 import {
   spendingCalendar,
   type Receipt,
@@ -29,9 +29,9 @@ export function SpendingCalendar({
 
   const offset = (new Date(`${month}-01T12:00:00Z`).getUTCDay() + 6) % 7;
 
-  // Deeper violet for heavier shopping days, like the mosaic bands on the note.
+  // Use a stronger colour for days with more purchases.
   const shade = (level: number) =>
-    level <= 0 ? colors.muted : mosaicPalette[Math.max(0, 4 - level)];
+    level <= 0 ? colors.muted : colors.chart[Math.max(0, 4 - level)];
 
   return (
     <View style={{ gap: 10 }}>
