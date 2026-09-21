@@ -137,7 +137,6 @@ it("schedules every background image before waiting and retains each successful 
   let committed = false;
 
   const transport: UploadTransport = {
-    concurrentImages: true,
     reserve: async () => receiptId,
     upload: async (_id, position) => {
       scheduled.push(position);

@@ -1,11 +1,6 @@
-import {
-  clearReceiptActivity,
-  ReceiptActivityTracking,
-} from "./receipt-activity";
-import Storage from "expo-sqlite/kv-store";
-import { clearReceiptSearch, ReceiptSearchIndex } from "./spotlight";
-import ReceiptIntelligence from "../../modules/receipt-intelligence/src/ReceiptIntelligenceModule";
-import { setPurchaseWidgetScope } from "@/lib/purchase-widget";
+import { ReceiptActivityTracking } from "./receipt-activity";
+import { ReceiptSearchIndex } from "./spotlight";
+import { retainReceiptSystemScope } from "./receipt-system-scope";
 import { storageSuffix } from "@/lib/deployment-storage";
 import { FeatureFlagsProvider, useFeatureFlag } from "./featureFlags";
 import { removeAccountCatalogCache } from "@/lib/catalog-cache";
@@ -137,12 +132,7 @@ function SessionGate({ children }: Readonly<{ children: ReactNode }>) {
 
     if (removed) removeAccountCatalogCache(removed);
 
-    if (!owner || removed) {
-      setPurchaseWidgetScope(null);
-      clearReceiptSearch();
-      clearReceiptActivity();
-      ReceiptIntelligence?.retainUploadScope?.(null);
-    }
+    if (!owner) retainReceiptSystemScope(null);
 
     previousOwner.current = owner;
   }, [owner, session.isPending]);
@@ -228,25 +218,10 @@ function HouseholdProvider({
   }, [details, owner]);
   const householdId = household?.id;
   useEffect(() => {
-    if (householdId) {
-      const scope = `${storageSuffix}:${owner}:${householdId}`;
-      const previousScope = Storage.getItemSync("receipt-system-scope");
-
-      if (previousScope !== scope) {
-        clearReceiptSearch();
-        clearReceiptActivity();
-      }
-
-      Storage.setItemSync("receipt-system-scope", scope);
-      setPurchaseWidgetScope(scope);
-      ReceiptIntelligence?.retainUploadScope?.(scope);
-    } else if (details === null) {
-      setPurchaseWidgetScope(null);
-      clearReceiptSearch();
-      clearReceiptActivity();
-      ReceiptIntelligence?.retainUploadScope?.(null);
-    }
-  }, [householdId, owner, details]);
+    retainReceiptSystemScope(
+      householdId ? `${storageSuffix}:${owner}:${householdId}` : null,
+    );
+  }, [householdId, owner]);
 
   const synchronize = useCallback(
     async (retryFailed = false) => {

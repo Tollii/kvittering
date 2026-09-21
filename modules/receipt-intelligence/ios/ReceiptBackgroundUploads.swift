@@ -40,7 +40,16 @@ final class ReceiptBackgroundUploads: NSObject, URLSessionDataDelegate {
           for pending in self.waiting.removeValue(forKey: key) ?? [] { pending.reject("UPLOAD_CANCELLED", "Kontoen er endret.") }
           return
         }
-        if tasks.contains(where: { $0.taskDescription == key }) { return }
+        // Completion can arrive while getAllTasks is in progress.
+        if UserDefaults.standard.bool(forKey: "receipt-upload:\(key)") {
+          for pending in self.waiting.removeValue(forKey: key) ?? [] {
+            pending.resolve(["status": 200, "body": ""])
+          }
+          return
+        }
+        if tasks.contains(where: {
+          $0.taskDescription == key && ($0.state == .running || $0.state == .suspended)
+        }) { return }
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
         request.allHTTPHeaderFields = headers

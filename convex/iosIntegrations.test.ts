@@ -183,3 +183,35 @@ it("keeps explicit completion for legacy uploads", async () => {
     "uploaded",
   );
 });
+
+it("publishes expiry without a receipt change and rejects stale cleanup", async () => {
+  const { t, owner, ids } = await setup();
+  await owner.mutation(api.liveActivities.register, {
+    activityId: "activity-expiry",
+    receiptIds: ids,
+  });
+
+  const activity = await t.run((ctx) =>
+    ctx.db
+      .query("receiptActivities")
+      .withIndex("by_activityId", (q) => q.eq("activityId", "activity-expiry"))
+      .unique(),
+  );
+
+  if (!activity) throw new Error("Expected a registered activity.");
+  await t.mutation(internal.liveActivities.expire, { id: activity._id });
+  expect(
+    await owner.query(api.liveActivities.current, {
+      activityId: activity.activityId,
+    }),
+  ).toMatchObject({ total: 2, completed: 0, failed: 0, ended: true });
+  await t.mutation(internal.liveActivities.remove, {
+    id: activity._id,
+    updatedAt: activity.updatedAt,
+  });
+  expect(
+    await owner.query(api.liveActivities.current, {
+      activityId: activity.activityId,
+    }),
+  ).not.toBeNull();
+});

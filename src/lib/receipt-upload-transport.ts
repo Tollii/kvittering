@@ -1,5 +1,4 @@
 import ReceiptIntelligence from "../../modules/receipt-intelligence/src/ReceiptIntelligenceModule";
-import { z } from "zod";
 import { fetch as nativeFetch } from "expo/fetch";
 import type { ConvexReactClient } from "convex/react";
 import { api } from "../../convex/_generated/api";
@@ -17,7 +16,6 @@ export function receiptUploadTransport(
   scope: string,
 ): UploadTransport {
   return {
-    concurrentImages: !!ReceiptIntelligence?.uploadReceiptImage,
     reserve: (entry) =>
       releaseMutation(convex, api.receipts.reserve, {
         clientId: entry.id,
@@ -64,30 +62,23 @@ export function receiptUploadTransport(
       });
 
       if (response.status < 200 || response.status >= 300) {
-        const data = z
-          .preprocess(
-            (value) => {
-              try {
-                return JSON.parse(z.string().parse(value));
-              } catch {
-                return null;
-              }
-            },
-            z.object({ code: z.string() }),
-          )
-          .safeParse(response.body).data;
+        let data: unknown;
 
-        if (data?.code)
-          throw releaseError({ data }, "receipt.image_upload", {
-            receiptId: id,
-            position,
-            status: response.status,
-          });
-        throw releaseError(
-          new Error("Bildet kunne ikke lastes opp. Prøv igjen med nett."),
-          "receipt.image_upload",
-          { receiptId: id, position, status: response.status },
-        );
+        try {
+          data = JSON.parse(response.body);
+        } catch {
+          throw releaseError(
+            new Error("Bildet kunne ikke lastes opp. Prøv igjen med nett."),
+            "receipt.image_upload",
+            { receiptId: id, position, status: response.status },
+          );
+        }
+
+        throw releaseError({ data }, "receipt.image_upload", {
+          receiptId: id,
+          position,
+          status: response.status,
+        });
       }
     },
     complete: async (id, entry) => {

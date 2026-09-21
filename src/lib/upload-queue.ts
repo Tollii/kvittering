@@ -20,7 +20,6 @@ export interface QueueStore {
 }
 
 export interface UploadTransport {
-  concurrentImages?: boolean;
   reserve(entry: LocalReceipt): Promise<Id<"receipts">>;
   upload(id: Id<"receipts">, position: number, uri: string): Promise<void>;
   complete(id: Id<"receipts">, entry: LocalReceipt): Promise<void>;
@@ -65,16 +64,14 @@ export function createQueueRunner(
             });
           }
 
+          const receiptId = entry.receiptId;
+
           const uploadImage = async (position: number) => {
             if (!active()) return;
 
             if (entry.uploaded[position]) return;
             const started = Date.now();
-            await transport.upload(
-              entry.receiptId!,
-              position,
-              entry.images[position],
-            );
+            await transport.upload(receiptId, position, entry.images[position]);
             entry.uploaded[position] = true;
             store.update(entry);
             record("receipt.image_uploaded", {
@@ -84,20 +81,13 @@ export function createQueueRunner(
             });
           };
 
-          if (transport.concurrentImages) {
-            const results = await Promise.allSettled(
-              entry.images.map((_, position) => uploadImage(position)),
-            );
+          const results = await Promise.allSettled(
+            entry.images.map((_, position) => uploadImage(position)),
+          );
 
-            const failed = results.find(
-              (result) => result.status === "rejected",
-            );
+          const failed = results.find((result) => result.status === "rejected");
 
-            if (failed?.status === "rejected") throw failed.reason;
-          } else {
-            for (let position = 0; position < entry.images.length; position++)
-              await uploadImage(position);
-          }
+          if (failed) throw failed.reason;
 
           if (!active()) return;
           await transport.complete(entry.receiptId, entry);

@@ -29,7 +29,7 @@ async function progress(ctx: QueryCtx, activity: Doc<"receiptActivities">) {
     receipts.map((receipt) =>
       receipt?.householdId === activity.householdId ? receipt.status : null,
     ),
-    activity.expiresAt <= Date.now(),
+    activity.expired ?? false,
   );
 }
 
@@ -197,12 +197,19 @@ export const expire = internalMutation({
   args: { id: v.id("receiptActivities") },
   returns: v.null(),
   handler: async (ctx, { id }) => {
-    if (await ctx.db.get("receiptActivities", id))
+    const activity = await ctx.db.get("receiptActivities", id);
+
+    if (activity && !activity.expired) {
+      await ctx.db.patch("receiptActivities", id, {
+        expired: true,
+        updatedAt: Math.max(Date.now(), activity.updatedAt + 1000),
+      });
       await ctx.scheduler.runAfter(0, internal.liveActivityPush.deliver, {
         id,
         attempt: 0,
         expired: true,
       });
+    }
 
     return null;
   },

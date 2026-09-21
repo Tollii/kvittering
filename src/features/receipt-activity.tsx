@@ -75,6 +75,8 @@ async function startActivity(
   generation++;
   const revision = generation;
   const activity = await factory();
+
+  if (generation !== revision) return;
   const previous = parseBinding(read());
 
   if (previous?.scope === scope)
@@ -82,8 +84,10 @@ async function startActivity(
       activityId: previous.activityId,
     });
 
-  for (const instance of activity.getInstances())
-    await instance.end("immediate");
+  if (generation !== revision) return;
+  await Promise.all(
+    activity.getInstances().map((instance) => instance.end("immediate")),
+  );
 
   if (generation !== revision) return;
 
