@@ -479,6 +479,18 @@ export function ReceiptEditor({
     <>
       <Stack.Screen options={screenOptions} />
       <ReceiptToolbar>
+        {data &&
+          !processing &&
+          !approved &&
+          (dirty || receipt.status !== "reviewed") && (
+            <Stack.Toolbar.Button
+              icon="checkmark"
+              disabled={saveDisabled || busy || (!dirty && !ready)}
+              onPress={() => void save()}
+            >
+              {busy ? "Lagrer …" : dirty ? "Lagre" : "Godkjenn"}
+            </Stack.Toolbar.Button>
+          )}
         <Stack.Toolbar.Menu icon="ellipsis" title="Flere handlinger">
           <Stack.Toolbar.MenuAction
             icon="pencil"

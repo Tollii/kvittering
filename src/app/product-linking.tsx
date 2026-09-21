@@ -1,7 +1,7 @@
 import { useTheme } from "@/constants/theme";
 import { useRef, useState } from "react";
 import { Stack, router } from "expo-router";
-import { ActivityIndicator, View } from "react-native";
+import { ActivityIndicator, Platform, View } from "react-native";
 import { api } from "../../convex/_generated/api";
 import {
   Button,
@@ -134,7 +134,7 @@ export default function ProductLinking() {
       insetTop={false}
       statusBarStyle="light"
       footer={
-        last || item ? (
+        Platform.OS !== "ios" && (last || item) ? (
           <View style={{ flexDirection: "row", gap: 8 }}>
             <View style={{ flexGrow: 1, flexShrink: 1 }}>
               <Button
@@ -179,6 +179,36 @@ export default function ProductLinking() {
           headerTitleStyle: { color: colors.onHero },
         }}
       />
+      {Platform.OS === "ios" && (last || item) && (
+        <Stack.Toolbar placement="bottom">
+          <Stack.Toolbar.Button
+            icon="arrow.uturn.backward"
+            disabled={!last || busy || !online}
+            onPress={() => void undoLast()}
+          >
+            Angre
+          </Stack.Toolbar.Button>
+          <Stack.Toolbar.Spacer />
+          {item && (
+            <Stack.Toolbar.Button
+              icon="magnifyingglass"
+              disabled={busy || !online}
+              onPress={() => setSearchKey(itemKey)}
+            >
+              Søk
+            </Stack.Toolbar.Button>
+          )}
+          {item && (
+            <Stack.Toolbar.Button
+              icon="xmark"
+              disabled={busy || !online}
+              onPress={() => void select({ kind: "separate" })}
+            >
+              Ingen passer
+            </Stack.Toolbar.Button>
+          )}
+        </Stack.Toolbar>
+      )}
       {!online && (
         <Notice icon="wifi.slash">
           Koble til nettet for å lagre produktvalg.

@@ -1,11 +1,12 @@
-import { router } from "expo-router";
+import { ReceiptContextMenu } from "@/components/receipt-context-menu";
+import { router, Stack } from "expo-router";
 import {
   useCompleteReceipts,
   useReceiptHistory,
 } from "@/features/receipt-queries";
 import { useDebouncedSearch } from "@/features/catalog-queries";
 import { useState } from "react";
-import { View } from "react-native";
+import { Platform, View } from "react-native";
 import {
   Button,
   Copy,
@@ -90,15 +91,38 @@ export default function History() {
   const prices = selected ? productPrices(selected.contributions) : null;
 
   return (
-    <Screen title="Historikk" settings>
-      <Field
-        label="Søk"
-        placeholder="Butikk, vare eller etikett"
-        value={search}
-        onChangeText={setSearch}
-        clearButtonMode="while-editing"
-        autoCorrect={false}
-      />
+    <Screen
+      title={Platform.OS === "ios" ? undefined : "Historikk"}
+      settings={Platform.OS !== "ios"}
+      insetTop={Platform.OS !== "ios"}
+    >
+      {Platform.OS === "ios" && (
+        <>
+          <Stack.SearchBar
+            placeholder="Butikk, vare eller etikett"
+            onChangeText={(event) => setSearch(event.nativeEvent.text)}
+            hideWhenScrolling={false}
+          />
+          <Stack.Toolbar placement="right">
+            <Stack.Toolbar.Button
+              icon="person.2"
+              onPress={() => router.push("/settings")}
+            >
+              Innstillinger
+            </Stack.Toolbar.Button>
+          </Stack.Toolbar>
+        </>
+      )}
+      {Platform.OS !== "ios" && (
+        <Field
+          label="Søk"
+          placeholder="Butikk, vare eller etikett"
+          value={search}
+          onChangeText={setSearch}
+          clearButtonMode="while-editing"
+          autoCorrect={false}
+        />
+      )}
       <Segments
         value={tab}
         onChange={setTab}
@@ -154,26 +178,33 @@ export default function History() {
                     </Copy>
                   </View>
                   {items.map((receipt) => (
-                    <View
+                    <ReceiptContextMenu
                       key={receipt._id}
-                      style={{
-                        borderBottomWidth: 1,
-                        borderBottomColor: colors.line,
-                        paddingVertical: 12,
-                      }}
+                      receiptId={receipt._id}
+                      store={receipt.store || "Ny kvittering"}
+                      amount={formatMoney(receipt.totalOre)}
+                      date={formatDate(receipt.purchaseDate)}
                     >
-                      <Row
-                        title={receipt.store || "Ny kvittering"}
-                        detail={formatDate(receipt.purchaseDate)}
-                        value={formatMoney(receipt.totalOre)}
-                        onPress={() =>
-                          router.push({
-                            pathname: "/receipt/[id]",
-                            params: { id: receipt._id },
-                          })
-                        }
-                      />
-                    </View>
+                      <View
+                        style={{
+                          borderBottomWidth: 1,
+                          borderBottomColor: colors.line,
+                          paddingVertical: 12,
+                        }}
+                      >
+                        <Row
+                          title={receipt.store || "Ny kvittering"}
+                          detail={formatDate(receipt.purchaseDate)}
+                          value={formatMoney(receipt.totalOre)}
+                          onPress={() =>
+                            router.push({
+                              pathname: "/receipt/[id]",
+                              params: { id: receipt._id },
+                            })
+                          }
+                        />
+                      </View>
+                    </ReceiptContextMenu>
                   ))}
                 </View>
               );

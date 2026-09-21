@@ -79,7 +79,24 @@
           "project": "kvitto",
           "organization": "andreas-tolnes"
         }
-      ]
+      ],
+      [
+        "expo-widgets",
+        {
+          "groupIdentifier": "group.no.tolnes.kvitto",
+          "widgets": [
+            {
+              "name": "PurchaseWidget",
+              "displayName": "Dagligvarer",
+              "description": "Månedens dagligvarekjøp og rask tilgang til kameraet.",
+              "ios": {
+                "supportedFamilies": ["systemSmall", "systemMedium"]
+              }
+            }
+          ]
+        }
+      ],
+      "./plugins/with-app-shortcuts"
     ],
     "experiments": {
       "typedRoutes": true,

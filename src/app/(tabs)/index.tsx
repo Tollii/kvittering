@@ -1,3 +1,7 @@
+import { CaptureReview } from "@/features/capture-review";
+import { recordEvent } from "@/lib/observability";
+import { useVisionKitEnabled } from "@/features/camera-preferences";
+import ReceiptIntelligence from "../../../modules/receipt-intelligence/src/ReceiptIntelligenceModule";
 import {
   useCallback,
   useEffect,
@@ -13,7 +17,6 @@ import {
   Pressable,
   StyleSheet,
   View,
-  useWindowDimensions,
   type ViewStyle,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -28,8 +31,6 @@ import {
   IconButton,
   Notice,
   Panel,
-  Sheet,
-  Toggle,
   pressed,
 } from "@/components/ui";
 import { useHousehold } from "@/features/session";
@@ -59,7 +60,7 @@ const onCameraMuted = "#E3E7FF";
 
 export default function Capture() {
   const colors = useTheme();
-  const { width } = useWindowDimensions();
+  const visionKit = useVisionKitEnabled();
   const { owner, household, online, synchronize, queue } = useHousehold();
   const [permission, requestPermission] = useCameraPermissions();
   const camera = useRef<CameraView>(null);
@@ -151,11 +152,43 @@ export default function Capture() {
 
       if (photos.length >= maxReceiptImages)
         throw new Error(`Maks ${maxReceiptImages} bilder`);
+      recordEvent("receipt.capture", { operation: "camera" });
       const result = await camera.current.takePictureAsync({ quality: 0.9 });
 
       if (!result) throw new Error("Kameraet kunne ikke ta et bilde.");
       const uri = await prepareImage(result.uri, result.width, result.height);
       setPhotos((current) => [...current, uri]);
+      setReview(true);
+    });
+
+  const scanDocument = () =>
+    run(async () => {
+      if (!ReceiptIntelligence?.scanDocument)
+        throw new Error("Oppdater appen for å bruke VisionKit.");
+
+      const cameraPermission = permission?.granted
+        ? permission
+        : await requestPermission();
+
+      if (!cameraPermission.granted)
+        throw new Error("Tillat kamera i Innstillinger for å skanne.");
+      const room = maxReceiptImages - photos.length;
+
+      if (room <= 0) throw new Error(`Maks ${maxReceiptImages} bilder`);
+      recordEvent("receipt.capture", { operation: "visionkit" });
+      const pages = await ReceiptIntelligence.scanDocument(room);
+
+      if (!pages || !mounted.current) return;
+
+      const imported = await importReceiptFiles(
+        pages.map((uri) => ({ uri, mimeType: "image/jpeg" })),
+        room,
+      );
+
+      if (!mounted.current) return;
+      setPhotos((current) => [...current, ...imported.uris]);
+
+      if (photos.length === 0) setCombined(true);
       setReview(true);
     });
 
@@ -249,7 +282,9 @@ export default function Capture() {
       void synchronize();
     });
 
-  const live = permission?.granted && focused && foreground && !review;
+  const live =
+    permission?.granted && focused && foreground && !review && !visionKit;
+
   const uploading = queue.some((entry) => !entry.error);
   const failed = queue.some((entry) => !!entry.error);
   // Let the success note fade away on its own once the upload has landed.
@@ -259,8 +294,6 @@ export default function Capture() {
 
     return () => clearTimeout(timeout);
   }, [saved, uploading, failed]);
-  // Two tiles per row inside the sheet's 16pt padding and 10pt gap.
-  const tile = Math.floor((width - 32 - 10) / 2);
 
   const overlay = (children: ReactNode, style?: ViewStyle) => (
     <View
@@ -306,7 +339,7 @@ export default function Capture() {
           {overlay(
             <>
               <Copy size={15} weight="700" style={{ color: onCamera }}>
-                Ny kvittering
+                {visionKit ? "VisionKit-skanner" : "Ny kvittering"}
               </Copy>
               <Copy
                 size={13}
@@ -439,10 +472,15 @@ export default function Capture() {
             !review && (
               <View style={{ padding: 28, gap: 14, alignItems: "center" }}>
                 <Icon
-                  name="camera.viewfinder"
+                  name={visionKit ? "doc.viewfinder" : "camera.viewfinder"}
                   size={52}
                   color={onCameraMuted}
                 />
+                {visionKit && (
+                  <Copy style={{ color: onCamera, textAlign: "center" }}>
+                    Trykk på skanneknappen for å åpne VisionKit.
+                  </Copy>
+                )}
                 {!permission?.granted && (
                   <Button
                     title={
@@ -494,9 +532,13 @@ export default function Capture() {
           </Pressable>
           <Pressable
             accessibilityRole="button"
-            accessibilityLabel="Ta bilde av kvitteringen"
-            disabled={!ready || busy || !live}
-            onPress={() => void takePhoto()}
+            accessibilityLabel={
+              visionKit
+                ? "Skann kvittering med VisionKit"
+                : "Ta bilde av kvitteringen"
+            }
+            disabled={busy || (!visionKit && (!ready || !live))}
+            onPress={() => void (visionKit ? scanDocument() : takePhoto())}
             style={(state) => [
               {
                 width: 78,
@@ -505,9 +547,9 @@ export default function Capture() {
                 borderRadius: 39,
                 borderWidth: 3,
                 borderColor: "white",
-                opacity: !ready || busy || !live ? 0.4 : 1,
+                opacity: busy || (!visionKit && (!ready || !live)) ? 0.4 : 1,
               },
-              state.pressed && { transform: [{ scale: 0.94 }] },
+              state.pressed && { opacity: 0.7 },
             ]}
           >
             <View
@@ -567,129 +609,23 @@ export default function Capture() {
           )}
         </View>
       </SafeAreaView>
-      <Sheet
-        title={
-          photos.length === 1
-            ? "Ett bilde valgt"
-            : `${photos.length} bilder valgt`
-        }
+      <CaptureReview
+        photos={photos}
+        combined={combined}
         visible={review}
-        onClose={() => {
-          if (!busy) setReview(false);
-        }}
-        footer={
-          <>
-            {!!error && <Notice error>{error}</Notice>}
-            {importRecovery}
-            <Button
-              title={
-                combined || photos.length === 1
-                  ? "Lagre kvittering"
-                  : `Lagre som ${photos.length} kvitteringer`
-              }
-              icon="checkmark"
-              disabled={!photos.length}
-              busy={busy}
-              onPress={() => void save()}
-            />
-          </>
-        }
-      >
-        <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 10 }}>
-          {photos.map((uri, index) => (
-            <View key={uri} style={{ width: tile, height: tile * 1.33 }}>
-              <Image
-                source={{ uri }}
-                style={{
-                  width: tile,
-                  height: tile * 1.33,
-                  borderRadius: 14,
-                  backgroundColor: colors.muted,
-                }}
-                resizeMode="cover"
-                accessibilityLabel={`Kvitteringsbilde ${index + 1}`}
-              />
-              <View
-                pointerEvents="none"
-                style={{
-                  position: "absolute",
-                  left: 8,
-                  top: 8,
-                  width: 24,
-                  height: 24,
-                  borderRadius: 12,
-                  backgroundColor: "#101C51CC",
-                  alignItems: "center",
-                  justifyContent: "center",
-                }}
-              >
-                <Copy size={12} weight="700" style={{ color: onCamera }}>
-                  {index + 1}
-                </Copy>
-              </View>
-              <Pressable
-                accessibilityRole="button"
-                accessibilityLabel={`Fjern bilde ${index + 1}`}
-                disabled={busy}
-                hitSlop={8}
-                onPress={() => {
-                  setPhotos((current) =>
-                    current.filter((photo) => photo !== uri),
-                  );
+        busy={busy}
+        error={error}
+        importRecovery={importRecovery}
+        onClose={() => setReview(false)}
+        onSave={() => void save()}
+        onChoosePhotos={() => void choosePhotos()}
+        onCombinedChange={setCombined}
+        onRemovePhoto={(uri) => {
+          setPhotos((current) => current.filter((photo) => photo !== uri));
 
-                  if (photos.length <= 2) setCombined(false);
-                }}
-                style={(state) => [
-                  {
-                    position: "absolute",
-                    right: 8,
-                    top: 8,
-                    width: 28,
-                    height: 28,
-                    borderRadius: 14,
-                    backgroundColor: "#101C51CC",
-                    alignItems: "center",
-                    justifyContent: "center",
-                  },
-                  pressed(state),
-                ]}
-              >
-                <Icon name="xmark" size={12} color={onCamera} />
-              </Pressable>
-            </View>
-          ))}
-        </View>
-        {photos.length > 1 && (
-          <Panel style={{ gap: 4 }}>
-            <Toggle
-              label="Samme kvittering"
-              value={combined}
-              onChange={setCombined}
-              disabled={busy}
-            />
-          </Panel>
-        )}
-        <View style={{ flexDirection: "row", gap: 8 }}>
-          <View style={{ flex: 1 }}>
-            <Button
-              title="Ta flere"
-              secondary
-              icon="camera"
-              disabled={busy || photos.length >= maxReceiptImages}
-              onPress={() => setReview(false)}
-            />
-          </View>
-          <View style={{ flex: 1 }}>
-            <Button
-              title="Velg flere"
-              secondary
-              icon="photo.on.rectangle"
-              disabled={busy || photos.length >= maxReceiptImages}
-              onPress={() => void choosePhotos()}
-            />
-          </View>
-        </View>
-      </Sheet>
+          if (photos.length <= 2) setCombined(false);
+        }}
+      />
     </View>
   );
 }
