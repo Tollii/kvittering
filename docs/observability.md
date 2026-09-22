@@ -15,6 +15,11 @@ The token is stored locally and in GitHub repository secrets, and the GitHub rel
 
 Known network failures, timeouts, rate limits, required updates, and paused services do not create issues. Unexpected failures do. Repeated reports for the same operation, error type, code, message and receipt are limited to one per five minutes in each app process. Repeated attempts still record failure milestones. Different failure messages remain distinct. Each captured error also writes a log with `sentry_event_id`, so the log and issue can be joined.
 
+Apple account-linking failures use the `auth.apple_link` operation. Reports retain
+the authentication error code and HTTP status without identity tokens or account
+details. Closing Apple's sign-in sheet is a cancellation and does not report an
+error.
+
 Automatic console collection and UI breadcrumbs are disabled. Explicit milestones contain IDs, counts, timings, status codes and fixed event names. Error messages retain the failure explanation, with credential patterns, email addresses, URL parameters and structured payload dumps removed, and a 2,000-character limit. Do not put receipt text, images, search terms, credentials, purchase totals or request/response bodies into messages or diagnostic fields. Performance tracing is disabled.
 
 ### Session Replay
