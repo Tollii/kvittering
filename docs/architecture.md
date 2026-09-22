@@ -41,6 +41,12 @@ The Expo application starts in `src/app/_layout.tsx`. Session context contains a
 - A catalog product describes one packaged item. A family groups the same product across package sizes. Purchased quantity is a separate interpretation.
 - `product-evidence.ts` parses package notation once. Unknown or conflicting measurements remain explicit.
 
+The analysis screen explains the largest observed price and quantity contributions
+and identifies product families recorded only in the current comparison period.
+Explanations use the same purchase projection as the numeric report, wait for all
+period pages, and link to supporting receipt lines. They do not infer consumption,
+first-time purchases, or missing product identities.
+
 Add receipt issues in `receipt-issues.ts`; display text belongs in its mapper. Parse receipt input at the boundary and use the assessment in `receipt-review.ts`. Add category metadata in `categories.ts` and classifier evidence in `classification.ts`. Add reports to the typed registry in `src/features/spending-reports/reports.tsx`; use existing purchase projections for arithmetic.
 
 ## Table ownership
