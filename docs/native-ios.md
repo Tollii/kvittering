@@ -84,6 +84,29 @@ On a supported iPhone, assign **Skann kvittering** under
 **Settings → Action Button → Shortcut**. The shortcuts are also available to Siri
 and Spotlight through App Intents.
 
+### Receipt and monthly purchase shortcuts
+
+**Finn siste kvittering** asks for a store name, such as Kiwi. It opens the
+latest dated receipt whose store name contains that text. It searches all
+history pages before selecting a result and omits excluded or unfinished
+receipts. Product-name matches alone do not qualify. Missing dates cannot
+establish the latest purchase. The normal receipt screen still enforces access.
+
+**Vis kjøp for måned** accepts a month and an optional year. Without a year it
+uses the current Gregorian year. It opens Forbruk for that period, using the
+same complete receipt subscription, provisional labels, and calculations as
+ordinary navigation. Each invocation resets the selected period and filters.
+
+Both actions open Kvitto and require account and household access and a network
+connection. They do not export receipt data to a shared cache or return a spoken
+amount. Siri can ask for missing parameters; Shortcuts can supply them explicitly.
+Try “Finn siste kvittering i Kvitto” or “Vis kjøp for august i Kvitto”.
+
+These App Intent additions need a new native binary. They add no backend
+endpoints, permissions, migrations, or minimum-version requirements. Verify Siri
+parameter prompts, repeated warm invocations, cold launch, and signed-out launch
+on a physical iPhone before release.
+
 ## Native build
 
 These features require a new native build. `expo-widgets` adds a widget extension.
