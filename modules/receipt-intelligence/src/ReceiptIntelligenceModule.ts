@@ -25,8 +25,6 @@ export default requireOptionalNativeModule<{
   ) => Promise<{ status: number; body: string }>;
   retainUploadScope?: (scope: string | null) => void;
   forgetUploads?: (keys: string[]) => void;
-  isDocumentScannerSupported?: () => boolean;
-  scanDocument?: (maxPages: number) => Promise<string[] | null>;
   /** Render a local PDF into one JPEG per page, in page order. */
   renderPdf?(uri: string, maxPages: number): Promise<string[]>;
 }>("ReceiptIntelligence");
