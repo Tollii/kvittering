@@ -33,7 +33,7 @@ export function spendingExplanations(
 
       explanations.push({
         id: `${kind}:${effect.id}`,
-        name: effect.name,
+        name: `${effect.name} · begge perioder`,
         // The detail sheet totals the supporting purchases from both periods.
         amountOre: effect.currentOre + effect.previousOre,
         contributions: effect.contributions,

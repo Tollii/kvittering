@@ -224,7 +224,10 @@ it("explains offsetting price and quantity changes even when total spending is u
   expect(explanations[0].contributions.map((item) => item.receipt._id)).toEqual(
     [after._id, before._id],
   );
-  expect(explanations[0].amountOre).toBe(4000);
+  expect(explanations[0]).toMatchObject({
+    name: "Cola · begge perioder",
+    amountOre: 4000,
+  });
 });
 
 it("identifies current-only families without calling unlinked purchases new", () => {
