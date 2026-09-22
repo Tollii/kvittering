@@ -1,3 +1,5 @@
+import { shortcutMonth } from "@/lib/shortcut-selection";
+import { z } from "zod";
 import { WidgetTip } from "@/features/widget-tip";
 import { usePurchaseWidget } from "@/features/purchase-widget";
 import { PeriodMenu } from "@/components/period-menu";
@@ -48,14 +50,36 @@ import { useTheme } from "@/constants/theme";
 import { budgetPace, paceLabel } from "@/lib/domain/budget";
 import { monthPriceSignals } from "@/lib/domain/price-signals";
 import { catalogInsights } from "@/lib/catalog/insights";
-import { router } from "expo-router";
+import { router, useLocalSearchParams } from "expo-router";
 import { StoreSpendingSheet } from "@/features/spending-reports/stores";
 
-export default function Spending() {
+export default function SpendingRoute() {
+  const params = useLocalSearchParams();
+  const month = shortcutMonth(params.month);
+  const request = z.string().safeParse(params.request).data ?? "";
+
+  if (params.month !== undefined && !month)
+    return (
+      <Screen title="Forbruk">
+        <Notice>
+          Måneden i snarveien er ugyldig. Velg måned og år på nytt.
+        </Notice>
+      </Screen>
+    );
+
+  return (
+    <Spending
+      key={`${month ?? "current"}:${request}`}
+      initialMonth={month ?? osloDate().slice(0, 7)}
+    />
+  );
+}
+
+function Spending({ initialMonth }: Readonly<{ initialMonth: string }>) {
   const { online, details } = useHousehold();
   const colors = useTheme();
   const currentMonth = osloDate().slice(0, 7);
-  const [month, setMonth] = useState(currentMonth);
+  const [month, setMonth] = useState(initialMonth);
 
   const { receipts, loadingReceipts, completeReceipts } = useCompleteReceipts({
     kind: "period",
