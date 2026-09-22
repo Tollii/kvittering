@@ -6,6 +6,7 @@ import {
   Button,
   Copy,
   Disclosure,
+  Empty,
   Field,
   Loading,
   Notice,
@@ -24,6 +25,7 @@ import { formatDate } from "@/lib/format-date";
 import { catalogInsights } from "@/lib/catalog/insights";
 import { productSearch, rankCatalogProducts } from "@/lib/catalog/matching";
 import { catalogImageSources } from "@/lib/catalog/images";
+import { useTheme } from "@/constants/theme";
 import { useHousehold } from "./session";
 
 export function CatalogProductPicker({
@@ -62,6 +64,8 @@ export function CatalogProductPicker({
           onChangeText={setSearch}
           autoCorrect={false}
           autoCapitalize="none"
+          clearButtonMode="while-editing"
+          hint="Skriv minst 3 tegn for å søke."
         />
       }
     >
@@ -77,7 +81,9 @@ export function CatalogProductPicker({
         <Loading title="Henter produkter …" />
       )}
       {(query.isError || query.data?.status === "error") && (
-        <Notice>{query.data?.message ?? "Kunne ikke hente produkter"}</Notice>
+        <Notice error>
+          {query.data?.message ?? "Kunne ikke hente produkter"}
+        </Notice>
       )}
       {products
         .filter((product) => !hasBarcode || product.ean || showWithoutBarcode)
@@ -124,7 +130,11 @@ export function CatalogProductPicker({
         />
       )}
       {query.data?.status === "ready" && !query.data.products.length && (
-        <Copy muted>Ingen treff</Copy>
+        <Empty
+          title="Ingen produkter funnet"
+          message="Prøv et kortere navn eller et annet søkeord."
+          icon="magnifyingglass"
+        />
       )}
       <Row
         title="Ingen av produktene passer"
@@ -214,7 +224,7 @@ export function CatalogProductSheet({
       <Button title="Endre produktkobling" secondary onPress={onChange} />
       {query.isFetching && !full && <Loading />}
       {(query.isError || query.data?.status === "error") && (
-        <Notice>Produktdetaljene kunne ikke hentes nå.</Notice>
+        <Notice error>Produktdetaljene kunne ikke hentes nå.</Notice>
       )}
       {purchases && completeReceipts && (
         <Panel>
@@ -326,6 +336,7 @@ function CatalogImage({
   name: string;
   style: StyleProp<ImageStyle>;
 }>) {
+  const colors = useTheme();
   const [sourceIndex, setSourceIndex] = useState(0);
   const uri = sources[sourceIndex];
 
@@ -334,7 +345,15 @@ function CatalogImage({
   return (
     <Image
       source={{ uri }}
-      style={style}
+      style={[
+        {
+          borderRadius: 8,
+          borderWidth: 1,
+          borderColor: colors.imageOutline,
+          backgroundColor: colors.surface,
+        },
+        style,
+      ]}
       resizeMode="contain"
       accessibilityLabel={name}
       onError={() => setSourceIndex((index) => index + 1)}

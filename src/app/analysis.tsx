@@ -123,7 +123,7 @@ export default function Analysis() {
           label="Forrige periode"
           onPress={() => move(-1)}
         />
-        <Copy weight="600">
+        <Copy weight="600" style={{ flex: 1, textAlign: "center" }}>
           {formatDate(period.start)} – {formatDate(period.end)}
         </Copy>
         <IconButton

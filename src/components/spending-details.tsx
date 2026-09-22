@@ -1,4 +1,4 @@
-import { Pressable, View } from "react-native";
+import { Pressable, View, useWindowDimensions } from "react-native";
 import { useTheme } from "@/constants/theme";
 import { Copy, Panel, Row, Sheet } from "./ui";
 import { openReceipt, receiptStatusLabel } from "./receipt-card";
@@ -17,6 +17,7 @@ export function SpendingBars({
   onSelect: (row: SpendingGroup) => void;
 }>) {
   const colors = useTheme();
+  const { fontScale } = useWindowDimensions();
   const maximum = Math.max(1, ...rows.map((row) => Math.abs(row.amountOre)));
 
   return (
@@ -48,11 +49,16 @@ export function SpendingBars({
             <View
               style={{
                 flexDirection: "row",
+                flexWrap: "wrap",
                 alignItems: "baseline",
                 gap: 12,
               }}
             >
-              <Copy size={15} weight="500" style={{ flex: 1 }}>
+              <Copy
+                size={15}
+                weight="500"
+                style={fontScale > 1.3 ? { width: "100%" } : { flex: 1 }}
+              >
                 {row.name}
               </Copy>
               {share !== null && (
@@ -66,17 +72,17 @@ export function SpendingBars({
             </View>
             <View
               style={{
-                height: 3,
+                height: 4,
                 backgroundColor: colors.muted,
-                borderRadius: 0,
+                borderRadius: 2,
                 overflow: "hidden",
               }}
             >
               <View
                 style={{
-                  height: 3,
-                  borderRadius: 0,
-                  width: `${Math.max(2, (Math.abs(row.amountOre) / maximum) * 100)}%`,
+                  height: 4,
+                  borderRadius: 2,
+                  width: `${row.amountOre === 0 ? 0 : Math.max(2, (Math.abs(row.amountOre) / maximum) * 100)}%`,
                   backgroundColor:
                     row.amountOre < 0
                       ? colors.warning

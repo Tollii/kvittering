@@ -6,7 +6,7 @@ import {
 } from "@/features/receipt-queries";
 import { useDebouncedSearch } from "@/features/catalog-queries";
 import { useState } from "react";
-import { Platform, View } from "react-native";
+import { Platform, View, useWindowDimensions } from "react-native";
 import {
   Button,
   Copy,
@@ -34,6 +34,7 @@ import { useTheme } from "@/constants/theme";
 
 export default function History() {
   const colors = useTheme();
+  const { fontScale } = useWindowDimensions();
   const [search, setSearch] = useState("");
   const [tab, setTab] = useState<"receipts" | "products">("receipts");
   const [selectedKey, setSelectedKey] = useState<string | null>(null);
@@ -167,7 +168,7 @@ export default function History() {
                       accessibilityRole="header"
                       size={15}
                       weight="700"
-                      style={{ flex: 1 }}
+                      style={fontScale > 1.3 ? { width: "100%" } : { flex: 1 }}
                     >
                       {monthTitle(key)}
                     </Copy>
@@ -259,7 +260,12 @@ export default function History() {
               {formatMoney(selected.amountOre)}
             </Copy>
             <Copy muted>{selected.purchases.size} kjøp</Copy>
-            <Panel style={{ flexDirection: "row", gap: 12 }}>
+            <Panel
+              style={{
+                flexDirection: fontScale > 1.3 ? "column" : "row",
+                gap: 16,
+              }}
+            >
               {[
                 { label: "Siste", amount: prices.latest },
                 { label: "Typisk", amount: prices.typical },

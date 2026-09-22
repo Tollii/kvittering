@@ -121,18 +121,23 @@ export function Button({
           gap: 8,
         },
         pressed(state),
-        (disabled || busy) && { opacity: 0.45 },
+        disabled && !busy && { opacity: 0.45 },
       ]}
     >
       {busy ? (
         <ActivityIndicator color={foreground} />
       ) : icon ? (
-        <Icon name={icon} size={compact ? 16 : 18} color={foreground} />
+        <Icon
+          name={icon}
+          size={compact ? 16 : 18}
+          weight="semibold"
+          color={foreground}
+        />
       ) : null}
       <Copy
         weight="600"
         size={compact ? 15 : 16}
-        style={{ color: foreground, flexShrink: 1 }}
+        style={{ color: foreground, flexShrink: 1, textAlign: "center" }}
       >
         {title}
       </Copy>
@@ -237,7 +242,7 @@ export function Field({
         }}
         style={[
           {
-            minHeight: 48,
+            minHeight: 52,
             borderWidth: 1.5,
             borderColor: focused ? colors.primary : colors.line,
             borderRadius: radius.control,
@@ -336,7 +341,7 @@ export function Segments<T extends string>({
             if (option) onChange(option.value);
           }}
           tintColor={colors.primary}
-          style={{ height: 36 }}
+          style={{ height: 44 }}
         />
       </View>
     );
@@ -344,11 +349,12 @@ export function Segments<T extends string>({
   return (
     <View
       style={{
-        flexDirection: "row",
-        borderBottomWidth: 1,
-        borderBottomColor: colors.line,
+        flexDirection: fontScale > 1.3 ? "column" : "row",
+        backgroundColor: colors.muted,
+        padding: 4,
+        borderRadius: radius.control,
         borderCurve: "continuous",
-        gap: 8,
+        gap: 4,
       }}
     >
       {options.map((option) => {
@@ -360,21 +366,29 @@ export function Segments<T extends string>({
             accessibilityRole="tab"
             accessibilityState={{ selected: active }}
             onPress={() => onChange(option.value)}
-            style={{
-              flex: 1,
-              minHeight: 44,
-              justifyContent: "center",
-              alignItems: "center",
-              borderBottomWidth: 2,
-              borderBottomColor: active ? colors.primary : "transparent",
-              borderCurve: "continuous",
-              padding: 6,
-            }}
+            style={(state) => [
+              {
+                flex: fontScale > 1.3 ? undefined : 1,
+                minHeight: 44,
+                justifyContent: "center",
+                alignItems: "center",
+                backgroundColor: active ? colors.surface : "transparent",
+                borderWidth: 1,
+                borderColor: active ? colors.primary : "transparent",
+                borderRadius: radius.control - 4,
+                borderCurve: "continuous",
+                padding: 8,
+              },
+              pressed(state),
+            ]}
           >
             <Copy
               size={14}
               weight="600"
-              style={{ color: active ? colors.primary : colors.secondary }}
+              style={{
+                color: active ? colors.primary : colors.secondary,
+                textAlign: "center",
+              }}
             >
               {option.label}
             </Copy>

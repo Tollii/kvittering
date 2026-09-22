@@ -258,7 +258,10 @@ export default function ProductLinking() {
           message="Nye varer uten produktkobling vises her. Kvitteringene beholder godkjenningen sin."
           icon="checkmark.circle"
         >
-          <Button title="Tilbake til Innboks" onPress={() => router.back()} />
+          <Button
+            title="Tilbake til Innboks"
+            onPress={() => router.dismissTo("/inbox")}
+          />
         </Empty>
       )}
     </Screen>

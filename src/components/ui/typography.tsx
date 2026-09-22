@@ -59,6 +59,9 @@ export function Icon({
 
   return (
     <SymbolView
+      accessible={false}
+      accessibilityElementsHidden
+      importantForAccessibility="no"
       name={name}
       size={size}
       weight={weight}

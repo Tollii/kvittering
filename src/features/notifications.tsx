@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { releaseMutation } from "@/lib/releases/requests";
 import { useEffect, useState } from "react";
-import { AppState, Linking, Platform } from "react-native";
+import { AppState, Linking, Platform, View } from "react-native";
 import * as Notifications from "expo-notifications";
 import * as SecureStore from "expo-secure-store";
 import Constants, { ExecutionEnvironment } from "expo-constants";
@@ -9,7 +9,7 @@ import * as Device from "expo-device";
 import { router } from "expo-router";
 import { useConvex, useQuery, type ConvexReactClient } from "convex/react";
 import { api } from "../../convex/_generated/api";
-import { Button, Copy, Notice, Panel } from "@/components/ui";
+import { Button, Copy, Notice } from "@/components/ui";
 import { useHousehold } from "./session";
 
 const tokenKey = "kvitto.push-token";
@@ -110,7 +110,7 @@ export function NotificationSettings() {
   }
 
   return (
-    <Panel>
+    <View style={{ gap: 12 }}>
       {!available && (
         <Copy size={13} muted>
           Ikke tilgjengelig i denne versjonen
@@ -134,7 +134,7 @@ export function NotificationSettings() {
         />
       )}
       {!!error && <Notice error>{error}</Notice>}
-    </Panel>
+    </View>
   );
 }
 

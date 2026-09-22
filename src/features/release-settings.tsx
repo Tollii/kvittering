@@ -1,6 +1,7 @@
 import { useState } from "react";
+import { View } from "react-native";
 import * as Updates from "expo-updates";
-import { Button, Copy, Notice, Panel } from "@/components/ui";
+import { Button, Copy, Notice } from "@/components/ui";
 import { installedRelease } from "@/lib/releases/client";
 import { useReleasePolicy } from "./release-policy";
 import { recordEvent, reportError } from "@/lib/observability";
@@ -56,7 +57,7 @@ export function ReleaseSettings() {
   }
 
   return (
-    <Panel>
+    <View style={{ gap: 12 }}>
       <Copy>
         Versjon {installedRelease.version} ({installedRelease.build})
       </Copy>
@@ -88,6 +89,6 @@ export function ReleaseSettings() {
         </>
       )}
       {!!message && <Notice>{message}</Notice>}
-    </Panel>
+    </View>
   );
 }

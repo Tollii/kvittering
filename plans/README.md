@@ -8,6 +8,24 @@ Audited commit: `af69fdafc24ae0b2367989e5203f50067b2479d8`, 2026-09-19. Applicat
 
 The report now explains where reactive queries can replace polling. Plans 007 and 017 are implemented. Convex 1.46.0 was already current. A separate source update adopts fluent optional validators and removes absent metadata placeholders; see [the migration record](../docs/optional-metadata-migration.md). Cited source lines describe the audit baseline; use the implementation records for the completed changes.
 
+## Follow-up: PR #5 interface maintainability review
+
+Status: DONE. The strict review of [PR #5](https://github.com/Tollii/kvittering/pull/5)
+found no confirmed material maintainability issues. All 32 changed source files
+and affected contracts were reviewed. The rebase onto `d90baf8` preserves the
+reviewed patch. No application fixes were required.
+
+The calendar grid and large-text list share purchase calculations and selection.
+Form sections own their surfaces. Submit eligibility has one owner per form.
+No changed file crosses 700 or 1,000 lines. The receipt editor grows from 1,147
+to 1,165 lines; its existing size is accepted here because the changes adjust
+local layout and list separators without adding state or orchestration.
+
+`npm run check` passed with 297 application tests and 13 lint-rule tests.
+The existing calendar and large-text receipt captures were inspected. No new
+native interaction or live-service tests were run. The [interface verification
+limits](../docs/interface-review.md#limits) still apply.
+
 ## Read and write contracts
 
 Mutations perform writes and return null, an ID, or a small acknowledgement. Queries return persisted objects. Mounted screens receive persisted changes automatically through their existing reactive query, without a manual refetch. Background workflows can use a focused read query when they need persisted data. Preserve draft edits and revision checks across either response order. Plans 006 and 009 no longer recommend returning complete receipts or profiles from mutations. This separation does not require another database or a command framework.

@@ -2,8 +2,8 @@ import { useState, type ReactNode } from "react";
 import {
   ActivityIndicator,
   Pressable,
-  StyleSheet,
   View,
+  useWindowDimensions,
   type StyleProp,
   type ViewStyle,
 } from "react-native";
@@ -33,17 +33,13 @@ export function Panel({
                 ? colors.primarySoft
                 : tone === "plain"
                   ? colors.surfaceRaised
-                  : "transparent",
-          borderRadius: tone === "surface" ? 0 : radius.card,
+                  : colors.surface,
+          borderRadius: radius.card,
           borderCurve: "continuous",
           paddingVertical: 16,
-          paddingHorizontal: tone === "surface" ? 0 : 16,
+          paddingHorizontal: 16,
           gap: 10,
           overflow: "hidden",
-        },
-        tone === "surface" && {
-          borderBottomWidth: 1,
-          borderColor: colors.line,
         },
         style,
       ]}
@@ -67,8 +63,8 @@ export function SectionTitle({
   const colors = useTheme();
 
   return (
-    <View style={[styles.row, { paddingTop: 10, paddingBottom: 2 }]}>
-      <View style={{ flex: 1, gap: 1 }}>
+    <View style={[styles.row, { paddingTop: 16, paddingBottom: 4 }]}>
+      <View style={{ flex: 1, gap: 4 }}>
         <Copy accessibilityRole="header" size={19} weight="700">
           {title}
         </Copy>
@@ -82,7 +78,6 @@ export function SectionTitle({
         <Pressable
           accessibilityRole="button"
           onPress={onAction}
-          hitSlop={8}
           style={(state) => [
             { minHeight: 44, justifyContent: "center", paddingLeft: 12 },
             pressed(state),
@@ -246,7 +241,12 @@ export function Empty({
       >
         <Icon name={icon} size={28} />
       </View>
-      <Copy size={20} weight="700" style={{ textAlign: "center" }}>
+      <Copy
+        accessibilityRole="header"
+        size={20}
+        weight="700"
+        style={{ textAlign: "center" }}
+      >
         {title}
       </Copy>
       {!!message && (
@@ -275,6 +275,8 @@ export function Row({
   selected?: boolean;
 }>) {
   const colors = useTheme();
+  const { fontScale } = useWindowDimensions();
+  const stacked = fontScale > 1.3;
 
   return (
     <Pressable
@@ -284,7 +286,7 @@ export function Row({
       onPress={onPress}
       style={({ pressed: down }) => [
         styles.row,
-        { minHeight: 44, paddingVertical: 4, opacity: down ? 0.6 : 1 },
+        { minHeight: 52, paddingVertical: 10, opacity: down ? 0.6 : 1 },
       ]}
     >
       {icon && (
@@ -294,26 +296,28 @@ export function Row({
             height: 32,
             borderRadius: 9,
             borderCurve: "continuous",
-            backgroundColor: colors.surface,
-            borderWidth: StyleSheet.hairlineWidth,
-            borderColor: colors.line,
+            backgroundColor: colors.primarySoft,
             alignItems: "center",
             justifyContent: "center",
           }}
         >
-          <Icon name={icon} size={15} />
+          <Icon name={icon} size={16} weight="semibold" />
         </View>
       )}
-      <View style={{ flex: 1, gap: 2 }}>
+      <View style={{ flex: 1, gap: 4 }}>
         <Copy weight="600">{title}</Copy>
         {!!detail && (
           <Copy size={13} muted>
             {detail}
           </Copy>
         )}
+        {stacked && !!value && <Copy weight="600">{value}</Copy>}
       </View>
-      {!!value && (
-        <Copy weight="600" style={{ flexShrink: 1 }}>
+      {!stacked && !!value && (
+        <Copy
+          weight="600"
+          style={{ flexShrink: 1, maxWidth: "45%", textAlign: "right" }}
+        >
           {value}
         </Copy>
       )}

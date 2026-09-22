@@ -13,6 +13,7 @@ import {
   Platform,
   Pressable,
   View,
+  useWindowDimensions,
 } from "react-native";
 import { router, Stack, useNavigation } from "expo-router";
 import { useConvex } from "convex/react";
@@ -78,6 +79,7 @@ export function ReceiptEditor({
 }>) {
   const client = useConvex();
   const colors = useTheme();
+  const { fontScale } = useWindowDimensions();
 
   const history = useCompleteReceipts({
     kind: "priceHistory",
@@ -593,10 +595,17 @@ export function ReceiptEditor({
                 style={{
                   flexDirection: "row",
                   alignItems: "flex-start",
+                  flexWrap: "wrap",
                   gap: 8,
                 }}
               >
-                <View style={{ flex: 1, gap: 4 }}>
+                <View
+                  style={{
+                    flex: 1,
+                    minWidth: fontScale > 1.3 ? "100%" : undefined,
+                    gap: 4,
+                  }}
+                >
                   <Copy
                     size={13}
                     weight="600"
@@ -783,13 +792,13 @@ export function ReceiptEditor({
                   <View
                     key={row.label}
                     style={{
-                      flexDirection: "row",
+                      flexDirection: fontScale > 1.3 ? "column" : "row",
                       justifyContent: "space-between",
-                      gap: 16,
-                      paddingVertical: 3,
+                      gap: fontScale > 1.3 ? 4 : 16,
+                      paddingVertical: 6,
                     }}
                   >
-                    <Copy size={14} muted>
+                    <Copy size={14} muted style={{ flexShrink: 1 }}>
                       {row.label}
                     </Copy>
                     <Copy
@@ -1139,9 +1148,18 @@ function ReceiptLineList({
   lines: ReceiptData["lines"];
   renderLine: (line: ReceiptData["lines"][number]) => ReactNode;
 }) {
+  const colors = useTheme();
+
   return lines.length ? (
-    <Panel style={{ gap: 0, paddingVertical: 2, paddingHorizontal: 0 }}>
-      {lines.map(renderLine)}
+    <Panel style={{ gap: 0, paddingVertical: 2 }}>
+      {lines.map((line, index) => (
+        <View
+          key={line.id}
+          style={{ borderTopWidth: index ? 1 : 0, borderTopColor: colors.line }}
+        >
+          {renderLine(line)}
+        </View>
+      ))}
     </Panel>
   ) : null;
 }

@@ -1,6 +1,6 @@
 import { type ComponentProps, type ReactNode } from "react";
 import { View } from "react-native";
-import { Button, Copy, Icon, Notice, Panel, Row } from "@/components/ui";
+import { Button, Copy, Empty, Icon, Notice, Panel, Row } from "@/components/ui";
 import { ProductAttributesReport } from "../product-attributes-report";
 import { SpendingBars } from "@/components/spending-details";
 import { FamilyPurchases, familySummary } from "@/components/family-purchases";
@@ -11,6 +11,7 @@ import { formatDate } from "@/lib/format-date";
 import { formatMoney } from "@/lib/domain/receipt";
 import {
   priceSignalLabel,
+  priceSignalMinimumObservations,
   type monthPriceSignals,
 } from "@/lib/domain/price-signals";
 import type {
@@ -157,7 +158,14 @@ export function useSpendingReports({
       render: () => (
         <>
           {!historyComplete && <Notice>Henter full prishistorikk …</Notice>}
-          {historyComplete && (
+          {historyComplete && !surprises.length && (
+            <Empty
+              title="Ingen prisavvik funnet"
+              message={`Prissjekken trenger koblede produkter med minst ${priceSignalMinimumObservations} andre kjøp å sammenligne med.`}
+              icon="tag"
+            />
+          )}
+          {historyComplete && surprises.length > 0 && (
             <Panel style={{ gap: 0, paddingVertical: 4 }}>
               {surprises.map((signal, index) => (
                 <View
