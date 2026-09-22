@@ -112,7 +112,10 @@ See [native iOS integration](docs/native-ios.md) for the VisionKit switch, Home 
 
 ## App functions
 
-- Email and password sign-in. Sessions use iOS Keychain through Expo SecureStore.
+- Apple sign-in and account creation on supported iOS devices, with email and
+  password as an alternative. Existing users can connect Apple in Settings.
+  Sessions use iOS Keychain through Expo SecureStore. See
+  [Apple setup](docs/native-ios.md#apple-authentication).
 - Shared households with two members and private invitation codes.
 - Full-screen camera and photo-library capture. Up to eight images can form one receipt or separate receipts. Images are converted to JPEG.
 - PDF receipts: pick them from Files, or share images and PDFs to Kvitto from any app via the iOS share sheet (`expo-share-intent`). PDF pages are rendered to JPEG on the device (PDFKit, in the `receipt-intelligence` module) and enter the normal upload queue as one receipt.

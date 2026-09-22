@@ -1,4 +1,5 @@
 import { ReceiptSearchSettings } from "@/features/spotlight";
+import { AppleAccount } from "@/features/apple-account";
 import { FormSection, NativeForm } from "@/components/ui/native-form";
 import { CameraPreferences } from "@/features/camera-preferences";
 import { ReleaseSettings } from "@/features/release-settings";
@@ -207,7 +208,8 @@ export default function Settings() {
             <CameraPreferences />
           </View>
         </FormSection>
-        <FormSection title="På denne enheten">
+        <FormSection title="Konto">
+          <AppleAccount disabled={!online || busy} />
           <View style={{ gap: 12 }}>
             <Copy muted size={14}>
               {queue.length === 0

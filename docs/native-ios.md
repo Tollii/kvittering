@@ -6,6 +6,58 @@ At larger accessibility text sizes, segmented controls use wrapping labels and
 sheets open at full height. Editing a receipt still requires the existing save
 operation; dismissing its details sheet does not discard the receipt draft.
 
+## Apple authentication
+
+On supported iOS devices, **Continue with Apple** is the first authentication
+option. The same button creates an account or signs in to an existing Kvitto
+account. **Opprett konto med e-post** opens email registration; **Logg inn med
+e-post** opens email login. The welcome screen uses a centered mark, rounded
+buttons, and a separate email form. Devices without Apple authentication show
+the email form directly.
+
+Existing email users can select **Innstillinger → Koble til Apple** to add Apple
+to their current account. This preserves the account identifier, household,
+receipt access, and email password. Apple private relay addresses are supported.
+The backend never links accounts automatically by matching email addresses. One
+Apple identity can belong to only one Kvitto account. Linking does not merge two
+existing Kvitto accounts.
+
+Before distributing a build:
+
+1. Enable **Sign in with Apple** for `no.tolnes.kvitto` in Apple Developer, under
+   team `592JWHZRVQ`. Refresh the provisioning profile if required. EAS can
+   synchronize this capability when the build has the required account access.
+2. Deploy the additive authentication backend to the build's target deployment.
+3. Build a new native binary with `expo-apple-authentication`. The Expo plugin
+   and `ios.usesAppleSignIn` setting are configured in `app.json`.
+4. Test new registration, repeat login, cancellation, Hide My Email, explicit
+   linking, and restored sessions on a signed physical iPhone. Confirm that an
+   existing email user's household and queued receipts remain available.
+
+This native flow sends an Apple identity token and nonce to Better Auth. The
+server verifies Apple's signature, issuer, audience, expiry, and nonce. The
+accepted audience comes from the bundle identifier in `app.json`. Apple supplies
+the native name only on first authorization; the client passes it with that
+first sign-in. A later sign-in preserves the stored name.
+
+Native identity-token verification does not require an Apple private key, client
+secret, Services ID, or browser return URL. Apple web and Android authentication
+are not configured. Expo Go identities are not accepted because its audience
+differs from Kvitto's bundle identifier. Use a development build for device tests.
+
+The new native dependency and entitlement require a binary, not an OTA-only
+release. Existing clients keep email/password access and their session storage.
+No receipt data migration or minimum-version change is required.
+
+Public App Store release still requires an in-app account-deletion flow and
+Apple token revocation. Those account-lifecycle operations are not implemented
+by this native sign-in flow. Plan the authorization-code exchange and server
+credentials with that work; an identity token alone cannot revoke Apple access.
+
+References: [Expo 57 Apple authentication](https://docs.expo.dev/versions/v57.0.0/sdk/apple-authentication/),
+[Better Auth Apple provider](https://www.better-auth.com/docs/authentication/apple),
+and [Apple account deletion](https://developer.apple.com/support/offering-account-deletion-in-your-app/).
+
 ## Compare cameras
 
 Open **Innstillinger → Kamera → Bruk VisionKit-skanner**.

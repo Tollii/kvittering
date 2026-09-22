@@ -26,6 +26,12 @@ The Expo application starts in `src/app/_layout.tsx`. Session context contains a
 
 ## Identity and evidence
 
+- Better Auth owns Apple and email/password accounts and sessions. Native Apple
+  identity tokens are verified by the backend. Provider links require an
+  authenticated session; email matching never links accounts automatically.
+  An account-creation trigger rejects duplicate Apple identities in the same
+  transaction as the provider-account write. Household membership and device
+  queues continue to use the existing Kvitto identity.
 - A receipt line preserves printed text and integer øre amounts.
 - A category alias records a household's category decision. It is not a product identity.
 - A product reference is unresolved, explicitly separate, a household product, or an exact catalog product. The compatibility adapter projects legacy fields for installed clients.
