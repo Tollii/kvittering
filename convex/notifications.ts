@@ -1,8 +1,9 @@
 import { clientMutation as mutation } from "./clientFunctions";
 import { v } from "convex/values";
 import { query, internalQuery, internalMutation } from "./_generated/server";
-import { requireMember } from "./access";
+import { requireMember, requireReceipt } from "./access";
 import schema from "./schema";
+import { internal } from "./_generated/api";
 import { reviewSummary } from "../src/lib/domain/receipt-review";
 import { formatMoney } from "../src/lib/domain/receipt";
 
@@ -174,6 +175,105 @@ export const removeExpired = internalMutation({
   handler: async (ctx, { id }) => {
     if (await ctx.db.get("deviceSubscriptions", id))
       await ctx.db.delete("deviceSubscriptions", id);
+
+    return null;
+  },
+});
+
+/** Replace this device's reminder in the same transaction as its authorization check. */
+export const remindLater = mutation({
+  args: { receiptId: v.id("receipts"), token: v.string(), at: v.number() },
+  returns: v.null(),
+  handler: async (ctx, { receiptId, token, at }) => {
+    const { member, receipt } = await requireReceipt(ctx, receiptId);
+
+    const subscription = await ctx.db
+      .query("deviceSubscriptions")
+      .withIndex("by_token", (q) => q.eq("token", token))
+      .unique();
+
+    if (
+      !subscription ||
+      subscription.identity !== member.identity ||
+      subscription.householdId !== member.householdId ||
+      receipt.uploadedBy !== member.identity
+    )
+      throw new Error("Slå på varsler for denne kontoen først.");
+
+    if (receipt.status !== "needs_review" || receipt.excluded)
+      throw new Error("Kvitteringen trenger ikke kontroll nå.");
+    const now = Date.now();
+
+    if (!Number.isFinite(at) || at <= now || at > now + 48 * 60 * 60 * 1000)
+      throw new Error("Velg et tidspunkt innen to døgn.");
+
+    const existing = await ctx.db
+      .query("receiptReminders")
+      .withIndex("by_subscriptionId_and_receiptId", (q) =>
+        q.eq("subscriptionId", subscription._id).eq("receiptId", receiptId),
+      )
+      .unique();
+
+    if (existing) {
+      await ctx.scheduler.cancel(existing.scheduledId);
+      await ctx.db.delete("receiptReminders", existing._id);
+    } else {
+      const pending = await ctx.db
+        .query("receiptReminders")
+        .withIndex("by_subscriptionId_and_receiptId", (q) =>
+          q.eq("subscriptionId", subscription._id),
+        )
+        .take(50);
+
+      if (pending.length >= 50)
+        throw new Error("Du har allerede 50 påminnelser.");
+    }
+
+    const scheduledId = await ctx.scheduler.runAt(
+      at,
+      internal.notifications.sendReminder,
+      {
+        receiptId,
+        subscriptionId: subscription._id,
+      },
+    );
+
+    await ctx.db.insert("receiptReminders", {
+      receiptId,
+      subscriptionId: subscription._id,
+      scheduledId,
+    });
+
+    return null;
+  },
+});
+
+export const sendReminder = internalMutation({
+  args: {
+    receiptId: v.id("receipts"),
+    subscriptionId: v.id("deviceSubscriptions"),
+  },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    const reminder = await ctx.db
+      .query("receiptReminders")
+      .withIndex("by_subscriptionId_and_receiptId", (q) =>
+        q
+          .eq("subscriptionId", args.subscriptionId)
+          .eq("receiptId", args.receiptId),
+      )
+      .unique();
+
+    if (!reminder) return null;
+    await ctx.db.delete("receiptReminders", reminder._id);
+    const receipt = await ctx.db.get("receipts", args.receiptId);
+
+    if (receipt?.status === "needs_review" && !receipt.excluded)
+      await ctx.scheduler.runAfter(0, internal.pushDelivery.send, {
+        ...args,
+        attempt: 0,
+        reviewOnly: true,
+      });
 
     return null;
   },

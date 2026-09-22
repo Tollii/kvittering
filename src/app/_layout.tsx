@@ -1,3 +1,4 @@
+import { NotificationRouting } from "@/features/notifications";
 import { sentryEnabled } from "@/lib/sentry";
 import { reportError } from "@/lib/observability";
 import { ReceiptMigrationError } from "@/lib/receipt-migrations";
@@ -66,6 +67,7 @@ function RootLayout() {
             <ShareIntentRouting />
             <QueryLifecycleProvider>
               <SessionProvider>
+                <NotificationRouting />
                 <Stack
                   screenOptions={{
                     headerTintColor: colors.onHero,

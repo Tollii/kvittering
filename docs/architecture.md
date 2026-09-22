@@ -57,6 +57,7 @@ Add receipt issues in `receipt-issues.ts`; display text belongs in its mapper. P
 | catalogRequests, catalogRequestWaiters | Shared catalog work and workflow completion                                 |
 | catalogProducts, catalogStores         | Shared catalog records; detail freshness is separate from summary freshness |
 | productFamilies, productProfiles       | Household family identity and reusable analysis evidence                    |
+| receiptReminders                       | One pending receipt-review reminder per device subscription and receipt     |
 | deviceSubscriptions                    | Device notification destinations                                            |
 | clientReleases                         | Installed-client diagnostics                                                |
 | releasePolicies, releasePolicyHistory  | Native/API version controls and operator history                            |
