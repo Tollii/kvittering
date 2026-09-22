@@ -12,7 +12,9 @@ import {
   Switch,
   TextInput,
   View,
+  type StyleProp,
   type TextInputProps,
+  type ViewStyle,
 } from "react-native";
 import { type SymbolViewProps } from "expo-symbols";
 import { radius, useTheme } from "@/constants/theme";
@@ -71,6 +73,7 @@ export function Button({
   busy = false,
   compact = false,
   icon,
+  style,
 }: Readonly<{
   title: string;
   onPress: () => void;
@@ -82,6 +85,7 @@ export function Button({
   busy?: boolean;
   compact?: boolean;
   icon?: SymbolViewProps["name"];
+  style?: StyleProp<ViewStyle>;
 }>) {
   const colors = useTheme();
 
@@ -120,6 +124,7 @@ export function Button({
           justifyContent: "center",
           gap: 8,
         },
+        style,
         pressed(state),
         disabled && !busy && { opacity: 0.45 },
       ]}

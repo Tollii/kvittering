@@ -26,6 +26,43 @@ The existing calendar and large-text receipt captures were inspected. No new
 native interaction or live-service tests were run. The [interface verification
 limits](../docs/interface-review.md#limits) still apply.
 
+## Follow-up: PR #6 authentication maintainability review
+
+Status: DONE. The strict review of
+[PR #6](https://github.com/Tollii/kvittering/pull/6) found two issues in the
+original `src/features/apple-account.tsx` and its Settings caller:
+
+- The connection-status effect (lines 22–49) and link handler both wrote a
+  local boolean. Removing a link elsewhere could leave Settings reporting that
+  Apple was still connected. Replaced both writes and the refresh effect with
+  the authenticated `auth.appleConnected` subscription. The query returns no
+  account status after sign-out and cannot read another user's links.
+- The link handler (lines 51–79) had its own operation lock, while sign-out
+  used a separate Settings lock. Sign-out could therefore run during a link
+  request. `AccountSettings` now owns both actions and their shared lock.
+
+The backend account-creation trigger is retained. Better Auth 1.6.33 checks only
+the current user's existing accounts in its native identity-token linking path.
+The Convex trigger enforces Apple identity uniqueness within the write
+transaction. An HTTP hook outside that transaction would not provide that guarantee.
+
+No changed source file crosses 700 or 1,000 lines. The synchronous submission
+references are retained to prevent duplicate presses before React renders the
+pending state. No additional state library or account table is needed.
+
+The maintainability gate passes with both findings fixed. `npm run check` and
+`npm run check:ci` pass with 311 application tests and 13 lint-rule tests. The
+extended authentication tests cover connection status before and after linking,
+unlinking, account isolation, and session removal. The iOS JavaScript export
+also passes. The shared account-operation guard was reviewed in source; no new
+native interaction test was run.
+
+This review compares with `main`; it does not
+establish the oldest installed binary or live release-policy adoption. A new
+native build and signed physical-device authentication tests remain required
+before distribution. No backend deployment, OTA update, or minimum-version
+change is part of this review.
+
 ## Read and write contracts
 
 Mutations perform writes and return null, an ID, or a small acknowledgement. Queries return persisted objects. Mounted screens receive persisted changes automatically through their existing reactive query, without a manual refetch. Background workflows can use a focused read query when they need persisted data. Preserve draft edits and revision checks across either response order. Plans 006 and 009 no longer recommend returning complete receipts or profiles from mutations. This separation does not require another database or a command framework.

@@ -1,59 +1,68 @@
 import { useReleaseMutation } from "@/lib/releases/requests";
-import { useState } from "react";
-import { View } from "react-native";
+import { useRef, useState } from "react";
+import { StyleSheet, View } from "react-native";
 
 import { randomUUID } from "expo-crypto";
 import { api } from "../../convex/_generated/api";
 import { authClient } from "@/lib/auth-client";
 import { Button, Copy, Field, Notice, Panel, Screen } from "@/components/ui";
-import { ArchMark } from "@/components/monument-artwork";
+import {
+  AuthenticationLayout,
+  AuthenticationLink,
+} from "./authentication-layout";
 import { useTheme } from "@/constants/theme";
-
-function Brand({ tagline }: Readonly<{ tagline: string }>) {
-  const colors = useTheme();
-
-  return (
-    <View style={{ paddingTop: 20, gap: 14 }}>
-      <View style={{ flexDirection: "row", alignItems: "center", gap: 10 }}>
-        <View
-          style={{
-            width: 40,
-            height: 40,
-            borderRadius: 12,
-            borderCurve: "continuous",
-            backgroundColor: colors.primary,
-            alignItems: "center",
-            justifyContent: "center",
-          }}
-        >
-          <ArchMark color={colors.onPrimary} />
-        </View>
-        <Copy size={20} weight="700">
-          Kvitto
-        </Copy>
-      </View>
-      <Copy
-        accessibilityRole="header"
-        size={40}
-        weight="700"
-        style={{ color: colors.primary }}
-      >
-        Dagligvarene.{"\n"}Samlet.
-      </Copy>
-      <Copy muted size={16}>
-        {tagline}
-      </Copy>
-    </View>
-  );
-}
+import {
+  AppleAuthenticationButton,
+  useAppleAuthentication,
+} from "./apple-authentication";
+import {
+  appleAuthenticationError,
+  requestAppleIdentity,
+} from "@/lib/apple-authentication";
 
 export function SignIn() {
-  const [register, setRegister] = useState(false);
+  const appleAvailable = useAppleAuthentication();
+  const colors = useTheme();
+  const [emailMode, setEmailMode] = useState<"login" | "register" | null>(null);
+  const register = emailMode === "register";
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [busy, setBusy] = useState(false);
+  const [pending, setPending] = useState<"apple" | "email" | null>(null);
+  const submitting = useRef(false);
   const [error, setError] = useState("");
+  const busy = pending !== null;
+  const showEmail = emailMode !== null || appleAvailable === false;
+
+  async function continueWithApple() {
+    if (submitting.current) return;
+    submitting.current = true;
+    setPending("apple");
+    setError("");
+
+    try {
+      const idToken = await requestAppleIdentity();
+
+      if (!idToken) return;
+
+      const result = await authClient.signIn.social({
+        provider: "apple",
+        idToken,
+      });
+
+      if (result.error) {
+        if (result.error.code === "OAUTH_LINK_ERROR") setEmailMode("login");
+        throw new Error(appleAuthenticationError(result.error.code));
+      }
+    } catch (cause) {
+      setError(
+        cause instanceof Error ? cause.message : "Innlogging mislyktes.",
+      );
+    } finally {
+      submitting.current = false;
+      setPending(null);
+    }
+  }
 
   const canSubmit =
     !!email.trim() &&
@@ -61,8 +70,9 @@ export function SignIn() {
     (!register || !!name.trim());
 
   async function submit() {
-    if (busy || !canSubmit) return;
-    setBusy(true);
+    if (submitting.current || !canSubmit) return;
+    submitting.current = true;
+    setPending("email");
     setError("");
 
     try {
@@ -82,69 +92,159 @@ export function SignIn() {
         cause instanceof Error ? cause.message : "Innlogging mislyktes.",
       );
     } finally {
-      setBusy(false);
+      submitting.current = false;
+      setPending(null);
     }
   }
 
   return (
-    <Screen statusBarStyle="auto">
-      <Brand tagline="Handle. Ta et bilde. Ferdig." />
-      <Panel style={{ gap: 16 }}>
-        <Copy accessibilityRole="header" size={22} weight="700">
-          {register ? "Opprett konto" : "Velkommen hjem"}
-        </Copy>
-        {register && (
-          <Field
-            label="Navn"
-            value={name}
-            onChangeText={setName}
-            autoComplete="name"
-            textContentType="name"
-            editable={!busy}
+    <AuthenticationLayout
+      compact={showEmail}
+      title={
+        showEmail
+          ? register
+            ? "Opprett konto"
+            : "Logg inn"
+          : "Velkommen til Kvitto"
+      }
+      subtitle={
+        showEmail
+          ? "Fortsett med e-post og passord."
+          : "Kvitteringer og dagligvarer.\nSamlet for hele husstanden."
+      }
+      navigation={
+        showEmail && appleAvailable ? (
+          <AuthenticationLink
+            back
+            title="Alle innloggingsvalg"
+            disabled={busy}
+            onPress={() => {
+              setEmailMode(null);
+              setError("");
+            }}
           />
-        )}
-        <Field
-          label="E-post"
-          value={email}
-          onChangeText={setEmail}
-          autoCapitalize="none"
-          autoCorrect={false}
-          keyboardType="email-address"
-          autoComplete="email"
-          textContentType="emailAddress"
-          editable={!busy}
-        />
-        <Field
-          label="Passord"
-          value={password}
-          onChangeText={setPassword}
-          editable={!busy}
-          returnKeyType={register ? "done" : "go"}
-          secureTextEntry
-          autoCapitalize="none"
-          autoComplete={register ? "new-password" : "current-password"}
-          textContentType={register ? "newPassword" : "password"}
-          onSubmitEditing={() => void submit()}
-          hint={register ? "Minst 12 tegn" : undefined}
-        />
+        ) : undefined
+      }
+    >
+      <View style={{ gap: 20 }}>
         {!!error && <Notice error>{error}</Notice>}
-        <Button
-          title={register ? "Opprett konto" : "Logg inn"}
-          busy={busy}
-          disabled={!canSubmit}
-          onPress={() => void submit()}
-        />
-        <Button
-          secondary
-          title={register ? "Har du konto? Logg inn" : "Ny her? Opprett konto"}
-          disabled={busy}
-          onPress={() => {
-            setRegister(!register);
-            setError("");
-          }}
-        />
-      </Panel>
-    </Screen>
+        {!showEmail && (
+          <>
+            {appleAvailable && (
+              <AppleAuthenticationButton
+                busy={pending === "apple"}
+                disabled={busy}
+                onPress={() => void continueWithApple()}
+              />
+            )}
+            <View
+              style={{ flexDirection: "row", alignItems: "center", gap: 16 }}
+            >
+              <View
+                style={{
+                  flex: 1,
+                  height: StyleSheet.hairlineWidth,
+                  backgroundColor: colors.line,
+                }}
+              />
+              <Copy muted size={14}>
+                eller
+              </Copy>
+              <View
+                style={{
+                  flex: 1,
+                  height: StyleSheet.hairlineWidth,
+                  backgroundColor: colors.line,
+                }}
+              />
+            </View>
+            <Button
+              secondary
+              title="Opprett konto med e-post"
+              disabled={busy}
+              style={{
+                minHeight: 56,
+                borderRadius: 28,
+                backgroundColor: "transparent",
+                borderWidth: 1,
+                borderColor: colors.line,
+              }}
+              onPress={() => setEmailMode("register")}
+            />
+            <View style={{ paddingTop: 12, gap: 2 }}>
+              <Copy muted size={14} style={{ textAlign: "center" }}>
+                Har du allerede en konto?
+              </Copy>
+              <AuthenticationLink
+                title="Logg inn med e-post"
+                disabled={busy}
+                onPress={() => setEmailMode("login")}
+              />
+            </View>
+          </>
+        )}
+        {showEmail && (
+          <>
+            <View style={{ gap: 16 }}>
+              {register && (
+                <Field
+                  label="Navn"
+                  value={name}
+                  onChangeText={setName}
+                  autoComplete="name"
+                  textContentType="name"
+                  editable={!busy}
+                  style={{ borderRadius: 14 }}
+                />
+              )}
+              <Field
+                label="E-post"
+                value={email}
+                onChangeText={setEmail}
+                autoCapitalize="none"
+                autoCorrect={false}
+                keyboardType="email-address"
+                autoComplete="email"
+                textContentType="emailAddress"
+                editable={!busy}
+                style={{ borderRadius: 14 }}
+              />
+              <Field
+                label="Passord"
+                value={password}
+                onChangeText={setPassword}
+                returnKeyType={register ? "done" : "go"}
+                secureTextEntry
+                autoCapitalize="none"
+                autoComplete={register ? "new-password" : "current-password"}
+                textContentType={register ? "newPassword" : "password"}
+                onSubmitEditing={() => void submit()}
+                hint={register ? "Minst 12 tegn" : undefined}
+                editable={!busy}
+                style={{ borderRadius: 14 }}
+              />
+            </View>
+            <Button
+              title={register ? "Opprett konto" : "Logg inn"}
+              busy={pending === "email"}
+              style={{ minHeight: 56, borderRadius: 28 }}
+              disabled={busy || !canSubmit}
+              onPress={() => void submit()}
+            />
+            <AuthenticationLink
+              title={
+                register ? "Har du konto? Logg inn" : "Ny her? Opprett konto"
+              }
+              disabled={busy}
+              onPress={() => {
+                setEmailMode(register ? "login" : "register");
+                setError("");
+              }}
+            />
+          </>
+        )}
+      </View>
+    </AuthenticationLayout>
   );
 }
 
