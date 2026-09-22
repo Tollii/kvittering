@@ -1,19 +1,15 @@
-import { installedRelease, releaseError } from "@/lib/releases/client";
 import { useReleaseMutation } from "@/lib/releases/requests";
 import { useState } from "react";
 import { Stack } from "expo-router";
-import { useAction } from "convex/react";
 import { useQuery, usePaginatedQuery } from "convex-helpers/react/cache";
 import { api } from "../../convex/_generated/api";
 import type { Id } from "../../convex/_generated/dataModel";
-import type { EvaluationResult } from "../../convex/correctionEvaluation";
 import {
   Button,
   Copy,
   Empty,
   Loading,
   Notice,
-  Panel,
   Row,
   Screen,
   SectionTitle,
@@ -63,10 +59,8 @@ export default function Corrections() {
       targetKeys.includes(`${target.receiptId}:${target.lineId}`),
     ) ?? [];
 
-  const evaluate = useAction(api.correctionEvaluation.evaluate);
   const apply = useReleaseMutation(api.corrections.apply);
   const undo = useReleaseMutation(api.corrections.undo);
-  const [result, setResult] = useState<EvaluationResult | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
 
@@ -92,7 +86,7 @@ export default function Corrections() {
 
   return (
     <Screen insetTop={false}>
-      <Stack.Screen options={{ title: "Rettelser og læring" }} />
+      <Stack.Screen options={{ title: "Rettelser" }} />
       {!history ? (
         <Loading />
       ) : (
@@ -107,46 +101,6 @@ export default function Corrections() {
             kategori- og produktrettelser fra nå av. Automatisk godkjenning
             teller ikke som en rettelse.
           </Copy>
-          <Button
-            title="Test Jev mot rettelsene"
-            secondary
-            busy={busy}
-            disabled={
-              !history.entries.some((entry) => entry.field === "category")
-            }
-            onPress={() =>
-              void run(async () =>
-                setResult(
-                  await evaluate({ client: installedRelease }).catch(
-                    (error) => {
-                      throw releaseError(error);
-                    },
-                  ),
-                ),
-              )
-            }
-          />
-          {result && (
-            <Panel>
-              <Copy weight="700">
-                {result.matched} av {result.checked} kategorier samsvarer
-              </Copy>
-              <Copy muted size={12}>
-                {result.model}. Siste beslutning per vare. Dette er en test mot
-                husstandens valg, ikke en generell nøyaktighetsmåling.
-                Produktkoblinger testes ikke her.
-              </Copy>
-              {result.results
-                .filter((entry) => entry.expected !== entry.actual)
-                .map((entry) => (
-                  <Row
-                    key={entry.id}
-                    title={entry.name}
-                    detail={`Du: ${categoryName(entry.expected)} · Jev: ${categoryName(entry.actual)}`}
-                  />
-                ))}
-            </Panel>
-          )}
           {!!error && <Notice error>{error}</Notice>}
           <SectionTitle title="Siste beslutninger" />
           {!history.entries.length && (

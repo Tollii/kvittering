@@ -250,13 +250,12 @@ export function SignIn() {
 
 export function HouseholdSetup() {
   const [join, setJoin] = useState(false);
-  const [name, setName] = useState("Hjemme");
   const [invitation, setInvitation] = useState("");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const create = useReleaseMutation(api.households.create);
   const joinHousehold = useReleaseMutation(api.households.join);
-  const canSubmit = join ? !!invitation.trim() : !!name.trim();
+  const canSubmit = !join || !!invitation.trim();
 
   async function submit() {
     if (busy || !canSubmit) return;
@@ -267,7 +266,7 @@ export function HouseholdSetup() {
       if (join) await joinHousehold({ invitation: invitation.trim() });
       else
         await create({
-          name: name.trim(),
+          name: "Hjemme",
           invitation: randomUUID().replaceAll("-", ""),
         });
     } catch (cause) {
@@ -280,14 +279,14 @@ export function HouseholdSetup() {
   }
 
   return (
-    <Screen title={join ? "Bli med i husstanden" : "Opprett husstand"}>
+    <Screen title={join ? "Bli med i husstanden" : "Kom i gang"}>
       <Copy muted>
         {join
           ? "Bruk invitasjonskoden fra den du deler husstand med."
-          : "Samle kvitteringene deres på ett sted. Du kan invitere én person etterpå."}
+          : "Start med dine egne kvitteringer i Hjemme. Du kan endre navnet og invitere en person senere."}
       </Copy>
       <Panel style={{ gap: 16 }}>
-        {join ? (
+        {join && (
           <Field
             label="Invitasjonskode"
             value={invitation}
@@ -296,18 +295,10 @@ export function HouseholdSetup() {
             autoCorrect={false}
             editable={!busy}
           />
-        ) : (
-          <Field
-            label="Navn på husstanden"
-            value={name}
-            onChangeText={setName}
-            maxLength={80}
-            editable={!busy}
-          />
         )}
         {!!error && <Notice error>{error}</Notice>}
         <Button
-          title={join ? "Bli med" : "Opprett husstand"}
+          title={join ? "Bli med" : "Start med mine kvitteringer"}
           busy={busy}
           disabled={!canSubmit}
           onPress={() => void submit()}
@@ -315,7 +306,7 @@ export function HouseholdSetup() {
         <Button
           secondary
           disabled={busy}
-          title={join ? "Opprett en ny husstand" : "Jeg har en invitasjonskode"}
+          title={join ? "Tilbake" : "Jeg har en invitasjonskode"}
           onPress={() => {
             setJoin(!join);
             setError("");

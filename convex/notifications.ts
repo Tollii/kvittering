@@ -116,8 +116,7 @@ export const delivery = internalQuery({
     if (
       !receipt ||
       !subscription ||
-      (receipt.status !== "needs_review" &&
-        !(receipt.status === "reviewed" && receipt.autoAccepted)) ||
+      receipt.status !== "needs_review" ||
       receipt.excluded ||
       receipt.uploadedBy !== subscription.identity ||
       receipt.householdId !== subscription.householdId
@@ -130,7 +129,6 @@ export const delivery = internalQuery({
       .unique();
 
     if (member?.householdId !== receipt.householdId) return null;
-    const autoAccepted = receipt.autoAccepted ?? false;
 
     const needs = reviewSummary(
       receipt.data,
@@ -145,17 +143,15 @@ export const delivery = internalQuery({
     return {
       subscription,
       store: receipt.data?.store ?? null,
-      autoAccepted,
+      autoAccepted: false,
       title: receipt.data?.store || "Kvitteringen er klar",
       // Say what the person will have to do, so the tap is informed.
       body: [
         amount,
-        autoAccepted
-          ? "godkjent automatisk"
-          : needs.length
-            ? needs.slice(0, 3).join(" · ") +
-              (needs.length > 3 ? ` · +${needs.length - 3}` : "")
-            : "klar til kontroll",
+        needs.length
+          ? needs.slice(0, 3).join(" · ") +
+            (needs.length > 3 ? ` · +${needs.length - 3}` : "")
+          : "klar til kontroll",
       ]
         .filter(Boolean)
         .join(" · "),

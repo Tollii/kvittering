@@ -9,7 +9,7 @@ import { useState } from "react";
 import { Stack, useLocalSearchParams } from "expo-router";
 import { View } from "react-native";
 import {
-  Button,
+  Disclosure,
   Copy,
   IconButton,
   Notice,
@@ -20,7 +20,6 @@ import {
   Segments,
 } from "@/components/ui";
 import { SpendingDetails } from "@/components/spending-details";
-import { useHousehold } from "@/features/session";
 import {
   analysisPeriod,
   analysisSummary,
@@ -34,7 +33,6 @@ import { formatDate } from "@/lib/format-date";
 export default function Analysis() {
   const spendingAnalysisEnabled = useFeatureFlag("spendingAnalysis");
   const { month } = useLocalSearchParams<{ month?: string }>();
-  const { synchronize } = useHousehold();
   const [frequency, setFrequency] = useState<AnalysisFrequency>("month");
 
   const [anchor, setAnchor] = useState(
@@ -45,10 +43,8 @@ export default function Analysis() {
       : osloDate(),
   );
 
-  const [today, setToday] = useState(osloDate());
+  const today = osloDate();
   const [selection, setSelection] = useState<SpendingSelection | null>(null);
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState("");
   const period = analysisPeriod(anchor, frequency, today);
 
   const { receipts, completeReceipts } = useCompleteReceipts({
@@ -186,50 +182,51 @@ export default function Analysis() {
                 er ikke nødvendigvis nye eller uvanlige kjøp. Manglende
                 kvitteringer og produktkoblinger kan endre bildet.
               </Copy>
-              <SectionTitle title="Hva forklarer forskjellen?" />
-              <Panel style={{ gap: 0, paddingVertical: 4 }}>
-                <Row
-                  title="Endret pris per mengde"
-                  value={formatMoney(report.priceOre)}
-                />
-                <Row
-                  title="Endret kjøpt mengde"
-                  value={formatMoney(report.quantityOre)}
-                />
-                <Row
-                  title="Andre varer og ukjent mengde"
-                  value={formatMoney(report.unexplainedOre)}
-                />
-              </Panel>
-              <Copy muted size={13}>
-                {report.measuredLines} av {report.productLines} varelinjer kan
-                sammenlignes som samme produktfamilie med kjent mengde. Pris
-                omfatter rabatter og ulik fordeling mellom butikker og
-                pakninger. Dette viser bidrag til endringen, ikke årsaken til
-                prisendringer.
-              </Copy>
-              <SectionTitle title="Sammenlignbare produkter" />
-              {!report.effects.length && (
-                <Copy muted>
-                  Vi trenger samme produktfamilie med kjent mengde i begge
-                  perioder.
+              <Disclosure title="Slik er endringen beregnet">
+                <Panel style={{ gap: 0, paddingVertical: 4 }}>
+                  <Row
+                    title="Endret pris per mengde"
+                    value={formatMoney(report.priceOre)}
+                  />
+                  <Row
+                    title="Endret kjøpt mengde"
+                    value={formatMoney(report.quantityOre)}
+                  />
+                  <Row
+                    title="Andre varer og ukjent mengde"
+                    value={formatMoney(report.unexplainedOre)}
+                  />
+                </Panel>
+                <Copy muted size={13}>
+                  {report.measuredLines} av {report.productLines} varelinjer kan
+                  sammenlignes som samme produktfamilie med kjent mengde. Pris
+                  omfatter rabatter og ulik fordeling mellom butikker og
+                  pakninger. Dette viser bidrag til endringen, ikke årsaken til
+                  prisendringer.
                 </Copy>
-              )}
-              {report.effects.map((effect) => (
-                <Row
-                  key={effect.id}
-                  title={effect.name}
-                  value={formatMoney(effect.differenceOre)}
-                  detail={`${effect.previousQuantity} → ${effect.currentQuantity} ${effect.unit} · pris ${formatMoney(effect.priceOre)}, mengde ${formatMoney(effect.quantityOre)}`}
-                  onPress={() =>
-                    setSelection({
-                      period: periodKey,
-                      dimension: "effect",
-                      key: effect.id,
-                    })
-                  }
-                />
-              ))}
+                <SectionTitle title="Sammenlignbare produkter" />
+                {!report.effects.length && (
+                  <Copy muted>
+                    Vi trenger samme produktfamilie med kjent mengde i begge
+                    perioder.
+                  </Copy>
+                )}
+                {report.effects.map((effect) => (
+                  <Row
+                    key={effect.id}
+                    title={effect.name}
+                    value={formatMoney(effect.differenceOre)}
+                    detail={`${effect.previousQuantity} → ${effect.currentQuantity} ${effect.unit} · pris ${formatMoney(effect.priceOre)}, mengde ${formatMoney(effect.quantityOre)}`}
+                    onPress={() =>
+                      setSelection({
+                        period: periodKey,
+                        dimension: "effect",
+                        key: effect.id,
+                      })
+                    }
+                  />
+                ))}
+              </Disclosure>
             </>
           )}
           <SectionTitle
@@ -258,24 +255,6 @@ export default function Analysis() {
           ))}
         </>
       )}
-      <Button
-        title="Oppdater analyse"
-        secondary
-        busy={busy}
-        onPress={() => {
-          setBusy(true);
-          setError("");
-          void synchronize()
-            .then(() => setToday(osloDate()))
-            .catch(() => setError("Kunne ikke oppdatere. Prøv igjen."))
-            .finally(() => setBusy(false));
-        }}
-      />
-      <Copy muted size={12}>
-        Analysen oppdateres også når nye kvitteringer og produktopplysninger
-        kommer inn.
-      </Copy>
-      {!!error && <Notice error>{error}</Notice>}
       <SpendingDetails selected={selected} onClose={() => setSelection(null)} />
     </Screen>
   );

@@ -1,5 +1,4 @@
 import { ReceiptActivityButton } from "@/features/receipt-activity";
-import { ReceiptTip } from "@/components/receipt-tip";
 import { useCompleteReceipts } from "@/features/receipt-queries";
 import { router } from "expo-router";
 import { ActivityIndicator, View } from "react-native";
@@ -7,10 +6,10 @@ import {
   Button,
   Copy,
   Icon,
+  IconButton,
   Loading,
   Notice,
   Panel,
-  Row,
   Screen,
   SectionTitle,
 } from "@/components/ui";
@@ -20,11 +19,9 @@ import { SwipeToApprove } from "@/features/swipe-approve";
 import { useHousehold } from "@/features/session";
 import { useTheme } from "@/constants/theme";
 import { quickApproveData } from "@/lib/domain/receipt-review";
-import { useProductLinkingQueue } from "@/features/product-linking-queue";
 
 export default function Inbox() {
   const colors = useTheme();
-  const productQueue = useProductLinkingQueue();
   const { queue, online, synchronize } = useHousehold();
   const { receipts, loadingReceipts } = useCompleteReceipts({ kind: "inbox" });
   const reserved = new Set(queue.map((entry) => entry.receiptId));
@@ -57,6 +54,14 @@ export default function Inbox() {
             : undefined
       }
       settings
+      headerRight={
+        <IconButton
+          name="barcode"
+          label="Koble produkter"
+          color={colors.onHero}
+          onPress={() => router.push("/product-linking")}
+        />
+      }
     >
       {!online && <Notice icon="wifi.slash">Uten nett</Notice>}
       {loadingReceipts && <Loading />}
@@ -191,22 +196,6 @@ export default function Inbox() {
           title="Ingen kvitteringer til kontroll"
           message="Alle kvitteringene dine er behandlet."
         />
-      )}
-      {productQueue.items.length > 0 && <ReceiptTip kind="matching" />}
-      {(productQueue.items.length > 0 || productQueue.loading) && (
-        <Panel>
-          <Row
-            title="Koble produkter"
-            icon="barcode"
-            detail="Valgfritt · koble varer til produktkatalogen"
-            value={
-              productQueue.loading
-                ? "…"
-                : `${productQueue.items.length}${productQueue.complete ? "" : "+"}`
-            }
-            onPress={() => router.push("/product-linking")}
-          />
-        </Panel>
       )}
       {empty && (
         <Button

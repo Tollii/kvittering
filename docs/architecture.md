@@ -24,6 +24,17 @@ The Expo application starts in `src/app/_layout.tsx`. Session context contains a
 4. Catalog matching and product analysis run on the server. Profile questions use bounded batches. Writes reject stale generation, revision, or evidence. Exhausted analysis can be retried explicitly; `productAnalysis.repair` is an operator recovery operation.
 5. `receipt-draft.ts` owns editor changes and save acknowledgement. Reactive queries deliver the saved receipt. Report selections keep identity and period, then derive their content from current data.
 
+Receipt approval checks material reading errors and duplicates. Category uncertainty
+does not block approval, and approval does not confirm or remember suggested
+categories. Explicit category edits still update household memory. Initial push
+notifications are reserved for receipts that need review; requested reminders
+keep their separate schedule and delivery checks.
+
+The product-linking queue is an optional action in the Inbox header. Spending uses
+one default purchase scope, with payment reconciliation and calculation details
+in secondary views. New users explicitly start with the default household name
+or join through an invitation; Settings permits an authenticated household rename.
+
 ## Identity and evidence
 
 - Better Auth owns Apple and email/password accounts and sessions. Native Apple

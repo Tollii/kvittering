@@ -92,14 +92,12 @@ it("groups review work into receipt facts and line fixes", () => {
     "duplicate",
     "store",
     "total",
-    "categories",
     "amounts",
   ]);
   expect(reviewSummary(data, true)).toEqual([
     "Mulig duplikat",
     "Butikk mangler",
     "Betalt beløp mangler",
-    "1 kategori",
     "1 beløp mangler",
   ]);
 });
@@ -157,17 +155,22 @@ it("confirms suggested categories in bulk without touching unclear or other issu
   expect(data.lines[0].issues).toEqual(["Kategorien er usikker."]);
   expect(reviewTasks(confirmed, false).map((task) => task.kind)).toEqual([
     "difference",
-    "categories",
     "line-issues",
   ]);
 });
 
-it("quick-approves only when suggested categories are the last open question", () => {
+it("approves receipt facts without confirming uncertain or unknown categories", () => {
   const data = batteryFixture();
   data.lines[0].issues = ["Kategorien er usikker."];
+  data.lines[0].confidence = 0.3;
+  data.lines[0].manual = false;
   const approved = quickApproveData(data, false);
-  expect(approved?.lines[0].issues).toEqual([]);
-  expect(approved?.lines[0].confidence).toBe(1);
+  expect(approved).toEqual(data);
+  expect(approved?.lines[0]).toMatchObject({
+    issues: ["Kategorien er usikker."],
+    confidence: 0.3,
+    manual: false,
+  });
   expect(quickApproveData(data, true)).toBeNull();
   data.lines[1].amountOre = null;
   expect(quickApproveData(data, false)).toBeNull();
@@ -175,24 +178,23 @@ it("quick-approves only when suggested categories are the last open question", (
   const unclear = batteryFixture();
   unclear.lines[0].categoryId = "fallback.unclear";
   unclear.lines[0].issues = ["Kategorien er usikker."];
-  expect(quickApproveData(unclear, false)).toBeNull();
+  expect(quickApproveData(unclear, false)).toEqual(unclear);
 });
 
 it("walks a weekly shop from reading to approval", () => {
   const data = weeklyShopFixture();
   // 239+399+1499+429+949+35 = 3550 products, -300 -122 discounts, +200 -430 deposits = 2898; unknown coffee line
   expect(reviewTasks(data, false).map((task) => task.kind)).toEqual([
-    "categories",
     "amounts",
   ]);
-  expect(reviewSummary(data, false)).toEqual(["1 kategori", "1 beløp mangler"]);
+  expect(reviewSummary(data, false)).toEqual(["1 beløp mangler"]);
   data.lines.find((line) => line.id === "unknown")!.amountOre = 13000;
   // Now the lines sum to 41980 minus nothing missing: check reconcile agrees with the printed total.
   expect(reconcile(data).difference).toBe(0);
   expect(
     quickApproveData(data, false)?.lines.find((line) => line.id === "cheez")
       ?.issues,
-  ).toEqual([]);
+  ).toEqual(data.lines.find((line) => line.id === "cheez")?.issues);
   expect(canAcceptReceipt(confirmSuggestedCategories(data), false)).toBe(true);
   const balanced = balanceWithAdjustment({ ...data, totalOre: 42000 }, "adj");
   expect(reconcile(balanced).difference).toBe(0);
@@ -212,7 +214,7 @@ it("uses stable codes and preserves reader text independently of category confir
   if (parsed.kind !== "parsed") throw new Error("Fixture must parse");
   expect(assessReceipt(parsed.receipt, false)).toMatchObject({
     acceptable: false,
-    tasks: [{ kind: "categories" }, { kind: "line-issues" }],
+    tasks: [{ kind: "line-issues" }],
   });
   expect(
     confirmLineCategory(data.lines[0], "drinks.soft-drinks").issues,

@@ -10,6 +10,7 @@ import { api, internal } from "./_generated/api";
 import schema from "./schema";
 import type { Id } from "./_generated/dataModel";
 import { batteryFixture, validateReceipt } from "../src/lib/domain/receipt";
+import { quickApproveData } from "../src/lib/domain/receipt-review";
 
 const modules = import.meta.glob("./**/*.ts");
 
@@ -28,7 +29,14 @@ it("keeps unresolved extraction issues, mismatches, duplicates and mock results 
 
   let previousId: Id<"receipts"> | undefined;
 
-  for (const scenario of ["issue", "mismatch", "duplicate", "mock", "clean"]) {
+  for (const scenario of [
+    "issue",
+    "category",
+    "mismatch",
+    "duplicate",
+    "mock",
+    "clean",
+  ]) {
     const id = await user.mutation(api.receipts.reserve, {
       clientId: `review-policy-${scenario}`,
       imageCount: 1,
@@ -47,6 +55,12 @@ it("keeps unresolved extraction issues, mismatches, duplicates and mock results 
     if (scenario === "issue")
       data.lines[0].issues.push("Varenavnet er usikkert.");
 
+    if (scenario === "category") {
+      data.lines[0].issues = ["Kategorien er usikker."];
+      data.lines[0].confidence = 0.3;
+      data.lines[0].manual = false;
+    }
+
     if (scenario === "mismatch") data.totalOre! += 100;
     await t.mutation(internal.processing.finish, {
       id,
@@ -57,9 +71,9 @@ it("keeps unresolved extraction issues, mismatches, duplicates and mock results 
     });
     const receipt = (await user.query(api.receipts.detail, { id }))!.receipt;
     expect(receipt.status).toBe(
-      scenario === "clean" ? "reviewed" : "needs_review",
+      ["clean", "category"].includes(scenario) ? "reviewed" : "needs_review",
     );
-    expect(receipt.autoAccepted).toBe(scenario === "clean");
+    expect(receipt.autoAccepted).toBe(["clean", "category"].includes(scenario));
 
     if (scenario === "issue") {
       data.lines[0].issues = [];
@@ -77,7 +91,7 @@ it("keeps unresolved extraction issues, mismatches, duplicates and mock results 
     expect(
       (await user.query(api.receipts.detail, { id }))!.receipt.status,
     ).toBe(
-      scenario === "issue" || scenario === "clean"
+      ["issue", "clean", "category"].includes(scenario)
         ? "reviewed"
         : "needs_review",
     );
@@ -193,6 +207,8 @@ it("persists category uncertainty in the representation understood by installed 
 
   const data = batteryFixture();
   data.lines[0].issues = ["category_uncertain"];
+  data.lines[0].confidence = 0.3;
+  data.lines[0].manual = false;
   await t.run((ctx) =>
     commitReceiptChange(ctx, {
       receiptId: id,
@@ -202,6 +218,33 @@ it("persists category uncertainty in the representation understood by installed 
     }),
   );
   const receipt = (await user.query(api.receipts.detail, { id }))!.receipt;
-  expect(receipt.data!.lines[0].issues).toEqual(["Kategorien er usikker."]);
+  expect(receipt.status).toBe("reviewed");
+  expect(receipt.data!.lines[0]).toMatchObject({
+    issues: ["Kategorien er usikker."],
+    confidence: 0.3,
+    manual: false,
+  });
   expect(data.lines[0].issues).toEqual(["category_uncertain"]);
+
+  const approved = quickApproveData(receipt.data, false);
+  expect(approved).not.toBeNull();
+  await user.mutation(api.receipts.save, {
+    id,
+    revision: receipt.revision,
+    data: approved!,
+    reviewed: true,
+    rememberLineIds: [],
+    duplicateResolved: false,
+    excluded: false,
+  });
+  const saved = (await user.query(api.receipts.detail, { id }))!.receipt;
+  expect(saved.data!.lines[0]).toMatchObject({
+    issues: ["Kategorien er usikker."],
+    confidence: 0.3,
+    manual: false,
+  });
+  expect(await t.run((ctx) => ctx.db.query("aliases").collect())).toEqual([]);
+  expect(await t.run((ctx) => ctx.db.query("corrections").collect())).toEqual(
+    [],
+  );
 });

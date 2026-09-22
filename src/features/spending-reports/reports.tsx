@@ -1,12 +1,12 @@
 import { type ComponentProps, type ReactNode } from "react";
 import { View } from "react-native";
-import { Button, Copy, Empty, Icon, Notice, Panel, Row } from "@/components/ui";
-import { ProductAttributesReport } from "../product-attributes-report";
+import { Copy, Empty, Icon, Notice, Panel, Row } from "@/components/ui";
 import { SpendingBars } from "@/components/spending-details";
 import { FamilyPurchases, familySummary } from "@/components/family-purchases";
 import { SpendingCalendar } from "@/components/spending-calendar";
 import { openReceipt } from "@/components/receipt-card";
 import { useTheme } from "@/constants/theme";
+import { isCategoryUncertain } from "@/lib/domain/receipt-issues";
 import { formatDate } from "@/lib/format-date";
 import { formatMoney } from "@/lib/domain/receipt";
 import {
@@ -15,7 +15,6 @@ import {
   type monthPriceSignals,
 } from "@/lib/domain/price-signals";
 import type {
-  comparisonInsights,
   monthlyInsights,
   receiptCoverage,
   Receipt,
@@ -25,13 +24,11 @@ import type { catalogInsights } from "@/lib/catalog/insights";
 import type { SpendingDimension } from "@/lib/spending-selection";
 
 export const reportIds = [
-  "attributes",
   "catalog",
   "prices",
   "families",
   "calendar",
-  "meat",
-  "changes",
+  "payment",
   "coverage",
 ] as const;
 
@@ -39,16 +36,13 @@ export type ReportId = (typeof reportIds)[number];
 
 type ReportProps = {
   totals: ReturnType<typeof monthlyInsights>;
-  comparison: ReturnType<typeof comparisonInsights>;
   coverage: ReturnType<typeof receiptCoverage>;
   catalog: ReturnType<typeof catalogInsights>;
   receipts: Receipt[];
   month: string;
-  reviewedOnly: boolean;
   historyComplete: boolean;
   coverageComplete: boolean;
   surprises: ReturnType<typeof monthPriceSignals>;
-  meatRows: SpendingGroup[];
   onSelect: (value: SpendingGroup, dimension?: SpendingDimension) => void;
   onAccounting: (key: string) => void;
   onClose: () => void;
@@ -56,22 +50,31 @@ type ReportProps = {
 
 export function useSpendingReports({
   totals,
-  comparison,
   coverage,
   catalog,
   receipts,
   month,
-  reviewedOnly,
   historyComplete,
   coverageComplete,
   surprises,
-  meatRows,
   onSelect,
   onAccounting,
   onClose,
 }: ReportProps) {
   const colors = useTheme();
   const pricier = surprises.filter((signal) => signal.ratio > 1);
+
+  const uncertainCategories = totals.selected.reduce(
+    (count, receipt) =>
+      count +
+      (receipt.data?.lines.filter(
+        (line) =>
+          line.kind === "product" &&
+          (line.categoryId === "fallback.unclear" ||
+            line.issues.some(isCategoryUncertain)),
+      ).length ?? 0),
+    0,
+  );
 
   const reports: Record<
     ReportId,
@@ -83,31 +86,6 @@ export function useSpendingReports({
       render: () => ReactNode;
     }
   > = {
-    attributes: {
-      title: "Produktegenskaper",
-      icon: "tag",
-      value: undefined,
-      visible: true,
-      render: () => (
-        <>
-          {
-            <ProductAttributesReport
-              receipts={totals.selected}
-              onSelect={(value, dimension) =>
-                onSelect(
-                  value,
-                  dimension === "type"
-                    ? "attributeType"
-                    : dimension === "sugar"
-                      ? "attributeSugar"
-                      : "attributePreparation",
-                )
-              }
-            />
-          }
-        </>
-      ),
-    },
     catalog: {
       title: "Produkter og merker",
       icon: "barcode",
@@ -218,71 +196,38 @@ export function useSpendingReports({
             <SpendingCalendar
               receipts={receipts}
               month={month}
-              reviewedOnly={reviewedOnly}
               onSelect={(value) => onSelect(value, "calendar")}
             />
           }
         </>
       ),
     },
-    meat: {
-      title: "Kjøtt og fisk",
-      icon: "fish",
-      value: formatMoney(meatRows.reduce((sum, row) => sum + row.amountOre, 0)),
-      visible: true,
+    payment: {
+      title: "Betaling og pant",
+      icon: "creditcard",
       render: () => (
         <>
-          {
-            <>
-              <SpendingBars
-                rows={meatRows}
-                onSelect={(value) => onSelect(value)}
-              />
-              {!meatRows.length && <Copy muted>Ingen kjøp i perioden</Copy>}
-            </>
-          }
-        </>
-      ),
-    },
-    changes: {
-      title: "Endringer fra forrige måned",
-      icon: "arrow.up.arrow.down",
-      value: undefined,
-      visible: comparison.previous.selected.length > 0,
-      render: () => (
-        <>
-          {
-            <>
-              <Copy size={12} muted>
-                {formatDate(comparison.currentEnd)} mot{" "}
-                {formatDate(comparison.previousEnd)}
-              </Copy>
-              {comparison.changes.slice(0, 3).map((item) => (
-                <Row
-                  key={item.id}
-                  title={item.name}
-                  detail={`${formatMoney(item.previous)} → ${formatMoney(item.current)}`}
-                  value={formatMoney(item.difference)}
-                  onPress={() =>
-                    onSelect(
-                      {
-                        id: item.id,
-                        name: item.name,
-                        amountOre: item.current,
-                        contributions: item.currentContributions,
-                      },
-                      "change",
-                    )
-                  }
-                />
-              ))}
-              <Button
-                title="Se kjøp i forrige periode"
-                secondary
-                onPress={() => onAccounting("previous")}
-              />
-            </>
-          }
+          <Copy muted>
+            Betalt beløp inkluderer pant. Dagligvaresummen viser varekjøp etter
+            rabatter.
+          </Copy>
+          <Row
+            title="Betalt"
+            value={formatMoney(totals.paid)}
+            onPress={() => onAccounting("paid")}
+          />
+          {[
+            { name: "Rabatter", amount: totals.discounts },
+            { name: "Pant betalt", amount: totals.deposits },
+            { name: "Pant returnert", amount: totals.returns },
+          ].map((item) => (
+            <Row
+              key={item.name}
+              title={item.name}
+              value={formatMoney(item.amount)}
+              onPress={() => onAccounting(item.name)}
+            />
+          ))}
         </>
       ),
     },
@@ -297,6 +242,13 @@ export function useSpendingReports({
             <>
               {!coverageComplete && (
                 <Notice>Henter kvitteringer uten dato …</Notice>
+              )}
+              {uncertainCategories > 0 && (
+                <Copy muted>
+                  {uncertainCategories} varelinjer har usikker kategori.
+                  Kategoriene kan rettes på kvitteringen. Beløpene er med i
+                  dagligvaresummen.
+                </Copy>
               )}
               <Row
                 title={`${coverage.unlinkedCount} varer uten produktkobling`}

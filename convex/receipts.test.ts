@@ -62,6 +62,51 @@ it("allows two household members, refuses a third, and rejects unauthenticated a
   );
 });
 
+it("renames only the caller's household and rejects invalid or stale names", async () => {
+  const { t, first, second, outsider } = await setup();
+  await expect(
+    t.mutation(api.households.rename, {
+      name: "Home",
+      previousName: "Test household",
+    }),
+  ).rejects.toThrow("Logg inn");
+  await expect(
+    outsider.mutation(api.households.rename, {
+      name: "Home",
+      previousName: "Test household",
+    }),
+  ).rejects.toThrow("Velg en husstand");
+  await first.mutation(api.households.rename, {
+    name: "  Our home  ",
+    previousName: "Test household",
+  });
+  expect((await second.query(api.households.current, {}))!.household.name).toBe(
+    "Our home",
+  );
+  await expect(
+    second.mutation(api.households.rename, {
+      name: "Second name",
+      previousName: "Test household",
+    }),
+  ).rejects.toThrow("Navnet er endret");
+
+  for (const name of [" ", "x".repeat(81)])
+    await expect(
+      first.mutation(api.households.rename, { name, previousName: "Our home" }),
+    ).rejects.toThrow("1–80");
+  await outsider.mutation(api.households.create, {
+    name: "Other home",
+    invitation: "ffffffffffffffffffffffffffffffff",
+  });
+  await outsider.mutation(api.households.rename, {
+    name: "Other name",
+    previousName: "Other home",
+  });
+  expect((await first.query(api.households.current, {}))!.household.name).toBe(
+    "Our home",
+  );
+});
+
 it("enforces household checks for receipts and image access", async () => {
   const { first, outsider, householdId } = await setup();
   await outsider.mutation(api.households.create, {

@@ -12,22 +12,18 @@ import { formatMoney } from "@/lib/domain/receipt";
 export function SpendingCalendar({
   receipts,
   month,
-  reviewedOnly,
   onSelect,
 }: Readonly<{
   receipts: Receipt[];
   month: string;
-  reviewedOnly: boolean;
   onSelect: (group: SpendingGroup) => void;
 }>) {
   const colors = useTheme();
   const { fontScale, width } = useWindowDimensions();
 
-  const days = spendingCalendar(
-    receipts,
-    Number(month.slice(0, 4)),
-    reviewedOnly,
-  ).filter((day) => day.date.startsWith(month));
+  const days = spendingCalendar(receipts, Number(month.slice(0, 4))).filter(
+    (day) => day.date.startsWith(month),
+  );
 
   const offset = (new Date(`${month}-01T12:00:00Z`).getUTCDay() + 6) % 7;
 

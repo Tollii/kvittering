@@ -8,7 +8,7 @@ import { recordEvent, reportError } from "@/lib/observability";
 
 /** OTA reload is explicit so a downloaded update cannot interrupt an edit. */
 export function ReleaseSettings() {
-  const { policy, refresh } = useReleasePolicy();
+  const { refresh } = useReleasePolicy();
   const [busy, setBusy] = useState(false);
   const [ready, setReady] = useState(false);
   const [message, setMessage] = useState("");
@@ -60,10 +60,6 @@ export function ReleaseSettings() {
     <View style={{ gap: 12 }}>
       <Copy>
         Versjon {installedRelease.version} ({installedRelease.build})
-      </Copy>
-      <Copy muted size={13}>
-        {installedRelease.channel} · API {installedRelease.apiVersion} · policy{" "}
-        {policy.revision}
       </Copy>
       <Button
         title="Se etter oppdateringer"

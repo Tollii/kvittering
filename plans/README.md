@@ -1,5 +1,12 @@
 # Kvitto simplification review
 
+## Product simplification assessment — 23 September 2026
+
+Status: IMPLEMENTED. See the [product assessment](product-simplification.md) for
+approved changes, sub-agent review fixes, and verification limits. Product linking
+remains accessible from the Inbox header. Inbox and History remain separate.
+These product changes are separate from the completed technical plans below.
+
 Read [the HTML report](simplification-review/report.html) for findings, all 23 tables, all 26 effects, architecture, evidence limits, and implementation packages.
 
 Audited commit: `af69fdafc24ae0b2367989e5203f50067b2479d8`, 2026-09-19. Application code was unchanged during the audit. Typecheck, lint, and all 148 tests passed. All 19 plans are implemented in separate commits. See [the final verification record](simplification-review/verification.md) for checks and remaining native/release limits. The findings and source counts below describe the audit baseline.

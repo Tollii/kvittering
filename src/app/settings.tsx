@@ -1,3 +1,4 @@
+import { HouseholdNameSettings } from "@/features/household-name-settings";
 import { ReceiptSearchSettings } from "@/features/spotlight";
 import { AccountSettings } from "@/features/account-settings";
 import { FormSection, NativeForm } from "@/components/ui/native-form";
@@ -59,6 +60,7 @@ export default function Settings() {
       )}
       <NativeForm>
         <FormSection title={household.name}>
+          <HouseholdNameSettings />
           <View>
             {details?.members.map((member, index) => (
               <View
@@ -180,8 +182,8 @@ export default function Settings() {
         )}
         <FormSection title="Kategorisering">
           <Row
-            title="Rettelser og læring"
-            detail="Se beslutninger og test kategorisering"
+            title="Rettelser"
+            detail="Se, bruk og angre tidligere rettelser"
             icon="checkmark.circle"
             onPress={() => router.push("/corrections")}
           />

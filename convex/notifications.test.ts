@@ -14,6 +14,47 @@ const subscription = {
   token: "ExpoPushToken[abcdefghijklmnop]",
 };
 
+it("keeps automatic approval silent and rejects an already queued success notification", async () => {
+  const { t, uploader, householdId } = await setup();
+  await uploader.mutation(api.notifications.subscribe, subscription);
+
+  const id = await uploader.mutation(api.receipts.reserve, {
+    clientId: "notification-success-001",
+    imageCount: 1,
+    householdId,
+  });
+
+  await t.run((ctx) =>
+    ctx.db.patch("receipts", id, { status: "processing", generation: 1 }),
+  );
+  const data = batteryFixture();
+  data.lines[0].issues = ["Kategorien er usikker."];
+  await t.mutation(internal.processing.finish, {
+    id,
+    generation: 1,
+    data,
+    original: data,
+    provider: "fixture",
+  });
+  expect(
+    (await uploader.query(api.receipts.detail, { id }))!.receipt.status,
+  ).toBe("reviewed");
+
+  const subscriptionId = await t.run(
+    async (ctx) => (await ctx.db.query("deviceSubscriptions").first())!._id,
+  );
+
+  expect(
+    await t.query(internal.notifications.delivery, {
+      receiptId: id,
+      subscriptionId,
+    }),
+  ).toBeNull();
+  expect(
+    await t.run((ctx) => ctx.db.system.query("_scheduled_functions").take(10)),
+  ).toHaveLength(0);
+});
+
 async function setup() {
   const t = convexTest(schema, modules);
 
@@ -95,11 +136,12 @@ it("schedules only the uploader once, and skips delivery after review, unsubscri
     ctx.db.patch("receipts", id, { status: "processing", generation: 1 }),
   );
   const data = batteryFixture();
+  data.lines[0].issues = ["Varenavnet er usikkert."];
   const args = { id, generation: 1, data, original: data, provider: "fixture" };
   await t.mutation(internal.processing.finish, args);
   expect(
     (await uploader.query(api.receipts.detail, { id }))!.receipt.autoAccepted,
-  ).toBe(true);
+  ).toBe(false);
   await t.mutation(internal.processing.finish, args);
 
   const deliveries = await t.run((ctx) =>
@@ -125,6 +167,7 @@ it("schedules only the uploader once, and skips delivery after review, unsubscri
   expect(
     await t.run((ctx) => ctx.db.system.query("_scheduled_functions").take(10)),
   ).toHaveLength(1);
+  data.lines[0].issues = [];
   await uploader.mutation(api.receipts.save, {
     id,
     revision: 0,

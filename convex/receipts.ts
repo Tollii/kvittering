@@ -247,6 +247,10 @@ export const save = mutation({
     for (const line of args.data.lines) {
       const previous = receipt.data?.lines.find((old) => old.id === line.id);
 
+      // Compatibility fields added below are not manual receipt edits.
+      if (!previous || JSON.stringify(previous) !== JSON.stringify(line))
+        line.manual = true;
+
       if (previous) line.originalText = previous.originalText;
       line.receiptName = previous?.receiptName ?? previous?.name ?? line.name;
 
@@ -329,10 +333,6 @@ export const save = mutation({
     );
 
     for (const line of args.data.lines) {
-      const previous = receipt.data?.lines.find((old) => old.id === line.id);
-
-      if (!previous || JSON.stringify(previous) !== JSON.stringify(line))
-        line.manual = true;
       line.categoryAliasKey = line.categoryAliasKey ?? line.productKey;
 
       if (

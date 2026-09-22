@@ -8,16 +8,12 @@ import { api } from "../../convex/_generated/api";
 import { Copy, Icon } from "@/components/ui";
 import { radius, useTheme } from "@/constants/theme";
 import type { Receipt } from "@/lib/domain/insights";
-import { aliasKey } from "@/lib/domain/receipt";
-import {
-  canConfirmSuggestedCategory,
-  quickApproveData,
-} from "@/lib/domain/receipt-review";
+import { quickApproveData } from "@/lib/domain/receipt-review";
 import { errorFeedback, successFeedback } from "@/lib/haptics";
 
 /**
- * Swipe a receipt card left to approve it, when the only open questions are
- * suggested categories. Everything else still needs the full review screen.
+ * Swipe left to approve receipt facts without confirming category suggestions.
+ * Material errors still require the full review screen.
  */
 export function SwipeToApprove({
   receipt,
@@ -56,10 +52,7 @@ export function SwipeToApprove({
         revision: receipt.revision,
         data,
         reviewed: true,
-        rememberLineIds: receipt
-          .data!.lines.filter(canConfirmSuggestedCategory)
-          .filter((line) => aliasKey(data, line) !== null)
-          .map((line) => line.id),
+        rememberLineIds: [],
         duplicateResolved: receipt.duplicateResolved,
         excluded: receipt.excluded,
       });

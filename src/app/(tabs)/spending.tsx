@@ -13,13 +13,11 @@ import {
   type SpendingSelection,
   type SpendingDimension,
 } from "@/lib/spending-selection";
-import { attributeInsights } from "@/lib/domain/attribute-insights";
 import { spendingCalendar, monthBefore } from "@/lib/domain/insights";
 import { useCompleteReceipts } from "@/features/receipt-queries";
 import { useState } from "react";
 import { Pressable, View } from "react-native";
 import {
-  Button,
   Copy,
   Icon,
   IconButton,
@@ -32,7 +30,6 @@ import {
   Screen,
   SectionTitle,
   Segments,
-  Toggle,
   pressed,
 } from "@/components/ui";
 import { MonumentArtwork } from "@/components/monument-artwork";
@@ -87,11 +84,9 @@ function Spending({ initialMonth }: Readonly<{ initialMonth: string }>) {
     end: `${month}-31`,
   });
 
-  const [filters, setFilters] = useState(false);
   const [storesOpen, setStoresOpen] = useState(false);
   const [report, setReport] = useState<ReportId | null>(null);
   const [showAllGroups, setShowAllGroups] = useState(false);
-  const [reviewedOnly, setReviewedOnly] = useState(false);
 
   const [breakdown, setBreakdown] = useState<"category" | "store" | "type">(
     "category",
@@ -99,25 +94,21 @@ function Spending({ initialMonth }: Readonly<{ initialMonth: string }>) {
 
   const [group, setGroup] = useState<string | null>(null);
   const [selection, setSelection] = useState<SpendingSelection | null>(null);
-  const periodKey = JSON.stringify([month, reviewedOnly]);
+  const periodKey = month;
 
   const undated = useCompleteReceipts(
     { kind: "undated" },
     report === "coverage" || selection?.key === "unlinked",
   );
 
-  const comparison = comparisonInsights(receipts, month, reviewedOnly);
+  const comparison = comparisonInsights(receipts, month);
   const totals = comparison.current;
-
-  const widgetTotals = reviewedOnly
-    ? comparisonInsights(receipts, month, false).current
-    : totals;
 
   usePurchaseWidget({
     ready: completeReceipts && month === currentMonth,
     month,
-    amountOre: widgetTotals.products,
-    provisional: widgetTotals.provisional,
+    amountOre: totals.products,
+    provisional: totals.provisional,
   });
 
   const monthLabel = new Intl.DateTimeFormat("nb-NO", {
@@ -185,17 +176,6 @@ function Spending({ initialMonth }: Readonly<{ initialMonth: string }>) {
     setGroup(null);
   }
 
-  const meatRows = totals.categories.filter(
-    (category) =>
-      [
-        "meat-fish.poultry",
-        "meat-fish.pork",
-        "meat-fish.lamb",
-        "meat-fish.beef",
-        "meat-fish.fish",
-      ].includes(category.id) && category.amountOre !== 0,
-  );
-
   const history = useCompleteReceipts(
     { kind: "allProducts" },
     report === "prices",
@@ -220,26 +200,14 @@ function Spending({ initialMonth }: Readonly<{ initialMonth: string }>) {
     catalogProduct: catalog.products,
     catalogBrand: catalog.brands,
     catalogStore: catalog.stores,
-    attributeType: attributeInsights(totals.selected, "type").groups,
-    attributeSugar: attributeInsights(totals.selected, "sugar").groups,
-    attributePreparation: attributeInsights(totals.selected, "preparation")
-      .groups,
-    calendar: spendingCalendar(
-      receipts,
-      Number(month.slice(0, 4)),
-      reviewedOnly,
-    ).map((day) => ({
-      id: day.date,
-      name: day.date,
-      amountOre: day.amountOre,
-      contributions: day.contributions,
-    })),
-    change: comparison.changes.map((item) => ({
-      id: item.id,
-      name: item.name,
-      amountOre: item.current,
-      contributions: item.currentContributions,
-    })),
+    calendar: spendingCalendar(receipts, Number(month.slice(0, 4))).map(
+      (day) => ({
+        id: day.date,
+        name: day.date,
+        amountOre: day.amountOre,
+        contributions: day.contributions,
+      }),
+    ),
     accounting: [
       {
         id: "paid",
@@ -272,14 +240,6 @@ function Spending({ initialMonth }: Readonly<{ initialMonth: string }>) {
         ),
       },
       {
-        id: "previous",
-        name: "Forrige periode",
-        amountOre: comparison.previous.products,
-        contributions: comparison.changes.flatMap(
-          (item) => item.previousContributions,
-        ),
-      },
-      {
         id: "unlinked",
         name: "Uten produktkobling",
         amountOre: 0,
@@ -291,15 +251,12 @@ function Spending({ initialMonth }: Readonly<{ initialMonth: string }>) {
   const reports = useSpendingReports({
     totals: { ...totals, undated: undated.receipts },
     coverageComplete: undated.completeReceipts,
-    comparison,
     coverage,
     catalog,
     receipts,
     month,
-    reviewedOnly,
     historyComplete: history.completeReceipts,
     surprises,
-    meatRows,
     onSelect: showDetails,
     onAccounting: select,
     onClose: () => setReport(null),
@@ -368,7 +325,6 @@ function Spending({ initialMonth }: Readonly<{ initialMonth: string }>) {
                   {totals.provisional
                     ? ` · ${totals.provisional} foreløpige`
                     : ""}
-                  {reviewedOnly ? " · bare godkjente" : ""}
                   {change !== null
                     ? ` · ${Math.abs(change)} % ${change > 0 ? "mer" : "mindre"} enn ${comparison.partial ? "samme del av forrige måned" : "forrige måned"}`
                     : ""}
@@ -422,16 +378,6 @@ function Spending({ initialMonth }: Readonly<{ initialMonth: string }>) {
       }
       title="Forbruk"
       settings
-      headerRight={
-        <IconButton
-          name="line.3.horizontal.decrease"
-          label="Filtrer forbruk"
-          filled="#FFFFFF22"
-          color={colors.onHero}
-          size={17}
-          onPress={() => setFilters(true)}
-        />
-      }
     >
       {!online && <Notice icon="wifi.slash">Uten nett</Notice>}
       {loadingReceipts ? (
@@ -548,43 +494,6 @@ function Spending({ initialMonth }: Readonly<{ initialMonth: string }>) {
               onPress={() => setStoresOpen(true)}
             />
           </Panel>
-          <SectionTitle title="Betaling" />
-          <Panel style={{ gap: 0, paddingVertical: 4 }}>
-            <Row
-              title="Betalt"
-              detail="Inkludert pant"
-              value={formatMoney(totals.paid)}
-              onPress={() => select("paid")}
-            />
-            {[
-              {
-                name: "Rabatter",
-                amount: totals.discounts,
-                kinds: ["item_discount", "receipt_discount"],
-              },
-              {
-                name: "Pant betalt",
-                amount: totals.deposits,
-                kinds: ["deposit"],
-              },
-              {
-                name: "Pant returnert",
-                amount: totals.returns,
-                kinds: ["deposit_return"],
-              },
-            ].map((metric) => (
-              <View
-                key={metric.name}
-                style={{ borderTopWidth: 1, borderTopColor: colors.line }}
-              >
-                <Row
-                  title={metric.name}
-                  value={formatMoney(metric.amount)}
-                  onPress={() => select(metric.name)}
-                />
-              </View>
-            ))}
-          </Panel>
           <SectionTitle title="Utforsk forbruket" />
           <Row
             title="Forbruksanalyse"
@@ -635,20 +544,6 @@ function Spending({ initialMonth }: Readonly<{ initialMonth: string }>) {
         onClose={() => setReport(null)}
       >
         {report ? reports[report].render() : null}
-      </Sheet>
-      <Sheet
-        title="Vis forbruk"
-        visible={filters}
-        onClose={() => setFilters(false)}
-      >
-        <Panel>
-          <Toggle
-            label="Bare godkjente kvitteringer"
-            value={reviewedOnly}
-            onChange={setReviewedOnly}
-          />
-        </Panel>
-        <Button title="Vis oversikt" onPress={() => setFilters(false)} />
       </Sheet>
       <SpendingDetails selected={selected} onClose={() => setSelection(null)} />
     </Screen>

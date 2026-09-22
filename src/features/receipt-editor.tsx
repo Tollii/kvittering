@@ -428,12 +428,6 @@ export function ReceiptEditor({
                 : [{ text: "OK" }],
             ),
         );
-      case "categories":
-        return chip(
-          `${task.count} ${task.count === 1 ? "kategori" : "kategorier"}`,
-          "tag",
-          toLines,
-        );
       case "amounts":
         return chip(`${task.count} beløp mangler`, "numbers", toLines);
       case "names":
@@ -528,40 +522,6 @@ export function ReceiptEditor({
             }}
           >
             Utelat fra forbruk
-          </Stack.Toolbar.MenuAction>
-          <Stack.Toolbar.MenuAction
-            icon="barcode.viewfinder"
-            disabled={
-              processing ||
-              !online ||
-              busy ||
-              dirty ||
-              receipt.catalogStatus === "pending"
-            }
-            onPress={() =>
-              void run(async () => {
-                await releaseMutation(client, api.catalogMatching.enrich, {
-                  id: receipt._id,
-                });
-                setMessage("Søker etter produkter …");
-              })
-            }
-          >
-            Finn produkter på nytt
-          </Stack.Toolbar.MenuAction>
-          <Stack.Toolbar.MenuAction
-            icon="chart.bar"
-            disabled={processing || !online || busy || dirty}
-            onPress={() =>
-              void run(async () => {
-                await releaseMutation(client, api.productAnalysis.ensure, {
-                  ids: [receipt._id],
-                });
-                setMessage("Analysen er lagt i kø.");
-              })
-            }
-          >
-            Oppdater analyse
           </Stack.Toolbar.MenuAction>
           <Stack.Toolbar.MenuAction
             icon="arrow.clockwise"
@@ -914,8 +874,7 @@ export function ReceiptEditor({
                 {value}
               </Notice>
             ))}
-            <Disclosure title="Om lesingen" value={receipt.uploaderName}>
-              <Row title="Lest med" detail={receipt.provider} icon="sparkles" />
+            <Disclosure title="Om kvitteringen" value={receipt.uploaderName}>
               {receipt.catalogStatus === "pending" && (
                 <Row title="Henter produktinformasjon …" icon="barcode" />
               )}
@@ -942,6 +901,25 @@ export function ReceiptEditor({
                                 id: receipt._id,
                               },
                             );
+                          })
+                  }
+                />
+              )}
+              {receipt.productAnalysis?.state === "error" && (
+                <Row
+                  title="Prøv mengdeberegning igjen"
+                  icon="arrow.clockwise"
+                  onPress={
+                    !online || busy || dirty || processing
+                      ? undefined
+                      : () =>
+                          void run(async () => {
+                            await releaseMutation(
+                              client,
+                              api.productAnalysis.ensure,
+                              { ids: [receipt._id] },
+                            );
+                            setMessage("Mengdene beregnes på nytt.");
                           })
                   }
                 />

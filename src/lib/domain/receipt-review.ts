@@ -88,17 +88,16 @@ export function receiptReviewIssues(data: ReceiptData): string[] {
 }
 
 /**
- * If accepting every suggested category is all that stands between the receipt
- * and approval, return that confirmed data. Otherwise null: a person must look.
+ * Approve receipt facts without confirming or learning suggested categories.
+ * Material receipt errors still require a person to review them.
  */
 export function quickApproveData(
   data: ReceiptData | null,
   unresolvedDuplicate: boolean,
 ): ReceiptData | null {
   if (!data) return null;
-  const confirmed = confirmSuggestedCategories(data);
 
-  return canAcceptReceipt(confirmed, unresolvedDuplicate) ? confirmed : null;
+  return canAcceptReceipt(data, unresolvedDuplicate) ? data : null;
 }
 
 /**
@@ -128,7 +127,7 @@ export function balanceWithAdjustment(
   };
 }
 
-/** Product matching and optional package information do not require receipt review. */
+/** Categories, product matching, and package information do not block receipt approval. */
 export function canAcceptReceipt(
   data: ReceiptData,
   unresolvedDuplicate: boolean,
@@ -149,7 +148,6 @@ export type ReviewTask =
   | { kind: "currency" }
   | { kind: "difference"; amountOre: number }
   | { kind: "no-lines" }
-  | { kind: "categories"; count: number }
   | { kind: "amounts"; count: number }
   | { kind: "names"; count: number }
   | { kind: "line-issues"; count: number }
@@ -206,18 +204,6 @@ export function assessReceipt(
 
   const counted = (predicate: (line: ReceiptLine) => boolean) =>
     data.lines.filter(predicate).length;
-
-  const categories = counted(canConfirmSuggestedCategory);
-
-  const unclear = counted(
-    (line) =>
-      line.kind === "product" &&
-      line.issues.some(isCategoryUncertain) &&
-      !canConfirmSuggestedCategory(line),
-  );
-
-  if (categories + unclear)
-    tasks.push({ kind: "categories", count: categories + unclear });
 
   const amounts = counted(
     (line) =>
@@ -277,8 +263,6 @@ export function reviewSummary(
         return "Ingen varer lest";
       case "receipt-issues":
         return plural(task.issues.length, "merknad", "merknader");
-      case "categories":
-        return plural(task.count, "kategori", "kategorier");
       case "amounts":
         return `${task.count} beløp mangler`;
       case "names":

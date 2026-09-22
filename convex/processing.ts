@@ -420,7 +420,7 @@ export const finish = internalMutation({
       duplicate: { duplicateOf, resolved: receipt.duplicateResolved },
     });
 
-    if (!receipt.receiptReadyNotified) {
+    if (!autoAccepted && !receipt.receiptReadyNotified) {
       await ctx.db.patch("receipts", args.id, { receiptReadyNotified: true });
 
       const subscriptions = await ctx.db

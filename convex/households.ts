@@ -147,6 +147,24 @@ export const setBudget = mutation({
   },
 });
 
+export const rename = mutation({
+  args: { name: v.string(), previousName: v.string() },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    const member = await requireMember(ctx);
+    const household = await ctx.db.get("households", member.householdId);
+    const name = args.name.trim();
+
+    if (!name || name.length > 80) throw new Error("Bruk 1–80 tegn i navnet.");
+
+    if (!household || household.name !== args.previousName)
+      throw new Error("Navnet er endret. Lukk og åpne navnefeltet på nytt.");
+    await ctx.db.patch("households", household._id, { name });
+
+    return null;
+  },
+});
+
 export const rotateInvitation = mutation({
   args: { invitation: v.string() },
   returns: v.null(),
