@@ -1,5 +1,5 @@
 import { ReceiptSearchSettings } from "@/features/spotlight";
-import { AppleAccount } from "@/features/apple-account";
+import { AccountSettings } from "@/features/account-settings";
 import { FormSection, NativeForm } from "@/components/ui/native-form";
 import { CameraPreferences } from "@/features/camera-preferences";
 import { ReleaseSettings } from "@/features/release-settings";
@@ -11,19 +11,15 @@ import { useConvex } from "convex/react";
 import * as Clipboard from "expo-clipboard";
 import { randomUUID } from "expo-crypto";
 import { api } from "../../convex/_generated/api";
-import { authClient } from "@/lib/auth-client";
 import { Button, Copy, Icon, Notice, Row, Screen } from "@/components/ui";
 import { useHousehold } from "@/features/session";
 import { BudgetSettings } from "@/features/budget-settings";
-import {
-  disableNotifications,
-  NotificationSettings,
-} from "@/features/notifications";
+import { NotificationSettings } from "@/features/notifications";
 import { useTheme } from "@/constants/theme";
 
 export default function Settings() {
   const colors = useTheme();
-  const { details, household, queue, online } = useHousehold();
+  const { details, household, online } = useHousehold();
   const client = useConvex();
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
@@ -209,28 +205,7 @@ export default function Settings() {
           </View>
         </FormSection>
         <FormSection title="Konto">
-          <AppleAccount disabled={!online || busy} />
-          <View style={{ gap: 12 }}>
-            <Copy muted size={14}>
-              {queue.length === 0
-                ? "Ingenting venter på opplasting"
-                : `${queue.length} ${queue.length === 1 ? "kvittering" : "kvitteringer"} venter på opplasting`}
-            </Copy>
-            <Button
-              title="Logg ut"
-              secondary
-              disabled={!online}
-              busy={busy}
-              onPress={() =>
-                void run(async () => {
-                  await disableNotifications(client);
-                  const result = await authClient.signOut();
-
-                  if (result.error) throw new Error(result.error.message);
-                })
-              }
-            />
-          </View>
+          <AccountSettings disabled={busy} />
           {!!error && <Notice error>{error}</Notice>}
         </FormSection>
       </NativeForm>

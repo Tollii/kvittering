@@ -4,7 +4,7 @@ import { register } from "@convex-dev/better-auth/test";
 import { afterEach, beforeAll, beforeEach, expect, it, vi } from "vitest";
 import { z } from "zod";
 import schema from "./schema";
-import { components } from "./_generated/api";
+import { api, components } from "./_generated/api";
 import type { createAuth } from "./auth";
 
 type AuthenticationRequest =
@@ -13,6 +13,9 @@ type AuthenticationRequest =
     >["body"]
   | NonNullable<
       Parameters<ReturnType<typeof createAuth>["api"]["signUpEmail"]>[0]
+    >["body"]
+  | NonNullable<
+      Parameters<ReturnType<typeof createAuth>["api"]["unlinkAccount"]>[0]
     >["body"];
 
 const modules = import.meta.glob("./**/*.ts");
@@ -117,7 +120,11 @@ function authentication() {
 
   return {
     t,
-    post: (path: string, body: AuthenticationRequest, cookie = "") =>
+    post: (
+      path: string,
+      body: AuthenticationRequest | undefined,
+      cookie = "",
+    ) =>
       t.fetch(`/api/auth/${path}`, {
         method: "POST",
         headers: {
@@ -220,7 +227,7 @@ it("rejects a token with a modified signature", async () => {
 });
 
 it("requires an existing session to link Apple", async () => {
-  const { post } = authentication();
+  const { t, post } = authentication();
   const token = await identityToken();
 
   const response = await post("link-social", {
@@ -229,10 +236,11 @@ it("requires an existing session to link Apple", async () => {
   });
 
   expect(response.status).toBe(401);
+  expect(await t.query(api.auth.appleConnected)).toBeNull();
 });
 
 it("requires explicit linking and preserves email login after linking a private Apple address", async () => {
-  const { post } = authentication();
+  const { t, post } = authentication();
 
   const emailCredentials = {
     email: "ada@example.com",
@@ -244,6 +252,20 @@ it("requires explicit linking and preserves email login after linking a private 
 
   expect(registration.status).toBe(200);
   const original = signedIn.parse(await registration.json());
+
+  const session = await t.run((ctx) =>
+    ctx.runQuery(components.betterAuth.adapter.findOne, {
+      model: "session",
+      where: [{ field: "userId", value: original.user.id }],
+    }),
+  );
+
+  const member = t.withIdentity({
+    subject: original.user.id,
+    sessionId: session!._id,
+  });
+
+  expect(await member.query(api.auth.appleConnected)).toBe(false);
   const sameEmailToken = await identityToken({ email: emailCredentials.email });
 
   const implicitLink = await post("sign-in/social", {
@@ -263,6 +285,7 @@ it("requires explicit linking and preserves email login after linking a private 
   );
 
   expect(linked.status).toBe(200);
+  expect(await member.query(api.auth.appleConnected)).toBe(true);
 
   const appleLogin = await post("sign-in/social", {
     provider: "apple",
@@ -279,6 +302,24 @@ it("requires explicit linking and preserves email login after linking a private 
   expect(signedIn.parse(await emailLogin.json()).user.id).toBe(
     original.user.id,
   );
+
+  const unlinked = await post(
+    "unlink-account",
+    { providerId: "apple" },
+    sessionCookie(registration),
+  );
+
+  expect(unlinked.status).toBe(200);
+  expect(await member.query(api.auth.appleConnected)).toBe(false);
+
+  const signOut = await post(
+    "sign-out",
+    undefined,
+    sessionCookie(registration),
+  );
+
+  expect(signOut.status).toBe(200);
+  expect(await member.query(api.auth.appleConnected)).toBeNull();
 });
 
 it("rejects linking an Apple identity already owned by another account", async () => {
@@ -298,6 +339,21 @@ it("rejects linking an Apple identity already owned by another account", async (
 
   expect(apple.status).toBe(200);
   expect(other.status).toBe(200);
+  const otherUser = signedIn.parse(await other.json()).user;
+
+  const otherSession = await t.run((ctx) =>
+    ctx.runQuery(components.betterAuth.adapter.findOne, {
+      model: "session",
+      where: [{ field: "userId", value: otherUser.id }],
+    }),
+  );
+
+  const otherMember = t.withIdentity({
+    subject: otherUser.id,
+    sessionId: otherSession!._id,
+  });
+
+  expect(await otherMember.query(api.auth.appleConnected)).toBe(false);
 
   const linked = await post(
     "link-social",
@@ -306,6 +362,7 @@ it("rejects linking an Apple identity already owned by another account", async (
   );
 
   expect(linked.ok).toBe(false);
+  expect(await otherMember.query(api.auth.appleConnected)).toBe(false);
 
   const accounts = await t.run((ctx) =>
     ctx.runQuery(components.betterAuth.adapter.findMany, {

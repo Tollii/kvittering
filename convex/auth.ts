@@ -6,11 +6,12 @@ import {
 import { convex } from "@convex-dev/better-auth/plugins";
 import { expo } from "@better-auth/expo";
 import { betterAuth } from "better-auth/minimal";
+import { v } from "convex/values";
 import { components, internal } from "./_generated/api";
 import appConfig from "../app.json";
 import type { DataModel } from "./_generated/dataModel";
 import authConfig from "./auth.config";
-import { env } from "./_generated/server";
+import { env, query } from "./_generated/server";
 
 const authFunctions: AuthFunctions = internal.auth;
 
@@ -44,6 +45,27 @@ export const authComponent = createClient<DataModel>(components.betterAuth, {
 });
 
 export const { onCreate } = authComponent.triggersApi();
+
+export const appleConnected = query({
+  args: {},
+  returns: v.union(v.boolean(), v.null()),
+  handler: async (ctx) => {
+    const user = await authComponent.safeGetAuthUser(ctx);
+
+    // The subscription can update before the client finishes signing out.
+    if (!user) return null;
+
+    const account = await ctx.runQuery(components.betterAuth.adapter.findOne, {
+      model: "account",
+      where: [
+        { field: "userId", value: user._id },
+        { field: "providerId", value: "apple" },
+      ],
+    });
+
+    return account !== null;
+  },
+});
 
 export const createAuth = (ctx: GenericCtx<DataModel>) =>
   betterAuth({
