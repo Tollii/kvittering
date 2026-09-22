@@ -71,6 +71,8 @@ export const createAuth = (ctx: GenericCtx<DataModel>) =>
   betterAuth({
     baseURL: env.CONVEX_SITE_URL,
     secret: env.BETTER_AUTH_SECRET,
+    // Apply the same origin protection in tests and deployed environments.
+    advanced: { disableOriginCheck: false },
     database: authComponent.adapter(ctx),
     socialProviders: {
       apple: {

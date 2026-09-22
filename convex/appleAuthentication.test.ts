@@ -7,6 +7,25 @@ import schema from "./schema";
 import { api, components } from "./_generated/api";
 import type { createAuth } from "./auth";
 
+// oxlint-disable-next-line anti-slop/no-module-mocking -- Run the real Expo client against the backend with an iOS environment boundary.
+vi.mock("react-native", () => ({ Platform: { OS: "ios" }, AppState: {} }));
+
+// oxlint-disable-next-line anti-slop/no-module-mocking -- Native app configuration is unavailable in the test runtime.
+vi.mock("expo-constants", () => ({ default: {} }));
+
+// oxlint-disable-next-line anti-slop/no-module-mocking -- Replace native URL construction, not the authentication client.
+vi.mock("expo-linking", () => ({ createURL: () => "kvitto://" }));
+
+// oxlint-disable-next-line anti-slop/no-module-mocking -- Store native session cookies in memory for the real Expo client.
+vi.mock("expo-secure-store", () => {
+  const values = new Map<string, string>();
+
+  return {
+    getItem: (key: string) => values.get(key) ?? null,
+    setItem: (key: string, value: string) => values.set(key, value),
+  };
+});
+
 type AuthenticationRequest =
   | NonNullable<
       Parameters<ReturnType<typeof createAuth>["api"]["signInSocial"]>[0]
@@ -49,6 +68,7 @@ beforeAll(async () => {
 beforeEach(() => {
   vi.stubEnv("NODE_ENV", "production");
   vi.stubEnv("CONVEX_SITE_URL", "https://auth-test.convex.site");
+  vi.stubEnv("EXPO_PUBLIC_CONVEX_SITE_URL", "https://auth-test.convex.site");
   vi.stubEnv(
     "BETTER_AUTH_SECRET",
     "apple-auth-test-secret-at-least-32-characters",
@@ -278,13 +298,32 @@ it("requires explicit linking and preserves email login after linking a private 
 
   const token = await identityToken();
 
-  const linked = await post(
-    "link-social",
-    { provider: "apple", idToken: { token, nonce: "native-request" } },
-    sessionCookie(registration),
-  );
+  const keyFetch = fetch;
+  vi.stubGlobal(
+    "fetch",
+    async (input: RequestInfo | URL, init?: RequestInit) => {
+      const request = new Request(input, init);
 
-  expect(linked.status).toBe(200);
+      if (new URL(request.url).origin === "https://auth-test.convex.site")
+        return t.fetch(new URL(request.url).pathname, request);
+
+      return keyFetch(input, init);
+    },
+  );
+  const { authClient } = await import("../src/lib/auth-client");
+  const login = await authClient.signIn.email(emailCredentials);
+
+  expect(login.error).toBeNull();
+  // Restore a saved session after an app restart, without an earlier login request.
+  vi.resetModules();
+  const { authClient: restoredClient } = await import("../src/lib/auth-client");
+
+  const linked = await restoredClient.linkSocial({
+    provider: "apple",
+    idToken: { token, nonce: "native-request" },
+  });
+
+  expect(linked.error).toBeNull();
   expect(await member.query(api.auth.appleConnected)).toBe(true);
 
   const appleLogin = await post("sign-in/social", {

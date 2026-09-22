@@ -4,6 +4,7 @@ import { useConvex, useQuery } from "convex/react";
 import { api } from "../../convex/_generated/api";
 import { Button, Copy, Notice } from "@/components/ui";
 import { authClient } from "@/lib/auth-client";
+import { reportError } from "@/lib/observability";
 import {
   appleAuthenticationError,
   requestAppleIdentity,
@@ -43,7 +44,10 @@ export function AccountSettings({ disabled }: Readonly<{ disabled: boolean }>) {
         });
 
         if (result.error)
-          throw new Error(appleAuthenticationError(result.error.code));
+          throw Object.assign(
+            new Error(appleAuthenticationError(result.error.code)),
+            { code: result.error.code, status: result.error.status },
+          );
       } else {
         await disableNotifications(client);
         const result = await authClient.signOut();
@@ -51,6 +55,10 @@ export function AccountSettings({ disabled }: Readonly<{ disabled: boolean }>) {
         if (result.error) throw new Error(result.error.message);
       }
     } catch (cause) {
+      reportError(
+        cause,
+        operation === "apple" ? "auth.apple_link" : "auth.sign_out",
+      );
       setError(cause instanceof Error ? cause.message : "Kunne ikke fullføre.");
     } finally {
       submitting.current = false;
