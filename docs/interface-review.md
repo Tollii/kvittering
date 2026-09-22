@@ -43,7 +43,7 @@ The verification record distinguishes rendered fixtures from live services.
 | Area               | Routes, components, and states reviewed                                                                                                                                                                                                              |
 | ------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Entry and access   | Root layout and error boundary; session loading, offline gate, sign-in, registration, create household, join household; release-required and recommended-update screens                                                                              |
-| Capture and import | Camera tab; camera permission, unavailable camera, VisionKit preference, photo and Files import, shared images/PDFs, prepared-image review, combine/remove/add images, busy and error states, upload confirmation                                    |
+| Capture and import | Camera tab; camera permission, unavailable camera, photo and Files import, shared images/PDFs, prepared-image review, combine/remove/add images, busy and error states, upload confirmation                                                          |
 | Inbox              | Review, failed, processing, empty and offline receipts; upload queue and retry; swipe approval; product-linking entry; receipt tips and Live Activity action                                                                                         |
 | Receipt review     | Receipt route, missing and loading receipt; summary, review/all-lines segments, category confirmation, missing amount/name, discounts, adjustments, duplicate and exclusion controls, approval and save footer, stale revision, unsaved-change guard |
 | Receipt sheets     | Receipt details and native date picker; category search, recent categories and groups; product and store search; product details; original images and Quick Look; action menu and destructive confirmation dialogs                                   |
@@ -52,9 +52,9 @@ The verification record distinguishes rendered fixtures from live services.
 | Spending           | Month menu and arrows; budget pace; review notice; category, store and purchase-type breakdown; payment details; filters and receipt contributions                                                                                                   |
 | Reports            | Analysis route; product attributes; products and brands; price signals; purchased quantities; calendar; meat and fish; period changes; coverage and unknown values                                                                                   |
 | Stores             | Store and chain lists; map and numbered markers; unknown locations; period controls; store detail and receipt drill-down                                                                                                                             |
-| Household/settings | Members; invitation, copy/share and code rotation; corrections link; budget draft and remote change; notifications; update check/reload; Spotlight; scanner preference; local queue and sign-out                                                     |
+| Household/settings | Members; invitation, copy/share and code rotation; corrections link; budget draft and remote change; notifications; update check/reload; Spotlight; local queue and sign-out                                                                         |
 | Corrections        | History, evaluation, propagation preview, selection limit, apply, undo, loading/error/empty states                                                                                                                                                   |
-| System surfaces    | Home Screen widget, Live Activity, TipKit, notification links, App Shortcuts, share-intent routing, VisionKit and Quick Look source                                                                                                                  |
+| System surfaces    | Home Screen widget, Live Activity, TipKit, notification links, App Shortcuts, share-intent routing, Quick Look source                                                                                                                                |
 | Shared system      | Copy, Icon, Button, IconButton, Chip, Field, MoneyField, Toggle, Segments, Select, Row, Panel, Disclosure, Notice, Empty, Loading, Screen, Sheet, NativeForm, artwork                                                                                |
 
 ## Verification environment
@@ -76,8 +76,8 @@ open them without access to the author's filesystem or a separate image service.
 
 ## Limits
 
-The simulator cannot verify camera image quality, physical-device VisionKit,
-push delivery, haptics, or Lock Screen and Home Screen behavior. The fixture run
+The simulator cannot verify camera image quality, push delivery, haptics, or
+Lock Screen and Home Screen behavior. The fixture run
 does not establish live authentication, extraction, catalog availability, upload
 completion, or server write behavior. Those boundaries retain the existing code
 and tests.

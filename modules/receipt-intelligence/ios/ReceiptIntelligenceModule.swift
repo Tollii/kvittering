@@ -1,13 +1,11 @@
 import ExpoModulesCore
 import PDFKit
 import UIKit
-import VisionKit
 import TipKit
 import WidgetKit
 
 /// Renders PDF receipts to images on the device. Reading happens on the server.
 public class ReceiptIntelligenceModule: Module {
-  private var scanner: ReceiptDocumentScanner?
   private var preview: ReceiptPreview?
   public func definition() -> ModuleDefinition {
     Name("ReceiptIntelligence")
@@ -52,24 +50,6 @@ public class ReceiptIntelligenceModule: Module {
         catch { self.preview = nil; promise.reject("PREVIEW_FAILED", error.localizedDescription) }
       }
     }.runOnQueue(.main)
-
-    Function("isDocumentScannerSupported") { VNDocumentCameraViewController.isSupported }
-
-    AsyncFunction("scanDocument") { (maxPages: Int, promise: Promise) in
-      guard self.scanner == nil else {
-        promise.reject("SCANNER_BUSY", "Skanneren er allerede åpen.")
-        return
-      }
-      guard VNDocumentCameraViewController.isSupported,
-            let presenter = self.appContext?.utilities?.currentViewController() else {
-        promise.reject("SCANNER_UNAVAILABLE", "Dokumentskanneren er ikke tilgjengelig på denne enheten.")
-        return
-      }
-      let scanner = ReceiptDocumentScanner(maxPages: maxPages, promise: promise) { self.scanner = nil }
-      self.scanner = scanner
-      scanner.present(from: presenter)
-    }.runOnQueue(.main)
-
 
     /// Render each page of a PDF receipt to a JPEG file and return the file URIs in page order.
     AsyncFunction("renderPdf") { (uri: String, maxPages: Int) throws -> [String] in

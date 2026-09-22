@@ -1,7 +1,5 @@
 import { CaptureReview } from "@/features/capture-review";
 import { recordEvent } from "@/lib/observability";
-import { useVisionKitEnabled } from "@/features/camera-preferences";
-import ReceiptIntelligence from "../../../modules/receipt-intelligence/src/ReceiptIntelligenceModule";
 import {
   useCallback,
   useEffect,
@@ -60,7 +58,6 @@ const onCameraMuted = "#E3E7FF";
 
 export default function Capture() {
   const colors = useTheme();
-  const visionKit = useVisionKitEnabled();
   const { owner, household, online, synchronize, queue } = useHousehold();
   const [permission, requestPermission] = useCameraPermissions();
   const camera = useRef<CameraView>(null);
@@ -161,37 +158,6 @@ export default function Capture() {
       setReview(true);
     });
 
-  const scanDocument = () =>
-    run(async () => {
-      if (!ReceiptIntelligence?.scanDocument)
-        throw new Error("Oppdater appen for å bruke VisionKit.");
-
-      const cameraPermission = permission?.granted
-        ? permission
-        : await requestPermission();
-
-      if (!cameraPermission.granted)
-        throw new Error("Tillat kamera i Innstillinger for å skanne.");
-      const room = maxReceiptImages - photos.length;
-
-      if (room <= 0) throw new Error(`Maks ${maxReceiptImages} bilder`);
-      recordEvent("receipt.capture", { operation: "visionkit" });
-      const pages = await ReceiptIntelligence.scanDocument(room);
-
-      if (!pages || !mounted.current) return;
-
-      const imported = await importReceiptFiles(
-        pages.map((uri) => ({ uri, mimeType: "image/jpeg" })),
-        room,
-      );
-
-      if (!mounted.current) return;
-      setPhotos((current) => [...current, ...imported.uris]);
-
-      if (photos.length === 0) setCombined(true);
-      setReview(true);
-    });
-
   const choosePhotos = () =>
     run(async () => {
       if (photos.length >= maxReceiptImages)
@@ -282,8 +248,7 @@ export default function Capture() {
       void synchronize();
     });
 
-  const live =
-    permission?.granted && focused && foreground && !review && !visionKit;
+  const live = permission?.granted && focused && foreground && !review;
 
   const uploading = queue.some((entry) => !entry.error);
   const failed = queue.some((entry) => !!entry.error);
@@ -339,7 +304,7 @@ export default function Capture() {
           {overlay(
             <>
               <Copy size={15} weight="700" style={{ color: onCamera }}>
-                {visionKit ? "VisionKit-skanner" : "Ny kvittering"}
+                Ny kvittering
               </Copy>
               <Copy
                 size={13}
@@ -471,7 +436,7 @@ export default function Capture() {
             !review && (
               <View style={{ padding: 28, gap: 14, alignItems: "center" }}>
                 <Icon
-                  name={visionKit ? "doc.viewfinder" : "camera.viewfinder"}
+                  name="camera.viewfinder"
                   size={52}
                   color={onCameraMuted}
                 />
@@ -490,11 +455,6 @@ export default function Capture() {
                   Ta et bilde, eller importer en kvittering fra Bilder eller
                   Filer.
                 </Copy>
-                {visionKit && (
-                  <Copy style={{ color: onCamera, textAlign: "center" }}>
-                    Trykk på skanneknappen for å åpne VisionKit.
-                  </Copy>
-                )}
                 {!permission?.granted && (
                   <Button
                     title={
@@ -547,17 +507,13 @@ export default function Capture() {
           </Pressable>
           <Pressable
             accessibilityRole="button"
-            accessibilityLabel={
-              visionKit
-                ? "Skann kvittering med VisionKit"
-                : "Ta bilde av kvitteringen"
-            }
-            disabled={busy || (!visionKit && (!ready || !live))}
+            accessibilityLabel="Ta bilde av kvitteringen"
+            disabled={busy || !ready || !live}
             accessibilityState={{
-              disabled: busy || (!visionKit && (!ready || !live)),
+              disabled: busy || !ready || !live,
               busy,
             }}
-            onPress={() => void (visionKit ? scanDocument() : takePhoto())}
+            onPress={() => void takePhoto()}
             style={(state) => [
               {
                 width: 78,
@@ -566,7 +522,7 @@ export default function Capture() {
                 borderRadius: 39,
                 borderWidth: 3,
                 borderColor: "white",
-                opacity: busy || (!visionKit && (!ready || !live)) ? 0.4 : 1,
+                opacity: busy || !ready || !live ? 0.4 : 1,
               },
               state.pressed && { opacity: 0.7 },
             ]}

@@ -58,26 +58,6 @@ References: [Expo 57 Apple authentication](https://docs.expo.dev/versions/v57.0.
 [Better Auth Apple provider](https://www.better-auth.com/docs/authentication/apple),
 and [Apple account deletion](https://developer.apple.com/support/offering-account-deletion-in-your-app/).
 
-## Compare cameras
-
-Open **Innstillinger → Kamera → Bruk VisionKit-skanner**.
-The device saves this experimental switch. It is off by default. Turn it off to
-return to the ordinary camera. Unsupported devices and older development
-binaries show a disabled switch with an explanation.
-
-VisionKit scans physical documents. Its pages enter the same image preparation,
-preview, upload queue, and server processing as camera photographs. A scan starts
-as one receipt; the preview still lets you choose separate receipts. Canceling
-the scanner does not add or upload anything. The eight-image limit applies to
-both cameras, including pictures already selected.
-
-Use a physical iPhone to compare a short receipt, a long receipt, folded paper,
-faint ink, poor lighting, multiple pages, cancellation, and denied permission.
-The simulator cannot verify capture quality. Keep the ordinary camera as the
-default until these comparisons show no unacceptable loss of detail.
-Remove the experimental switch after these checks establish the selected camera
-and supported clients no longer need the alternative for comparison.
-
 ## Home Screen widget
 
 Add **Kvitto → Dagligvarer** from the iOS widget gallery. The widget supports small
@@ -97,8 +77,8 @@ or receipt lines are stored there.
 ## App Shortcuts
 
 In Apple's Shortcuts app, select Kvitto's **Skann kvittering** or **Åpne innboks**.
-Both open the corresponding screen. The camera screen uses the camera preference
-above. Capture still requires the user's action and camera permission.
+Both open the corresponding screen. Capture uses the standard camera and requires
+the user's action and camera permission.
 
 On a supported iPhone, assign **Skann kvittering** under
 **Settings → Action Button → Shortcut**. The shortcuts are also available to Siri
@@ -106,10 +86,10 @@ and Spotlight through App Intents.
 
 ## Native build
 
-These features require a new native build. `expo-widgets` adds a widget extension,
-and the local receipt module adds VisionKit support. The App Shortcuts config
-plugin compiles its Swift source in the main application target so Xcode can
-extract the intent metadata. Expo prebuild recreates all generated native files.
+These features require a new native build. `expo-widgets` adds a widget extension.
+The App Shortcuts config plugin compiles its Swift source in the main application
+target so Xcode can extract the intent metadata. Expo prebuild recreates all
+generated native files.
 The existing fingerprint runtime policy separates this build from older clients.
 Do not publish this change as an OTA update to an older runtime.
 
@@ -134,7 +114,7 @@ Changing account or household cancels transfers from the previous scope.
 ## Control Center and Lock Screen
 
 On iOS 18 or later, add **Kvitto → Skann kvittering** from the controls gallery.
-The control opens the camera selected in Settings. The shared capture intent
+The control opens the standard camera. The shared capture intent
 runs in the main application. It does not capture a photograph without user
 interaction. Lock Screen access can require unlocking the phone.
 
