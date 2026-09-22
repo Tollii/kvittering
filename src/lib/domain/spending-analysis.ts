@@ -194,8 +194,30 @@ export function spendingAnalysis(
 
   const effects: SpendingEffect[] = [];
 
+  const currentOnly: {
+    id: string;
+    name: string;
+    amountOre: number;
+    contributions: Contribution[];
+  }[] = [];
+
   for (const [id, group] of groups) {
     const all = [...group.current, ...group.previous];
+
+    if (group.current.length && !group.previous.length) {
+      const amountOre = group.current.reduce(
+        (sum, item) => sum + item.amountOre,
+        0,
+      );
+
+      if (amountOre > 0)
+        currentOnly.push({
+          id,
+          name: group.name,
+          amountOre,
+          contributions: group.current,
+        });
+    }
 
     if (!group.current.length || !group.previous.length) continue;
 
@@ -267,6 +289,9 @@ export function spendingAnalysis(
     measuredLines,
     productLines,
     effects,
+    currentOnly: currentOnly.toSorted(
+      (a, b) => b.amountOre - a.amountOre || a.id.localeCompare(b.id),
+    ),
     categories: [...categories.values()]
       .map((row) => ({
         ...row,

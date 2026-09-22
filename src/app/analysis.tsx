@@ -1,3 +1,4 @@
+import { spendingExplanations } from "@/lib/domain/spending-explanations";
 import { useFeatureFlag } from "@/features/featureFlags";
 import {
   resolveSpendingSelection,
@@ -58,8 +59,10 @@ export default function Analysis() {
 
   const report = spendingAnalysis(receipts, period);
   const periodKey = JSON.stringify(period);
+  const explanations = spendingExplanations(report);
 
   const selected = resolveSpendingSelection(selection, periodKey, {
+    change: explanations,
     effect: report.effects.map((effect) => ({
       id: effect.id,
       name: `${effect.name} · begge perioder`,
@@ -155,6 +158,33 @@ export default function Analysis() {
           )}
           {report.previousReceipts > 0 && (
             <>
+              <SectionTitle title="Kort forklart" />
+              {explanations.map((explanation) => (
+                <Row
+                  key={explanation.id}
+                  title={explanation.name}
+                  detail={explanation.detail}
+                  onPress={() =>
+                    setSelection({
+                      period: periodKey,
+                      dimension: "change",
+                      key: explanation.id,
+                    })
+                  }
+                />
+              ))}
+              {!explanations.length && (
+                <Copy muted>
+                  Det er ikke nok sammenlignbare produktopplysninger til å
+                  forklare endringen.
+                </Copy>
+              )}
+              <Copy muted size={13}>
+                Viser de største pris- og mengdebidragene og opptil to
+                produktfamilier som bare er identifisert i denne perioden. Dette
+                er ikke nødvendigvis nye eller uvanlige kjøp. Manglende
+                kvitteringer og produktkoblinger kan endre bildet.
+              </Copy>
               <SectionTitle title="Hva forklarer forskjellen?" />
               <Panel style={{ gap: 0, paddingVertical: 4 }}>
                 <Row

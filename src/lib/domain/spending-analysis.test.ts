@@ -1,3 +1,4 @@
+import { spendingExplanations } from "./spending-explanations";
 import { testId } from "../testing/receipts";
 import { expect, it } from "vitest";
 import { batteryFixture, emptyLine } from "./receipt";
@@ -209,4 +210,37 @@ it("groups product attributes across families and keeps weak or stale evidence u
       "receipt",
     ),
   ).toMatchObject({ sugar: { value: "unknown" }, type: { value: "unknown" } });
+});
+
+it("explains offsetting price and quantity changes even when total spending is unchanged", () => {
+  const before = receipt("2026-08-10", 2000, 1000);
+  const after = receipt("2026-09-10", 2000, 2000);
+  const report = spendingAnalysis([before, after], period);
+  const explanations = spendingExplanations(report);
+  expect(report.differenceOre).toBe(0);
+  expect(explanations).toHaveLength(2);
+  expect(explanations[0].detail).toContain("lavere");
+  expect(explanations[1].detail).toContain("større");
+  expect(explanations[0].contributions.map((item) => item.receipt._id)).toEqual(
+    [after._id, before._id],
+  );
+  expect(explanations[0].amountOre).toBe(4000);
+});
+
+it("identifies current-only families without calling unlinked purchases new", () => {
+  const before = receipt("2026-08-10", 1000, 1000);
+  const after = receipt("2026-09-10", 2500, null);
+  after.productAnalysis!.results[0].family = {
+    id: testId<"productFamilies">("coffee"),
+    name: "Kaffe",
+  };
+  const unknown = { ...receipt("2026-09-11", 800, null), revision: 1 };
+  const report = spendingAnalysis([before, after, unknown], period);
+  expect(report.currentOnly.map((item) => item.name)).toEqual(["Kaffe"]);
+  const explanations = spendingExplanations(report);
+  expect(explanations).toHaveLength(1);
+  expect(explanations[0]).toMatchObject({ name: "Kaffe", amountOre: 2500 });
+  expect(report.unexplainedOre).toBe(2300);
+  expect(spendingExplanations(spendingAnalysis([after], period))).toEqual([]);
+  expect(spendingExplanations(spendingAnalysis([before], period))).toEqual([]);
 });
