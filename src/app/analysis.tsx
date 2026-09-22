@@ -175,8 +175,9 @@ export default function Analysis() {
               ))}
               {!explanations.length && (
                 <Copy muted>
-                  Det er ikke nok sammenlignbare produktopplysninger til å
-                  forklare endringen.
+                  {report.effects.length
+                    ? "Ingen pris- eller mengdeendring i de sammenlignbare produktfamiliene."
+                    : "Det er ikke nok sammenlignbare produktopplysninger til å forklare endringen."}
                 </Copy>
               )}
               <Copy muted size={13}>
