@@ -176,3 +176,22 @@ clients keep explicit upload completion. The queue format and API version are
 unchanged. Validate Control Center launch, background transfers after locking,
 Spotlight launch, and APNs updates on a signed physical iPhone before release.
 Simulator checks do not establish APNs delivery or background scheduling.
+
+## Receipt notification actions
+
+Expand a receipt notification to select **Kontroller** or **Minn meg kl. 20**.
+Both open Kvitto so the action can use the signed-in account. Review opens the
+receipt. A reminder is scheduled for 20:00 in the device's current time zone,
+or the next day if that time has passed. Kvitto confirms the date after the server
+accepts the request. The action needs network access and enabled notifications.
+
+Reminders are private to the uploader and device subscription. Repeating the
+action replaces that receipt's pending reminder on the device. The server checks
+access and review status again at delivery; reviewed, excluded, deleted, and
+inaccessible receipts do not cause a reminder. Signing out disables the device
+subscription. No receipt is approved through a notification action.
+
+Deploy the additive reminder backend before publishing the JavaScript update.
+Existing clients ignore the new notification category and keep ordinary taps.
+No native dependency, local queue format, or minimum supported version changes.
+Validate expanded actions and cold launches on a signed physical iPhone.

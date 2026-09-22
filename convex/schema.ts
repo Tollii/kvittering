@@ -197,6 +197,11 @@ export default defineSchema({
   })
     .index("by_token", ["token"])
     .index("by_identity", ["identity"]),
+  receiptReminders: defineTable({
+    receiptId: v.id("receipts"),
+    subscriptionId: v.id("deviceSubscriptions"),
+    scheduledId: v.id("_scheduled_functions"),
+  }).index("by_subscriptionId_and_receiptId", ["subscriptionId", "receiptId"]),
   products: defineTable({
     catalogKey: v.string().optional(),
     householdId: v.id("households"),

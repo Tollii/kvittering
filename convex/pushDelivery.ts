@@ -1,3 +1,4 @@
+import { receiptReviewCategory } from "../src/lib/receipt-notifications";
 import { z } from "zod";
 import { v } from "convex/values";
 import { internalAction, env } from "./_generated/server";
@@ -23,6 +24,7 @@ export const send = internalAction({
     receiptId: v.id("receipts"),
     subscriptionId: v.id("deviceSubscriptions"),
     attempt: v.number(),
+    reviewOnly: v.boolean().optional(),
   },
   returns: v.null(),
   handler: async (ctx, args) => {
@@ -31,7 +33,7 @@ export const send = internalAction({
       subscriptionId: args.subscriptionId,
     });
 
-    if (!target) return null;
+    if (!target || (args.reviewOnly && target.autoAccepted)) return null;
 
     try {
       const response = await fetch("https://exp.host/--/api/v2/push/send", {
@@ -42,6 +44,7 @@ export const send = internalAction({
           sound: "default",
           title: target.title,
           body: target.body,
+          categoryId: target.autoAccepted ? undefined : receiptReviewCategory,
           data: { receiptId: args.receiptId },
         }),
       });

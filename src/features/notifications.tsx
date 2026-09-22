@@ -1,3 +1,10 @@
+import {
+  nextReviewEvening,
+  receiptReviewCategory,
+  reviewReceiptAction,
+  remindReceiptAction,
+} from "@/lib/receipt-notifications";
+import { reportError } from "@/lib/observability";
 import { z } from "zod";
 import { releaseMutation } from "@/lib/releases/requests";
 import { useEffect, useState } from "react";
@@ -142,17 +149,40 @@ export function NotificationRouting() {
   const client = useConvex();
   const { household } = useHousehold();
   const [error, setError] = useState("");
+  const [confirmation, setConfirmation] = useState("");
   useEffect(() => {
     let active = true;
-    let lastIdentifier: string | undefined;
+    const handled = new Set<string>();
+    void Notifications.setNotificationCategoryAsync(receiptReviewCategory, [
+      {
+        identifier: reviewReceiptAction,
+        buttonTitle: "Kontroller",
+        options: { opensAppToForeground: true },
+      },
+      {
+        identifier: remindReceiptAction,
+        buttonTitle: "Minn meg kl. 20",
+        options: { opensAppToForeground: true },
+      },
+    ]).catch((cause) => reportError(cause, "notifications.register_actions"));
 
     async function open(response: Notifications.NotificationResponse | null) {
+      if (!response) return;
+      const identifier = `${response.notification.request.identifier}:${response.actionIdentifier}`;
+
+      if (handled.has(identifier)) return;
+      handled.add(identifier);
+
       if (
-        !response ||
-        response.notification.request.identifier === lastIdentifier
+        ![
+          Notifications.DEFAULT_ACTION_IDENTIFIER,
+          reviewReceiptAction,
+          remindReceiptAction,
+        ].includes(response.actionIdentifier)
       )
         return;
-      lastIdentifier = response.notification.request.identifier;
+      setError("");
+      setConfirmation("");
       const data = response.notification.request.content.data ?? {};
 
       if (data.route === "/spending") {
@@ -173,12 +203,39 @@ export function NotificationRouting() {
 
         if (!result) throw new Error("Receipt unavailable");
 
-        if (active && result.receipt.householdId === household.id)
+        if (!active) return;
+
+        if (result.receipt.householdId !== household.id)
+          throw new Error("Receipt unavailable");
+
+        if (response.actionIdentifier === remindReceiptAction) {
+          const token = await SecureStore.getItemAsync(tokenKey);
+
+          if (!active) return;
+
+          if (!token) throw new Error("Notifications disabled");
+          const evening = nextReviewEvening(new Date());
+          await releaseMutation(client, api.notifications.remindLater, {
+            receiptId: result.receipt._id,
+            token,
+            at: evening.getTime(),
+          });
+
+          if (active)
+            setConfirmation(
+              `Påminnelse satt til ${evening.toLocaleString("nb-NO", { day: "numeric", month: "long", hour: "2-digit", minute: "2-digit" })}.`,
+            );
+        } else {
           router.push({ pathname: "/receipt/[id]", params: { id } });
-      } catch {
+        }
+      } catch (cause) {
+        reportError(cause, "notifications.response");
+
         if (active)
           setError(
-            "Kvitteringen i varselet er ikke tilgjengelig for denne kontoen.",
+            response.actionIdentifier === remindReceiptAction
+              ? "Kunne ikke sette påminnelsen. Kontroller nettet og at varsler er på og kvitteringen fortsatt trenger kontroll."
+              : "Kvitteringen i varselet er ikke tilgjengelig for denne kontoen.",
           );
       } finally {
         Notifications.clearLastNotificationResponse();
@@ -201,5 +258,9 @@ export function NotificationRouting() {
     };
   }, [client, household.id]);
 
-  return error ? <Notice error>{error}</Notice> : null;
+  return error ? (
+    <Notice error>{error}</Notice>
+  ) : confirmation ? (
+    <Notice>{confirmation}</Notice>
+  ) : null;
 }

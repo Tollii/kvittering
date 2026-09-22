@@ -3,7 +3,6 @@ import { api } from "../../../convex/_generated/api";
 import { NativeTabs } from "expo-router/unstable-native-tabs";
 import { useTheme } from "@/constants/theme";
 import { useHousehold } from "@/features/session";
-import { NotificationRouting } from "@/features/notifications";
 
 export default function TabLayout() {
   const colors = useTheme();
@@ -16,7 +15,6 @@ export default function TabLayout() {
 
   return (
     <>
-      <NotificationRouting />
       <NativeTabs
         tintColor={colors.primary}
         backgroundColor={colors.background}
