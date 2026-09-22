@@ -1,7 +1,6 @@
 import { ReceiptSearchSettings } from "@/features/spotlight";
 import { AccountSettings } from "@/features/account-settings";
 import { FormSection, NativeForm } from "@/components/ui/native-form";
-import { CameraPreferences } from "@/features/camera-preferences";
 import { ReleaseSettings } from "@/features/release-settings";
 import { releaseMutation } from "@/lib/releases/requests";
 import { useState } from "react";
@@ -198,11 +197,6 @@ export default function Settings() {
         </FormSection>
         <FormSection title="Spotlight">
           <ReceiptSearchSettings />
-        </FormSection>
-        <FormSection title="Kamera">
-          <View style={{ gap: 12 }}>
-            <CameraPreferences />
-          </View>
         </FormSection>
         <FormSection title="Konto">
           <AccountSettings disabled={busy} />
