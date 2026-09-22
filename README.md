@@ -135,6 +135,8 @@ iOS is the primary target. The application and Convex backend are at the reposit
 
 The existing receipt extraction and classification pipeline is retained. Configure `BETTER_AUTH_SECRET` and the selected provider's credentials (`OPENAI_API_KEY` or `TYPESAFE_API_KEY`) in Convex. Existing `RECEIPT_PROVIDER`, `OPENAI_RECEIPT_MODEL`, and `TYPESAFE_MODEL` settings still apply.
 
+Receipt extraction defaults to `gpt-6-luna`. `OPENAI_RECEIPT_MODEL` overrides this default; check each deployment for an existing override before rollout. To restore the previous model, set it to `gpt-5.6-luna`. TypeSafe classification and product analysis continue to use `TYPESAFE_MODEL`, which defaults to `jev-latest`.
+
 Authentication requests go directly to `EXPO_PUBLIC_CONVEX_SITE_URL`. The server trusts the `kvitto://` application scheme. The Svelte authentication proxy is no longer required.
 
 For Expo Go, set `ALLOW_EXPO_GO=true` on the Convex development deployment with `npx convex env set ALLOW_EXPO_GO true`. Expo Go sends an `exp://` origin instead of the app scheme. Leave this setting unset on production deployments. No native rebuild is needed when this server setting changes.

@@ -60,7 +60,7 @@ export const extract = internalAction({
       }),
     );
 
-    const model = env.OPENAI_RECEIPT_MODEL ?? "gpt-5.6-luna";
+    const model = env.OPENAI_RECEIPT_MODEL ?? "gpt-6-luna";
 
     const client = new OpenAI({
       apiKey: env.OPENAI_API_KEY,
