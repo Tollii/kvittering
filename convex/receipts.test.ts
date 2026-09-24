@@ -1,10 +1,11 @@
 import { date } from "../src/lib/testing/calendar";
 import { present } from "../src/lib/testing/receipts";
 import { Ore } from "../src/lib/domain/ore";
+import { receiptFixture } from "../src/lib/testing/receipts";
 /// <reference types="vite/client" />
 import { register as registerRateLimiter } from "@convex-dev/rate-limiter/test";
 import { convexTest } from "convex-test";
-import { expect, it } from "vitest";
+import { expect, it, vi } from "vitest";
 import { api, internal } from "./_generated/api";
 import schema from "./schema";
 import {
@@ -822,4 +823,124 @@ it("retains an active extraction when remembered categories propagate", async ()
   expect(
     await t.run((ctx) => ctx.db.query("extractions").collect()),
   ).toHaveLength(1);
+});
+
+it("propagates changed aliases in one finite scan and skips unchanged decisions", async () => {
+  vi.useFakeTimers();
+
+  try {
+    const { t, first, householdId } = await setup();
+    const data = batteryFixture();
+    data.lines = [
+      data.lines[0],
+      { ...data.lines[0], id: "second", name: "Second product" },
+    ];
+
+    const ids = await t.run(async (ctx) => {
+      const result = [];
+
+      for (let index = 0; index < 13; index++) {
+        const copy = structuredClone(data);
+        copy.lines.forEach((line) => {
+          line.categoryId = "other-purchases.batteries";
+        });
+        copy.lines[0].manual = index === 1;
+
+        const { _id, _creationTime, ...fields } = receiptFixture({
+          householdId,
+          data: copy,
+          status: "needs_review",
+          clientId: `alias-batch-${index}`,
+        });
+
+        result.push(await ctx.db.insert("receipts", fields));
+      }
+
+      return result;
+    });
+
+    vi.setSystemTime(Date.now() + 100);
+
+    const save = {
+      id: ids[0],
+      revision: 0,
+      data,
+      reviewed: false,
+      rememberLineIds: data.lines.map((line) => line.id),
+      duplicateResolved: false,
+      excluded: false,
+    };
+
+    await first.mutation(api.receipts.save, save);
+
+    const jobs = await t.run((ctx) =>
+      ctx.db.system.query("_scheduled_functions").collect(),
+    );
+
+    const propagation = jobs.filter((job) => job.name.startsWith("aliases:"));
+    expect(propagation).toHaveLength(1);
+    await t.mutation(internal.aliases.applyChanges, propagation[0].args[0]);
+    vi.setSystemTime(Date.now() + 100);
+
+    const newId = await t.run((ctx) => {
+      const { _id, _creationTime, ...fields } = receiptFixture({
+        householdId,
+        data,
+        status: "needs_review",
+        clientId: "after-alias-boundary",
+      });
+
+      return ctx.db.insert("receipts", fields);
+    });
+
+    const allJobs = await t.run((ctx) =>
+      ctx.db.system.query("_scheduled_functions").collect(),
+    );
+
+    const continuation = allJobs.filter(
+      (job) =>
+        job.name === "aliases:applyChanges" && job._id !== propagation[0]._id,
+    );
+
+    expect(continuation).toHaveLength(1);
+    await t.mutation(internal.aliases.applyChanges, continuation[0].args[0]);
+    await t.mutation(internal.aliases.applyChanges, continuation[0].args[0]);
+
+    const receipts = await t.run((ctx) =>
+      Promise.all(ids.slice(1).map((id) => ctx.db.get("receipts", id))),
+    );
+
+    expect(receipts.every((receipt) => receipt?.revision === 1)).toBe(true);
+    expect(
+      receipts.every(
+        (receipt) =>
+          receipt?.data?.lines[1].categoryId === "drinks.soft-drinks",
+      ),
+    ).toBe(true);
+    expect(receipts[0]?.data?.lines[0].categoryId).toBe(
+      "other-purchases.batteries",
+    );
+    expect(
+      (await t.run((ctx) => ctx.db.get("receipts", newId)))?.revision,
+    ).toBe(0);
+
+    const current = (await first.query(api.receipts.detail, { id: ids[0] }))!
+      .receipt;
+
+    await first.mutation(api.receipts.save, {
+      ...save,
+      revision: current.revision,
+      data: current.data!,
+    });
+
+    const finalJobs = await t.run((ctx) =>
+      ctx.db.system.query("_scheduled_functions").collect(),
+    );
+
+    expect(
+      finalJobs.filter((job) => job.name.startsWith("aliases:")),
+    ).toHaveLength(2);
+  } finally {
+    vi.useRealTimers();
+  }
 });

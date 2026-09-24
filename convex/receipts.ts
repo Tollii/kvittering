@@ -377,6 +377,8 @@ export const save = mutation({
       args.physicalStoreId,
     );
 
+    const changedAliases = new Set<string>();
+
     for (const line of args.data.lines) {
       line.categoryAliasKey = line.categoryAliasKey ?? line.productKey;
 
@@ -406,27 +408,34 @@ export const save = mutation({
           )
           .unique();
 
-        if (existing)
-          await ctx.db.patch("aliases", existing._id, {
-            categoryId: line.categoryId,
-            confirmedBy: member.identity,
-          });
-        else
-          await ctx.db.insert("aliases", {
-            householdId: member.householdId,
-            key,
-            categoryId: line.categoryId,
-            confirmedBy: member.identity,
-          });
+        if (existing?.categoryId !== line.categoryId) {
+          if (existing)
+            await ctx.db.patch("aliases", existing._id, {
+              categoryId: line.categoryId,
+              confirmedBy: member.identity,
+            });
+          else
+            await ctx.db.insert("aliases", {
+              householdId: member.householdId,
+              key,
+              categoryId: line.categoryId,
+              confirmedBy: member.identity,
+            });
+          changedAliases.add(key);
+        }
+
         line.categoryAliasKey = key;
         line.productKey = key;
-        await ctx.scheduler.runAfter(0, internal.aliases.applyToMatching, {
-          householdId: member.householdId,
-          key,
-          cursor: null,
-        });
       }
     }
+
+    if (changedAliases.size)
+      await ctx.scheduler.runAfter(0, internal.aliases.applyChanges, {
+        householdId: member.householdId,
+        keys: [...changedAliases],
+        cursor: null,
+        through: Date.now(),
+      });
 
     await recordCorrections(ctx, receipt, args.data);
 

@@ -78,3 +78,16 @@ and fallback/aggregate digests agree. The existing sync and backfill byte caps
 were retained and tested with the same large data. In-process checks do not
 measure hosted transaction contention or action memory. Hosted load and recovery
 checks remain release work; no projection was deployed or backfilled here.
+
+## 008 — Alias scheduling
+
+A save schedules one household traversal containing only changed alias keys.
+Repeated unchanged choices schedule no propagation. Each page applies all keys
+before committing one revision per affected receipt. A fixed creation boundary
+excludes later receipts; their normal extraction completion applies aliases.
+The old single-key scheduled function remains compatible.
+
+The integration test checks scheduled work across two pages, manual category
+precedence, a later receipt outside the boundary, one revision per target,
+idempotent continuation, and an unchanged repeated save. All 354 tests and
+`check:ci` passed. No association backfill is needed.
