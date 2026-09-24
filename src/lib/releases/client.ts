@@ -1,3 +1,4 @@
+import { RequestDeferred, deferredRequestSchema } from "../request-retry";
 import { z } from "zod";
 import * as Application from "expo-application";
 import * as Updates from "expo-updates";
@@ -57,6 +58,9 @@ export function releaseError(
   operation = "backend.request",
   fields: DiagnosticFields = {},
 ): Error {
+  const deferred = deferredRequestSchema.safeParse(cause).data?.data;
+
+  if (deferred) return new RequestDeferred(deferred.message, deferred.retryAt);
   const data = releaseFailureSchema.safeParse(cause).data?.data;
 
   if (data?.code === "UNSUPPORTED_API_VERSION") {

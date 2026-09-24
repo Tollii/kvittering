@@ -1,3 +1,8 @@
+import {
+  maxReceiptImages,
+  receiptImageLimitMessage,
+} from "./domain/receipt-images";
+import type { RetryStore } from "./request-retry";
 import { parse } from "convex-helpers/validators";
 import { v } from "convex/values";
 import { migrateReceipt, migrateReceiptDatabase } from "./receipt-migrations";
@@ -29,7 +34,7 @@ function storage() {
   if (!database) {
     const opened = openDatabaseSync(`kvitto${storageSuffix}.db`);
     opened.execSync(
-      "PRAGMA journal_mode = WAL; CREATE TABLE IF NOT EXISTS receipt_queue (id TEXT PRIMARY KEY, owner TEXT NOT NULL, household TEXT NOT NULL, data TEXT NOT NULL); CREATE TABLE IF NOT EXISTS household_cache (owner TEXT PRIMARY KEY, data TEXT NOT NULL);",
+      "PRAGMA journal_mode = WAL; CREATE TABLE IF NOT EXISTS receipt_queue (id TEXT PRIMARY KEY, owner TEXT NOT NULL, household TEXT NOT NULL, data TEXT NOT NULL); CREATE TABLE IF NOT EXISTS household_cache (owner TEXT PRIMARY KEY, data TEXT NOT NULL); CREATE TABLE IF NOT EXISTS receipt_retry (id TEXT PRIMARY KEY, attempts INTEGER NOT NULL, retryAt REAL NOT NULL, restricted INTEGER NOT NULL);",
     );
     migrateReceiptDatabase(opened);
     database = opened;
@@ -76,6 +81,33 @@ export function imageFile(name: string) {
   return new File(directory(), name);
 }
 
+export const uploadRetries: RetryStore = {
+  read(id) {
+    const row = storage().getFirstSync<{
+      attempts: number;
+      retryAt: number;
+      restricted: number;
+    }>(
+      "SELECT attempts, retryAt, restricted FROM receipt_retry WHERE id = ?",
+      id,
+    );
+
+    return row ? { ...row, restricted: row.restricted === 1 } : null;
+  },
+  write(id, deadline) {
+    storage().runSync(
+      "INSERT OR REPLACE INTO receipt_retry (id, attempts, retryAt, restricted) VALUES (?, ?, ?, ?)",
+      id,
+      deadline.attempts,
+      deadline.retryAt,
+      Number(deadline.restricted),
+    );
+  },
+  remove(id) {
+    storage().runSync("DELETE FROM receipt_retry WHERE id = ?", id);
+  },
+};
+
 export const receiptStorage: QueueStore = {
   list(owner, householdId) {
     return getOrInsert(queueSnapshots, scopeKey(owner, householdId), () => {
@@ -97,6 +129,7 @@ export const receiptStorage: QueueStore = {
     publishQueue(entry.owner, entry.householdId);
   },
   remove(entry) {
+    uploadRetries.remove(entry.id);
     // Remove the durable record only after the server has accepted every image.
     storage().runSync("DELETE FROM receipt_queue WHERE id = ?", entry.id);
     publishQueue(entry.owner, entry.householdId);
@@ -119,8 +152,8 @@ export function saveLocalReceipts(
   uris: string[],
   combined: boolean,
 ) {
-  if (!uris.length || uris.length > 8)
-    throw new Error("Velg mellom ett og åtte bilder.");
+  if (!uris.length || uris.length > maxReceiptImages)
+    throw new Error("Velg mellom ett og fem bilder.");
   directory().create({ intermediates: true, idempotent: true });
   const files: File[] = [];
 
@@ -203,4 +236,69 @@ export function cacheHousehold(owner: string, value: CachedHousehold | null) {
   else storage().runSync("DELETE FROM household_cache WHERE owner = ?", owner);
   householdSnapshots.set(owner, value ? parseCachedHousehold(value) : null);
   changed();
+}
+
+/** Regroup only a rejected, unreserved legacy entry, without copying or deleting its images. */
+export function regroupQueuedReceipt(
+  owner: string,
+  householdId: Id<"households">,
+  id: string,
+  selected: number[],
+) {
+  storage().withTransactionSync(() => {
+    const row = storage().getFirstSync<{ data: string }>(
+      "SELECT data FROM receipt_queue WHERE id = ? AND owner = ? AND household = ?",
+      id,
+      owner,
+      householdId,
+    );
+
+    if (!row) throw new Error("Kvitteringen er endret. Åpne køen på nytt.");
+    const entry = migrateReceipt(JSON.parse(row.data));
+
+    if (
+      entry.receiptId ||
+      entry.uploaded.some(Boolean) ||
+      !entry.error?.includes(receiptImageLimitMessage)
+    )
+      throw new Error(
+        "Vent til opplastingen er avklart før du deler opp bildene.",
+      );
+    const positions = new Set(selected);
+
+    if (
+      positions.size !== selected.length ||
+      selected.some(
+        (position) =>
+          !Number.isInteger(position) ||
+          position < 0 ||
+          position >= entry.images.length,
+      )
+    )
+      throw new Error("Ugyldig bildevalg.");
+
+    const groups = [
+      entry.images.filter((_, position) => positions.has(position)),
+      entry.images.filter((_, position) => !positions.has(position)),
+    ];
+
+    if (
+      groups.some((group) => !group.length || group.length > maxReceiptImages)
+    )
+      throw new Error("Hver kvittering må ha mellom ett og fem bilder.");
+
+    for (const images of groups)
+      writeEntry({
+        schemaVersion: 1,
+        id: randomUUID(),
+        owner,
+        householdId,
+        createdAt: entry.createdAt,
+        images,
+        uploaded: images.map(() => false),
+      });
+    storage().runSync("DELETE FROM receipt_queue WHERE id = ?", id);
+    uploadRetries.remove(id);
+  });
+  publishQueue(owner, householdId);
 }

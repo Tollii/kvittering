@@ -1,13 +1,11 @@
-import {
-  createContext,
-  useContext,
-  useEffect,
-  useState,
-  type ReactNode,
-} from "react";
+import { QueryLifecycleContext } from "./query-lifecycle-context";
+
+import { useEffect, useState, type ReactNode } from "react";
 import { AppState } from "react-native";
 import { useNetworkState } from "expo-network";
 import { focusManager, onlineManager } from "@tanstack/react-query";
+
+export { useQueryLifecycle } from "./query-lifecycle-context";
 
 interface ForegroundSource {
   current(): boolean;
@@ -23,10 +21,6 @@ export function observeForeground(
 
   return source.subscribe(changed);
 }
-
-const LifecycleContext = createContext({ active: true, online: true });
-
-export const useQueryLifecycle = () => useContext(LifecycleContext);
 
 export function QueryLifecycleProvider({
   children,
@@ -62,9 +56,9 @@ export function QueryLifecycleProvider({
   );
 
   return (
-    <LifecycleContext.Provider value={{ active, online }}>
+    <QueryLifecycleContext.Provider value={{ active, online }}>
       {children}
-    </LifecycleContext.Provider>
+    </QueryLifecycleContext.Provider>
   );
 }
 

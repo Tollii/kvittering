@@ -2,7 +2,7 @@ import ReceiptIntelligence from "../../modules/receipt-intelligence/src/ReceiptI
 import { useState } from "react";
 import { Image, ScrollView, View } from "react-native";
 import { Button, IconButton, Notice, Sheet } from "@/components/ui";
-import { convexSiteUrl, fetchAccessToken } from "@/lib/auth-client";
+import { cachedReceiptImages } from "@/lib/receipt-image-cache";
 import type { Receipt } from "@/lib/domain/insights";
 
 export function ReceiptImages({
@@ -16,7 +16,7 @@ export function ReceiptImages({
   color?: string;
   background?: string;
 }>) {
-  const [token, setToken] = useState<string | null>(null);
+  const [images, setImages] = useState<string[]>([]);
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
@@ -26,19 +26,12 @@ export function ReceiptImages({
     setError("");
 
     try {
-      const accessToken = await fetchAccessToken();
+      const images = await cachedReceiptImages(receipt._id, receipt.imageCount);
 
-      if (ReceiptIntelligence?.previewReceipts) {
-        await ReceiptIntelligence.previewReceipts(
-          Array.from(
-            { length: receipt.imageCount },
-            (_, position) =>
-              `${convexSiteUrl}/receipt-image?receipt=${receipt._id}&position=${position}`,
-          ),
-          accessToken,
-        );
+      if (ReceiptIntelligence?.previewLocalReceipts) {
+        await ReceiptIntelligence.previewLocalReceipts(images);
       } else {
-        setToken(accessToken);
+        setImages(images);
         setOpen(true);
       }
     } catch {
@@ -80,33 +73,28 @@ export function ReceiptImages({
             <Button title="Prøv igjen" onPress={() => void load()} />
           </>
         )}
-        {!!token &&
-          Array.from({ length: receipt.imageCount }, (_, position) => (
-            <ScrollView
-              key={`${position}-${token}`}
-              maximumZoomScale={5}
-              minimumZoomScale={1}
-              centerContent
-              style={{ height: 650 }}
-              contentContainerStyle={{ flexGrow: 1 }}
-            >
-              <View style={{ flex: 1 }}>
-                <Image
-                  accessibilityLabel={`Originalkvittering, bilde ${position + 1}`}
-                  source={{
-                    uri: `${convexSiteUrl}/receipt-image?receipt=${receipt._id}&position=${position}`,
-                    headers: { Authorization: `Bearer ${token}` },
-                    cache: "reload",
-                  }}
-                  resizeMode="contain"
-                  style={{ width: "100%", height: 650 }}
-                  onError={() =>
-                    setError("Bildet kunne ikke hentes. Prøv igjen.")
-                  }
-                />
-              </View>
-            </ScrollView>
-          ))}
+        {images.map((uri, position) => (
+          <ScrollView
+            key={uri}
+            maximumZoomScale={5}
+            minimumZoomScale={1}
+            centerContent
+            style={{ height: 650 }}
+            contentContainerStyle={{ flexGrow: 1 }}
+          >
+            <View style={{ flex: 1 }}>
+              <Image
+                accessibilityLabel={`Originalkvittering, bilde ${position + 1}`}
+                source={{ uri }}
+                resizeMode="contain"
+                style={{ width: "100%", height: 650 }}
+                onError={() =>
+                  setError("Bildet kunne ikke hentes. Prøv igjen.")
+                }
+              />
+            </View>
+          </ScrollView>
+        ))}
       </Sheet>
     </>
   );

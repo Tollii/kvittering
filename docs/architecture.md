@@ -21,10 +21,10 @@ The Expo application starts in `src/app/_layout.tsx`. Session context contains a
 ## Receipt flow
 
 1. Capture claims an import batch. It retains the batch until conversion succeeds or the user dismisses it.
-2. `receipt-storage.ts` copies images into durable storage and commits the queue to SQLite. It publishes immutable snapshots after commit. `receipt-upload-transport.ts` owns authenticated uploads; `upload-queue.ts` retains each completed step. After a failure it retries automatically with backoff (15 seconds, doubling) for at most six attempts per app start. A `REJECTED` user error waits for the person's retry. These limits live in memory, so each app start tries every queued capture again; they never remove queued images.
+2. `receipt-storage.ts` copies images into durable storage and commits the queue to SQLite. It publishes immutable snapshots after commit. `receipt-upload-transport.ts` owns authenticated uploads; `upload-queue.ts` retains each completed step. After a failure it retries automatically with backoff (15 seconds, doubling) for at most six attempts per app start. A `REJECTED` user error waits for the person's retry. These attempt limits live in memory. Quota deadlines are stored separately and survive app restarts and manual retry. Timers use both limits and recheck the queue after each drain; they never remove queued images.
 3. Convex processing extracts and parses receipt evidence, classifies products, checks duplicates, and applies saved household choices. `receiptChanges.ts` owns revision, history, status, and follow-up policy for receipt changes.
 4. Catalog matching and product analysis run on the server. Profile questions use bounded batches. Writes reject stale generation, revision, or evidence. Exhausted analysis can be retried explicitly; `productAnalysis.repair` is an operator recovery operation.
-5. `receipt-draft.ts` owns editor changes and save acknowledgement. Reactive queries deliver the saved receipt. Report selections keep identity and period, then derive their content from current data.
+5. `receipt-draft.ts` owns editor changes and save acknowledgement. The change subscription and bounded synchronization deliver the saved receipt. Report selections keep identity and period, then derive their content from current data.
 
 Receipt approval checks material reading errors and duplicates. Category uncertainty
 does not block approval, and approval does not confirm or remember suggested
@@ -64,23 +64,25 @@ Add receipt issues in `receipt-issues.ts`; display text belongs in its mapper. P
 
 ## Table ownership
 
-| Tables                                 | Owner and purpose                                                           |
-| -------------------------------------- | --------------------------------------------------------------------------- |
-| households, members                    | Household membership, invitation, and budget                                |
-| receipts, images                       | Current receipt state and uploaded image references                         |
-| extractions                            | Original provider output for each generation                                |
-| revisions                              | Prior receipt data before a committed non-extraction change                 |
-| aliases, categoryMemory                | Explicit and learned household category decisions                           |
-| products, productMappings              | Household identities and remembered product choices                         |
-| corrections, correctionBatches         | Human decisions, bulk changes, and guarded undo                             |
-| catalogRequests, catalogRequestWaiters | Shared catalog work and workflow completion                                 |
-| catalogProducts, catalogStores         | Shared catalog records; detail freshness is separate from summary freshness |
-| productFamilies, productProfiles       | Household family identity and reusable analysis evidence                    |
-| receiptReminders                       | One pending receipt-review reminder per device subscription and receipt     |
-| deviceSubscriptions                    | Device notification destinations                                            |
-| clientReleases                         | Installed-client diagnostics                                                |
-| releasePolicies, releasePolicyHistory  | Native/API version controls and operator history                            |
-| featureFlags, featureFlagHistory       | Platform-scoped service configuration and operator history                  |
+| Tables                                               | Owner and purpose                                                           |
+| ---------------------------------------------------- | --------------------------------------------------------------------------- |
+| households, members                                  | Household membership, invitation, and budget                                |
+| receipts, images                                     | Current receipt state and uploaded image references                         |
+| receiptSummaries, receiptSyncHeads, receiptReadModel | Compact receipt records, synchronization cursor, and backfill state         |
+| receiptDailyTotals                                   | Incremental daily spending totals and comparison categories                 |
+| extractions                                          | Original provider output for each generation                                |
+| revisions                                            | Prior receipt data before a committed non-extraction change                 |
+| aliases, categoryMemory                              | Explicit and learned household category decisions                           |
+| products, productMappings                            | Household identities and remembered product choices                         |
+| corrections, correctionBatches                       | Human decisions, bulk changes, and guarded undo                             |
+| catalogRequests, catalogRequestWaiters               | Shared catalog work and workflow completion                                 |
+| catalogProducts, catalogStores                       | Shared catalog records; detail freshness is separate from summary freshness |
+| productFamilies, productProfiles                     | Household family identity and reusable analysis evidence                    |
+| receiptReminders                                     | One pending receipt-review reminder per device subscription and receipt     |
+| deviceSubscriptions                                  | Device notification destinations                                            |
+| clientReleases                                       | Installed-client diagnostics                                                |
+| releasePolicies, releasePolicyHistory                | Native/API version controls and operator history                            |
+| featureFlags, featureFlagHistory                     | Platform-scoped service configuration and operator history                  |
 
 Convex components own their workflow, workpool, and authentication tables. Revision retention is a separate operator decision.
 
@@ -89,3 +91,75 @@ Convex components own their workflow, workpool, and authentication tables. Revis
 `src/components/ui.tsx` is an import facade. Typography, controls, surfaces, layout, and selection views have separate modules. Feature screens own state and use these components directly.
 
 Native camera, PDF import, sheets, large text, light/dark mode, offline restart, and old-client upgrades require device checks. Source tests do not prove those behaviors. See [quality checks](quality.md) and [release policy](releases.md) for verification procedures.
+
+## API abuse controls
+
+Receipt admission and explicit retries use transactional user and household quotas.
+Each external provider has a separate deployment-wide allowance, consumed before
+network I/O. Email registration uses the `emailSignUp` feature flag in both the
+sign-in screen and the authentication route. See [API limits](api-limits.md) and
+[feature flags](featureFlags.md#email-registration) for policy and operations.
+
+## Receipt read storage and cost
+
+Receipt mutations maintain compact summaries, daily report totals, and a
+household change sequence in the same transaction. New phones synchronize
+bounded changes into a separate SQLite cache. Tabs, receipt details, search,
+and product history read this cache. One small foreground subscription reports
+new changes; inactive tabs do not keep broad receipt subscriptions alive.
+Queued uploads and editor drafts remain separate from disposable caches. If the
+disposable cache cannot open or accept a page, screens use server reads instead.
+Cleanup failures are reported without blocking the screen or retaining revoked
+data in memory. Synchronization backoff resets after a successful download.
+
+See [Convex operating cost](convex-costs.md) for synchronization, backfill,
+retention, release order, and usage measurements. Existing receipt endpoints
+remain available to installed clients and during the backfill.
+
+## Workflow journal retention
+
+Receipt processing and catalog matching use the processing workflow component.
+Product analysis uses its own component. `workflowJournals` stores the component,
+workflow ID, receipt ID, and cleanup deadline. It stores no receipt payload.
+All terminal outcomes retain diagnostics for 30 days. Receipt deletion schedules
+cancellation of active associated work and cleanup of terminal journals. Cleanup
+uses the component API and does not force deletion of active journals.
+
+A daily bounded inventory discovers older journals in both components. Existing
+terminal journals get a full 30-day grace period from first discovery. Journals
+for receipts already deleted are cleaned after discovery, including cancellation
+of active work. Legacy null completion contexts and old scheduled arguments
+remain valid. A failed callback is recovered by the inventory. This additive
+association table requires no receipt backfill and no client minimum change.
+
+## Receipt read budgets
+
+Full-receipt pages use a server-selected 500,000-byte budget as well as row
+limits. One document can exceed the page target; the maximum document size
+still bounds that read. Clients must continue across empty filtered pages until
+`isDone`. This also applies to the legacy list API. Recent category suggestions
+and Spotlight use bounded samples. The attention indicator reports a lower
+bound once either status has five receipts, using an index that excludes
+receipts omitted from reports. This avoids scanning excluded documents.
+
+The pre-backfill digest fallback reduces each bounded receipt page into daily
+totals. It retains at most the days in the report period. Normal digests still
+use persisted daily totals. Synchronization and backfill keep their existing
+4 MiB budgets; synchronization also bounds its returned full-record payload.
+
+## Unsaved editor drafts
+
+The editor writes dirty values synchronously to a separate SQLite draft store.
+The key includes deployment, account, household, and receipt. Drafts survive
+sign-out, policy gates, and process restart; another account cannot load them.
+Each draft keeps its original baseline identity and revision. Other receipt
+fields come from the current server snapshot, so an unknown historical status
+does not block recovery. A newer server revision causes
+the existing explicit conflict flow, not an automatic overwrite.
+
+A save keeps the durable draft until both acknowledgement and the corresponding
+server snapshot arrive. Explicit discard or completed deletion removes it.
+Pending saves keep navigation protection active. Disk-write failures retain the
+live edits and show an error. Unknown future database or payload versions block
+editing and remain unchanged on disk. Disposable cache removal never clears this
+store. The draft database and upload queue have independent version contracts.

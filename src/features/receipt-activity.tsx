@@ -1,3 +1,4 @@
+import { useQueryLifecycle } from "./query-lifecycle";
 import { useEffect, useState, useSyncExternalStore } from "react";
 import { useConvex, useQuery, type ConvexReactClient } from "convex/react";
 import { requireOptionalNativeModule } from "expo";
@@ -125,9 +126,11 @@ export function ReceiptActivityTracking() {
   const binding = parseBinding(serialized);
   const activityId = binding?.scope === scope ? binding.activityId : undefined;
 
+  const { active: foreground, online } = useQueryLifecycle();
+
   const progress = useQuery(
     api.liveActivities.current,
-    activityId ? { activityId } : "skip",
+    activityId && foreground && online ? { activityId } : "skip",
   );
 
   useEffect(() => {

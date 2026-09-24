@@ -1,3 +1,7 @@
+import { ReceiptCacheContext } from "../features/receipt-cache-context";
+import { QueryLifecycleContext } from "../features/query-lifecycle-context";
+import { receiptFixture } from "./testing/receipts";
+import type { ReceiptCacheSnapshot } from "./receipt-cache";
 import { z } from "zod";
 import { createElement, StrictMode, act } from "react";
 // eslint-disable-next-line sonarjs/deprecation -- The installed React Native test renderer exercises subscription lifecycle behavior.
@@ -11,10 +15,15 @@ import { NavigationQueryProvider } from "../features/navigation-query-provider";
 import {
   useCompleteReceipts,
   useReceiptHistory,
+  useReceiptDetail,
 } from "../features/receipt-queries";
 import { useProductLinkingQueue } from "../features/product-linking-queue";
 
 const navigation = vi.hoisted(() => ({ focused: true, authenticated: true }));
+
+let cache: ReceiptCacheSnapshot & { available: boolean; synchronized: boolean };
+
+let lifecycle = { active: true, online: true };
 
 // oxlint-disable-next-line anti-slop/no-module-mocking -- Replace the native SDK or environment boundary; application behavior remains under test.
 vi.mock("expo-router", () => ({ useIsFocused: () => navigation.focused }));
@@ -49,6 +58,14 @@ beforeEach(() => {
   navigation.focused = true;
   navigation.authenticated = true;
   subscriptions = new Map();
+  cache = {
+    receipts: [],
+    sequence: 0,
+    complete: false,
+    available: false,
+    synchronized: false,
+  };
+  lifecycle = { active: true, online: true };
   client = new ConvexReactClient("https://navigation-test.convex.cloud");
   // Exercise real React/Convex hooks with a transport that drops unsubscribed data.
   vi.spyOn(client, "watchQuery").mockImplementation(
@@ -115,7 +132,15 @@ async function show(component: (() => null) | null, scope = "household-a") {
       createElement(
         NavigationQueryProvider,
         { key: scope },
-        component ? createElement(component) : null,
+        createElement(
+          ReceiptCacheContext.Provider,
+          { value: cache },
+          createElement(
+            QueryLifecycleContext.Provider,
+            { value: lifecycle },
+            component ? createElement(component) : null,
+          ),
+        ),
       ),
     ),
   );
@@ -151,51 +176,44 @@ async function publish(
   });
 }
 
-it("keeps all report pages and live changes while covered or switched off", async () => {
-  let enabled = true;
+it("reads complete cached reports without server pages when tabs are covered or offline", async () => {
+  cache = {
+    receipts: [receiptFixture()],
+    sequence: 1,
+    complete: true,
+    available: true,
+    synchronized: true,
+  };
   let result: ReturnType<typeof useCompleteReceipts>;
-  const loading: boolean[] = [];
 
   function Report() {
-    result = useCompleteReceipts({ kind: "allProducts" }, enabled);
-    loading.push(result.loadingReceipts);
+    result = useCompleteReceipts({ kind: "allProducts" });
 
     return null;
   }
 
   await show(Report);
-  await publish("receipts:readPage", {
-    page: [{ _id: "first" }],
-    isDone: false,
-    continueCursor: "second",
-  });
-  await publish(
-    "receipts:readPage",
-    {
-      page: [{ _id: "second" }],
-      isDone: true,
-      continueCursor: "end",
-    },
-    "second",
-  );
+  expect(result!.receipts).toHaveLength(1);
   expect(result!.completeReceipts).toBe(true);
-  loading.length = 0;
   navigation.focused = false;
-  enabled = false;
+  lifecycle = { active: false, online: false };
   await show(Report);
-  await publish("receipts:readPage", {
-    page: [{ _id: "updated" }],
-    isDone: false,
-    continueCursor: "second",
-  });
-  navigation.focused = true;
-  enabled = true;
+  expect(result!.receipts).toHaveLength(1);
+  expect(subscriptions.size).toBe(0);
+});
+
+it("releases fallback receipt pages while the app is in the background", async () => {
+  function Report() {
+    useCompleteReceipts({ kind: "allProducts" });
+
+    return null;
+  }
+
   await show(Report);
-  expect(loading).not.toContain(true);
-  expect(result!.receipts.map((receipt) => receipt._id)).toEqual([
-    "updated",
-    "second",
-  ]);
+  expect(subscriptions.size).toBe(1);
+  lifecycle.active = false;
+  await show(Report);
+  expect(subscriptions.size).toBe(0);
 });
 
 it("loads optional report scopes only on demand and stops at sign-out", async () => {
@@ -224,9 +242,20 @@ it("loads optional report scopes only on demand and stops at sign-out", async ()
   expect(result!.completeReceipts).toBe(false);
 });
 
-it("retains history pagination across product tabs without mixing searches", async () => {
-  let enabled = true;
-  let search = "";
+it("retains local history pagination across tabs and keeps searches separate", async () => {
+  cache = {
+    receipts: Array.from({ length: 40 }, (_, index) =>
+      receiptFixture({ _id: String(index) }),
+    ),
+    sequence: 40,
+    complete: true,
+    available: true,
+    synchronized: true,
+  };
+
+  let enabled = true,
+    search = "";
+
   let result: ReturnType<typeof useReceiptHistory>;
 
   function History() {
@@ -236,30 +265,21 @@ it("retains history pagination across product tabs without mixing searches", asy
   }
 
   await show(History);
-  await publish("receipts:history", {
-    page: [{ _id: "first" }],
-    isDone: false,
-    continueCursor: "second",
-  });
+  expect(result!.results).toHaveLength(30);
   await act(async () => result!.loadMore(30));
-  await publish(
-    "receipts:history",
-    { page: [{ _id: "second" }], isDone: true, continueCursor: "end" },
-    "second",
-  );
   enabled = false;
   await show(History);
   enabled = true;
   await show(History);
-  expect(result!.results).toHaveLength(2);
+  expect(result!.results).toHaveLength(40);
   expect(result!.status).toBe("Exhausted");
   search = "different store";
   await show(History);
   expect(result!.results).toEqual([]);
-  expect(result!.status).toBe("LoadingFirstPage");
+  expect(subscriptions.size).toBe(0);
 });
 
-it("keeps the matching queue current while another screen has focus", async () => {
+it("releases the matching queue while another screen has focus", async () => {
   let result: ReturnType<typeof useProductLinkingQueue>;
 
   function Queue() {
@@ -276,7 +296,9 @@ it("keeps the matching queue current while another screen has focus", async () =
   });
   navigation.focused = false;
   await show(Queue);
-  expect(result!.items).toHaveLength(1);
+  expect(subscriptions.size).toBe(0);
+  navigation.focused = true;
+  await show(Queue);
   await publish("productLinking:page", {
     page: [],
     isDone: true,
@@ -288,17 +310,17 @@ it("keeps the matching queue current while another screen has focus", async () =
   expect(result!.loading).toBe(false);
 });
 
-it("reopens a live detail immediately, including edits and deletion", async () => {
+it("releases closed details and obtains fresh values when reopened", async () => {
   const query = makeFunctionReference<
     "query",
     { id: string },
     { total: number } | null
   >("receipts:detail");
 
-  const values: unknown[] = [];
+  let value: { total: number } | null | undefined;
 
   function Detail() {
-    values.push(useQuery(query, { id: "first" }));
+    value = useQuery(query, { id: "first" });
 
     return null;
   }
@@ -306,18 +328,13 @@ it("reopens a live detail immediately, including edits and deletion", async () =
   await show(Detail);
   await publish("receipts:detail", { total: 100 });
   await show(null);
+  expect(subscriptions.size).toBe(0);
+  await show(Detail);
+  expect(value).toBeUndefined();
   await publish("receipts:detail", { total: 200 });
-  values.length = 0;
-  await show(Detail);
-  expect(values.length).toBeGreaterThan(0);
-  expect(
-    values.every((value) => JSON.stringify(value) === '{"total":200}'),
-  ).toBe(true);
-  await show(null);
+  expect(value).toEqual({ total: 200 });
   await publish("receipts:detail", null);
-  values.length = 0;
-  await show(Detail);
-  expect(values.every((value) => value === null)).toBe(true);
+  expect(value).toBeNull();
 });
 
 it("expires idle results and releases them when the household changes", async () => {
@@ -371,5 +388,32 @@ it("bounds idle subscriptions without evicting mounted queries", async () => {
   await show(Details);
   expect(subscriptions.size).toBe(45);
   await show(null);
-  expect(subscriptions.size).toBe(40);
+  expect(subscriptions.size).toBe(0);
+});
+
+it("opens a newly linked receipt before the local change page arrives", async () => {
+  cache = {
+    receipts: [],
+    sequence: 1,
+    complete: true,
+    available: true,
+    synchronized: true,
+  };
+  let receipt: ReturnType<typeof useReceiptDetail>;
+
+  function Detail() {
+    receipt = useReceiptDetail("new-receipt");
+
+    return null;
+  }
+
+  await show(Detail);
+  expect(receipt).toBeUndefined();
+  const added = receiptFixture({ _id: "new-receipt" });
+  await publish("receipts:detail", { receipt: added, images: [] });
+  expect(receipt?._id).toBe("new-receipt");
+  cache = { ...cache, receipts: [added], sequence: 2 };
+  await show(Detail);
+  expect(subscriptions.size).toBe(0);
+  expect(receipt?._id).toBe("new-receipt");
 });

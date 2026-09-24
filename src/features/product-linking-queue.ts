@@ -1,3 +1,4 @@
+import { useQueryLifecycle } from "./query-lifecycle-context";
 import { useEffect } from "react";
 import { useIsFocused } from "expo-router";
 import { useConvexAuth } from "convex/react";
@@ -8,7 +9,10 @@ import { api } from "../../convex/_generated/api";
 export function useProductLinkingQueue() {
   const focused = useIsFocused();
   const { isAuthenticated } = useConvexAuth();
-  const active = isAuthenticated;
+  const lifecycle = useQueryLifecycle();
+
+  const active =
+    isAuthenticated && focused && lifecycle.active && lifecycle.online;
 
   const { results, status, loadMore } = usePaginatedQuery(
     api.productLinking.page,
@@ -21,8 +25,7 @@ export function useProductLinkingQueue() {
   );
 
   useEffect(() => {
-    if (active && focused && items.length === 0 && status === "CanLoadMore")
-      loadMore(30);
+    if (active && items.length === 0 && status === "CanLoadMore") loadMore(30);
   }, [active, focused, items.length, status, loadMore]);
 
   return {

@@ -1,19 +1,35 @@
 import { present, testId } from "./testing/receipts";
+import { openDatabaseSync } from "expo-sqlite";
+import { receiptImageLimitMessage } from "./domain/receipt-images";
 import { expect, it, vi } from "vitest";
 import {
   receiptStorage,
   subscribeStorage,
   saveLocalReceipts,
   parseCachedHousehold,
+  regroupQueuedReceipt,
 } from "./receipt-storage";
 
-const control = vi.hoisted(() => ({ fail: false, copyFails: false }));
+const control = vi.hoisted(() => ({
+  fail: false,
+  copyFails: false,
+  sequence: 0,
+  copies: 0,
+  deletes: 0,
+  writesBeforeFailure: -1,
+}));
 
 // oxlint-disable-next-line anti-slop/no-module-mocking -- Replace the native SDK or environment boundary; application behavior remains under test.
 vi.mock("./deployment-storage", () => ({ storageSuffix: "-test" }));
 
 // oxlint-disable-next-line anti-slop/no-module-mocking -- Replace the native SDK or environment boundary; application behavior remains under test.
-vi.mock("expo-crypto", () => ({ randomUUID: () => "capture" }));
+vi.mock("expo-crypto", () => ({
+  randomUUID: () => {
+    control.sequence++;
+
+    return `capture-${control.sequence}`;
+  },
+}));
 
 // oxlint-disable-next-line anti-slop/no-module-mocking -- Replace the native SDK or environment boundary; application behavior remains under test.
 vi.mock("expo-file-system", () => ({
@@ -25,8 +41,11 @@ vi.mock("expo-file-system", () => ({
     exists = false;
     copySync() {
       if (control.copyFails) throw new Error("Copy failed");
+      control.copies++;
     }
-    delete() {}
+    delete() {
+      control.deletes++;
+    }
   },
 }));
 
@@ -43,7 +62,10 @@ vi.mock("expo-sqlite", async () => {
       getAllSync: (sql: string, ...args: string[]) =>
         db.prepare(sql).all(...args),
       runSync: (sql: string, ...args: string[]) => {
-        if (control.fail) throw new Error("Disk full");
+        if (control.fail || control.writesBeforeFailure === 0)
+          throw new Error("Disk full");
+
+        if (control.writesBeforeFailure > 0) control.writesBeforeFailure--;
 
         return db.prepare(sql).run(...args);
       },
@@ -105,4 +127,96 @@ it("rejects malformed disposable household cache data", () => {
     id: "household",
     name: "Home",
   });
+});
+
+it("rejects a sixth new image before copying files", () => {
+  const before = control.copies;
+  expect(() =>
+    saveLocalReceipts(
+      "limit",
+      testId<"households">("household"),
+      Array.from({ length: 6 }, (_, index) => `image-${index}`),
+      true,
+    ),
+  ).toThrow("fem");
+  expect(control.copies).toBe(before);
+});
+
+it("atomically regroups all legacy images and keeps the original on write failure", () => {
+  const household = testId<"households">("regroup-household");
+
+  const entry = {
+    schemaVersion: 1 as const,
+    id: "legacy-group",
+    owner: "regroup",
+    householdId: household,
+    createdAt: 1,
+    images: Array.from({ length: 8 }, (_, index) => `${index}.jpg`),
+    uploaded: Array.from({ length: 8 }, () => false),
+    error: receiptImageLimitMessage,
+  };
+
+  receiptStorage.update(entry);
+  control.writesBeforeFailure = 1;
+  expect(() =>
+    regroupQueuedReceipt(entry.owner, household, entry.id, [0, 2, 4, 6]),
+  ).toThrow("Disk full");
+  control.writesBeforeFailure = -1;
+  expect(receiptStorage.list(entry.owner, household)).toEqual([entry]);
+  const { copies, deletes } = control;
+  expect(() =>
+    regroupQueuedReceipt("other", household, entry.id, [0, 2, 4, 6]),
+  ).toThrow("endret");
+  regroupQueuedReceipt(entry.owner, household, entry.id, [0, 2, 4, 6]);
+  const groups = receiptStorage.list(entry.owner, household);
+  expect(groups.map((group) => group.images)).toEqual([
+    ["0.jpg", "2.jpg", "4.jpg", "6.jpg"],
+    ["1.jpg", "3.jpg", "5.jpg", "7.jpg"],
+  ]);
+  expect(new Set(groups.map((group) => group.id)).size).toBe(2);
+  expect(
+    groups.every(
+      (group) =>
+        !group.receiptId && group.uploaded.every((uploaded) => !uploaded),
+    ),
+  ).toBe(true);
+  expect(control.copies).toBe(copies);
+  expect(control.deletes).toBe(deletes);
+});
+
+it("refuses to regroup reserved or unknown future queue payloads", () => {
+  const household = testId<"households">("protected-household");
+
+  const entry = {
+    schemaVersion: 1 as const,
+    id: "protected-group",
+    owner: "protected",
+    householdId: household,
+    createdAt: 1,
+    images: Array.from({ length: 6 }, (_, index) => `${index}.jpg`),
+    uploaded: Array.from({ length: 6 }, () => false),
+    receiptId: testId<"receipts">("reserved"),
+    error: receiptImageLimitMessage,
+  };
+
+  receiptStorage.update(entry);
+  expect(() =>
+    regroupQueuedReceipt(entry.owner, household, entry.id, [0, 1, 2]),
+  ).toThrow("avklart");
+  const db = openDatabaseSync("ignored");
+  const future = JSON.stringify({ ...entry, schemaVersion: 2 });
+  db.runSync(
+    "UPDATE receipt_queue SET data = ? WHERE id = ?",
+    future,
+    entry.id,
+  );
+  expect(() =>
+    regroupQueuedReceipt(entry.owner, household, entry.id, [0, 1, 2]),
+  ).toThrow("nyere versjon");
+  expect(
+    db.getFirstSync<{ data: string }>(
+      "SELECT data FROM receipt_queue WHERE id = ?",
+      entry.id,
+    )?.data,
+  ).toBe(future);
 });

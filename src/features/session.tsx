@@ -1,3 +1,6 @@
+import { retainReceiptImageScope } from "@/lib/receipt-image-cache";
+import { ReceiptCacheProvider } from "./receipt-cache-provider";
+import { retainReceiptCache } from "@/lib/receipt-cache-storage";
 import { ReceiptActivityTracking } from "./receipt-activity";
 import { ReceiptSearchIndex } from "./spotlight";
 import { retainReceiptSystemScope } from "./receipt-system-scope";
@@ -37,6 +40,8 @@ import {
   cachedHousehold,
   cacheHousehold,
   receiptStorage,
+  uploadRetries,
+  regroupQueuedReceipt,
 } from "@/lib/receipt-storage";
 import { visibleHousehold } from "@/lib/household";
 import { createQueueRunner, type LocalReceipt } from "@/lib/upload-queue";
@@ -57,7 +62,11 @@ const convex = convexUrl
     }
   : null;
 
-const drainQueue = createQueueRunner(receiptStorage, recordEvent);
+const drainQueue = createQueueRunner(
+  receiptStorage,
+  recordEvent,
+  uploadRetries,
+);
 
 function useSessionAuth() {
   const session = authClient.useSession();
@@ -114,7 +123,11 @@ function SessionGate({ children }: Readonly<{ children: ReactNode }>) {
 
     if (removed) removeAccountCatalogCache(removed);
 
-    if (!owner) retainReceiptSystemScope(null);
+    if (!owner) {
+      retainReceiptSystemScope(null);
+      retainReceiptCache(null);
+      retainReceiptImageScope(null);
+    }
 
     previousOwner.current = owner;
   }, [owner, session.isPending]);
@@ -146,7 +159,7 @@ function HouseholdProvider({
   const { policy, blocked } = useReleasePolicy();
   const receiptProcessing = useFeatureFlag("receiptProcessing");
   const auth = useConvexAuth();
-  const { online } = useQueryLifecycle();
+  const { online, active: foreground } = useQueryLifecycle();
 
   const details = useQuery(
     api.households.current,
@@ -188,7 +201,14 @@ function HouseholdProvider({
   useEffect(() => {
     if (details === undefined) return;
 
-    cacheHousehold(owner, visibleHousehold(details, null));
+    const value = visibleHousehold(details, null);
+
+    cacheHousehold(owner, value);
+
+    if (!value) {
+      retainReceiptCache(null);
+      retainReceiptImageScope(null);
+    }
   }, [details, owner]);
   const householdId = household?.id;
   useEffect(() => {
@@ -237,36 +257,27 @@ function HouseholdProvider({
   const retryFailedUploads = useCallback(async () => {
     if (!householdId || !canUpload.current) return;
 
-    try {
-      for (const entry of receiptStorage.list(owner, householdId))
-        receiptStorage.update({ ...entry, error: undefined });
-    } catch (error) {
-      reportError(error, "receipt.queue_read");
-      showQueueReadError();
-
-      return;
-    }
-
     await synchronize({ retryFailed: true });
-  }, [householdId, owner, synchronize, showQueueReadError]);
+  }, [householdId, synchronize]);
 
   useEffect(() => {
-    const initialUpload = setTimeout(() => void synchronize(), 0);
+    if (!foreground || !canUpload.current || !queue.length) return undefined;
 
-    const interval = setInterval(() => {
-      if (AppState.currentState === "active") void synchronize();
-    }, 15000);
+    if (!householdId) return undefined;
 
-    const listener = AppState.addEventListener("change", (state) => {
-      if (state === "active") void synchronize();
-    });
-
-    return () => {
-      clearTimeout(initialUpload);
-      clearInterval(interval);
-      listener.remove();
-    };
-  }, [synchronize, online, auth.isAuthenticated]);
+    return drainQueue.schedule(owner, householdId, synchronize);
+  }, [
+    synchronize,
+    owner,
+    householdId,
+    online,
+    auth.isAuthenticated,
+    foreground,
+    queue,
+    blocked,
+    receiptProcessing,
+    details,
+  ]);
 
   if (!online && !household)
     return (
@@ -294,28 +305,39 @@ function HouseholdProvider({
         queue,
         synchronize,
         retryFailedUploads,
+        regroup: (id, selected) => {
+          if (drainQueue.isRunning())
+            throw new Error("Vent til opplastingsforsøket er ferdig.");
+          regroupQueuedReceipt(owner, household.id, id, selected);
+        },
       }}
     >
-      {auth.isAuthenticated && (
-        <>
-          <ReleaseDiagnostics />
-          <ReceiptSearchIndex />
-          <ReceiptActivityTracking />
-        </>
-      )}
-      {!receiptProcessing && (
-        <Notice>
-          {policy.message ||
-            "Behandling av kvitteringer er satt på pause. Nye bilder blir lagret på enheten."}
-        </Notice>
-      )}
-      {queueError ? <Notice tone="error">{queueError}</Notice> : null}
-      <CatalogQueryProvider
+      <ReceiptCacheProvider
         key={`${owner}:${household.id}`}
-        scope={`${owner}:${household.id}`}
+        owner={owner}
+        household={household.id}
       >
-        <NavigationQueryProvider>{children}</NavigationQueryProvider>
-      </CatalogQueryProvider>
+        {auth.isAuthenticated && (
+          <>
+            <ReleaseDiagnostics />
+            <ReceiptSearchIndex />
+            <ReceiptActivityTracking />
+          </>
+        )}
+        {!receiptProcessing && (
+          <Notice>
+            {policy.message ||
+              "Behandling av kvitteringer er satt på pause. Nye bilder blir lagret på enheten."}
+          </Notice>
+        )}
+        {queueError ? <Notice tone="error">{queueError}</Notice> : null}
+        <CatalogQueryProvider
+          key={`${owner}:${household.id}`}
+          scope={`${owner}:${household.id}`}
+        >
+          <NavigationQueryProvider>{children}</NavigationQueryProvider>
+        </CatalogQueryProvider>
+      </ReceiptCacheProvider>
     </SessionContext.Provider>
   );
 }

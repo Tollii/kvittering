@@ -1,9 +1,12 @@
+import type { createImportQueue } from "./capture-import";
 import { soleElement } from "./domain/collections";
 import { Image } from "react-native";
 import { ImageManipulator, SaveFormat } from "expo-image-manipulator";
 import ReceiptIntelligence from "../../modules/receipt-intelligence/src/ReceiptIntelligenceModule";
 
-export const maxReceiptImages = 8;
+import { maxReceiptImages } from "./domain/receipt-images";
+
+export { maxReceiptImages } from "./domain/receipt-images";
 
 export type ImportedFile = {
   uri: string;
@@ -66,6 +69,11 @@ export async function importReceiptFiles(
   files: ImportedFile[],
   room = maxReceiptImages,
 ): Promise<{ uris: string[]; singleDocument: boolean }> {
+  room = Math.min(room, maxReceiptImages);
+
+  if (!Number.isInteger(room) || room < 1 || files.length > room)
+    throw new Error(`Maks ${maxReceiptImages} bilder`);
+
   if (!files.length) return { uris: [], singleDocument: false };
   const uris: string[] = [];
 
@@ -75,7 +83,12 @@ export async function importReceiptFiles(
         throw new Error(
           "PDF-kvitteringer krever en oppdatert versjon av appen.",
         );
-      const pages = await ReceiptIntelligence.renderPdf(file.uri, room);
+
+      const pages = await ReceiptIntelligence.renderPdf(
+        file.uri,
+        room - uris.length,
+      );
+
       uris.push(...pages);
     } else if (!file.mimeType || file.mimeType.startsWith("image/")) {
       uris.push(await prepareImage(file.uri, file.width, file.height));
@@ -92,4 +105,25 @@ export async function importReceiptFiles(
     uris,
     singleDocument: !!only && isPdf(only) && uris.length > 1,
   };
+}
+
+/** Retain the original files until capture accepts every rendered image. */
+export async function importPendingFiles(
+  queue: ReturnType<typeof createImportQueue>,
+  id: number,
+  room: number,
+  receive: (imported: Awaited<ReturnType<typeof importReceiptFiles>>) => void,
+) {
+  const batch = queue.claim(id);
+
+  if (!batch) return;
+
+  try {
+    const imported = await importReceiptFiles(batch.files, room);
+    receive(imported);
+    queue.finish(id, "completed");
+  } catch (error) {
+    queue.finish(id, "failed");
+    throw error;
+  }
 }

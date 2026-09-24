@@ -1,5 +1,8 @@
 import { v, type Infer } from "convex/values";
-import { catalogIdentityValidator } from "../catalog/model";
+import {
+  catalogIdentityValidator,
+  catalogProductValidator,
+} from "../catalog/model";
 import type { ReceiptLine } from "./receipt";
 
 const provenance = v.union(v.literal("manual"), v.literal("automatic"));
@@ -34,6 +37,18 @@ export const productSelectionValidator = v.union(
 );
 
 export type ProductSelection = Infer<typeof productSelectionValidator>;
+
+/** Editable selection retains the catalog description until the server accepts it. */
+export const productChoiceValidator = v.union(
+  productSelectionValidator.members[0]
+    .omit("lineId")
+    .extend({ product: catalogProductValidator }),
+  productSelectionValidator.members[1].omit("lineId"),
+  productSelectionValidator.members[2].omit("lineId"),
+  productSelectionValidator.members[3].omit("lineId"),
+);
+
+export type ProductChoice = Infer<typeof productChoiceValidator>;
 
 /** Read old serialized lines through one compatibility boundary. */
 export function productReference(line: ReceiptLine): ProductReference {

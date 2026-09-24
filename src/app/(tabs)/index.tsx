@@ -33,15 +33,9 @@ import {
 } from "@/components/ui";
 import { useHousehold } from "@/features/household-context";
 import { saveLocalReceipts } from "@/lib/receipt-storage";
+import { maxReceiptImages, prepareImage } from "@/lib/receipt-import";
 import {
-  importReceiptFiles,
-  maxReceiptImages,
-  prepareImage,
-  type ImportedFile,
-} from "@/lib/receipt-import";
-import {
-  claimImportedFiles,
-  finishImportedFiles,
+  receiveImportedFiles,
   retryImportedFiles,
   dismissImportedFiles,
   offerImportedFiles,
@@ -126,20 +120,22 @@ export default function Capture() {
 
   /** Shared images and PDFs arrive here from the share sheet and the file picker. */
   const addFiles = useCallback(
-    (files: ImportedFile[]) =>
-      run(async () => {
-        const room = maxReceiptImages - photos.length;
+    (id: number) =>
+      run(() =>
+        receiveImportedFiles(
+          id,
+          maxReceiptImages - photos.length,
+          (imported) => {
+            if (!mounted.current || !imported.uris.length)
+              throw new Error("Importen ble avbrutt. Prøv igjen.");
+            setPhotos((current) => [...current, ...imported.uris]);
 
-        if (room <= 0) throw new Error(`Maks ${maxReceiptImages} bilder`);
-        const imported = await importReceiptFiles(files, room);
-
-        if (!mounted.current || !imported.uris.length)
-          throw new Error("Importen ble avbrutt. Prøv igjen.");
-        setPhotos((current) => [...current, ...imported.uris]);
-
-        if (imported.singleDocument && photos.length === 0) setCombined(true);
-        setReview(true);
-      }),
+            if (imported.singleDocument && photos.length === 0)
+              setCombined(true);
+            setReview(true);
+          },
+        ),
+      ),
     [photos.length, run],
   );
 
@@ -208,12 +204,7 @@ export default function Capture() {
     );
 
     if (!next || busyRef.current) return;
-    const batch = claimImportedFiles(next.id);
-
-    if (!batch) return;
-    void addFiles(batch.files).then((outcome) =>
-      finishImportedFiles(batch.id, outcome),
-    );
+    void addFiles(next.id);
   }, [addFiles, busy, focused, pendingImports]);
 
   const failedImports = pendingImports.filter(

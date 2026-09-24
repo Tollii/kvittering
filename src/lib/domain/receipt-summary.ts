@@ -101,6 +101,20 @@ export function receiptListItem(receipt: Receipt) {
   };
 }
 
+export function receiptSearchText(receipt: Receipt) {
+  return [
+    receipt.data?.store,
+    receipt.data?.purchaseDate,
+    ...(receipt.data?.lines.flatMap((line) => [
+      line.name,
+      line.originalText,
+      ...line.tags,
+    ]) ?? []),
+  ]
+    .join(" ")
+    .toLocaleLowerCase("nb-NO");
+}
+
 export function receiptComparisonCategories(
   receipt: Receipt,
 ): Record<string, number> {

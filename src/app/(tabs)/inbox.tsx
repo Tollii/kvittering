@@ -1,4 +1,5 @@
 import { needsAttention } from "@/lib/domain/receipt-state";
+import { QueueRegroup } from "@/features/queue-regroup";
 import { ReceiptActivityButton } from "@/features/receipt-activity";
 import { useCompleteReceipts } from "@/features/receipt-queries";
 import { router } from "expo-router";
@@ -173,6 +174,7 @@ export default function Inbox() {
                     }}
                   />
                 </View>
+                <QueueRegroup entry={entry} />
                 {!!entry.error && (
                   <Button
                     title="Prøv igjen"

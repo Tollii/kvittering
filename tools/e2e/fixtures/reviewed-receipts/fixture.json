@@ -1,0 +1,172 @@
+{
+  "includes": ["household"],
+  "tables": {
+    "receipts": [
+      {
+        "householdId": "${HOUSEHOLD_ID}",
+        "uploadedBy": "${USER_IDENTITY}",
+        "uploaderName": "E2E Tester",
+        "clientId": "e2e-reviewed-1",
+        "imageCount": 0,
+        "status": "reviewed",
+        "revision": 1,
+        "generation": 0,
+        "data": {
+          "store": "REMA 1000",
+          "branch": "Oslo",
+          "purchaseDate": "2026-09-23",
+          "purchaseTime": "17:42",
+          "receiptNumber": "E2E-1",
+          "currency": "NOK",
+          "totalOre": 6380,
+          "originalText": "TINE LETTMELK 1L\nKNEIPP",
+          "lines": [
+            {
+              "id": "milk",
+              "kind": "product",
+              "originalText": "TINE LETTMELK 1L",
+              "name": "TINE LETTMELK 1L",
+              "amountOre": 2390,
+              "quantity": 1,
+              "unit": "stk",
+              "unitPriceOre": 2390,
+              "packageSize": null,
+              "packageUnit": null,
+              "brand": null,
+              "attributes": [],
+              "relatedLineId": null,
+              "categoryId": "dairy.milk",
+              "confidence": 1,
+              "tags": [],
+              "issues": [],
+              "manual": false,
+              "productKey": null
+            },
+            {
+              "id": "bread",
+              "kind": "product",
+              "originalText": "KNEIPP",
+              "name": "KNEIPP",
+              "amountOre": 3990,
+              "quantity": 1,
+              "unit": "stk",
+              "unitPriceOre": 3990,
+              "packageSize": null,
+              "packageUnit": null,
+              "brand": null,
+              "attributes": [],
+              "relatedLineId": null,
+              "categoryId": "bakery.bread",
+              "confidence": 1,
+              "tags": [],
+              "issues": [],
+              "manual": false,
+              "productKey": null
+            }
+          ],
+          "issues": []
+        },
+        "provider": "mock",
+        "duplicateResolved": false,
+        "excluded": false,
+        "catalogStatus": "complete"
+      },
+      {
+        "householdId": "${HOUSEHOLD_ID}",
+        "uploadedBy": "${USER_IDENTITY}",
+        "uploaderName": "E2E Tester",
+        "clientId": "e2e-reviewed-2",
+        "imageCount": 0,
+        "status": "reviewed",
+        "revision": 1,
+        "generation": 0,
+        "data": {
+          "store": "KIWI",
+          "branch": "Oslo",
+          "purchaseDate": "2026-09-22",
+          "purchaseTime": "17:42",
+          "receiptNumber": "E2E-2",
+          "currency": "NOK",
+          "totalOre": 6990,
+          "originalText": "EVERGOOD KAFFE",
+          "lines": [
+            {
+              "id": "coffee",
+              "kind": "product",
+              "originalText": "EVERGOOD KAFFE",
+              "name": "EVERGOOD KAFFE",
+              "amountOre": 6990,
+              "quantity": 1,
+              "unit": "stk",
+              "unitPriceOre": 6990,
+              "packageSize": null,
+              "packageUnit": null,
+              "brand": null,
+              "attributes": [],
+              "relatedLineId": null,
+              "categoryId": "drinks.coffee",
+              "confidence": 1,
+              "tags": [],
+              "issues": [],
+              "manual": false,
+              "productKey": null
+            }
+          ],
+          "issues": []
+        },
+        "provider": "mock",
+        "duplicateResolved": false,
+        "excluded": false,
+        "catalogStatus": "complete"
+      },
+      {
+        "householdId": "${HOUSEHOLD_ID}",
+        "uploadedBy": "${USER_IDENTITY}",
+        "uploaderName": "E2E Tester",
+        "clientId": "e2e-reviewed-3",
+        "imageCount": 0,
+        "status": "reviewed",
+        "revision": 1,
+        "generation": 0,
+        "data": {
+          "store": "Coop Extra",
+          "branch": "Oslo",
+          "purchaseDate": "2026-09-21",
+          "purchaseTime": "17:42",
+          "receiptNumber": "E2E-3",
+          "currency": "NOK",
+          "totalOre": 8990,
+          "originalText": "KYLLINGFILET",
+          "lines": [
+            {
+              "id": "chicken",
+              "kind": "product",
+              "originalText": "KYLLINGFILET",
+              "name": "KYLLINGFILET",
+              "amountOre": 8990,
+              "quantity": 1,
+              "unit": "stk",
+              "unitPriceOre": 8990,
+              "packageSize": null,
+              "packageUnit": null,
+              "brand": null,
+              "attributes": [],
+              "relatedLineId": null,
+              "categoryId": "meat-fish.poultry",
+              "confidence": 1,
+              "tags": [],
+              "issues": [],
+              "manual": false,
+              "productKey": null
+            }
+          ],
+          "issues": []
+        },
+        "provider": "mock",
+        "duplicateResolved": false,
+        "excluded": false,
+        "catalogStatus": "complete"
+      }
+    ]
+  }
+}

@@ -4,6 +4,7 @@ export default requireOptionalNativeModule<{
   hasPurchaseWidget?: () => Promise<boolean>;
   supportsReceiptTips?: () => boolean;
   completeReceiptTip?: (kind: "matching" | "widget") => void;
+  previewLocalReceipts?: (urls: string[]) => Promise<void>;
   previewReceipts?: (urls: string[], token: string) => Promise<void>;
   indexReceipts?: (
     receipts: {

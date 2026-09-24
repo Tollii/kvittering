@@ -1,0 +1,35 @@
+appId: no.tolnes.kvitto
+name: Recover and discard an unsaved receipt edit after restart
+---
+- runFlow: history.yaml
+- tapOn: "Flere handlinger"
+- tapOn: "Kvitteringsdetaljer"
+- tapOn: "Oslo"
+- eraseText
+- inputText: "Draft branch"
+# Finish text entry before selecting controls in the native sheet.
+- pressKey: Enter
+- waitForAnimationToEnd
+- tapOn: "Lukk"
+- assertNotVisible: "Kvitteringsdetaljer"
+- assertVisible: ".*Draft branch.*"
+# Stop without saving. Relaunch must retain both the account and the draft.
+- stopApp
+- launchApp
+- extendedWaitUntil:
+    visible: "Historikk"
+    timeout: 30000
+- tapOn: "Historikk"
+- tapOn: "REMA 1000.*"
+- assertVisible: ".*Draft branch.*"
+- tapOn:
+    id: "BackButton"
+- assertVisible: "Forkaste endringene[?]"
+- tapOn: "Fortsett å redigere"
+- assertVisible: ".*Draft branch.*"
+- tapOn:
+    id: "BackButton"
+- tapOn: "Forkast"
+- tapOn: "REMA 1000.*"
+- assertVisible: ".*Oslo.*"
+- assertNotVisible: ".*Draft branch.*"

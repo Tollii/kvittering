@@ -16,7 +16,10 @@ import {
   type SpendingDimension,
 } from "@/lib/spending-selection";
 import { spendingCalendar } from "@/lib/domain/insights";
-import { useCompleteReceipts } from "@/features/receipt-queries";
+import {
+  useCompleteReceipts,
+  useInitialSpendingTotals,
+} from "@/features/receipt-queries";
 import { useState } from "react";
 import { Pressable, View } from "react-native";
 import {
@@ -105,12 +108,26 @@ function Spending({ initialMonth }: Readonly<{ initialMonth: CalendarMonth }>) {
 
   const comparison = comparisonInsights(receipts, month);
   const totals = comparison.current;
+  const initialTotals = useInitialSpendingTotals(month, comparison.currentEnd);
+
+  const initialPrevious = useInitialSpendingTotals(
+    CalendarMonth.shift(month, -1),
+    comparison.previousEnd,
+  );
+
+  const headline = initialTotals ?? {
+    ...totals,
+    receipts: totals.selected.length,
+  };
+
+  const previousProducts =
+    initialPrevious?.products ?? comparison.previous.products;
 
   usePurchaseWidget({
-    ready: completeReceipts && month === currentMonth,
+    ready: (completeReceipts || !!initialTotals) && month === currentMonth,
     month,
-    amountOre: totals.products,
-    provisional: totals.provisional,
+    amountOre: headline.products,
+    provisional: headline.provisional,
   });
 
   const monthLabel = CalendarMonth.format(month);
@@ -119,14 +136,15 @@ function Spending({ initialMonth }: Readonly<{ initialMonth: CalendarMonth }>) {
   const [firstPending] = coverage.pending;
   const catalog = catalogInsights(totals.selected);
 
-  const change = comparison.previous.products
-    ? Math.round(
-        Ore.ratio(
-          Ore.subtract(totals.products, comparison.previous.products),
-          Ore.abs(comparison.previous.products),
-        ) * 100,
-      )
-    : null;
+  const change =
+    (!loadingReceipts || initialPrevious) && previousProducts
+      ? Math.round(
+          Ore.ratio(
+            Ore.subtract(headline.products, previousProducts),
+            Ore.abs(previousProducts),
+          ) * 100,
+        )
+      : null;
 
   const rows =
     breakdown === "store"
@@ -187,7 +205,7 @@ function Spending({ initialMonth }: Readonly<{ initialMonth: CalendarMonth }>) {
 
   const pace =
     budgetOre && budgetOre > 0
-      ? budgetPace(budgetOre, totals.products, month)
+      ? budgetPace(budgetOre, headline.products, month)
       : null;
 
   const selected = resolveSpendingSelection(selection, periodKey, {
@@ -263,7 +281,7 @@ function Spending({ initialMonth }: Readonly<{ initialMonth: CalendarMonth }>) {
   return (
     <Screen
       summary={
-        !loadingReceipts && (
+        (!loadingReceipts || !!initialTotals) && (
           <Panel
             tone="primary"
             style={{
@@ -315,13 +333,13 @@ function Spending({ initialMonth }: Readonly<{ initialMonth: CalendarMonth }>) {
                   selectable
                   style={{ color: colors.onHero }}
                 >
-                  {Ore.format(totals.products)}
+                  {Ore.format(headline.products)}
                 </Copy>
                 <Copy size={13} style={{ color: colors.onHeroMuted }}>
-                  {totals.selected.length}{" "}
-                  {totals.selected.length === 1 ? "kvittering" : "kvitteringer"}
-                  {totals.provisional
-                    ? ` · ${totals.provisional} foreløpige`
+                  {headline.receipts}{" "}
+                  {headline.receipts === 1 ? "kvittering" : "kvitteringer"}
+                  {headline.provisional
+                    ? ` · ${headline.provisional} foreløpige`
                     : ""}
                   {change !== null
                     ? ` · ${Math.abs(change)} % ${change > 0 ? "mer" : "mindre"} enn ${comparison.partial ? "samme del av forrige måned" : "forrige måned"}`
