@@ -1,165 +1,63 @@
-# Application structure
+# Application architecture
 
-Use this map for ownership and data-flow changes. [Design principles](principles.md) explain the design preferences; [AGENTS.md](../AGENTS.md) lists task-specific references and checks.
+This guide explains ownership and cross-component constraints. Exact limits, schemas, configuration, and individual feature behavior belong in source. Use [principles](principles.md) for design decisions and [release review](../.agents/skills/release-review/SKILL.md) when contracts change.
 
-Users capture or import receipts, review uncertain readings, and correct items and categories. Saved decisions reduce repeated work. Extraction turns images into purchases; Kassalapp supplies product and store information. Product families and quantity normalization support comparisons. Missing evidence remains explicit.
+## Ownership
 
-The Expo application starts in `src/app/_layout.tsx`. Session context contains account, household, connectivity, and local upload state. Active screens declare their receipt reads in `src/features/receipt-queries.ts`. History pages contain summaries. Reports wait until all pages in their purchase-date range are loaded. Product price history is a separate, explicit read.
+Convex owns household access, persisted receipts, and server processing. Authorization, revision checks, and related writes share one transaction. Mutations return a small acknowledgement; queries and subscriptions deliver persisted state. Accepted work must finish without an open screen.
 
-## State and data contracts
+The phone has three distinct kinds of local state: durable upload work, unsaved editor drafts, and disposable read caches. Cache cleanup must not delete queued images or edits. Startup can render the cached household while authentication completes, but uploads wait for server-confirmed membership. The server response, including no membership, replaces the startup fallback. Scope includes the deployment, account, and household so changing backend or identity cannot expose another scope's data.
 
-- Convex queries return persisted data. Mutations write and return `null`, an ID, or a small acknowledgement. Existing subscriptions deliver changes; background work can use focused read queries. Live reads need no polling, manual refetch, or cache invalidation.
-- Server completion and retries belong to the backend. Opening a screen must not be required to finish accepted work.
-- Keep editable drafts separate from persisted data. Incoming query updates must preserve unsaved changes and revision checks. Derive other UI values from their source instead of keeping synchronized copies.
-- Use React effects for external synchronization, event handlers for user actions, and render or pure functions for calculations. Give subscriptions, timers, persistence, and lifecycle listeners an owner and cleanup path.
-- Read only the scope and fields needed. Avoid complete household history in root providers. Growing collections use indexes and pagination; background work uses bounded batches with continuation, not silent truncation.
-- Startup renders from the owner's cached household while Convex authenticates; the server's answer, including "no household", replaces it. Uploads wait for the server-confirmed household.
-- Persistent caches serve startup, offline use, or external providers. Their validity includes account/household scope, source, and completeness. A cached product summary is not a complete product record. Transport and cache policy belong behind feature interfaces; callers do not manage freshness.
-- Failures a person can act on are thrown with `userError` (`convex/userErrors.ts`), a `ConvexError` whose `{ code, message }` reaches clients in production. Plain `Error` messages are redacted there, so use them only for defects and operator problems that should reach Sentry. `RECEIPT_CHANGED` marks revision conflicts; other rejections use `REJECTED`. The client reads them with `parseUserError` and records them as expected. The image upload route keeps user errors on its existing plain-text 403 response for installed clients.
-- Separate tables when lifecycle, ownership, or retention differs. Table count alone does not justify merging them.
+| Responsibility                           | Source entry point                                                                                                                                            |
+| ---------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Application and session composition      | [Root layout](../src/app/_layout.tsx), [session](../src/features/session.tsx)                                                                                 |
+| Durable capture and upload               | [Receipt storage](../src/lib/receipt-storage.ts), [upload queue](../src/lib/upload-queue.ts), [transport](../src/lib/receipt-upload-transport.ts)             |
+| Receipt write policy and derived records | [Receipt changes](../convex/receiptChanges.ts), [mutation builders](../convex/serverFunctions.ts)                                                             |
+| Local read synchronization               | [Receipt sync](../convex/receiptSync.ts), [cache provider](../src/features/receipt-cache-provider.tsx), [read interfaces](../src/features/receipt-queries.ts) |
+| Product and quantity evidence            | [Product evidence](../src/lib/domain/product-evidence.ts), [analysis worker](../convex/productAnalysisWorker.ts)                                              |
+| Tables and indexes                       | [Schema](../convex/schema.ts)                                                                                                                                 |
+| API compatibility and service controls   | [Client guards](../convex/clientFunctions.ts), [release policy](../convex/releasePolicy.ts), [feature flags](../convex/featureFlags.ts)                       |
 
 ## Receipt flow
 
-1. Capture claims an import batch. It retains the batch until conversion succeeds or the user dismisses it.
-2. `receipt-storage.ts` copies images into durable storage and commits the queue to SQLite. It publishes immutable snapshots after commit. `receipt-upload-transport.ts` owns authenticated uploads; `upload-queue.ts` retains each completed step. After a failure it retries automatically with backoff (15 seconds, doubling) for at most six attempts per app start. A `REJECTED` user error waits for the person's retry. These attempt limits live in memory. Quota deadlines are stored separately and survive app restarts and manual retry. Timers use both limits and recheck the queue after each drain; they never remove queued images.
-3. Convex processing extracts and parses receipt evidence, classifies products, checks duplicates, and applies saved household choices. `receiptChanges.ts` owns revision, history, status, and follow-up policy for receipt changes.
-4. Catalog matching and product analysis run on the server. Profile questions use bounded batches. Writes reject stale generation, revision, or evidence. Exhausted analysis can be retried explicitly; `productAnalysis.repair` is an operator recovery operation.
-5. `receipt-draft.ts` owns editor changes and save acknowledgement. The change subscription and bounded synchronization deliver the saved receipt. Report selections keep identity and period, then derive their content from current data.
+Capture retains an import batch until conversion succeeds or the user dismisses it. Storage commits durable images and queue state before publishing a snapshot. Uploads retain reservation identity and completed steps across failure, so retries do not create another receipt. Supported iOS builds can transfer scheduled images while suspended; force-quit, expired credentials, and unscheduled work can require reopening the app.
 
-Receipt approval checks material reading errors and duplicates. Category uncertainty
-does not block approval, and approval does not confirm or remember suggested
-categories. Explicit category edits still update household memory. Initial push
-notifications are reserved for receipts that need review; requested reminders
-keep their separate schedule and delivery checks.
+After upload, Convex extracts receipt evidence, classifies items, checks duplicates, applies household choices, and schedules catalog and product analysis. Completion and bounded retries belong to the server. Generation, revision, and evidence checks reject stale results. Operator repair is separate from normal screen reads.
 
-The product-linking queue is an optional action in the Inbox header. Spending uses
-one default purchase scope, with payment reconciliation and calculation details
-in secondary views. New users explicitly start with the default household name
-or join through an invitation; Settings permits an authenticated household rename.
+Approval means material reading errors and duplicates have been addressed. It does not turn a suggested category into a confirmed decision. Category refinement and product linking remain optional; explicit corrections can teach household memory. This separation prevents ordinary receipt review from requiring catalog maintenance.
 
-## Identity and evidence
+The editor persists dirty values synchronously in a separate SQLite draft store, scoped by deployment, account, household, and receipt. It retains the baseline revision through sign-out, policy gates, and restart. A newer server revision requires explicit conflict resolution. Unknown future formats stay untouched and block editing. A save acknowledgement can arrive before or after the updated read; neither order may discard a later edit. The durable draft remains until acknowledgement and the corresponding server snapshot arrive; explicit discard or completed deletion removes it. Failed disk writes retain live edits and show an error. Reports retain a selected identity and period, then derive the selected content from current data instead of keeping a second copy.
 
-- Better Auth owns Apple and email/password accounts and sessions. Native Apple
-  identity tokens are verified by the backend. Provider links require an
-  authenticated session; email matching never links accounts automatically.
-  An account-creation trigger rejects duplicate Apple identities in the same
-  transaction as the provider-account write. Household membership and device
-  queues continue to use the existing Kvitto identity.
-  Settings subscribes to the authenticated account's Apple connection status.
-  It does not keep a second local copy. One account component controls Apple
-  linking and sign-out, and permits only one of these operations at a time.
-- A receipt line preserves printed text and integer øre amounts. In code, amounts are `Ore` values combined only through the `Ore` operations; storage and client payloads keep plain numbers. See [quality checks](quality.md#money).
-- A category alias records a household's category decision. It is not a product identity.
-- A product reference is unresolved, explicitly separate, a household product, or an exact catalog product. The compatibility adapter projects legacy fields for installed clients.
-- A catalog product describes one packaged item. A family groups the same product across package sizes. Purchased quantity is a separate interpretation.
-- `product-evidence.ts` parses package notation once. Unknown or conflicting measurements remain explicit.
+## Read model and retention
 
-The analysis screen explains the largest observed price and quantity contributions
-and identifies product families recorded only in the current comparison period.
-Explanations use the same purchase projection as the numeric report, wait for all
-period pages, and link to supporting receipt lines. They do not infer consumption,
-first-time purchases, or missing product identities.
+Receipt mutations update the canonical receipt, compact summary, daily totals, and household change sequence together. Use the application mutation builders: raw generated mutations and direct dashboard edits bypass those triggers. Administrative repair must reconcile derived records too.
 
-Add receipt issues in `receipt-issues.ts`; display text belongs in its mapper. Parse receipt input at the boundary and use the assessment in `receipt-review.ts`. Add category metadata in `categories.ts` and classifier evidence in `classification.ts`. Add reports to the typed registry in `src/features/spending-reports/reports.tsx`; use existing purchase projections for arithmetic.
+A small foreground subscription announces household changes. The phone downloads bounded pages into SQLite and commits records with their synchronization cursor. Ordinary navigation reads the local copy. The change stream stores the current entry for each receipt, not every edit; a receipt changed during download is read under its later sequence. Deletion markers let a phone catch up after a long offline period.
 
-## Table ownership
+Reports require complete data for their scope. During initial synchronization, a server aggregate can supply the headline without claiming the local history is complete. Offline reports describe the last complete copy. Existing bounded reads remain available while the server read model is being backfilled, or when the disposable cache cannot open or accept a page. Full-record reads have byte budgets as well as row limits; clients continue across empty filtered pages until completion.
 
-| Tables                                               | Owner and purpose                                                           |
-| ---------------------------------------------------- | --------------------------------------------------------------------------- |
-| households, members                                  | Household membership, invitation, and budget                                |
-| receipts, images                                     | Current receipt state and uploaded image references                         |
-| receiptSummaries, receiptSyncHeads, receiptReadModel | Compact receipt records, synchronization cursor, and backfill state         |
-| receiptDailyTotals                                   | Incremental daily spending totals and comparison categories                 |
-| extractions                                          | Original provider output for each generation                                |
-| revisions                                            | Prior receipt data before a committed non-extraction change                 |
-| aliases, categoryMemory                              | Explicit and learned household category decisions                           |
-| products, productMappings                            | Household identities and remembered product choices                         |
-| corrections, correctionBatches                       | Human decisions, bulk changes, and guarded undo                             |
-| catalogRequests, catalogRequestWaiters               | Shared catalog work and workflow completion                                 |
-| catalogProducts, catalogStores                       | Shared catalog records; detail freshness is separate from summary freshness |
-| productFamilies, productProfiles                     | Household family identity and reusable analysis evidence                    |
-| receiptReminders                                     | One pending receipt-review reminder per device subscription and receipt     |
-| deviceSubscriptions                                  | Device notification destinations                                            |
-| clientReleases                                       | Installed-client diagnostics                                                |
-| releasePolicies, releasePolicyHistory                | Native/API version controls and operator history                            |
-| featureFlags, featureFlagHistory                     | Platform-scoped service configuration and operator history                  |
+Caches can be rebuilt; receipt originals, revision evidence, corrections, and unfinished uploads cannot be treated as caches. Keep catalog identities that receipts reference even when request results expire. Clean workflow journals through the component API. A payload-free association tracks receipt, workflow component, and cleanup deadline for every terminal outcome. A bounded inventory recovers missed callbacks and older journals; deletion cancels associated active work before cleanup. Active journals are never force-deleted. A database restore needs an explicit device-cache invalidation and reconciliation plan, not only a successful import.
 
-Convex components own their workflow, workpool, and authentication tables. Revision retention is a separate operator decision.
+## Evidence and purchase calculations
 
-## Presentation and checks
+Printed receipt text and integer øre amounts are the evidence for purchases. Domain calculations use `Ore` operations; serialized storage and client payloads remain numbers. Category memory records a classification decision; it does not establish product identity. A packaged catalog product, an equivalent candidate group, a product family, and purchased quantity serve different purposes.
 
-`src/components/ui.tsx` is an import facade. Typography, controls, surfaces, layout, and selection views have separate modules. Feature screens own state and use these components directly.
+Equivalent catalog links can help users recognize an item without establishing its barcode, weight, ingredients, or exact-product price. Do not use a representative group's image as authority to fetch that representative's details for the purchased item. Catalog summaries and fetched details have separate completeness and freshness.
 
-Native camera, PDF import, sheets, large text, light/dark mode, offline restart, and old-client upgrades require device checks. Source tests do not prove those behaviors. See [quality checks](quality.md) and [release policy](releases.md) for verification procedures.
+Parse package notation once and preserve conflicting evidence. A catalog pack count that conflicts with the receipt cannot fill a missing quantity. Unknown quantities stay unknown. Families can span package sizes while keeping brands and variants distinct; physical-quantity comparisons and item-count comparisons therefore need different evidence.
 
-## API abuse controls
+Reports share purchase projections and receipt amounts after discounts. Price changes can reflect stores, discounts, or package choices; they are not a measure of inflation. A product recorded only in the current period is not proof of a first purchase. Explanations must use the same projection as the figures and link to supporting lines. These reports describe purchases, never measured consumption.
 
-Receipt admission and explicit retries use transactional user and household quotas.
-Each external provider has a separate deployment-wide allowance, consumed before
-network I/O. Email registration uses the `emailSignUp` feature flag in both the
-sign-in screen and the authentication route. See [API limits](api-limits.md) and
-[feature flags](featureFlags.md#email-registration) for policy and operations.
+Correction propagation and undo check the receipt revisions used by the preview. They must not overwrite a later manual decision or turn one correction into several independent learning examples. Fixed model examples and agreement with recorded corrections do not establish accuracy across all purchases.
 
-## Receipt read storage and cost
+## External boundaries
 
-Receipt mutations maintain compact summaries, daily report totals, and a
-household change sequence in the same transaction. New phones synchronize
-bounded changes into a separate SQLite cache. Tabs, receipt details, search,
-and product history read this cache. One small foreground subscription reports
-new changes; inactive tabs do not keep broad receipt subscriptions alive.
-Queued uploads and editor drafts remain separate from disposable caches. If the
-disposable cache cannot open or accept a page, screens use server reads instead.
-Cleanup failures are reported without blocking the screen or retaining revoked
-data in memory. Synchronization backoff resets after a successful download.
+Better Auth owns accounts and sessions. Provider linking requires an authenticated session, and a transactional account trigger enforces Apple identity uniqueness. Matching email addresses must not link accounts automatically. Application household identity remains stable when a provider is linked.
 
-See [Convex operating cost](convex-costs.md) for synchronization, backfill,
-retention, release order, and usage measurements. Existing receipt endpoints
-remain available to installed clients and during the backfill.
+Shared catalog requests and provider caches can cross households; receipt data and saved corrections cannot. Provider calls run on the backend, with persisted allowance consumed before network I/O. Admission and scheduling of new optional paid work share a transaction. Provider attempts have deployment, user, and household limits with server-resolved attribution; retries keep the same source. Legacy journaled calls retain their accepted arguments and deployment limits. Retries and uncertain outcomes still cost requests. Request caps and billing alerts are not exact monetary ceilings.
 
-## Workflow journal retention
+Service flags control availability, not authorization. The client uses a scoped persisted fallback for offline presentation; server writes check current values. Legacy release-policy reads and writes adapt to the same flag store, rather than maintaining another writable copy. Version policy remains separate from service availability.
 
-Receipt processing and catalog matching use the processing workflow component.
-Product analysis uses its own component. `workflowJournals` stores the component,
-workflow ID, receipt ID, and cleanup deadline. It stores no receipt payload.
-All terminal outcomes retain diagnostics for 30 days. Receipt deletion schedules
-cancellation of active associated work and cleanup of terminal journals. Cleanup
-uses the component API and does not force deletion of active journals.
+Optional metadata represents absence. Provider nulls are normalized at the boundary, while unknown amounts, explicit no-match decisions, and clear commands retain distinct null meanings. Review old client writes and stored workflow arguments when changing these contracts; successful schema validation only checks part of compatibility.
 
-A daily bounded inventory discovers older journals in both components. Existing
-terminal journals get a full 30-day grace period from first discovery. Journals
-for receipts already deleted are cleaned after discovery, including cancellation
-of active work. Legacy null completion contexts and old scheduled arguments
-remain valid. A failed callback is recovered by the inventory. This additive
-association table requires no receipt backfill and no client minimum change.
-
-## Receipt read budgets
-
-Full-receipt pages use a server-selected 500,000-byte budget as well as row
-limits. One document can exceed the page target; the maximum document size
-still bounds that read. Clients must continue across empty filtered pages until
-`isDone`. This also applies to the legacy list API. Recent category suggestions
-and Spotlight use bounded samples. The attention indicator reports a lower
-bound once either status has five receipts, using an index that excludes
-receipts omitted from reports. This avoids scanning excluded documents.
-
-The pre-backfill digest fallback reduces each bounded receipt page into daily
-totals. It retains at most the days in the report period. Normal digests still
-use persisted daily totals. Synchronization and backfill keep their existing
-4 MiB budgets; synchronization also bounds its returned full-record payload.
-
-## Unsaved editor drafts
-
-The editor writes dirty values synchronously to a separate SQLite draft store.
-The key includes deployment, account, household, and receipt. Drafts survive
-sign-out, policy gates, and process restart; another account cannot load them.
-Each draft keeps its original baseline identity and revision. Other receipt
-fields come from the current server snapshot, so an unknown historical status
-does not block recovery. A newer server revision causes
-the existing explicit conflict flow, not an automatic overwrite.
-
-A save keeps the durable draft until both acknowledgement and the corresponding
-server snapshot arrive. Explicit discard or completed deletion removes it.
-Pending saves keep navigation protection active. Disk-write failures retain the
-live edits and show an error. Unknown future database or payload versions block
-editing and remain unchanged on disk. Disposable cache removal never clears this
-store. The draft database and upload queue have independent version contracts.
+Expected user-facing failures use `convex/userErrors.ts`; plain error messages are redacted in production. Preserve the image-upload route’s plain-text error contract for installed clients.

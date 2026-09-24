@@ -7,11 +7,11 @@ description: Review Kvitto native releases, OTA updates, and backend changes for
 
 Review the proposed change as an upgrade from an installed app. The latest source tree alone is not the compatibility boundary.
 
-Use [backend operations](../../../docs/backend-operations.md) before any authorized deployment or data operation. This review does not itself authorize publication.
+Use [release operations](../release-operations/SKILL.md) when publication is requested. This review does not itself authorize publication.
 
 ## Establish the comparison
 
-- Read `docs/releases.md`, `app.json`, `eas.json`, and the release workflows. Identify the target backend, channel, native runtime, and current API contract.
+- Read `app.json`, `eas.json`, `package.json`, `src/lib/releases/policy.ts`, and the release workflows. Identify the target backend, channel, native runtime, and current API contract.
 - Use the user's comparison ref when supplied. Otherwise identify the last shipped build's commit from EAS or release records. A branch's merge base is only a substitute; label that limitation. Include uncommitted changes if they will ship.
 - Read the diff and the affected callers. Distinguish newly introduced problems from existing limitations. Never print credentials or receipt contents in findings.
 - Read the release policy and active-client report when authorized tools are available. If unavailable, state that minimum versions and adoption were not verified. Do not assume every user runs the latest version.
@@ -24,7 +24,7 @@ Use [backend operations](../../../docs/backend-operations.md) before any authori
 - A required argument or new stored field can break old clients even if current tests pass. In particular, receipt edits submit a document: check that an old editor cannot erase newer fields.
 - Public writes must use `clientMutation` in `convex/clientFunctions.ts`. Public actions and HTTP uploads must perform the corresponding server check. Diagnostics are an intentional exception; authentication and ownership still apply.
 - Check API-version zero callers until legacy support is explicitly retired. Keep old functions during the transition. A client-supplied version is compatibility information, not authentication.
-- A backend deployment precedes the binary in this project. It must remain safe if the build fails, Apple delays release, or the user does not update.
+- Review deployment order explicitly. Additive backend changes normally precede the binary and must remain safe if the build fails or users do not update. A stricter admission rule can require client recovery first; see [release operations](../release-operations/SKILL.md#five-image-admission-transition).
 
 **Local data and retries**
 
@@ -52,9 +52,13 @@ Use [backend operations](../../../docs/backend-operations.md) before any authori
 - Check native app version/build separately from API version, policy revision and OTA update ID. Do not infer the installed binary version from JavaScript config.
 - OTA reloads must not interrupt edits. Check embedded fallback and rollback, source maps/Sentry release metadata, and store update links. Do not bypass Expo's recovery controls.
 
+Build 5 predates the update gate and OTA support. A backend deployment cannot add those capabilities to that installed binary; do not assume a policy change can display an update screen there.
+
 ## Verify and report
 
-Run the applicable [project checks](../../../docs/quality.md) when source changes are in scope. Add focused verification only if implementation is requested. Existing legacy-contract tests are evidence for the current support window, not permission to change their fixtures to make a breaking change pass.
+Run the applicable [project checks](../../../README.md#checks) when source changes are in scope. Add focused verification only if implementation is requested. Existing legacy-contract tests are evidence for the current support window, not permission to change their fixtures to make a breaking change pass.
+
+For affected native flows, check large text, VoiceOver, themes, draft preservation, and cold/warm navigation. Use a signed physical iPhone for camera quality, push, APNs updates, and suspended-app transfers. Record the build and data source used; synthetic fixtures prove layout only. Source tests do not establish these device behaviors.
 
 Report:
 
