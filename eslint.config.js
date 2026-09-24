@@ -113,6 +113,12 @@ module.exports = defineConfig([
       "@typescript-eslint/no-unsafe-call": "error",
       "@typescript-eslint/no-unsafe-function-type": "error",
       "@typescript-eslint/no-unnecessary-type-assertion": "error",
+      // Index reads include undefined (noUncheckedIndexedAccess), so a guard the
+      // type already rules out is dead code.
+      "@typescript-eslint/no-unnecessary-condition": [
+        "error",
+        { allowConstantLoopConditions: "only-allowed-literals" },
+      ],
       "@typescript-eslint/ban-ts-comment": [
         "error",
         { "ts-expect-error": "allow-with-description" },

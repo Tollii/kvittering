@@ -132,7 +132,9 @@ export function ReceiptActivityTracking() {
 
   useEffect(() => {
     if (!activityId) return undefined;
-    let active = true;
+    // Aborted when the effect is cleaned up; pending work then stops.
+    const effect = new AbortController();
+    const stopped = () => effect.signal.aborted;
     let remove = () => {};
 
     void factory()
@@ -141,7 +143,7 @@ export function ReceiptActivityTracking() {
           .getInstances()
           .find((item) => item.getId() === activityId);
 
-        if (!active) return;
+        if (stopped()) return;
 
         if (!instance) {
           saveBinding(null);
@@ -155,10 +157,10 @@ export function ReceiptActivityTracking() {
         const environment =
           await getIosPushNotificationServiceEnvironmentAsync();
 
-        if (!active || !environment) return;
+        if (stopped() || !environment) return;
 
         const register = (token: string) => {
-          if (active)
+          if (!stopped())
             void releaseMutation(client, api.liveActivities.setToken, {
               activityId,
               token,
@@ -178,17 +180,19 @@ export function ReceiptActivityTracking() {
       .catch((error) => reportError(error, "activity.restore"));
 
     return () => {
-      active = false;
+      effect.abort();
       remove();
     };
   }, [activityId, client]);
 
   useEffect(() => {
     if (!activityId || progress === undefined) return undefined;
-    let active = true;
+    // Aborted when the effect is cleaned up; pending work then stops.
+    const effect = new AbortController();
+    const stopped = () => effect.signal.aborted;
     void factory()
       .then(async (activity) => {
-        if (!active || read() !== serialized) return;
+        if (stopped() || read() !== serialized) return;
 
         const instance = activity
           .getInstances()
@@ -206,7 +210,7 @@ export function ReceiptActivityTracking() {
       .catch((error) => reportError(error, "activity.update"));
 
     return () => {
-      active = false;
+      effect.abort();
     };
   }, [activityId, progress, serialized, client]);
 

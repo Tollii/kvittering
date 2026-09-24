@@ -31,6 +31,10 @@ export function shiftDate(date: string, days: number) {
 }
 
 /** Compare an unfinished week/month with the same elapsed part of its predecessor. */
+/** ISO dates order lexically. */
+export const earlierDate = (left: string, right: string) =>
+  left < right ? left : right;
+
 export function analysisPeriod(
   anchor: string,
   frequency: AnalysisFrequency,
@@ -41,9 +45,7 @@ export function analysisPeriod(
   if (frequency === "week") {
     const start = shiftDate(anchor, -((date.getUTCDay() + 6) % 7));
 
-    const end = [shiftDate(start, 6), today].sort((left, right) =>
-      left.localeCompare(right, "en"),
-    )[0];
+    const end = earlierDate(shiftDate(start, 6), today);
 
     return {
       start,
@@ -59,9 +61,7 @@ export function analysisPeriod(
     new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth() + 1, 0, 12)),
   );
 
-  const end = [monthEnd, today].sort((left, right) =>
-    left.localeCompare(right, "en"),
-  )[0];
+  const end = earlierDate(monthEnd, today);
 
   const previousStart = dateString(
     new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth() - 1, 1, 12)),

@@ -67,7 +67,11 @@ export default function Inbox() {
           <SectionTitle
             title="Til kontroll"
             action={attention.length > 1 ? "Start" : undefined}
-            onAction={() => openReceipt(attention[0])}
+            onAction={() => {
+              const [next] = attention;
+
+              if (next) openReceipt(next);
+            }}
           />
           {attention.map((receipt) => (
             <SwipeToApprove

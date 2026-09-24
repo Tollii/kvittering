@@ -29,12 +29,17 @@ export type SpendingGroup = {
   contributions: Contribution[];
 };
 
-export function monthBefore(month: string) {
-  const [year, number] = month.split("-").map(Number);
-  const date = new Date(Date.UTC(year, number - 2, 1));
+/** The "YYYY-MM" month `offset` months after `month`. */
+export function shiftMonth(month: string, offset: number) {
+  const year = Number(month.slice(0, 4));
+  const number = Number(month.slice(5, 7));
 
-  return date.toISOString().slice(0, 7);
+  return new Date(Date.UTC(year, number - 1 + offset, 1))
+    .toISOString()
+    .slice(0, 7);
 }
+
+export const monthBefore = (month: string) => shiftMonth(month, -1);
 
 export function receiptMonth(receipt: Receipt) {
   return receipt.data?.purchaseDate?.slice(0, 7) ?? null;

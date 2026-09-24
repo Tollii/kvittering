@@ -200,7 +200,7 @@ async function prepareProfiles(
           )
           .unique(),
       );
-    const profile = profiles.get(key)!;
+    const profile = profiles.get(key) ?? null;
     let families: Doc<"productFamilies">[] = [];
     let catalog = null;
 

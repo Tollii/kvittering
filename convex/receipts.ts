@@ -276,15 +276,16 @@ export const save = mutation({
       );
     }
 
+    // Matching the saved store narrows the saved data to present.
     args.data.physicalStore =
       args.data.store === receipt.data?.store &&
-      args.data.branch === receipt.data?.branch
-        ? (receipt.data?.physicalStore ?? null)
+      args.data.branch === receipt.data.branch
+        ? (receipt.data.physicalStore ?? null)
         : null;
     args.data.physicalStoreManual =
       args.data.store === receipt.data?.store &&
-      args.data.branch === receipt.data?.branch
-        ? (receipt.data?.physicalStoreManual ?? false)
+      args.data.branch === receipt.data.branch
+        ? (receipt.data.physicalStoreManual ?? false)
         : false;
     // Translate installed-client commands once; the resolver consumes one selection union.
     const selections = new Map<string, ProductSelection>();

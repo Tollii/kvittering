@@ -1,3 +1,4 @@
+import { present } from "../src/lib/testing/receipts";
 /// <reference types="vite/client" />
 import { convexTest } from "convex-test";
 import { afterEach, expect, it, vi } from "vitest";
@@ -111,10 +112,12 @@ it("includes unresolved products in approved receipts and omits dismissed, linke
   await create({ duplicateOf: id });
   const result = await page();
   expect(result.page).toHaveLength(1);
-  expect(result.page[0].receiptId).toBe(id);
-  expect(result.page[0].lines.map((line) => line.id)).toEqual(["battery"]);
+  expect(present(result.page[0]).receiptId).toBe(id);
+  expect(present(result.page[0]).lines.map((line) => line.id)).toEqual([
+    "battery",
+  ]);
   expect(result.page[0]).not.toHaveProperty("data");
-  expect(result.page[0].lines[0]).not.toHaveProperty("originalText");
+  expect(present(result.page[0]).lines[0]).not.toHaveProperty("originalText");
 });
 
 it("continues across empty pages instead of treating a bounded page as the complete queue", async () => {
@@ -161,7 +164,7 @@ it.each(["reviewed", "needs_review"] as const)(
     const saved = (await user.query(api.receipts.detail, { id }))!.receipt;
     expect(saved.status).toBe(status);
     expect(saved.autoAccepted).toBe(before.autoAccepted);
-    expect(productReference(saved.data!.lines[0])).toMatchObject({
+    expect(productReference(present(saved.data!.lines[0]))).toMatchObject({
       kind: "catalog",
       provenance: "manual",
       product: { key: product.key },
@@ -174,11 +177,13 @@ it.each(["reviewed", "needs_review"] as const)(
     ).toMatchObject({ revision: 1, reference: { kind: "catalog" } });
     await user.mutation(api.productLinking.undo, commit);
     const restored = (await user.query(api.receipts.detail, { id }))!.receipt;
-    expect(productReference(restored.data!.lines[0])).toEqual({
+    expect(productReference(present(restored.data!.lines[0]))).toEqual({
       kind: "unresolved",
     });
     expect(restored.status).toBe(status);
-    expect((await page()).page[0].lines[0].id).toBe("battery");
+    expect(present(present((await page()).page[0]).lines[0]).id).toBe(
+      "battery",
+    );
     expect(
       await t.run((ctx) => ctx.db.query("productMappings").take(10)),
     ).toEqual([]);
@@ -195,7 +200,7 @@ it("persists a dismissal and restores a pre-existing mapping when it is undone",
   const prior = {
     householdId,
     retailer: matchingKey(data.store!),
-    key: matchingKey(data.lines[0].name),
+    key: matchingKey(present(data.lines[0]).name),
     productId: null,
     confirmedBy: "prior",
   };
@@ -216,12 +221,12 @@ it("persists a dismissal and restores a pre-existing mapping when it is undone",
 
   expect((await page()).page).toEqual([]);
   const saved = (await user.query(api.receipts.detail, { id }))!.receipt;
-  expect(productReference(saved.data!.lines[0])).toEqual({
+  expect(productReference(present(saved.data!.lines[0]))).toEqual({
     kind: "separate",
     provenance: "manual",
   });
   // An installed receipt editor submits no new command; the dismissal must survive.
-  expect(saved.data!.lines[0].productMatchManual).toBe(true);
+  expect(present(saved.data!.lines[0]).productMatchManual).toBe(true);
   await user.mutation(api.productLinking.undo, commit);
   expect(
     await t.run((ctx) => ctx.db.get("productMappings", mappingId)),
@@ -303,8 +308,10 @@ it("does not undo a newer receipt edit or overwrite a newer mapping decision", a
   );
   expect(
     productReference(
-      (await user.query(api.receipts.detail, { id: firstId }))!.receipt.data!
-        .lines[0],
+      present(
+        (await user.query(api.receipts.detail, { id: firstId }))!.receipt.data!
+          .lines[0],
+      ),
     ).kind,
   ).toBe("catalog");
   await t.run((ctx) => ctx.db.patch("receipts", secondId, { revision: 2 }));
@@ -323,7 +330,7 @@ it("returns ranked stored candidates with images only while their evidence is cu
     catalogDecisions: [
       {
         lineId: "battery",
-        evidenceKey: lineEvidenceKey(batteryFixture().lines[0]),
+        evidenceKey: lineEvidenceKey(present(batteryFixture().lines[0])),
         productKey: null,
         categoryId: null,
         categoryConfidence: 0,
@@ -346,7 +353,7 @@ it("returns ranked stored candidates with images only while their evidence is cu
     }),
   ).toEqual([product]);
   const data = batteryFixture();
-  data.lines[0].name = "Another product";
+  present(data.lines[0]).name = "Another product";
   await t.run((ctx) => ctx.db.patch("receipts", id, { data }));
   expect(
     await user.query(api.productLinking.candidates, {

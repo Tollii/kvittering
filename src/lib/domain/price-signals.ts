@@ -1,4 +1,5 @@
 import { Ore } from "./ore";
+import { median } from "./statistics";
 import { productIdentityKey, productReference } from "./product-reference";
 import { receiptMonth, type Receipt } from "./insights";
 import { type ReceiptLine } from "./receipt";
@@ -38,15 +39,6 @@ function identity(line: ReceiptLine) {
     return null;
 
   return productIdentityKey(line);
-}
-
-function median(values: number[]) {
-  const sorted = [...values].sort((a, b) => a - b);
-  const middle = Math.floor(sorted.length / 2);
-
-  return sorted.length % 2
-    ? sorted[middle]
-    : Math.round((sorted[middle - 1] + sorted[middle]) / 2);
 }
 
 type Observation = {
@@ -126,7 +118,7 @@ function comparePrices(
     if (others.length < priceSignalMinimumObservations) continue;
     const typicalUnitPrice = median(others.map((item) => item.unitPrice));
 
-    if (typicalUnitPrice <= 0) continue;
+    if (typicalUnitPrice === undefined || typicalUnitPrice <= 0) continue;
     const ratio = unitPrice / typicalUnitPrice;
 
     if (Math.abs(ratio - 1) < priceSignalThreshold) continue;

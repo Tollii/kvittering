@@ -1,3 +1,4 @@
+import { present } from "./testing/receipts";
 import { expect, it } from "vitest";
 import { defaultStackParser, exceptionFromError } from "@sentry/browser";
 import { diagnosticText, prepareErrorEvent } from "./sentry-event";
@@ -12,7 +13,9 @@ it("retains Hermes named and anonymous frames through the SDK parser", () => {
     exception: { values: [exceptionFromError(defaultStackParser, error)] },
   });
 
-  expect(event.exception?.values?.[0].stacktrace?.frames).toHaveLength(2);
+  expect(present(event.exception?.values?.[0]).stacktrace?.frames).toHaveLength(
+    2,
+  );
   expect(event.contexts?.diagnostics?.stack_source).toBe("original");
 });
 
@@ -31,7 +34,9 @@ it("uses a labelled capture stack when a native rejection has no JavaScript fram
     frames,
   );
 
-  expect(event.exception?.values?.[0].stacktrace?.frames).toEqual(frames);
+  expect(present(event.exception?.values?.[0]).stacktrace?.frames).toEqual(
+    frames,
+  );
   expect(event.contexts?.diagnostics?.stack_source).toBe("capture");
 });
 
@@ -58,10 +63,13 @@ it("retains native causes and original frames instead of replacing them with the
   );
 
   expect(event.exception?.values).toHaveLength(2);
-  expect(event.exception?.values?.[0].stacktrace?.frames?.[0].filename).toBe(
-    "update.ts",
+  expect(
+    present(present(event.exception?.values?.[0]).stacktrace?.frames?.[0])
+      .filename,
+  ).toBe("update.ts");
+  expect(present(event.exception?.values?.[1]).value).toBe(
+    "Connection refused",
   );
-  expect(event.exception?.values?.[1].value).toBe("Connection refused");
 });
 
 it("removes credentials and payload dumps while keeping the failure explanation", () => {
@@ -100,7 +108,7 @@ it("keeps HTTP status and app milestones without request bodies or UI labels", (
   });
 
   expect(event.breadcrumbs).toHaveLength(2);
-  expect(event.breadcrumbs?.[0].data).toEqual({
+  expect(present(event.breadcrumbs?.[0]).data).toEqual({
     method: "POST",
     url: "https://example.com/api/query",
     status_code: 503,

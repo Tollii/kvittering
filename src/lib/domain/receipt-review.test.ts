@@ -1,3 +1,4 @@
+import { present } from "../testing/receipts";
 import { Ore } from "./ore";
 import { expect, it } from "vitest";
 import { batteryFixture, reconcile, weeklyShopFixture } from "./receipt";
@@ -15,8 +16,8 @@ import {
 
 it("accepts balanced receipts without optional package details or product links", () => {
   const data = batteryFixture();
-  expect(data.lines[0].productId).toBeUndefined();
-  expect(data.lines[0].packageSize).toBeNull();
+  expect(present(data.lines[0]).productId).toBeUndefined();
+  expect(present(data.lines[0]).packageSize).toBeNull();
   expect(canAcceptReceipt(data, false)).toBe(true);
   expect(canAcceptReceipt(data, true)).toBe(false);
 });
@@ -33,13 +34,13 @@ it("requires review for amounts, identity, overlap and missing receipt informati
       data.store = null;
     },
     (data: ReturnType<typeof batteryFixture>) => {
-      data.lines[0].name = "";
+      present(data.lines[0]).name = "";
     },
     (data: ReturnType<typeof batteryFixture>) => {
-      data.lines[0].amountOre = null;
+      present(data.lines[0]).amountOre = null;
     },
     (data: ReturnType<typeof batteryFixture>) => {
-      data.lines[0].issues = ["Mulig overlapp."];
+      present(data.lines[0]).issues = ["Mulig overlapp."];
     },
     (data: ReturnType<typeof batteryFixture>) => {
       data.issues = ["Kvitteringen er ufullstendig."];
@@ -52,13 +53,13 @@ it("requires review for amounts, identity, overlap and missing receipt informati
 });
 
 it("keeps a missing amount visible after a general warning is acknowledged", () => {
-  const line = batteryFixture().lines[0];
+  const line = present(batteryFixture().lines[0]);
   line.amountOre = null;
   expect(lineReviewIssues(line)).toEqual([{ code: "amount_missing" }]);
 });
 
 it("resolves category uncertainty without dismissing other review requirements", () => {
-  const line = batteryFixture().lines[0];
+  const line = present(batteryFixture().lines[0]);
   line.issues = ["Kategorien er usikker.", "Mulig overlapp."];
   line.amountOre = null;
   const corrected = confirmLineCategory(line, "drinks.soft-drinks");
@@ -86,8 +87,8 @@ it("groups review work into receipt facts and line fixes", () => {
   const data = batteryFixture();
   data.store = null;
   data.totalOre = null;
-  data.lines[0].issues = ["Kategorien er usikker."];
-  data.lines[1].amountOre = null;
+  present(data.lines[0]).issues = ["Kategorien er usikker."];
+  present(data.lines[1]).amountOre = null;
   const tasks = reviewTasks(data, true);
   expect(tasks.map((task) => task.kind)).toEqual([
     "duplicate",
@@ -105,11 +106,11 @@ it("groups review work into receipt facts and line fixes", () => {
 
 it("hides the total difference while amounts are still missing", () => {
   const data = batteryFixture();
-  data.lines[1].amountOre = null;
+  present(data.lines[1]).amountOre = null;
   expect(reviewTasks(data, false).map((task) => task.kind)).toEqual([
     "amounts",
   ]);
-  data.lines[1].amountOre = Ore.of(-100);
+  present(data.lines[1]).amountOre = Ore.of(-100);
   expect(reviewTasks(data, false)).toEqual([
     { kind: "difference", amountOre: Ore.of(159) },
   ]);
@@ -133,27 +134,29 @@ it("balances a receipt with an explicit adjustment line", () => {
 
 it("confirms suggested categories in bulk without touching unclear or other issues", () => {
   const data = batteryFixture();
-  data.lines[0].issues = ["Kategorien er usikker."];
+  present(data.lines[0]).issues = ["Kategorien er usikker."];
   data.lines.push({
-    ...data.lines[0],
+    ...present(data.lines[0]),
     id: "unclear",
     categoryId: "fallback.unclear",
     issues: ["Kategorien er usikker."],
   });
   data.lines.push({
-    ...data.lines[0],
+    ...present(data.lines[0]),
     id: "overlap",
     issues: ["Kategorien er usikker.", "Mulig overlapp."],
   });
-  expect(canConfirmSuggestedCategory(data.lines[0])).toBe(true);
-  expect(canConfirmSuggestedCategory(data.lines[3])).toBe(false);
+  expect(canConfirmSuggestedCategory(present(data.lines[0]))).toBe(true);
+  expect(canConfirmSuggestedCategory(present(data.lines[3]))).toBe(false);
   const confirmed = confirmSuggestedCategories(data);
-  expect(confirmed.lines[0].issues).toEqual([]);
-  expect(confirmed.lines[0].confidence).toBe(1);
-  expect(confirmed.lines[0].manual).toBe(true);
-  expect(confirmed.lines[3].issues).toEqual(["Kategorien er usikker."]);
-  expect(confirmed.lines[4].issues).toEqual(["Mulig overlapp."]);
-  expect(data.lines[0].issues).toEqual(["Kategorien er usikker."]);
+  expect(present(confirmed.lines[0]).issues).toEqual([]);
+  expect(present(confirmed.lines[0]).confidence).toBe(1);
+  expect(present(confirmed.lines[0]).manual).toBe(true);
+  expect(present(confirmed.lines[3]).issues).toEqual([
+    "Kategorien er usikker.",
+  ]);
+  expect(present(confirmed.lines[4]).issues).toEqual(["Mulig overlapp."]);
+  expect(present(data.lines[0]).issues).toEqual(["Kategorien er usikker."]);
   expect(reviewTasks(confirmed, false).map((task) => task.kind)).toEqual([
     "difference",
     "line-issues",
@@ -162,9 +165,9 @@ it("confirms suggested categories in bulk without touching unclear or other issu
 
 it("approves receipt facts without confirming uncertain or unknown categories", () => {
   const data = batteryFixture();
-  data.lines[0].issues = ["Kategorien er usikker."];
-  data.lines[0].confidence = 0.3;
-  data.lines[0].manual = false;
+  present(data.lines[0]).issues = ["Kategorien er usikker."];
+  present(data.lines[0]).confidence = 0.3;
+  present(data.lines[0]).manual = false;
   const approved = quickApproveData(data, false);
   expect(approved).toEqual(data);
   expect(approved?.lines[0]).toMatchObject({
@@ -173,12 +176,12 @@ it("approves receipt facts without confirming uncertain or unknown categories", 
     manual: false,
   });
   expect(quickApproveData(data, true)).toBeNull();
-  data.lines[1].amountOre = null;
+  present(data.lines[1]).amountOre = null;
   expect(quickApproveData(data, false)).toBeNull();
   expect(quickApproveData(null, false)).toBeNull();
   const unclear = batteryFixture();
-  unclear.lines[0].categoryId = "fallback.unclear";
-  unclear.lines[0].issues = ["Kategorien er usikker."];
+  present(unclear.lines[0]).categoryId = "fallback.unclear";
+  present(unclear.lines[0]).issues = ["Kategorien er usikker."];
   expect(quickApproveData(unclear, false)).toEqual(unclear);
 });
 
@@ -212,7 +215,10 @@ it("uses stable codes and preserves reader text independently of category confir
   const { parseReceipt } = await import("./receipt");
   const { assessReceipt } = await import("./receipt-review");
   const data = batteryFixture();
-  data.lines[0].issues = [categoryUncertainIssue, "Reader wording changed"];
+  present(data.lines[0]).issues = [
+    categoryUncertainIssue,
+    "Reader wording changed",
+  ];
   const before = structuredClone(data);
   const parsed = parseReceipt(data);
   expect(parsed.kind).toBe("parsed");
@@ -223,7 +229,7 @@ it("uses stable codes and preserves reader text independently of category confir
     tasks: [{ kind: "line-issues" }],
   });
   expect(
-    confirmLineCategory(data.lines[0], "drinks.soft-drinks").issues,
+    confirmLineCategory(present(data.lines[0]), "drinks.soft-drinks").issues,
   ).toEqual(["Reader wording changed"]);
   expect(data).toEqual(before);
 });
@@ -231,7 +237,7 @@ it("uses stable codes and preserves reader text independently of category confir
 it("parses structural invariants separately from approval", async () => {
   const { parseReceipt } = await import("./receipt");
   const incomplete = batteryFixture();
-  incomplete.lines[0].amountOre = null;
+  present(incomplete.lines[0]).amountOre = null;
   expect(parseReceipt(incomplete).kind).toBe("parsed");
   expect(canAcceptReceipt(incomplete, false)).toBe(false);
   expect(parseReceipt({ ...incomplete, totalOre: 0.5 }).kind).toBe("rejected");

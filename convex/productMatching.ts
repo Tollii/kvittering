@@ -41,31 +41,27 @@ export const match = internalAction({
       const batch = lines.slice(offset, offset + 12);
 
       const prepared = await Promise.all(
-        batch.map((line) =>
-          ctx.runQuery(internal.products.prepare, {
+        batch.map(async (line, index) => ({
+          line,
+          position: offset + index,
+          ...(await ctx.runQuery(internal.products.prepare, {
             id: args.id,
             retailer: args.data.store!,
             line,
-          }),
-        ),
+          })),
+        })),
       );
 
-      const unresolved = batch
-        .map((line, index) => ({
-          line,
-          index,
-          candidates: prepared[index].candidates,
-        }))
-        .filter(({ index }) => {
-          if (!prepared[index].saved) return true;
-          decisions[offset + index] = {
-            lineId: batch[index].id,
-            kind: prepared[index].productId ? "match" : "uncertain",
-            productId: prepared[index].productId,
-          };
+      const unresolved = prepared.filter((item) => {
+        if (!item.saved) return true;
+        decisions[item.position] = {
+          lineId: item.line.id,
+          kind: item.productId ? "match" : "uncertain",
+          productId: item.productId,
+        };
 
-          return false;
-        });
+        return false;
+      });
 
       if (!unresolved.length || !available || Date.now() >= deadline) continue;
 
@@ -116,13 +112,17 @@ export const match = internalAction({
           );
 
           if (candidate)
-            decisions[offset + item.index] = {
+            decisions[item.position] = {
               lineId: item.line.id,
               kind: "match",
               productId: candidate._id,
             };
           else if (answer.choice === "new_product")
-            decisions[offset + item.index].kind = "new";
+            decisions[item.position] = {
+              lineId: item.line.id,
+              kind: "new",
+              productId: null,
+            };
         });
       } catch {
         // Keep exact mappings available, but stop model calls after a provider failure.

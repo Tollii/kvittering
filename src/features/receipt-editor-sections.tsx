@@ -125,7 +125,7 @@ export function ReviewTaskChips({
                     { text: "Avbryt", style: "cancel" },
                     {
                       text: "Dette stemmer",
-                      onPress: () => data && onChange({ ...data, issues: [] }),
+                      onPress: () => onChange({ ...data, issues: [] }),
                     },
                   ]
                 : [{ text: "OK" }],

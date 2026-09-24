@@ -15,7 +15,7 @@ export default function ReceiptPage() {
 
 function ReceiptDetail({ id }: Readonly<{ id: string }>) {
   const { online } = useHousehold();
-  const detail = useQuery(api.receipts.detail, { id: id ?? "" });
+  const detail = useQuery(api.receipts.detail, { id });
 
   const [deletion, setDeletion] = useState<"idle" | "deleting" | "deleted">(
     "idle",

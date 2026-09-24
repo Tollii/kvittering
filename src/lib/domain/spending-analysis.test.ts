@@ -1,6 +1,6 @@
+import { present, testId } from "../testing/receipts";
 import { Ore } from "./ore";
 import { spendingExplanations } from "./spending-explanations";
-import { testId } from "../testing/receipts";
 import { expect, it } from "vitest";
 import { batteryFixture, emptyLine } from "./receipt";
 import type { Receipt } from "./insights";
@@ -57,7 +57,7 @@ function receipt(date: string, ore: number, ml: number | null): Receipt {
       results: [
         {
           lineId: "cola",
-          evidenceKey: purchaseEvidenceKey(data.lines[0]),
+          evidenceKey: purchaseEvidenceKey(present(data.lines[0])),
           family: { id: testId<"productFamilies">("cola"), name: "Cola" },
           quantity: { packages: 1, units: null, grams: null, millilitres: ml },
           attributes,
@@ -83,7 +83,7 @@ it("separates quantity and unit-price effects and conserves every øre", () => {
     unexplainedOre: Ore.of(0),
   });
   const changed = receipt("2026-09-12", 333, null);
-  changed.productAnalysis!.results[0].family = null;
+  present(changed.productAnalysis!.results[0]).family = null;
 
   const expanded = spendingAnalysis(
     [
@@ -174,12 +174,12 @@ it("compares counts only when the package identity is the same", () => {
   const after = receipt("2026-09-10", 1500, null);
 
   for (const item of [before, after])
-    item.productAnalysis!.results[0].quantity.units = 1;
+    present(item.productAnalysis!.results[0]).quantity.units = 1;
   expect(spendingAnalysis([before, after], period).priceOre).toBe(500);
-  after.data!.lines[0].packageSize = 500;
-  after.data!.lines[0].packageUnit = "ml";
-  after.productAnalysis!.results[0].evidenceKey = purchaseEvidenceKey(
-    after.data!.lines[0],
+  present(after.data!.lines[0]).packageSize = 500;
+  present(after.data!.lines[0]).packageUnit = "ml";
+  present(after.productAnalysis!.results[0]).evidenceKey = purchaseEvidenceKey(
+    present(after.data!.lines[0]),
   );
   const report = spendingAnalysis([before, after], period);
   expect(report.effects).toEqual([]);
@@ -190,7 +190,7 @@ it("groups product attributes across families and keeps weak or stale evidence u
   const a = receipt("2026-09-01", 1000, 1000),
     b = receipt("2026-09-02", 2000, 2000);
 
-  b.productAnalysis!.results[0].family!.id =
+  present(b.productAnalysis!.results[0]).family!.id =
     testId<"productFamilies">("other-brand");
   const report = attributeInsights([a, b], "type");
   expect(report).toMatchObject({ known: 2, total: 2 });
@@ -199,9 +199,9 @@ it("groups product attributes across families and keeps weak or stale evidence u
     amountOre: Ore.of(3000),
     quantity: { millilitres: 3000 },
   });
-  expect(attributeInsights([{ ...a, revision: 1 }], "type").groups[0].id).toBe(
-    "unknown",
-  );
+  expect(
+    present(attributeInsights([{ ...a, revision: 1 }], "type").groups[0]).id,
+  ).toBe("unknown");
   expect(
     readAttributes(
       {
@@ -220,11 +220,11 @@ it("explains offsetting price and quantity changes even when total spending is u
   const explanations = spendingExplanations(report);
   expect(report.differenceOre).toBe(0);
   expect(explanations).toHaveLength(2);
-  expect(explanations[0].detail).toContain("lavere");
-  expect(explanations[1].detail).toContain("større");
-  expect(explanations[0].contributions.map((item) => item.receipt._id)).toEqual(
-    [after._id, before._id],
-  );
+  expect(present(explanations[0]).detail).toContain("lavere");
+  expect(present(explanations[1]).detail).toContain("større");
+  expect(
+    present(explanations[0]).contributions.map((item) => item.receipt._id),
+  ).toEqual([after._id, before._id]);
   expect(explanations[0]).toMatchObject({
     name: "Cola · begge perioder",
     amountOre: Ore.of(4000),
@@ -234,7 +234,7 @@ it("explains offsetting price and quantity changes even when total spending is u
 it("identifies current-only families without calling unlinked purchases new", () => {
   const before = receipt("2026-08-10", 1000, 1000);
   const after = receipt("2026-09-10", 2500, null);
-  after.productAnalysis!.results[0].family = {
+  present(after.productAnalysis!.results[0]).family = {
     id: testId<"productFamilies">("coffee"),
     name: "Kaffe",
   };

@@ -66,12 +66,12 @@ export function createQueueRunner(
 
           const receiptId = entry.receiptId;
 
-          const uploadImage = async (position: number) => {
+          const uploadImage = async (image: string, position: number) => {
             if (!active()) return;
 
             if (entry.uploaded[position]) return;
             const started = Date.now();
-            await transport.upload(receiptId, position, entry.images[position]);
+            await transport.upload(receiptId, position, image);
             entry.uploaded[position] = true;
             store.update(entry);
             record("receipt.image_uploaded", {
@@ -82,7 +82,7 @@ export function createQueueRunner(
           };
 
           const results = await Promise.allSettled(
-            entry.images.map((_, position) => uploadImage(position)),
+            entry.images.map((image, position) => uploadImage(image, position)),
           );
 
           const failed = results.find((result) => result.status === "rejected");

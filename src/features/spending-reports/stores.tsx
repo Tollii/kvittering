@@ -1,3 +1,4 @@
+import { nonEmpty } from "@/lib/domain/collections";
 import { Ore } from "@/lib/domain/ore";
 import { useState } from "react";
 import { Platform, View } from "react-native";
@@ -57,6 +58,8 @@ function StoreReport({
         ]
       : [],
   );
+
+  const mapPoints = nonEmpty(points);
 
   const unlocated = report.stores.filter((store) => !store.location);
 
@@ -151,8 +154,8 @@ function StoreReport({
       </Copy>
       {dimension === "stores" && (
         <>
-          {points.length > 0 && (
-            <StoreMap stores={points} onSelect={setSelectedId} />
+          {!!mapPoints && (
+            <StoreMap stores={mapPoints} onSelect={setSelectedId} />
           )}
           {unlocatedCount > 0 && (
             <Notice icon="mappin.slash">

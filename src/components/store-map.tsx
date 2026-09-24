@@ -1,3 +1,4 @@
+import type { NonEmpty } from "@/lib/domain/collections";
 import { Ore } from "@/lib/domain/ore";
 import type { StoreLocation } from "@/lib/domain/store-spending";
 
@@ -9,7 +10,7 @@ export type StoreMapPoint = {
 };
 
 export type StoreMapProps = {
-  stores: StoreMapPoint[];
+  stores: NonEmpty<StoreMapPoint>;
   onSelect: (id: string) => void;
 };
 

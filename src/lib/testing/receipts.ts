@@ -30,3 +30,10 @@ export function receiptFixture(
     _id: testId<"receipts">(overrides._id ?? "receipt"),
   };
 }
+
+/** The element a test depends on; fails the test when it is absent. */
+export function present<T>(value: T | undefined, what = "value"): T {
+  if (value === undefined) throw new Error(`Expected ${what} to be present.`);
+
+  return value;
+}

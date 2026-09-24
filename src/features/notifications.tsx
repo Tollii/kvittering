@@ -153,7 +153,9 @@ export function NotificationRouting() {
   const [error, setError] = useState("");
   const [confirmation, setConfirmation] = useState("");
   useEffect(() => {
-    let active = true;
+    // Aborted when the effect is cleaned up; pending work then stops.
+    const effect = new AbortController();
+    const stopped = () => effect.signal.aborted;
     const handled = new Set<string>();
     void Notifications.setNotificationCategoryAsync(receiptReviewCategory, [
       {
@@ -205,7 +207,7 @@ export function NotificationRouting() {
 
         if (!result) throw new Error("Receipt unavailable");
 
-        if (!active) return;
+        if (stopped()) return;
 
         if (result.receipt.householdId !== household.id)
           throw new Error("Receipt unavailable");
@@ -213,7 +215,7 @@ export function NotificationRouting() {
         if (response.actionIdentifier === remindReceiptAction) {
           const token = await SecureStore.getItemAsync(tokenKey);
 
-          if (!active) return;
+          if (stopped()) return;
 
           if (!token) throw new Error("Notifications disabled");
           const evening = nextReviewEvening(new Date());
@@ -223,7 +225,7 @@ export function NotificationRouting() {
             at: evening.getTime(),
           });
 
-          if (active)
+          if (!stopped())
             setConfirmation(
               `Påminnelse satt til ${evening.toLocaleString("nb-NO", { day: "numeric", month: "long", hour: "2-digit", minute: "2-digit" })}.`,
             );
@@ -233,7 +235,7 @@ export function NotificationRouting() {
       } catch (cause) {
         reportError(cause, "notifications.response");
 
-        if (active)
+        if (!stopped())
           setError(
             response.actionIdentifier === remindReceiptAction
               ? "Kunne ikke sette påminnelsen. Kontroller nettet og at varsler er på og kvitteringen fortsatt trenger kontroll."
@@ -255,7 +257,7 @@ export function NotificationRouting() {
     );
 
     return () => {
-      active = false;
+      effect.abort();
       subscription.remove();
     };
   }, [client, household.id]);

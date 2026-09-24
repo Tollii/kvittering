@@ -1,5 +1,5 @@
+import { present, receiptFixture, testId } from "../testing/receipts";
 import { Ore } from "./ore";
-import { receiptFixture, testId } from "../testing/receipts";
 import { expect, it } from "vitest";
 import { batteryFixture, emptyLine } from "./receipt";
 import {
@@ -41,7 +41,7 @@ it("compares the same part of the current month and excludes later purchases", (
 
   expect(result.current.products).toBe(1000);
   expect(result.previous.products).toBe(500);
-  expect(result.changes[0].difference).toBe(500);
+  expect(present(result.changes[0]).difference).toBe(500);
 });
 
 it("handles year boundaries, leap days and completed months", () => {

@@ -1,4 +1,4 @@
-import { testId } from "./testing/receipts";
+import { present, testId } from "./testing/receipts";
 import { expect, it, vi } from "vitest";
 import {
   receiptStorage,
@@ -84,7 +84,7 @@ it("publishes immutable scoped snapshots only after committed writes", () => {
   expect(snapshot).toHaveLength(1);
   expect(notified).toHaveReturnedWith(snapshot);
   expect(receiptStorage.list("owner", household)).toBe(snapshot);
-  expect(Object.isFrozen(snapshot[0].uploaded)).toBe(true);
+  expect(Object.isFrozen(present(snapshot[0]).uploaded)).toBe(true);
   expect(receiptStorage.list("another", household)).toEqual([]);
   unsubscribe();
 });

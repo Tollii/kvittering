@@ -1,5 +1,5 @@
+import { present, receiptFixture, testId } from "../testing/receipts";
 import { Ore } from "./ore";
-import { receiptFixture, testId } from "../testing/receipts";
 import { expect, it } from "vitest";
 import { storeSpending, type StorePurchase } from "./store-spending";
 import { monthlyInsights, type Receipt } from "./insights";
@@ -59,13 +59,12 @@ it("groups stable branch IDs, keeps branches separate, and includes unlocated pu
     ["unlocated:KIWI", 500],
     ["unlocated:unknown", 100],
   ]);
-  expect(result.stores[0].name).toBe("Kiwi Storgata");
-  expect(result.stores[0].purchases.map((item) => item.receiptId)).toEqual([
-    "b",
-    "a",
-  ]);
-  expect(result.chains[0].amountOre).toBe(3500);
-  expect(result.chains[0].purchases).toHaveLength(4);
+  expect(present(result.stores[0]).name).toBe("Kiwi Storgata");
+  expect(
+    present(result.stores[0]).purchases.map((item) => item.receiptId),
+  ).toEqual(["b", "a"]);
+  expect(present(result.chains[0]).amountOre).toBe(3500);
+  expect(present(result.chains[0]).purchases).toHaveLength(4);
   expect(input).toEqual(before);
 });
 
@@ -93,7 +92,7 @@ it("preserves known coordinates while refusing invalid or incomplete positions",
   expect(
     result.stores.find((store) => store.id === "branch:40")?.location,
   ).toEqual({ latitude: 0, longitude: 0 });
-  expect(result.chains[0].amountOre).toBe(5000);
+  expect(present(result.chains[0]).amountOre).toBe(5000);
 });
 
 it("retains refunds, unknown amounts and review state without inventing spending", () => {
@@ -110,8 +109,10 @@ it("retains refunds, unknown amounts and review state without inventing spending
     amountOre: Ore.of(-1200),
     unknownAmounts: 2,
   });
-  expect(result.stores[0].purchases[1].provisional).toBe(true);
-  expect(result.chains[0].amountOre).toBe(-1200);
+  expect(present(present(result.stores[0]).purchases[1]).provisional).toBe(
+    true,
+  );
+  expect(present(result.chains[0]).amountOre).toBe(-1200);
   expect(storeSpending([])).toEqual({ stores: [], chains: [] });
 });
 
@@ -180,5 +181,5 @@ it("agrees with Forbruk accounting, period, currency, exclusion and review filte
   );
 
   expect(reviewed.stores).toHaveLength(1);
-  expect(reviewed.stores[0].amountOre).toBe(2331);
+  expect(present(reviewed.stores[0]).amountOre).toBe(2331);
 });

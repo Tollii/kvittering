@@ -291,8 +291,10 @@ export default function History() {
                 contributions: [observation.contribution],
               }))}
               onSelect={(row) => {
+                const [contribution] = row.contributions;
                 setSelectedKey(null);
-                openReceipt(row.contributions[0].receipt);
+
+                if (contribution) openReceipt(contribution.receipt);
               }}
             />
             {prices.omitted > 0 && (

@@ -1,5 +1,5 @@
+import { present, receiptFixture } from "../testing/receipts";
 import { Ore } from "./ore";
-import { receiptFixture } from "../testing/receipts";
 import { describe, it, expect } from "vitest";
 import {
   batteryFixture,
@@ -43,7 +43,7 @@ describe("receipt accounting", () => {
     ];
     receipt.totalOre = Ore.of(1222);
     expect(reconcile(receipt).issues).toEqual([]);
-    receipt.lines[0].amountOre = Ore.of(1400);
+    present(receipt.lines[0]).amountOre = Ore.of(1400);
     expect(reconcile(receipt).issues.join(" ")).toContain("Avvik mot betalt");
   });
   it("flags an unreadable total instead of replacing it with a sum", () => {
@@ -83,33 +83,35 @@ describe("receipt accounting", () => {
   });
   it("does not match aliases by abbreviated names or across stores", () => {
     const receipt = batteryFixture();
-    const key = aliasKey(receipt, receipt.lines[0]);
+    const key = aliasKey(receipt, present(receipt.lines[0]));
     receipt.store = "Other";
-    expect(aliasKey(receipt, receipt.lines[0])).not.toBe(key);
+    expect(aliasKey(receipt, present(receipt.lines[0]))).not.toBe(key);
     receipt.store = "Eksempelbutikk";
-    receipt.lines[0].name = "BATTERY";
-    expect(aliasKey(receipt, receipt.lines[0])).not.toBe(key);
+    present(receipt.lines[0]).name = "BATTERY";
+    expect(aliasKey(receipt, present(receipt.lines[0]))).not.toBe(key);
   });
   it("rejects fractional øre and duplicate line IDs", () => {
     const receipt = batteryFixture();
     // SAFETY: A fractional amount is built deliberately to test the receipt boundary.
-    receipt.lines[0].amountOre = 1.1 as Ore;
+    present(receipt.lines[0]).amountOre = 1.1 as Ore;
     expect(() => validateReceipt(receipt)).toThrow(/hele øre|ulike ID-er/);
-    receipt.lines[0].amountOre = Ore.of(2590);
-    receipt.lines.push(receipt.lines[0]);
+    present(receipt.lines[0]).amountOre = Ore.of(2590);
+    receipt.lines.push(present(receipt.lines[0]));
     expect(() => validateReceipt(receipt)).toThrow(/hele øre|ulike ID-er/);
   });
   it("accepts the retired energy-drink category without changing the source receipt", () => {
     const receipt = batteryFixture();
-    receipt.lines[0].categoryId = "drinks.energy-drinks";
+    present(receipt.lines[0]).categoryId = "drinks.energy-drinks";
     const parsed = parseReceipt(receipt);
     expect(parsed.kind).toBe("parsed");
 
     if (parsed.kind !== "parsed") throw new Error(parsed.issue.message);
-    expect(parsed.receipt.lines[0].categoryId).toBe("drinks.soft-drinks");
+    expect(present(parsed.receipt.lines[0]).categoryId).toBe(
+      "drinks.soft-drinks",
+    );
     expect(parsed.receipt.totalOre).toBe(receipt.totalOre);
-    expect(receipt.lines[0].categoryId).toBe("drinks.energy-drinks");
-    receipt.lines[0].categoryId = "unknown.category";
+    expect(present(receipt.lines[0]).categoryId).toBe("drinks.energy-drinks");
+    present(receipt.lines[0]).categoryId = "unknown.category";
     expect(parseReceipt(receipt).kind).toBe("rejected");
   });
   it("keeps undated receipts visible and excluded receipts out of spending", () => {
@@ -142,16 +144,18 @@ describe("receipt accounting", () => {
 
 it("uses linked product evidence without sending prices or payment details to Jev", () => {
   const data = batteryFixture();
-  data.lines[1].name = "10% Battery energidrikk";
+  present(data.lines[1]).name = "10% Battery energidrikk";
   const input = classificationInputs(data);
-  expect(JSON.stringify(input[0].evidence)).toContain("Battery energidrikk");
-  expect(JSON.stringify(input[0].evidence)).not.toContain("2590");
-  expect(JSON.stringify(input[0].evidence)).not.toContain("25,90");
+  expect(JSON.stringify(present(input[0]).evidence)).toContain(
+    "Battery energidrikk",
+  );
+  expect(JSON.stringify(present(input[0]).evidence)).not.toContain("2590");
+  expect(JSON.stringify(present(input[0]).evidence)).not.toContain("25,90");
 });
 
 it("flags repeated discount lines instead of subtracting them silently", () => {
   const data = batteryFixture();
-  data.lines.push({ ...data.lines[1], id: "repeated" });
+  data.lines.push({ ...present(data.lines[1]), id: "repeated" });
   expect(reconcile(data).issues).toContain(
     "Like rabattlinjer må kontrolleres.",
   );
@@ -173,11 +177,11 @@ it("keeps unknown and foreign currencies out of NOK totals", () => {
 
 it("provides structured category evidence without unknown package fields or accounting data", async () => {
   const data = batteryFixture();
-  data.lines[0].name = "MONSTER PIPELINE PUNCH";
-  data.lines[0].brand = null;
-  data.lines[0].packageSize = null;
-  data.lines[0].packageUnit = null;
-  const state = classificationInputs(data)[0].evidence;
+  present(data.lines[0]).name = "MONSTER PIPELINE PUNCH";
+  present(data.lines[0]).brand = null;
+  present(data.lines[0]).packageSize = null;
+  present(data.lines[0]).packageUnit = null;
+  const state = present(classificationInputs(data)[0]).evidence;
   expect(state.name).toBe("MONSTER PIPELINE PUNCH");
   expect(state).not.toHaveProperty("packageSize");
   expect(state).not.toHaveProperty("brand");

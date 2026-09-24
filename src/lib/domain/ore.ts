@@ -1,4 +1,5 @@
 import { v, type VFloat64 } from "convex/values";
+import { median } from "./statistics";
 
 declare const oreBrand: unique symbol;
 
@@ -102,14 +103,9 @@ export const Ore = {
 
   /** The middle amount, averaging the two middle ones; null when empty. */
   median(amounts: Iterable<Ore>): Ore | null {
-    const sorted = [...amounts].sort((a, b) => a - b);
-    const middle = Math.floor(sorted.length / 2);
+    const middle = median([...amounts]);
 
-    if (!sorted.length) return null;
-
-    return sorted.length % 2
-      ? sorted[middle]
-      : of(Math.round((sorted[middle - 1] + sorted[middle]) / 2));
+    return middle === undefined ? null : of(Math.round(middle));
   },
 
   /** Multiplies by a factor, such as a quantity or share, rounding to whole øre. */

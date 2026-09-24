@@ -3,6 +3,7 @@ import {
   analysisPeriod,
   analysisSummary,
   spendingAnalysis,
+  earlierDate,
 } from "./spending-analysis";
 import { monthlyInsights, type Receipt } from "./insights";
 import { osloDate } from "./receipt";
@@ -138,10 +139,11 @@ export function digestPeriod(today: string) {
   const week = analysisPeriod(today, "week", today);
   const month = today.slice(0, 7);
 
+  const monthStart = `${month}-01`;
+
   return {
-    start: [week.previousStart, `${month}-01`].sort((left, right) =>
-      left.localeCompare(right, "en"),
-    )[0],
+    // ISO dates order lexically; the digest covers whichever period began first.
+    start: earlierDate(week.previousStart, monthStart),
     end: `${month}-${daysInMonth(month)}`,
   };
 }

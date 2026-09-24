@@ -20,6 +20,19 @@ import { ensureRequest } from "./catalogQueue";
 import type { Doc } from "./_generated/dataModel";
 import { retailerCode } from "../src/lib/catalog/matching";
 
+/** The provider id to fetch details or prices by; equivalence groups have none. */
+function providerId(record: Doc<"catalogProducts"> | null): number | null {
+  return record && !record.product.equivalence
+    ? (record.product.ids[0] ?? null)
+    : null;
+}
+
+const missingProduct = {
+  ...emptyCatalogResult(),
+  status: "error" as const,
+  message: "Produktet finnes ikke i den lagrede katalogen.",
+};
+
 /** Equivalent identities have no provider SKU from which to fetch details or prices. */
 function equivalentResponse(
   record: Doc<"catalogProducts"> | null,
@@ -106,19 +119,15 @@ export const prices = mutation({
     const equivalent = equivalentResponse(record, "prices");
 
     if (equivalent) return equivalent;
+    const id = providerId(record);
 
-    if (!record)
-      return {
-        ...emptyCatalogResult(),
-        status: "error" as const,
-        message: "Produktet finnes ikke i den lagrede katalogen.",
-      };
+    if (!record || id === null) return missingProduct;
 
     return requestResponse(
       await ensureRequest(ctx, {
         kind: "prices",
         productKey: record.key,
-        id: record.product.ids[0],
+        id,
         ean: record.product.ean,
       }),
     );
@@ -140,13 +149,9 @@ export const product = mutation({
     const equivalent = equivalentResponse(record, "details");
 
     if (equivalent) return equivalent;
+    const id = providerId(record);
 
-    if (!record)
-      return {
-        ...emptyCatalogResult(),
-        status: "error" as const,
-        message: "Produktet finnes ikke i den lagrede katalogen.",
-      };
+    if (!record || id === null) return missingProduct;
 
     if (
       record.detailsFetchedAt !== undefined &&
@@ -163,7 +168,7 @@ export const product = mutation({
       await ensureRequest(ctx, {
         kind: "details",
         productKey: key,
-        id: record.product.ids[0],
+        id,
       }),
     );
 
@@ -204,12 +209,14 @@ async function lookupContext(ctx: QueryCtx, lookup: CatalogLookup) {
     .withIndex("by_key", (q) => q.eq("key", lookup.productKey))
     .unique();
 
+  const id = providerId(record);
+
   return {
     request:
-      record && !record.product.equivalence
+      record && id !== null
         ? lookup.kind === "prices"
-          ? { ...lookup, id: record.product.ids[0], ean: record.product.ean }
-          : { ...lookup, id: record.product.ids[0] }
+          ? { ...lookup, id, ean: record.product.ean }
+          : { ...lookup, id }
         : null,
     record,
   };

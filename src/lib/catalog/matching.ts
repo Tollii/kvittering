@@ -1,3 +1,4 @@
+import { soleElement } from "../domain/collections";
 import {
   parseProductEvidence,
   normalizeMeasureText,
@@ -196,10 +197,11 @@ export function automaticCatalogProduct(
       .map(({ product }) => product),
   );
 
-  if (contained.length)
-    return contained.length === 1 && !hasUnresolvedCount(contained[0])
-      ? contained[0]
-      : null;
+  if (contained.length) {
+    const only = soleElement(contained);
+
+    return only && !hasUnresolvedCount(only) ? only : null;
+  }
 
   const candidates = unique(
     ranked
@@ -214,10 +216,9 @@ export function automaticCatalogProduct(
       .map(({ product }) => product),
   );
 
-  if (candidates.length !== 1) return null;
-  const candidate = candidates[0];
+  const candidate = soleElement(candidates);
 
-  if (!candidate.ean || !candidate.brand || hasUnresolvedCount(candidate))
+  if (!candidate?.ean || !candidate.brand || hasUnresolvedCount(candidate))
     return null;
   const brandWords = productWords(candidate.brand);
 

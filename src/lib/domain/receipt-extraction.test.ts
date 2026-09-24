@@ -1,3 +1,4 @@
+import { present } from "../testing/receipts";
 import { describe, expect, it } from "vitest";
 import { extractionSchema, prepareExtraction } from "./receipt-extraction";
 import { batteryFixture, reconcile } from "./receipt";
@@ -16,19 +17,24 @@ const fixture = () =>
 describe("receipt image evidence", () => {
   it("counts a row visible in several images once and retains the original text", () => {
     const extracted = fixture();
-    extracted.lines[0].sourceImages = [3, 1, 3];
+    present(extracted.lines[0]).sourceImages = [3, 1, 3];
     extracted.originalText =
       "Image 1: BATTERY REMIX 25,90\nImage 3: BATTERY REMIX 25,90";
     const data = prepareExtraction(extractionSchema.parse(extracted), 3);
-    expect(data.lines[0].sourceImages).toEqual([1, 3]);
+    expect(present(data.lines[0]).sourceImages).toEqual([1, 3]);
     expect(data.originalText).toBe(extracted.originalText);
-    expect(data.lines[0].originalText).toBe(extracted.lines[0].originalText);
+    expect(present(data.lines[0]).originalText).toBe(
+      present(extracted.lines[0]).originalText,
+    );
     expect(reconcile(data).difference).toBe(0);
   });
 
   it("keeps separately printed equal products and their amounts", () => {
     const extracted = fixture();
-    extracted.lines.push({ ...extracted.lines[0], id: "second-battery" });
+    extracted.lines.push({
+      ...present(extracted.lines[0]),
+      id: "second-battery",
+    });
     extracted.totalOre! += 2590;
     const data = prepareExtraction(extractionSchema.parse(extracted), 1);
     expect(data.lines.filter((line) => line.kind === "product")).toHaveLength(
@@ -40,14 +46,14 @@ describe("receipt image evidence", () => {
   it("retains uncertain overlap and flags it without forcing the total to match", () => {
     const extracted = fixture();
     extracted.lines.push({
-      ...extracted.lines[0],
+      ...present(extracted.lines[0]),
       id: "possible-repeat",
       sourceImages: [2],
       overlapUncertain: true,
     });
     const data = prepareExtraction(extractionSchema.parse(extracted), 2);
     expect(data.lines).toHaveLength(4);
-    expect(data.lines[3].issues).toContain(
+    expect(present(data.lines[3]).issues).toContain(
       "Mulig overlapp mellom bildene. Kontroller om varen er telt to ganger.",
     );
     expect(reconcile(data).difference).toBe(2590);
@@ -55,11 +61,11 @@ describe("receipt image evidence", () => {
 
   it("does not trust image references outside the uploaded set", () => {
     const extracted = fixture();
-    extracted.lines[0].sourceImages = [0, 4];
+    present(extracted.lines[0]).sourceImages = [0, 4];
     const data = prepareExtraction(extractionSchema.parse(extracted), 3);
-    expect(data.lines[0].sourceImages).toEqual([]);
-    expect(data.lines[0].issues).toEqual([]);
-    expect(data.lines[0].amountOre).toBe(2590);
+    expect(present(data.lines[0]).sourceImages).toEqual([]);
+    expect(present(data.lines[0]).issues).toEqual([]);
+    expect(present(data.lines[0]).amountOre).toBe(2590);
   });
 });
 
@@ -69,28 +75,28 @@ describe("reading uncertainty", () => {
     extracted.issues = [
       { severity: "minor", message: "Utydelig mellomrom i butikknavnet." },
     ];
-    extracted.lines[0].issues = [
+    present(extracted.lines[0]).issues = [
       {
         severity: "minor",
         message: "En bokstav i variantsuffikset er utydelig.",
       },
     ];
     const data = prepareExtraction(extracted, 1);
-    data.lines[0].categoryId = "drinks.soft-drinks";
+    present(data.lines[0]).categoryId = "drinks.soft-drinks";
     expect(data.issues).toEqual([]);
-    expect(data.lines[0].issues).toEqual([]);
+    expect(present(data.lines[0]).issues).toEqual([]);
     expect(canAcceptReceipt(data, false)).toBe(true);
   });
 
   it("requires review for unreadable identity and ambiguous amounts even when the sum matches", () => {
     const extracted = fixture();
-    extracted.lines[0].issues = [
+    present(extracted.lines[0]).issues = [
       { severity: "minor", message: "Utydelig mellomrom." },
       { severity: "blocking", message: "Kan ikke se hvilken vare dette er." },
       { severity: "blocking", message: "Beløpet kan være 25,90 eller 26,90." },
     ];
     const data = prepareExtraction(extracted, 1);
-    expect(data.lines[0].issues).toEqual([
+    expect(present(data.lines[0]).issues).toEqual([
       "Kan ikke se hvilken vare dette er.",
       "Beløpet kan være 25,90 eller 26,90.",
     ]);

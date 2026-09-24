@@ -102,16 +102,16 @@ function components(value: string) {
   if (parts.some((part) => !Number.isSafeInteger(part)))
     throw new Error("Invalid release number.");
 
-  return [parts[0], parts[1] ?? 0, parts[2] ?? 0];
+  return [parts[0] ?? 0, parts[1] ?? 0, parts[2] ?? 0] as const;
 }
 
 function compareNumber(left: string, right: string) {
-  const a = components(left),
-    b = components(right);
+  const [leftMajor, leftMinor, leftPatch] = components(left);
+  const [rightMajor, rightMinor, rightPatch] = components(right);
 
-  for (let i = 0; i < a.length; i++) if (a[i] !== b[i]) return a[i] - b[i];
-
-  return 0;
+  return (
+    leftMajor - rightMajor || leftMinor - rightMinor || leftPatch - rightPatch
+  );
 }
 
 export function compareRelease(

@@ -14,7 +14,11 @@ import {
   type SpendingSelection,
   type SpendingDimension,
 } from "@/lib/spending-selection";
-import { spendingCalendar, monthBefore } from "@/lib/domain/insights";
+import {
+  spendingCalendar,
+  monthBefore,
+  shiftMonth,
+} from "@/lib/domain/insights";
 import { useCompleteReceipts } from "@/features/receipt-queries";
 import { useState } from "react";
 import { Pressable, View } from "react-native";
@@ -118,6 +122,7 @@ function Spending({ initialMonth }: Readonly<{ initialMonth: string }>) {
   }).format(new Date(`${month}-01T12:00:00Z`));
 
   const coverage = receiptCoverage([...receipts, ...undated.receipts]);
+  const [firstPending] = coverage.pending;
   const catalog = catalogInsights(totals.selected);
 
   const change = comparison.previous.products
@@ -171,10 +176,7 @@ function Spending({ initialMonth }: Readonly<{ initialMonth: string }>) {
     }));
 
   function moveMonth(offset: number) {
-    const [year, value] = month.split("-").map(Number);
-    setMonth(
-      new Date(Date.UTC(year, value - 1 + offset, 1)).toISOString().slice(0, 7),
-    );
+    setMonth(shiftMonth(month, offset));
     setGroup(null);
   }
 
@@ -413,8 +415,9 @@ function Spending({ initialMonth }: Readonly<{ initialMonth: string }>) {
                     : `${coverage.pending.length} kvitteringer venter på kontroll`}
                 </Copy>
                 <Copy size={12} muted numberOfLines={1}>
-                  {receiptNeeds(coverage.pending[0]).slice(0, 2).join(" · ") ||
-                    "Summene er foreløpige."}
+                  {(firstPending ? receiptNeeds(firstPending) : [])
+                    .slice(0, 2)
+                    .join(" · ") || "Summene er foreløpige."}
                 </Copy>
               </View>
               <Icon name="chevron.right" size={12} color={colors.secondary} />
@@ -454,7 +457,7 @@ function Spending({ initialMonth }: Readonly<{ initialMonth: string }>) {
                   Alle kategorier
                 </Copy>
                 <Copy size={14} muted>
-                  · {categoryById.get(rows[0]?.id)?.groupName}
+                  · {categoryById.get(rows[0]?.id ?? "")?.groupName}
                 </Copy>
               </Pressable>
             )}

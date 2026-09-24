@@ -1,3 +1,4 @@
+import { present } from "../src/lib/testing/receipts";
 /// <reference types="vite/client" />
 import { convexTest } from "convex-test";
 import { register } from "@convex-dev/better-auth/test";
@@ -168,7 +169,7 @@ function authentication() {
 function sessionCookie(response: Response) {
   return response.headers
     .getSetCookie()
-    .map((cookie) => cookie.split(";")[0])
+    .map((cookie) => present(cookie.split(";")[0]))
     .join("; ");
 }
 
@@ -425,7 +426,7 @@ it("rejects linking an Apple identity already owned by another account", async (
   );
 
   expect(accounts.page).toHaveLength(1);
-  expect(accounts.page[0].userId).toBe(
+  expect(present(accounts.page[0]).userId).toBe(
     signedIn.parse(await apple.json()).user.id,
   );
 });

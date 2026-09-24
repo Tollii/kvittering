@@ -1,3 +1,4 @@
+import { soleElement } from "@/lib/domain/collections";
 import { Ore } from "@/lib/domain/ore";
 import { useEffect, useRef, useState } from "react";
 import { View } from "react-native";
@@ -28,9 +29,11 @@ export function StoreMap({ stores, onSelect }: Readonly<StoreMapProps>) {
     if (!ready) return;
     const coordinates = storeLocations.parse(JSON.parse(coordinateKey));
 
-    if (coordinates.length === 1) {
+    const only = soleElement(coordinates);
+
+    if (only) {
       map.current?.animateToRegion(
-        { ...coordinates[0], latitudeDelta: 0.02, longitudeDelta: 0.02 },
+        { ...only, latitudeDelta: 0.02, longitudeDelta: 0.02 },
         0,
       );
     } else {

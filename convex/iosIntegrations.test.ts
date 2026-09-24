@@ -1,3 +1,4 @@
+import { present } from "../src/lib/testing/receipts";
 /// <reference types="vite/client" />
 import { convexTest } from "convex-test";
 import { register } from "@convex-dev/workflow/test";
@@ -58,31 +59,34 @@ it("starts server processing only after the last background image and keeps comp
   );
 
   await owner.mutation(internal.receipts.attachImage, {
-    id: ids[0],
+    id: present(ids[0]),
     position: 0,
-    storageId: storageIds[0],
+    storageId: present(storageIds[0]),
   });
   expect(
-    (await owner.query(api.receipts.detail, { id: ids[0] }))?.receipt.status,
+    (await owner.query(api.receipts.detail, { id: present(ids[0]) }))?.receipt
+      .status,
   ).toBe("uploading");
   await owner.mutation(internal.receipts.attachImage, {
-    id: ids[0],
+    id: present(ids[0]),
     position: 1,
-    storageId: storageIds[1],
+    storageId: present(storageIds[1]),
   });
   expect(
-    (await owner.query(api.receipts.detail, { id: ids[0] }))?.receipt,
+    (await owner.query(api.receipts.detail, { id: present(ids[0]) }))?.receipt,
   ).toMatchObject({ status: "uploaded", generation: 1 });
   await owner.mutation(internal.receipts.attachImage, {
-    id: ids[0],
+    id: present(ids[0]),
     position: 1,
-    storageId: storageIds[2],
+    storageId: present(storageIds[2]),
   });
-  await owner.mutation(api.receipts.completeUpload, { id: ids[0] });
+  await owner.mutation(api.receipts.completeUpload, { id: present(ids[0]) });
   expect(
-    (await owner.query(api.receipts.detail, { id: ids[0] }))?.images,
+    (await owner.query(api.receipts.detail, { id: present(ids[0]) }))?.images,
   ).toHaveLength(2);
-  expect(await t.run((ctx) => ctx.storage.get(storageIds[2]))).toBeNull();
+  expect(
+    await t.run((ctx) => ctx.storage.get(present(storageIds[2]))),
+  ).toBeNull();
 });
 
 it("restricts activity registration, progress, and token replacement to the owning account", async () => {
@@ -133,7 +137,7 @@ it("restricts activity registration, progress, and token replacement to the owni
   await expect(
     owner.mutation(api.liveActivities.register, {
       activityId: "duplicate",
-      receiptIds: [ids[0], ids[0]],
+      receiptIds: [present(ids[0]), present(ids[0])],
     }),
   ).rejects.toThrow("Ugyldig");
 });
@@ -141,11 +145,11 @@ it("restricts activity registration, progress, and token replacement to the owni
 it("keeps Spotlight records within the household and removes excluded receipts", async () => {
   const { t, owner, outsider, ids } = await setup();
   await t.run(async (ctx) => {
-    await ctx.db.patch("receipts", ids[0], {
+    await ctx.db.patch("receipts", present(ids[0]), {
       data: batteryFixture(),
       status: "reviewed",
     });
-    await ctx.db.patch("receipts", ids[1], {
+    await ctx.db.patch("receipts", present(ids[1]), {
       data: batteryFixture(),
       status: "reviewed",
       excluded: true,

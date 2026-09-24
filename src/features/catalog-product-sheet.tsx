@@ -240,7 +240,6 @@ export function CatalogProductSheet({
                 .size
             }{" "}
             kvitteringer · etter varerabatt
-            {!completeReceipts ? " · henter flere kjøp" : ""}
           </Copy>
         </Panel>
       )}

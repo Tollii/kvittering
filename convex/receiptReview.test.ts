@@ -1,3 +1,4 @@
+import { present } from "../src/lib/testing/receipts";
 import { Ore } from "../src/lib/domain/ore";
 import {
   decideReceiptChange,
@@ -54,12 +55,12 @@ it("keeps unresolved extraction issues, mismatches, duplicates and mock results 
     const data = batteryFixture();
 
     if (scenario === "issue")
-      data.lines[0].issues.push("Varenavnet er usikkert.");
+      present(data.lines[0]).issues.push("Varenavnet er usikkert.");
 
     if (scenario === "category") {
-      data.lines[0].issues = ["Kategorien er usikker."];
-      data.lines[0].confidence = 0.3;
-      data.lines[0].manual = false;
+      present(data.lines[0]).issues = ["Kategorien er usikker."];
+      present(data.lines[0]).confidence = 0.3;
+      present(data.lines[0]).manual = false;
     }
 
     if (scenario === "mismatch")
@@ -78,7 +79,7 @@ it("keeps unresolved extraction issues, mismatches, duplicates and mock results 
     expect(receipt.autoAccepted).toBe(["clean", "category"].includes(scenario));
 
     if (scenario === "issue") {
-      data.lines[0].issues = [];
+      present(data.lines[0]).issues = [];
       await user.mutation(api.receipts.save, {
         id,
         revision: 0,
@@ -208,9 +209,9 @@ it("persists category uncertainty in the representation understood by installed 
   });
 
   const data = batteryFixture();
-  data.lines[0].issues = ["category_uncertain"];
-  data.lines[0].confidence = 0.3;
-  data.lines[0].manual = false;
+  present(data.lines[0]).issues = ["category_uncertain"];
+  present(data.lines[0]).confidence = 0.3;
+  present(data.lines[0]).manual = false;
   await t.run((ctx) =>
     commitReceiptChange(ctx, {
       receiptId: id,
@@ -226,7 +227,7 @@ it("persists category uncertainty in the representation understood by installed 
     confidence: 0.3,
     manual: false,
   });
-  expect(data.lines[0].issues).toEqual(["category_uncertain"]);
+  expect(present(data.lines[0]).issues).toEqual(["category_uncertain"]);
 
   const approved = quickApproveData(receipt.data, false);
   expect(approved).not.toBeNull();

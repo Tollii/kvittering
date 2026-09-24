@@ -1,3 +1,4 @@
+import { present } from "../testing/receipts";
 import { expect, it } from "vitest";
 import { broaderProductSearch, productSearch } from "./search";
 import { requestKey } from "./policy";
@@ -27,12 +28,15 @@ it("uses the same identity and cached request for receipt spacing and Unicode va
 });
 
 it("recognizes glued multipack evidence and keeps missing counts unknown", () => {
-  const [pack, bottle] = normalizeProducts({
+  const products = normalizeProducts({
     data: [
       { id: 1, name: "Coca-Cola 10pk bx" },
       { id: 2, name: "Coca-Cola 330ml" },
     ],
   });
+
+  const pack = present(products[0]);
+  const bottle = present(products[1]);
 
   const line = { ...emptyLine(), name: "COCA-COLA10PK BX" };
   expect(compatibleCatalogProduct(line, pack)).toBe(true);

@@ -1,3 +1,4 @@
+import { present } from "../../src/lib/testing/receipts";
 import { afterEach, expect, it, vi } from "vitest";
 import { kassalappFetch, CatalogRequestError } from "./transport";
 
@@ -16,11 +17,11 @@ it("adapts OpenAPI boolean query values to Kassalapp's accepted encoding", async
 
   vi.stubGlobal("fetch", fetch);
   await kassalappFetch("/products?search=Stratos&unique=true");
-  expect(new Request(fetch.mock.calls[0][0]).url).toBe(
+  expect(new Request(present(fetch.mock.calls[0])[0]).url).toBe(
     "https://kassal.app/api/v1/products?search=Stratos&unique=1",
   );
   expect(
-    new Headers(fetch.mock.calls[0][1]?.headers).get("Authorization"),
+    new Headers(present(fetch.mock.calls[0])[1]?.headers).get("Authorization"),
   ).toBe("Bearer test-key");
 });
 

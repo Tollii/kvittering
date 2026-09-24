@@ -152,7 +152,6 @@ export default function Capture() {
       recordEvent("receipt.capture", { operation: "camera" });
       const result = await camera.current.takePictureAsync({ quality: 0.9 });
 
-      if (!result) throw new Error("Kameraet kunne ikke ta et bilde.");
       const uri = await prepareImage(result.uri, result.width, result.height);
       setPhotos((current) => [...current, uri]);
       setReview(true);
