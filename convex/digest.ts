@@ -1,21 +1,25 @@
 import { CalendarDate } from "../src/lib/domain/calendar";
 import type { Ore } from "../src/lib/domain/ore";
-import { receiptPeriodPage } from "./receipts";
+import {
+  receiptSpendingTotals,
+  receiptComparisonCategories,
+  addSpendingTotals,
+  addCategoryTotals,
+} from "../src/lib/domain/receipt-summary";
+import { dailyDigest } from "../src/lib/domain/daily-digest";
+import { receiptPeriodPage } from "./receiptPeriod";
 import { featureEnabled } from "./featureFlags";
 import { v } from "convex/values";
 import {
   paginationOptsValidator,
   paginationResultValidator,
 } from "convex/server";
-import {
-  internalAction,
-  internalMutation,
-  internalQuery,
-} from "./_generated/server";
+import { internalAction, internalQuery } from "./_generated/server";
+import { internalMutation } from "./serverFunctions";
 import { internal } from "./_generated/api";
 import type { Doc, Id } from "./_generated/dataModel";
 import schema from "./schema";
-import { weeklyDigest, digestPeriod } from "../src/lib/domain/budget";
+import { digestPeriod } from "../src/lib/domain/budget";
 
 const device = v.object({
   householdId: v.id("households"),
@@ -109,7 +113,10 @@ export const forHousehold = internalAction({
     ctx,
     args,
   ): Promise<{ title: string; body: string } | null> => {
-    const receipts: Doc<"receipts">[] = [];
+    const summary = await ctx.runQuery(internal.digest.summary, args);
+
+    if (summary) return summary;
+    const days = new Map<string, Parameters<typeof dailyDigest>[0][number]>();
     let cursor: string | null = null;
     let budget: Ore | null = null;
 
@@ -128,13 +135,34 @@ export const forHousehold = internalAction({
 
       if (!result.household) return null;
       budget = result.household.monthlyBudgetOre ?? null;
-      receipts.push(...result.receipts.page);
+
+      for (const receipt of result.receipts.page) {
+        const date = receipt.data?.purchaseDate;
+
+        if (!date) continue;
+        const previous = days.get(date);
+        const totals = receiptSpendingTotals(receipt);
+        const categories = receiptComparisonCategories(receipt);
+        days.set(date, {
+          date,
+          totals: previous
+            ? addSpendingTotals(previous.totals, totals)
+            : totals,
+          categories: previous
+            ? addCategoryTotals(previous.categories, categories)
+            : categories,
+        });
+      }
 
       if (result.receipts.isDone) break;
       cursor = result.receipts.continueCursor;
     }
 
-    const digest = weeklyDigest(receipts, budget, digestDate(args.today));
+    const digest = dailyDigest(
+      [...days.values()],
+      budget,
+      digestDate(args.today),
+    );
 
     return { title: digest.title, body: digest.body };
   },
@@ -195,5 +223,41 @@ export const queueMessage = internalMutation({
       });
 
     return null;
+  },
+});
+
+/** At most 45 daily rows cover the weekly comparison and its calendar month. */
+export const summary = internalQuery({
+  args: { householdId: v.id("households"), today: v.string() },
+  returns: v.union(v.object({ title: v.string(), body: v.string() }), v.null()),
+  handler: async (ctx, { householdId, today }) => {
+    const state = await ctx.db
+      .query("receiptReadModel")
+      .withIndex("by_name", (q) => q.eq("name", "receipts-v1"))
+      .unique();
+
+    if (!state?.ready) return null;
+    const household = await ctx.db.get("households", householdId);
+
+    if (!household) return null;
+    const period = digestPeriod(digestDate(today));
+
+    const days = await ctx.db
+      .query("receiptDailyTotals")
+      .withIndex("by_householdId_and_date", (q) =>
+        q
+          .eq("householdId", householdId)
+          .gte("date", period.start)
+          .lte("date", period.end),
+      )
+      .take(45);
+
+    const digest = dailyDigest(
+      days,
+      household.monthlyBudgetOre ?? null,
+      digestDate(today),
+    );
+
+    return { title: digest.title, body: digest.body };
   },
 });

@@ -1,5 +1,7 @@
 "use node";
 
+import { providerFetch } from "./providerTransport";
+
 import { v } from "convex/values";
 import { internalAction } from "./_generated/server";
 import { internal } from "./_generated/api";
@@ -36,18 +38,25 @@ export const execute = internalAction({
     if (!request) return null;
     const started = Date.now();
 
+    const options = {
+      fetch: providerFetch(ctx, "kassalapp", { kind: "catalog", id }),
+    };
+
     try {
       let result: CatalogResult = emptyCatalogResult();
 
       if (request.kind === "products") {
         const search = async (term: string, store?: string) =>
           normalizeProducts(
-            await searchProducts({
-              search: term,
-              store,
-              size: 20,
-              unique: true,
-            }),
+            await searchProducts(
+              {
+                search: term,
+                store,
+                size: 20,
+                unique: true,
+              },
+              options,
+            ),
           );
 
         result.products = await search(request.search, request.store);
@@ -79,19 +88,24 @@ export const execute = internalAction({
 
         if (request.chain && !group) throw new Error("Unknown store group");
         result.stores = normalizeStores(
-          await searchPhysicalStores({
-            search: request.search,
-            size: 20,
-            group,
-          }),
+          await searchPhysicalStores(
+            {
+              search: request.search,
+              size: 20,
+              group,
+            },
+            options,
+          ),
         );
       } else if (request.kind === "details")
-        result.products = normalizeProducts(await findProductById(request.id));
+        result.products = normalizeProducts(
+          await findProductById(request.id, options),
+        );
       else
         result = normalizePrices(
           request.ean
-            ? await findProductByEanBarcode(request.ean)
-            : await findProductById(request.id),
+            ? await findProductByEanBarcode(request.ean, options)
+            : await findProductById(request.id, options),
         );
       await ctx.runMutation(internal.catalogQueue.succeed, { id, result });
       console.info("catalog.request_completed", {

@@ -33,6 +33,8 @@ if (existing.length > 0)
 
 run("Types", "typescript/bin/tsc", ["--noEmit"]);
 
+run("Backend types", "typescript/bin/tsc", ["--noEmit", "-p", "convex"]);
+
 run("Tool types", "typescript/bin/tsc", [
   "--noEmit",
   "-p",

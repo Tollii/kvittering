@@ -1,6 +1,8 @@
 import { unclearCategoryId } from "../src/lib/domain/categories";
 import { userError } from "./userErrors";
 import { hasReceiptBeenRead } from "../src/lib/domain/receipt-state";
+import { consumeWorkQuota, type QuotaActor } from "./rateLimits";
+import { trackWorkflow } from "./retention";
 import { featureEnabled } from "./featureFlags";
 import { clientMutation as mutation } from "./clientFunctions";
 import { productAttributesValidator } from "../src/lib/domain/product-attributes";
@@ -9,11 +11,11 @@ import { WorkflowManager } from "@convex-dev/workflow";
 import { components, internal } from "./_generated/api";
 import {
   env,
-  internalMutation,
   internalQuery,
   type MutationCtx,
   type QueryCtx,
 } from "./_generated/server";
+import { internalMutation } from "./serverFunctions";
 import type { Doc, Id } from "./_generated/dataModel";
 import schema from "./schema";
 import { requireReceipt } from "./access";
@@ -91,7 +93,7 @@ export const process = manager
 async function launch(
   ctx: MutationCtx,
   receipt: Doc<"receipts">,
-  origin: "automatic" | "manual" = "automatic",
+  requester?: QuotaActor | "operator",
 ) {
   if (!(await featureEnabled(ctx, "spendingAnalysis")))
     return "disabled" as const;
@@ -110,15 +112,29 @@ async function launch(
     previous?.version === productAnalysisVersion &&
     previous.generation === receipt.generation &&
     previous.revision === receipt.revision &&
-    (previous.state !== "error" || origin === "automatic")
+    (previous.state !== "error" || !requester)
   )
     return "current" as const;
-  await manager.start(ctx, internal.productAnalysis.process, {
-    id: receipt._id,
-    generation: receipt.generation,
-    revision: receipt.revision,
-    version: productAnalysisVersion,
-  });
+
+  if (requester && requester !== "operator")
+    await consumeWorkQuota(ctx, requester, "analysis");
+
+  const workflowId = await manager.start(
+    ctx,
+    internal.productAnalysis.process,
+    {
+      id: receipt._id,
+      generation: receipt.generation,
+      revision: receipt.revision,
+      version: productAnalysisVersion,
+    },
+    {
+      onComplete: internal.retention.workflowCompleted,
+      context: { component: "analysis", receiptId: receipt._id },
+    },
+  );
+
+  await trackWorkflow(ctx, workflowId, "analysis", receipt._id);
   await ctx.db.patch("receipts", receipt._id, {
     productAnalysis: {
       version: productAnalysisVersion,
@@ -154,8 +170,8 @@ export const ensure = mutation({
     if (ids.length > 20) throw userError("For mange kvitteringer.");
 
     for (const id of ids) {
-      const { receipt } = await requireReceipt(ctx, id);
-      await launch(ctx, receipt, "manual");
+      const { receipt, member } = await requireReceipt(ctx, id);
+      await launch(ctx, receipt, member);
     }
 
     return null;
@@ -526,9 +542,14 @@ export const repair = internalMutation({
           .eq("householdId", args.householdId)
           .lte("_creationTime", args.through),
       )
-      .paginate({ cursor: args.cursor, numItems: 10, maximumRowsRead: 10 });
+      .paginate({
+        cursor: args.cursor,
+        numItems: 10,
+        maximumRowsRead: 10,
+        maximumBytesRead: 500_000,
+      });
 
-    for (const receipt of page.page) await launch(ctx, receipt, "manual");
+    for (const receipt of page.page) await launch(ctx, receipt, "operator");
 
     if (!page.isDone)
       await ctx.scheduler.runAfter(0, internal.productAnalysis.repair, {

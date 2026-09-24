@@ -1,5 +1,6 @@
 import { v } from "convex/values";
-import { mutation, internalQuery } from "./_generated/server";
+import { internalQuery } from "./_generated/server";
+import { mutation } from "./serverFunctions";
 import { clientValidator } from "../src/lib/releases/policy";
 import { requireMember } from "./access";
 import schema from "./schema";

@@ -1,5 +1,7 @@
 "use node";
 
+import { providerFetch } from "./providerTransport";
+
 import { Buffer } from "node:buffer";
 
 import OpenAI from "openai";
@@ -63,6 +65,11 @@ export const extract = internalAction({
     const model = env.OPENAI_RECEIPT_MODEL ?? "gpt-6-luna";
 
     const client = new OpenAI({
+      fetch: providerFetch(
+        ctx,
+        "openai",
+        args.receiptId ? { kind: "receipt", id: args.receiptId } : undefined,
+      ),
       apiKey: env.OPENAI_API_KEY,
       timeout: 120000,
       maxRetries: 1,
@@ -71,6 +78,7 @@ export const extract = internalAction({
     const response = await client.responses.parse({
       model,
       store: false,
+      max_output_tokens: 16000,
       input: [
         {
           role: "system",
@@ -124,7 +132,7 @@ export const classify = internalAction({
     provider: v.string(),
     durationMs: v.number(),
   }),
-  handler: async (_ctx, args) => {
+  handler: async (ctx, args) => {
     const started = Date.now();
 
     if (!args.products.length)
@@ -144,12 +152,23 @@ export const classify = internalAction({
         provider: "mock: classification unavailable",
         durationMs: 0,
       };
-    const client = new TypeSafeClient({ apiKey: env.TYPESAFE_API_KEY });
+
+    const client = new TypeSafeClient({
+      fetch: providerFetch(
+        ctx,
+        "typesafe",
+        args.receiptId ? { kind: "receipt", id: args.receiptId } : undefined,
+      ),
+      apiKey: env.TYPESAFE_API_KEY,
+      retry: { maxRetries: 0 },
+    });
 
     const results: { id: string; categoryId: string; confidence: number }[] =
       [];
 
     const model = env.TYPESAFE_MODEL ?? "jev-latest";
+    let provider = model;
+    let batchCount = 0;
 
     for (let offset = 0; offset < args.products.length; offset += 12) {
       const batch = args.products.slice(offset, offset + 12);
@@ -161,13 +180,37 @@ export const classify = internalAction({
         ]),
       );
 
-      const response = await client.systemOne({
-        model,
-        state: {
-          products: batch.map((p) => classificationEvidence(p)),
-        },
-        questions,
-      });
+      batchCount++;
+
+      const response = await client
+        .systemOne({
+          model,
+          state: {
+            products: batch.map((p) => classificationEvidence(p)),
+          },
+          questions,
+        })
+        .catch(() => {
+          console.warn("receipt.classification_unavailable", {
+            receiptId: args.receiptId,
+            generation: args.generation,
+            model,
+          });
+
+          return null;
+        });
+
+      if (!response) {
+        provider = `${model}: classification unavailable`;
+        results.push(
+          ...args.products.slice(offset).map((product) => ({
+            id: product.id,
+            categoryId: "fallback.unclear",
+            confidence: 0,
+          })),
+        );
+        break;
+      }
 
       batch.forEach((product, index) => {
         const answer = response.answers[`item_${index}`];
@@ -188,12 +231,13 @@ export const classify = internalAction({
       model,
       durationMs: Date.now() - started,
       itemCount: results.length,
-      batchCount: Math.ceil(args.products.length / 12),
+      batchCount,
+      provider,
     });
 
     return {
       classifications: results,
-      provider: model,
+      provider,
       durationMs: Date.now() - started,
     };
   },

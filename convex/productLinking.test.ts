@@ -1,5 +1,6 @@
 import { present } from "../src/lib/testing/receipts";
 /// <reference types="vite/client" />
+import { register as registerRateLimiter } from "@convex-dev/rate-limiter/test";
 import { convexTest } from "convex-test";
 import { afterEach, expect, it, vi } from "vitest";
 import schema from "./schema";
@@ -22,6 +23,7 @@ afterEach(() => vi.useRealTimers());
 async function setup() {
   vi.useFakeTimers();
   const t = convexTest(schema, modules);
+  registerRateLimiter(t);
   const user = t.withIdentity({ subject: "member", issuer: "test" });
   const other = t.withIdentity({ subject: "other", issuer: "test" });
 

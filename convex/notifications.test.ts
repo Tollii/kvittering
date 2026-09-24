@@ -2,6 +2,7 @@ import { present } from "../src/lib/testing/receipts";
 import { parse } from "convex-helpers/validators";
 import { sendArgs as pushSendArgs } from "./pushDelivery";
 /// <reference types="vite/client" />
+import { register as registerRateLimiter } from "@convex-dev/rate-limiter/test";
 import { convexTest } from "convex-test";
 import { afterEach, expect, it, vi } from "vitest";
 import { api, internal } from "./_generated/api";
@@ -60,6 +61,7 @@ it("keeps automatic approval silent and rejects an already queued success notifi
 
 async function setup() {
   const t = convexTest(schema, modules);
+  registerRateLimiter(t);
 
   const uploader = t.withIdentity({
     subject: "uploader",

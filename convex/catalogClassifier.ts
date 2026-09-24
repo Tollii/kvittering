@@ -1,5 +1,7 @@
 "use node";
 
+import { providerFetch } from "./providerTransport";
+
 import { v } from "convex/values";
 import { TypeSafeClient, noul, type Questions } from "@typesafe-ai/sdk";
 import { internalAction, env } from "./_generated/server";
@@ -41,6 +43,20 @@ export function catalogMatchQuestion(item: number, candidate: number) {
 
 /** All questions are independent and use the complete, already collected candidate evidence. */
 export async function classifyCatalogProducts(
+  items: Parameters<typeof classifyCatalogBatch>[0],
+  client: TypeSafeClient | null,
+): Promise<CatalogDecision[]> {
+  const results: CatalogDecision[] = [];
+
+  for (let offset = 0; offset < items.length; offset += 12)
+    results.push(
+      ...(await classifyCatalogBatch(items.slice(offset, offset + 12), client)),
+    );
+
+  return results;
+}
+
+async function classifyCatalogBatch(
   items: {
     line: ReceiptLine;
     candidates: CatalogProduct[];
@@ -204,6 +220,7 @@ export async function classifyCatalogProducts(
 
 export const classify = internalAction({
   args: {
+    receiptId: v.id("receipts").optional(),
     items: v.array(
       matchingInput.extend({
         requestId: v.union(v.id("catalogRequests"), v.null()),
@@ -211,7 +228,7 @@ export const classify = internalAction({
     ),
   },
   returns: v.array(catalogDecision),
-  handler: async (ctx, { items }): Promise<CatalogDecision[]> => {
+  handler: async (ctx, { items, receiptId }): Promise<CatalogDecision[]> => {
     const requests = await Promise.all(
       [
         ...new Set(
@@ -242,6 +259,11 @@ export const classify = internalAction({
 
     const client = env.TYPESAFE_API_KEY
       ? new TypeSafeClient({
+          fetch: providerFetch(
+            ctx,
+            "typesafe",
+            receiptId ? { kind: "receipt", id: receiptId } : undefined,
+          ),
           apiKey: env.TYPESAFE_API_KEY,
           timeout: 30000,
           retry: { maxRetries: 0 },

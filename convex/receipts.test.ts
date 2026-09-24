@@ -2,6 +2,7 @@ import { date } from "../src/lib/testing/calendar";
 import { present } from "../src/lib/testing/receipts";
 import { Ore } from "../src/lib/domain/ore";
 /// <reference types="vite/client" />
+import { register as registerRateLimiter } from "@convex-dev/rate-limiter/test";
 import { convexTest } from "convex-test";
 import { expect, it } from "vitest";
 import { api, internal } from "./_generated/api";
@@ -12,6 +13,7 @@ const modules = import.meta.glob("./**/*.ts");
 
 async function setup() {
   const t = convexTest(schema, modules);
+  registerRateLimiter(t);
 
   const first = t.withIdentity({
     subject: "first",

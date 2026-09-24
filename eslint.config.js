@@ -195,6 +195,19 @@ module.exports = defineConfig([
     },
   },
   {
+    files: ["src/**/*.{ts,tsx}"],
+    rules: {
+      "no-restricted-properties": [
+        "error",
+        {
+          property: "toSorted",
+          message:
+            "Supported Hermes clients lack Array.toSorted. Copy the array before calling sort.",
+        },
+      ],
+    },
+  },
+  {
     files: ["src/lib/domain/**/*.ts", "src/lib/catalog/**/*.ts"],
     rules: {
       // Domain rules stay pure so tests and the backend can run them.

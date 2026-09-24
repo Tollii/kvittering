@@ -1,5 +1,7 @@
 import { userError } from "./userErrors";
 import { isReceiptProcessing } from "../src/lib/domain/receipt-state";
+import { consumeWorkQuota } from "./rateLimits";
+import { trackWorkflow } from "./retention";
 import { commitReceiptChange } from "./receiptChanges";
 import { isCategoryUncertain } from "../src/lib/domain/receipt-issues";
 import { featureEnabled } from "./featureFlags";
@@ -11,7 +13,8 @@ import {
   vWorkflowId,
 } from "@convex-dev/workflow";
 import { components, internal } from "./_generated/api";
-import { internalMutation, internalQuery, env } from "./_generated/server";
+import { internalQuery, env, type MutationCtx } from "./_generated/server";
+import { internalMutation } from "./serverFunctions";
 import { requireReceipt } from "./access";
 import schema from "./schema";
 import { findMapping } from "./products";
@@ -86,7 +89,8 @@ export const process = workflow
         [...requests].map(async ([key, request]) => {
           const result = await step.runMutation(
             internal.catalogQueue.requestForWorkflow,
-            { request, workflowId: step.workflowId },
+            { request, workflowId: step.workflowId, receiptId: args.id },
+            { unstableArgs: true },
           );
 
           return { key, ...result };
@@ -102,12 +106,14 @@ export const process = workflow
       const decisions = await step.runAction(
         internal.catalogClassifier.classify,
         {
+          receiptId: args.id,
           items: inputs.map((item) => ({
             ...item,
             requestId:
               entries.find((entry) => entry.key === item.search)?.id ?? null,
           })),
         },
+        { unstableArgs: true },
       );
 
       await step.runMutation(internal.catalogMatching.apply, {
@@ -133,14 +139,26 @@ export const process = workflow
   });
 
 async function launch(
-  ctx: Parameters<typeof startWorkflow>[0],
+  ctx: MutationCtx,
   id: Id<"receipts">,
   generation: number,
 ) {
-  return startWorkflow(ctx, internal.catalogMatching.process, {
-    id,
-    generation,
-  });
+  const workflowId = await startWorkflow(
+    ctx,
+    internal.catalogMatching.process,
+    {
+      id,
+      generation,
+    },
+    {
+      onComplete: internal.retention.workflowCompleted,
+      context: { component: "processing", receiptId: id },
+    },
+  );
+
+  await trackWorkflow(ctx, workflowId, "processing", id);
+
+  return workflowId;
 }
 
 export const start = internalMutation({
@@ -187,7 +205,7 @@ export const enrich = mutation({
   args: { id: v.id("receipts"), onlyIfMissing: v.boolean().optional() },
   returns: v.null(),
   handler: async (ctx, { id, onlyIfMissing }) => {
-    const { receipt } = await requireReceipt(ctx, id);
+    const { receipt, member } = await requireReceipt(ctx, id);
 
     if (onlyIfMissing && receipt.catalogStatus) return null;
 
@@ -198,6 +216,7 @@ export const enrich = mutation({
       throw new Error("Legg til KASSALAPP_API_KEY i Convex først.");
 
     if (receipt.catalogStatus === "pending") return null;
+    await consumeWorkQuota(ctx, member, "analysis");
     const workflowId = await launch(ctx, id, receipt.generation);
     await ctx.db.patch("receipts", id, {
       catalogStatus: "pending",

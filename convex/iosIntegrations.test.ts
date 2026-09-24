@@ -1,5 +1,6 @@
 import { present } from "../src/lib/testing/receipts";
 /// <reference types="vite/client" />
+import { register as registerRateLimiter } from "@convex-dev/rate-limiter/test";
 import { convexTest } from "convex-test";
 import { register } from "@convex-dev/workflow/test";
 import { expect, it } from "vitest";
@@ -11,6 +12,7 @@ const modules = import.meta.glob("./**/*.ts");
 
 async function setup() {
   const t = convexTest(schema, modules);
+  registerRateLimiter(t);
   register(t);
 
   const owner = t.withIdentity({
