@@ -95,6 +95,14 @@ it("routes old operator writes into the one flag store", async () => {
     operator: "test",
     reason: "Pause",
   });
+  await t.mutation(internal.featureFlags.set, {
+    platform: "ios",
+    name: "emailSignUp",
+    enabled: true,
+    expectedRevision: 1,
+    operator: "test",
+    reason: "Enable email registration",
+  });
   await expect(
     t.mutation(internal.releasePolicy.configure, {
       platform: "ios",
@@ -132,5 +140,10 @@ it("routes old operator writes into the one flag store", async () => {
   });
   expect(
     (await t.query(api.featureFlags.get, { platform: "ios" })).values,
-  ).toMatchObject({ receiptProcessing: false, productLookup: false });
+  ).toMatchObject({
+    receiptProcessing: false,
+    productLookup: false,
+    emailSignUp: true,
+  });
+  expect(current.features).not.toHaveProperty("emailSignUp");
 });

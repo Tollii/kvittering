@@ -1,5 +1,6 @@
 import { present } from "../src/lib/testing/receipts";
 /// <reference types="vite/client" />
+import { register as registerRateLimiter } from "@convex-dev/rate-limiter/test";
 import { convexTest } from "convex-test";
 import { register as registerWorkpool } from "@convex-dev/workpool/test";
 import { afterEach, expect, it, vi } from "vitest";
@@ -161,6 +162,7 @@ afterEach(() => {
 async function setup() {
   vi.useFakeTimers();
   const t = convexTest(schema, modules);
+  registerRateLimiter(t);
   registerWorkpool(t, "catalogWorkpool");
 
   const first = t.withIdentity({

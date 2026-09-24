@@ -38,6 +38,29 @@ final class ReceiptPreview: NSObject, QLPreviewControllerDataSource, QLPreviewCo
     }
   }
 
+  /// Copies only app-owned cached images; legacy HTTPS previews remain supported.
+  func presentLocal(urls: [String], from presenter: UIViewController) throws {
+    guard !urls.isEmpty, urls.count <= 8,
+      let cache = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask).first
+    else { throw RenderError.unavailable("Ugyldig antall bilder.") }
+    try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+    do {
+      for (position, address) in urls.enumerated() {
+        guard let url = URL(string: address), url.isFileURL,
+          url.resolvingSymlinksInPath().path.hasPrefix(cache.resolvingSymlinksInPath().path + "/kvitto-receipt-images")
+        else { throw RenderError.unavailable("Ugyldig bildeadresse.") }
+        let file = directory.appendingPathComponent("Kvittering-\(position + 1).jpg")
+        try FileManager.default.setAttributes([.protectionKey: FileProtectionType.complete], ofItemAtPath: url.path)
+        try FileManager.default.copyItem(at: url, to: file)
+        files.append(file)
+      }
+      let controller = QLPreviewController()
+      controller.dataSource = self
+      controller.delegate = self
+      presenter.present(controller, animated: true)
+    } catch { cleanUp(); throw error }
+  }
+
   func numberOfPreviewItems(in controller: QLPreviewController) -> Int { files.count }
   func previewController(_ controller: QLPreviewController, previewItemAt index: Int) -> QLPreviewItem { files[index] as NSURL }
   nonisolated func previewControllerDidDismiss(_ controller: QLPreviewController) {

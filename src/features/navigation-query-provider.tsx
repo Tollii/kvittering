@@ -2,12 +2,12 @@ import { useContext, useEffect, type PropsWithChildren } from "react";
 import { ConvexQueryCacheProvider } from "convex-helpers/react/cache";
 import { ConvexQueryCacheContext } from "convex-helpers/react/cache/provider";
 
-/** Retain live results for return navigation within one account and household. */
+/** Release unused subscriptions; receipt data is retained separately in SQLite. */
 export function NavigationQueryProvider({
   children,
 }: Readonly<PropsWithChildren>) {
   return (
-    <ConvexQueryCacheProvider expiration={5 * 60_000} maxIdleEntries={40}>
+    <ConvexQueryCacheProvider expiration={0} maxIdleEntries={0}>
       <QueryCacheCleanup />
       {children}
     </ConvexQueryCacheProvider>

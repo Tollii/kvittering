@@ -1,0 +1,75 @@
+# API usage limits
+
+The backend uses `@convex-dev/rate-limiter`. Counters persist in the deployment
+and apply to all backend instances. Limits are defined in `convex/rateLimits.ts`.
+They are independent of client feature flags and cannot be bypassed by an older
+app or a direct API call.
+
+## Receipt attempts
+
+Each user and household can accept 30 new receipt attempts per UTC day. Each
+also has a token bucket with capacity 10 and a refill rate of 10 per minute.
+There is no daily rollover. Midnight UTC is the daily reset, not local midnight.
+
+A new `receipts:reserve` consumes one attempt. Repeating an existing reservation
+with the same household and client ID returns that reservation without another
+charge. An explicit `receipts:retry` consumes one attempt from the current caller
+and the receipt household. Automatic provider retries consume provider allowance,
+but do not charge the user again. Leaving a household does not reset user quota.
+
+Authorization, validation, both quota checks, and receipt writes share one
+transaction. A rejected request does not consume any quota or change the receipt.
+Quota errors use Norwegian text. The upload queue retains images and the original
+reservation identity after rejection. Users can retry after the quota recovers.
+
+## Provider allowances
+
+| Provider  | Requests per UTC day | Requests per fixed 30-day period |
+| --------- | -------------------: | -------------------------------: |
+| OpenAI    |                  300 |                            3,000 |
+| TypeSafe  |               10,000 |                          100,000 |
+| Kassalapp |               10,000 |                          100,000 |
+
+These are separate, deployment-wide allowances. The 30-day windows start at Unix
+epoch boundaries; they are not calendar months or rolling windows. No unused
+allowance carries forward. Change the constants through a reviewed backend
+change. A provider's own lower limit still applies, including Kassalapp's free tier.
+
+Every outbound attempt passes through a persisted quota mutation before network
+I/O. SDK retries, workflow retries, search fallbacks, product analysis, and
+operator evaluations all count. Failed requests and uncertain network outcomes
+are not refunded. A rejected allowance prevents the network call. If quota
+storage fails, the request fails without contacting the provider.
+
+Receipt extraction permits at most 16,000 output tokens per request. Receipt
+uploads already permit at most eight images of 10 MiB each. These constraints
+and request caps limit use; **they are not exact currency budgets**. Token prices,
+input size, model selection, and provider billing rules still determine cost.
+A monetary ceiling requires a priced reservation model or an enforceable limit
+at the provider. Do not describe a billing alert as a hard spending limit.
+
+When TypeSafe classification is unavailable, the extracted receipt is retained
+with unknown categories for unresolved items. Existing exact matches and cached
+catalog data remain usable. OpenAI failures leave the server receipt and images
+available for an explicit retry. Catalog and analysis jobs retain their existing
+bounded failure/retry behavior; all later network attempts still need allowance.
+
+## Deployment and keys
+
+Use a separate provider project/account where available, and a separate API key
+for each of development and staging. Configure `OPENAI_API_KEY`,
+`TYPESAFE_API_KEY`, and `KASSALAPP_API_KEY` only in the corresponding backend.
+Separate keys improve isolation, but keys within one provider account may still
+share its billing or provider-side quota. Never place them in `EXPO_PUBLIC_*`
+variables or commit them. See [backend operations](backend-operations.md).
+
+The source change does not issue or rotate provider credentials, change deployed
+feature flags, or deploy the backend. Configure the isolated end-to-end deployment to use
+mock receipt extraction and enable the [email registration flag](featureFlags.md#email-registration)
+before creating accounts. There is no public quota bypass for tests.
+
+Deploy the additive backend before distributing the updated sign-in screen.
+Older clients keep their existing receipt API contracts and receive quota errors.
+They may still show email registration, but the server rejects it when disabled.
+No minimum version change or local queue migration is required. Device upgrade,
+offline startup, and an actual old binary must still be checked before release.

@@ -1,5 +1,7 @@
 "use node";
 
+import { providerFetch } from "./providerTransport";
+
 import { v } from "convex/values";
 import { TypeSafeClient, noul, type Questions } from "@typesafe-ai/sdk";
 import { internalAction, env } from "./_generated/server";
@@ -242,6 +244,7 @@ export const classify = internalAction({
 
     const client = env.TYPESAFE_API_KEY
       ? new TypeSafeClient({
+          fetch: providerFetch(ctx, "typesafe"),
           apiKey: env.TYPESAFE_API_KEY,
           timeout: 30000,
           retry: { maxRetries: 0 },

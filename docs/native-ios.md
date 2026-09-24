@@ -10,7 +10,7 @@ operation; dismissing its details sheet does not discard the receipt draft.
 
 On supported iOS devices, **Continue with Apple** is the first authentication
 option. The same button creates an account or signs in to an existing Kvitto
-account. **Opprett konto med e-post** opens email registration; **Logg inn med
+account. **Opprett konto med e-post** opens email registration when the `emailSignUp` flag is enabled; **Logg inn med
 e-post** opens email login. The welcome screen uses a centered mark, rounded
 buttons, and a separate email form. Devices without Apple authentication show
 the email form directly.
@@ -66,7 +66,7 @@ overspend, and the update time. Provisional totals are marked. The medium widget
 also has a **Skann kvittering** shortcut; tapping the summary opens Forbruk.
 
 Open Forbruk for the current month to refresh the widget. It reuses the complete,
-unfiltered spending subscription. Filters do not change the widget totals.
+unfiltered local report, or the server aggregate during first synchronization. Filters do not change the widget totals.
 It does not run a second history fetch or promise background freshness. The
 month and timestamp remain visible when the application is closed.
 
@@ -94,11 +94,11 @@ establish the latest purchase. The normal receipt screen still enforces access.
 
 **Vis kjøp for måned** accepts a month and an optional year. Without a year it
 uses the current Gregorian year. It opens Forbruk for that period, using the
-same complete receipt subscription, provisional labels, and calculations as
+same complete local receipt data, provisional labels, and calculations as
 ordinary navigation. Each invocation resets the selected period and filters.
 
-Both actions open Kvitto and require account and household access and a network
-connection. They do not export receipt data to a shared cache or return a spoken
+Both actions open Kvitto and require account and household access. Cached
+receipts remain available offline after the first complete synchronization. They do not export receipt data to a shared cache or return a spoken
 amount. Siri can ask for missing parameters; Shortcuts can supply them explicitly.
 Try “Finn siste kvittering i Kvitto” or “Vis kjøp for august i Kvitto”.
 
@@ -218,3 +218,10 @@ Deploy the additive reminder backend before publishing the JavaScript update.
 Existing clients ignore the new notification category and keep ordinary taps.
 No native dependency, local queue format, or minimum supported version changes.
 Validate expanded actions and cold launches on a signed physical iPhone.
+
+Original-image previews use a private, bounded device cache. The optional
+`previewLocalReceipts` method copies cached images into a protected temporary
+Quick Look directory. Existing `previewReceipts` HTTPS callers remain supported;
+older binaries use the image sheet for cached previews. A new native build is
+required for the local Quick Look method. See [Convex operating cost](convex-costs.md)
+for cache retention and release order.

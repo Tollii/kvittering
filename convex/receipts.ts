@@ -9,6 +9,7 @@ import {
   isReceiptProcessing,
   receiptStatusValidator,
 } from "../src/lib/domain/receipt-state";
+import { consumeReceiptQuota } from "./rateLimits";
 import { notifyReceiptActivities } from "./liveActivities";
 import type { Id } from "./_generated/dataModel";
 import {
@@ -35,10 +36,10 @@ import {
 import {
   query,
   internalQuery,
-  internalMutation,
   type QueryCtx,
   type MutationCtx,
 } from "./_generated/server";
+import { internalMutation } from "./serverFunctions";
 import { internal } from "./_generated/api";
 import schema from "./schema";
 import { requireMember, requireReceipt } from "./access";
@@ -103,6 +104,7 @@ export const reserve = mutation({
     clientId: v.string(),
     imageCount: v.number(),
     backgroundUpload: v.boolean().optional(),
+    retryMetadata: v.boolean().optional(),
     householdId: v.id("households"),
   },
   returns: v.id("receipts"),
@@ -136,6 +138,8 @@ export const reserve = mutation({
       return existing._id;
     }
 
+    await consumeReceiptQuota(ctx, member, args.retryMetadata);
+
     return ctx.db.insert("receipts", {
       householdId: member.householdId,
       uploadedBy: member.identity,
@@ -160,7 +164,12 @@ async function beginUploadedReceipt(
   imageCount: number,
 ) {
   await ctx.db.patch("receipts", id, { status: "uploaded", generation: 1 });
-  await start(ctx, internal.processing.processReceipt, { id, generation: 1 });
+  await start(
+    ctx,
+    internal.processing.processReceipt,
+    { id, generation: 1 },
+    { onComplete: internal.retention.workflowCompleted, context: null },
+  );
   console.info("receipt.upload_completed", {
     receiptId: id,
     generation: 1,
@@ -196,17 +205,23 @@ export const retry = mutation({
   args: { id: v.id("receipts") },
   returns: v.null(),
   handler: async (ctx, { id }) => {
-    const { receipt } = await requireReceipt(ctx, id);
+    const { receipt, member } = await requireReceipt(ctx, id);
 
     if (isReceiptProcessing(receipt.status))
       throw userError("Kvitteringen behandles allerede.");
+    await consumeReceiptQuota(ctx, member);
     const generation = receipt.generation + 1;
     await ctx.db.patch("receipts", id, {
       status: "uploaded",
       generation,
       error: undefined,
     });
-    await start(ctx, internal.processing.processReceipt, { id, generation });
+    await start(
+      ctx,
+      internal.processing.processReceipt,
+      { id, generation },
+      { onComplete: internal.retention.workflowCompleted, context: null },
+    );
     console.info("receipt.processing_retried", { receiptId: id, generation });
 
     return null;

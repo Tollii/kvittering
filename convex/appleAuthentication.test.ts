@@ -1,11 +1,11 @@
 import { present } from "../src/lib/testing/receipts";
 /// <reference types="vite/client" />
-import { convexTest } from "convex-test";
+import { convexTest, type TestConvex } from "convex-test";
 import { register } from "@convex-dev/better-auth/test";
 import { afterEach, beforeAll, beforeEach, expect, it, vi } from "vitest";
 import { z } from "zod";
 import schema from "./schema";
-import { api, components } from "./_generated/api";
+import { api, components, internal } from "./_generated/api";
 import type { createAuth } from "./auth";
 
 // oxlint-disable-next-line anti-slop/no-module-mocking -- Run the real Expo client against the backend with an iOS environment boundary.
@@ -137,6 +137,18 @@ async function identityToken({
   );
 
   return `${message}.${base64url(new Uint8Array(signature))}`;
+}
+
+async function enableEmailSignUp(t: TestConvex<typeof schema>) {
+  for (const platform of ["ios", "android"] as const)
+    await t.mutation(internal.featureFlags.set, {
+      platform,
+      name: "emailSignUp",
+      enabled: true,
+      expectedRevision: 0,
+      operator: "test",
+      reason: "Create an email account for Apple linking",
+    });
 }
 
 function authentication() {
@@ -276,6 +288,7 @@ it("requires explicit linking and preserves email login after linking a private 
     name: "Ada",
   };
 
+  await enableEmailSignUp(t);
   const registration = await post("sign-up/email", emailCredentials);
 
   expect(registration.status).toBe(200);
@@ -379,6 +392,8 @@ it("rejects linking an Apple identity already owned by another account", async (
     provider: "apple",
     idToken: { token, nonce: "native-request" },
   });
+
+  await enableEmailSignUp(t);
 
   const other = await post("sign-up/email", {
     email: "other@example.com",

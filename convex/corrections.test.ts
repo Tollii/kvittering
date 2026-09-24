@@ -4,6 +4,7 @@ import {
   type ModelRequest,
 } from "../src/lib/testing/model-requests";
 /// <reference types="vite/client" />
+import { register as registerRateLimiter } from "@convex-dev/rate-limiter/test";
 import { convexTest } from "convex-test";
 import { afterEach, expect, it, vi } from "vitest";
 import { api } from "./_generated/api";
@@ -17,6 +18,7 @@ afterEach(() => vi.unstubAllEnvs());
 async function setup() {
   vi.stubEnv("TYPESAFE_API_KEY", "");
   const t = convexTest(schema, modules);
+  registerRateLimiter(t);
   const first = t.withIdentity({ subject: "first", issuer: "test" });
   const other = t.withIdentity({ subject: "other", issuer: "test" });
 

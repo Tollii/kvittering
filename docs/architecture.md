@@ -24,7 +24,7 @@ The Expo application starts in `src/app/_layout.tsx`. Session context contains a
 2. `receipt-storage.ts` copies images into durable storage and commits the queue to SQLite. It publishes immutable snapshots after commit. `receipt-upload-transport.ts` owns authenticated uploads; `upload-queue.ts` retains each completed step. After a failure it retries automatically with backoff (15 seconds, doubling) for at most six attempts per app start. A `REJECTED` user error waits for the person's retry. These limits live in memory, so each app start tries every queued capture again; they never remove queued images.
 3. Convex processing extracts and parses receipt evidence, classifies products, checks duplicates, and applies saved household choices. `receiptChanges.ts` owns revision, history, status, and follow-up policy for receipt changes.
 4. Catalog matching and product analysis run on the server. Profile questions use bounded batches. Writes reject stale generation, revision, or evidence. Exhausted analysis can be retried explicitly; `productAnalysis.repair` is an operator recovery operation.
-5. `receipt-draft.ts` owns editor changes and save acknowledgement. Reactive queries deliver the saved receipt. Report selections keep identity and period, then derive their content from current data.
+5. `receipt-draft.ts` owns editor changes and save acknowledgement. The change subscription and bounded synchronization deliver the saved receipt. Report selections keep identity and period, then derive their content from current data.
 
 Receipt approval checks material reading errors and duplicates. Category uncertainty
 does not block approval, and approval does not confirm or remember suggested
@@ -64,23 +64,25 @@ Add receipt issues in `receipt-issues.ts`; display text belongs in its mapper. P
 
 ## Table ownership
 
-| Tables                                 | Owner and purpose                                                           |
-| -------------------------------------- | --------------------------------------------------------------------------- |
-| households, members                    | Household membership, invitation, and budget                                |
-| receipts, images                       | Current receipt state and uploaded image references                         |
-| extractions                            | Original provider output for each generation                                |
-| revisions                              | Prior receipt data before a committed non-extraction change                 |
-| aliases, categoryMemory                | Explicit and learned household category decisions                           |
-| products, productMappings              | Household identities and remembered product choices                         |
-| corrections, correctionBatches         | Human decisions, bulk changes, and guarded undo                             |
-| catalogRequests, catalogRequestWaiters | Shared catalog work and workflow completion                                 |
-| catalogProducts, catalogStores         | Shared catalog records; detail freshness is separate from summary freshness |
-| productFamilies, productProfiles       | Household family identity and reusable analysis evidence                    |
-| receiptReminders                       | One pending receipt-review reminder per device subscription and receipt     |
-| deviceSubscriptions                    | Device notification destinations                                            |
-| clientReleases                         | Installed-client diagnostics                                                |
-| releasePolicies, releasePolicyHistory  | Native/API version controls and operator history                            |
-| featureFlags, featureFlagHistory       | Platform-scoped service configuration and operator history                  |
+| Tables                                               | Owner and purpose                                                           |
+| ---------------------------------------------------- | --------------------------------------------------------------------------- |
+| households, members                                  | Household membership, invitation, and budget                                |
+| receipts, images                                     | Current receipt state and uploaded image references                         |
+| receiptSummaries, receiptSyncHeads, receiptReadModel | Compact receipt records, synchronization cursor, and backfill state         |
+| receiptDailyTotals                                   | Incremental daily spending totals and comparison categories                 |
+| extractions                                          | Original provider output for each generation                                |
+| revisions                                            | Prior receipt data before a committed non-extraction change                 |
+| aliases, categoryMemory                              | Explicit and learned household category decisions                           |
+| products, productMappings                            | Household identities and remembered product choices                         |
+| corrections, correctionBatches                       | Human decisions, bulk changes, and guarded undo                             |
+| catalogRequests, catalogRequestWaiters               | Shared catalog work and workflow completion                                 |
+| catalogProducts, catalogStores                       | Shared catalog records; detail freshness is separate from summary freshness |
+| productFamilies, productProfiles                     | Household family identity and reusable analysis evidence                    |
+| receiptReminders                                     | One pending receipt-review reminder per device subscription and receipt     |
+| deviceSubscriptions                                  | Device notification destinations                                            |
+| clientReleases                                       | Installed-client diagnostics                                                |
+| releasePolicies, releasePolicyHistory                | Native/API version controls and operator history                            |
+| featureFlags, featureFlagHistory                     | Platform-scoped service configuration and operator history                  |
 
 Convex components own their workflow, workpool, and authentication tables. Revision retention is a separate operator decision.
 
@@ -89,3 +91,24 @@ Convex components own their workflow, workpool, and authentication tables. Revis
 `src/components/ui.tsx` is an import facade. Typography, controls, surfaces, layout, and selection views have separate modules. Feature screens own state and use these components directly.
 
 Native camera, PDF import, sheets, large text, light/dark mode, offline restart, and old-client upgrades require device checks. Source tests do not prove those behaviors. See [quality checks](quality.md) and [release policy](releases.md) for verification procedures.
+
+## API abuse controls
+
+Receipt admission and explicit retries use transactional user and household quotas.
+Each external provider has a separate deployment-wide allowance, consumed before
+network I/O. Email registration uses the `emailSignUp` feature flag in both the
+sign-in screen and the authentication route. See [API limits](api-limits.md) and
+[feature flags](featureFlags.md#email-registration) for policy and operations.
+
+## Receipt read storage and cost
+
+Receipt mutations maintain compact summaries, daily report totals, and a
+household change sequence in the same transaction. New phones synchronize
+bounded changes into a separate SQLite cache. Tabs, receipt details, search,
+and product history read this cache. One small foreground subscription reports
+new changes; inactive tabs do not keep broad receipt subscriptions alive.
+Queued uploads and editor drafts remain separate from disposable caches.
+
+See [Convex operating cost](convex-costs.md) for synchronization, backfill,
+retention, release order, and usage measurements. Existing receipt endpoints
+remain available to installed clients and during the backfill.

@@ -47,7 +47,8 @@ Use `clientReleases:active` through operator tools to inspect installations seen
 
 Use [featureFlags](featureFlags.md) for new single-flag operator changes. Current clients receive live flags from one Convex subscription with a persisted offline fallback. Version checks retain their separate refresh and update-lock behavior. The old full-settings mutation remains a compatibility adapter; it writes the same authoritative flag store.
 
-All current flags default on because they represent existing features. New experimental flags must default off. Remove a temporary flag once its release is established and the oldest supported client no longer needs the alternate path.
+The four original service flags default on because they represent existing features.
+`emailSignUp` defaults off and controls new email accounts on the server and in the sign-in screen. New experimental flags must default off. Remove a temporary flag once its release is established and the oldest supported client no longer needs the alternate path.
 
 - `receiptProcessing`: stops new reservations, image uploads, completion and retry. Local capture remains available, with images queued. Work already accepted by the server may finish.
 - `productLookup`: stops new catalog requests and queued catalog workers before external calls. Already-running requests may finish. Previously cached product information can remain visible.
@@ -84,3 +85,11 @@ Native code, native packages, permissions, plugins or entitlements require a new
 ## Verification
 
 Run the applicable [project checks](quality.md). Focused tests cover numeric version ordering, anonymous policy reads, legacy request compatibility and retirement, stale-policy writes, service pauses, policy history, and actual SQLite migration rollback. Before a public release, additionally test update links, offline startup, returning from the store, an OTA download/restart, and native upgrade with unsent images on a device.
+
+Receipt cache releases use an additive server read model. Deploy the backend,
+run its bounded backfill, then release the app as described in
+[Convex operating cost](convex-costs.md). Upload queue payloads remain version
+1; retry deadlines and disposable receipt caches use separate tables or files.
+Cached image Quick Look is an optional native method. Older binaries use the
+image sheet. Existing HTTPS preview calls and workflow step arguments remain
+supported.

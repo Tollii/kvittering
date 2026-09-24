@@ -91,11 +91,17 @@ import type * as productAnalysisWorker from "../productAnalysisWorker.js";
 import type * as productLinking from "../productLinking.js";
 import type * as productMatching from "../productMatching.js";
 import type * as products from "../products.js";
+import type * as providerTransport from "../providerTransport.js";
 import type * as providers from "../providers.js";
 import type * as pushDelivery from "../pushDelivery.js";
+import type * as rateLimits from "../rateLimits.js";
 import type * as receiptChanges from "../receiptChanges.js";
+import type * as receiptReadModel from "../receiptReadModel.js";
+import type * as receiptSync from "../receiptSync.js";
 import type * as receipts from "../receipts.js";
 import type * as releasePolicy from "../releasePolicy.js";
+import type * as retention from "../retention.js";
+import type * as serverFunctions from "../serverFunctions.js";
 import type * as spotlight from "../spotlight.js";
 
 import type {
@@ -188,11 +194,17 @@ declare const fullApi: ApiFromModules<{
   productLinking: typeof productLinking;
   productMatching: typeof productMatching;
   products: typeof products;
+  providerTransport: typeof providerTransport;
   providers: typeof providers;
   pushDelivery: typeof pushDelivery;
+  rateLimits: typeof rateLimits;
   receiptChanges: typeof receiptChanges;
+  receiptReadModel: typeof receiptReadModel;
+  receiptSync: typeof receiptSync;
   receipts: typeof receipts;
   releasePolicy: typeof releasePolicy;
+  retention: typeof retention;
+  serverFunctions: typeof serverFunctions;
   spotlight: typeof spotlight;
 }>;
 
@@ -223,6 +235,7 @@ export declare const internal: FilterApi<
 >;
 
 export declare const components: {
+  rateLimiter: import("@convex-dev/rate-limiter/_generated/component.js").ComponentApi<"rateLimiter">;
   betterAuth: import("@convex-dev/better-auth/_generated/component.js").ComponentApi<"betterAuth">;
   workflow: import("@convex-dev/workflow/_generated/component.js").ComponentApi<"workflow">;
   productAnalysisWorkflow: import("@convex-dev/workflow/_generated/component.js").ComponentApi<"productAnalysisWorkflow">;

@@ -1,10 +1,7 @@
 import { commitReceiptChange } from "./receiptChanges";
 import { v } from "convex/values";
-import {
-  internalMutation,
-  type MutationCtx,
-  type QueryCtx,
-} from "./_generated/server";
+import { type MutationCtx, type QueryCtx } from "./_generated/server";
+import { internalMutation } from "./serverFunctions";
 import { internal } from "./_generated/api";
 import type { Id } from "./_generated/dataModel";
 import { aliasKey, type ReceiptData } from "../src/lib/domain/receipt";

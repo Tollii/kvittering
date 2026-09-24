@@ -18,7 +18,7 @@ import {
 } from "react-native";
 import { Stack, useNavigation } from "expo-router";
 import { useConvex } from "convex/react";
-import { useQuery } from "convex-helpers/react/cache";
+
 import { randomUUID } from "expo-crypto";
 import { api } from "../../convex/_generated/api";
 import {
@@ -65,7 +65,10 @@ import {
   lineReviewIssues,
   reviewTasks,
 } from "@/lib/domain/receipt-review";
-import { useCompleteReceipts } from "./receipt-queries";
+import {
+  useCompleteReceipts,
+  useReceiptEditorContext,
+} from "./receipt-queries";
 import type { Receipt } from "@/lib/domain/insights";
 import { receiptStatusLabel } from "@/components/receipt-card";
 import { useTheme } from "@/constants/theme";
@@ -89,7 +92,7 @@ export function ReceiptEditor({
     receiptId: receipt._id,
   });
 
-  const context = useQuery(api.receipts.editorContext, { id: receipt._id });
+  const context = useReceiptEditorContext(receipt._id);
 
   const [draft, dispatch] = useReducer(
     reduceReceiptDraft,

@@ -9,11 +9,11 @@ import { WorkflowManager } from "@convex-dev/workflow";
 import { components, internal } from "./_generated/api";
 import {
   env,
-  internalMutation,
   internalQuery,
   type MutationCtx,
   type QueryCtx,
 } from "./_generated/server";
+import { internalMutation } from "./serverFunctions";
 import type { Doc, Id } from "./_generated/dataModel";
 import schema from "./schema";
 import { requireReceipt } from "./access";
@@ -113,12 +113,17 @@ async function launch(
     (previous.state !== "error" || origin === "automatic")
   )
     return "current" as const;
-  await manager.start(ctx, internal.productAnalysis.process, {
-    id: receipt._id,
-    generation: receipt.generation,
-    revision: receipt.revision,
-    version: productAnalysisVersion,
-  });
+  await manager.start(
+    ctx,
+    internal.productAnalysis.process,
+    {
+      id: receipt._id,
+      generation: receipt.generation,
+      revision: receipt.revision,
+      version: productAnalysisVersion,
+    },
+    { onComplete: internal.retention.workflowCompleted, context: null },
+  );
   await ctx.db.patch("receipts", receipt._id, {
     productAnalysis: {
       version: productAnalysisVersion,

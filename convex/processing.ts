@@ -9,7 +9,8 @@ import { v } from "convex/values";
 import { errorDetails } from "../src/lib/diagnostics";
 import { WorkflowManager } from "@convex-dev/workflow";
 import { components, internal } from "./_generated/api";
-import { internalMutation, internalQuery, env } from "./_generated/server";
+import { internalQuery, env } from "./_generated/server";
+import { internalMutation } from "./serverFunctions";
 import {
   receiptDataValidator,
   normalizeAlias,

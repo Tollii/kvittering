@@ -1,8 +1,7 @@
 import { useEffect, useState } from "react";
 import { View } from "react-native";
 import { router, Stack, useLocalSearchParams } from "expo-router";
-import { useQuery } from "convex-helpers/react/cache";
-import { api } from "../../../convex/_generated/api";
+import { useReceiptDetail } from "@/features/receipt-queries";
 import { Button, Copy, Icon, Loading, Screen } from "@/components/ui";
 import { useHousehold } from "@/features/household-context";
 import { ReceiptEditor } from "@/features/receipt-editor";
@@ -15,7 +14,7 @@ export default function ReceiptPage() {
 
 function ReceiptDetail({ id }: Readonly<{ id: string }>) {
   const { online } = useHousehold();
-  const detail = useQuery(api.receipts.detail, { id });
+  const detail = useReceiptDetail(id ?? "");
 
   const [deletion, setDeletion] = useState<"idle" | "deleting" | "deleted">(
     "idle",
@@ -73,7 +72,7 @@ function ReceiptDetail({ id }: Readonly<{ id: string }>) {
   return (
     <ReceiptEditor
       key={id}
-      receipt={detail.receipt}
+      receipt={detail}
       online={online}
       onDeletionChange={setDeletion}
     />

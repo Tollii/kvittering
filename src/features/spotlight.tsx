@@ -1,5 +1,7 @@
-import { useEffect, useSyncExternalStore } from "react";
+import { useEffect, useMemo, useSyncExternalStore } from "react";
 import { useQuery } from "convex/react";
+import { useCachedReceipts } from "./receipt-cache-context";
+import { useQueryLifecycle } from "./query-lifecycle-context";
 import Storage from "expo-sqlite/kv-store";
 import ReceiptIntelligence from "../../modules/receipt-intelligence/src/ReceiptIntelligenceModule";
 import { api } from "../../convex/_generated/api";
@@ -42,10 +44,47 @@ function useSearchEnabled() {
 export function ReceiptSearchIndex() {
   const { enabled, scope } = useSearchEnabled();
 
-  const receipts = useQuery(
+  const cache = useCachedReceipts();
+  const { active, online } = useQueryLifecycle();
+
+  const legacy = useQuery(
     api.spotlight.recent,
-    enabled && ReceiptIntelligence?.indexReceipts ? {} : "skip",
+    !cache.available &&
+      active &&
+      online &&
+      enabled &&
+      ReceiptIntelligence?.indexReceipts
+      ? {}
+      : "skip",
   );
+
+  const local = useMemo(
+    () =>
+      cache.receipts
+        .toSorted((left, right) => right._creationTime - left._creationTime)
+        .slice(0, 100)
+        .flatMap((receipt) =>
+          receipt.data && !receipt.excluded
+            ? [
+                {
+                  id: receipt._id,
+                  title: receipt.data.store || "Kvittering",
+                  detail: receipt.data.purchaseDate || "Uten dato",
+                  keywords: receipt.data.lines
+                    .map((line) => line.name)
+                    .filter(Boolean),
+                },
+              ]
+            : [],
+        ),
+    [cache.receipts],
+  );
+
+  const receipts = cache.available
+    ? cache.complete
+      ? local
+      : undefined
+    : legacy;
 
   useEffect(() => {
     if (enabled && receipts && read() === scope) {

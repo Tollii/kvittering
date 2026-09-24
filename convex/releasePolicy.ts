@@ -2,12 +2,8 @@ import { readFeatureFlags, writeFeatureFlags } from "./featureFlags";
 import { deploymentChannel } from "./deployment";
 import { featureNameValidator, legacyFeatures } from "../src/lib/featureFlags";
 import { ConvexError, v } from "convex/values";
-import {
-  query,
-  internalQuery,
-  internalMutation,
-  type QueryCtx,
-} from "./_generated/server";
+import { query, internalQuery, type QueryCtx } from "./_generated/server";
+import { internalMutation } from "./serverFunctions";
 import {
   apiVersion,
   clientValidator,

@@ -1,3 +1,8 @@
+import {
+  RequestDeferred,
+  retryDeadline,
+  type RetryStore,
+} from "./request-retry";
 import type { Id } from "../../convex/_generated/dataModel";
 import type { DiagnosticFields } from "./diagnostics";
 import { parseUserError } from "./user-errors";
@@ -47,15 +52,16 @@ type RetryState = { failures: number; nextAttemptAt: number | null };
 
 /**
  * Persist each completed step. Repeated requests use the same server reservation.
- * Retry limits live only for this app process, so every app start tries again.
+ * Quota deadlines survive restarts. Other failures stop after the per-process cap.
  */
 export function createQueueRunner(
   store: QueueStore,
   record: (event: string, fields: DiagnosticFields) => void = () => {},
+  retries: RetryStore,
   clock: () => number = Date.now,
 ) {
   let running = false;
-  const retries = new Map<string, RetryState>();
+  const attempts = new Map<string, RetryState>();
 
   return async (
     owner: string,
@@ -65,7 +71,7 @@ export function createQueueRunner(
     { retryFailed = false }: { retryFailed?: boolean } = {},
   ) => {
     // A manual retry applies even if a drain is already running.
-    if (retryFailed) retries.clear();
+    if (retryFailed) attempts.clear();
 
     if (running) return;
     running = true;
@@ -79,7 +85,10 @@ export function createQueueRunner(
         };
 
         if (!active()) break;
-        const retry = retries.get(entry.id);
+        const previous = retries.read(entry.id);
+
+        if (previous?.restricted && previous.retryAt > clock()) continue;
+        const retry = attempts.get(entry.id);
 
         if (
           retry &&
@@ -127,13 +136,17 @@ export function createQueueRunner(
 
           if (!active()) return;
           await transport.complete(entry.receiptId, entry);
+          retries.remove(entry.id);
           store.remove(entry);
-          retries.delete(entry.id);
+          attempts.delete(entry.id);
           record("receipt.upload_completed", {
             receiptId: entry.receiptId,
             imageCount: entry.images.length,
           });
         } catch (cause) {
+          if (cause instanceof RequestDeferred)
+            retries.write(entry.id, retryDeadline((previous?.attempts ?? 0) + 1, clock(), cause));
+          else retries.remove(entry.id);
           entry.error =
             cause instanceof Error ? cause.message : "Opplastingen mislyktes.";
           store.update(entry);
@@ -145,13 +158,21 @@ export function createQueueRunner(
             clock(),
           );
 
-          retries.set(entry.id, { failures, nextAttemptAt: next });
+          attempts.set(entry.id, { failures, nextAttemptAt: next });
 
           if (next === null)
             record("receipt.upload_paused", {
               captureId: entry.id,
               attempts: failures,
             });
+
+          if (cause instanceof RequestDeferred) {
+            for (const pending of store.list(owner, householdId)) {
+              if (pending.receiptId || pending.id === entry.id) continue;
+              retries.write(pending.id, retryDeadline(1, clock(), cause));
+              store.update({ ...pending, error: cause.message });
+            }
+          }
         }
       }
     } finally {

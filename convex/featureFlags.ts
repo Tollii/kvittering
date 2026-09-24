@@ -2,11 +2,11 @@ import { v } from "convex/values";
 import {
   query,
   internalQuery,
-  internalMutation,
   type QueryCtx,
   type MutationCtx,
 } from "./_generated/server";
 import { deploymentChannel } from "./deployment";
+import { internalMutation } from "./serverFunctions";
 import {
   platformValidator,
   channelValidator,

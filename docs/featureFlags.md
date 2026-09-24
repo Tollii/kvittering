@@ -36,3 +36,24 @@ On the first offline app start after this upgrade, the flag provider can read th
 ## Verification limits
 
 Unit and Convex tests cover defaults, parser failures, legacy transfer, revision conflicts, operator forwarding, and platform/deployment separation. The provider has one subscription by construction. Native offline startup, disconnect/reconnect, resume, and an installed old binary still require device checks before release. No live values are changed by these source changes.
+
+## Email registration
+
+`emailSignUp` defaults to false. It is a permanent account-creation control,
+not an experiment. The sign-in screen hides email registration while it is off.
+The server checks the current flag on `/sign-up/email`, including requests from
+older apps or direct HTTP clients. Existing email accounts can still sign in;
+Apple sign-in and account linking are unchanged.
+
+Authentication is shared between platforms. Enable `emailSignUp` for **both
+`ios` and `android`** in the selected deployment to allow email registration.
+Disabling either platform blocks registration on the server. Read each platform's
+revision first, then use `featureFlags:set` with `name: "emailSignUp"` and the
+required operator fields. This uses the same revision checks and history as
+other flags. No backend deployment or app rebuild is needed to change a live flag.
+An offline screen can retain an older value, but it cannot bypass the server.
+
+Enable both flags in the isolated end-to-end backend before account fixtures are
+created. Keep the staging flags off unless email registration is needed. Remove
+this flag only when email registration is retired or replaced by an account
+creation policy that provides equivalent control.

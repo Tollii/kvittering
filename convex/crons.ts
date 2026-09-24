@@ -11,4 +11,18 @@ crons.weekly(
   {},
 );
 
+crons.interval(
+  "remove expired catalog results",
+  { hours: 24 },
+  internal.retention.catalog,
+  { state: "ready" },
+);
+
+crons.interval(
+  "remove expired catalog errors",
+  { hours: 24 },
+  internal.retention.catalog,
+  { state: "error" },
+);
+
 export default crons;

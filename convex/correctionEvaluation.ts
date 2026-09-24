@@ -1,6 +1,7 @@
 "use node";
 
 import { userError } from "./userErrors";
+import { providerFetch } from "./providerTransport";
 
 import { clientValidator } from "../src/lib/releases/policy";
 import { v } from "convex/values";
@@ -74,6 +75,7 @@ export const evaluate = action({
     if (!examples.length) return { model, checked: 0, matched: 0, results: [] };
 
     const client = new TypeSafeClient({
+      fetch: providerFetch(ctx, "typesafe"),
       apiKey: env.TYPESAFE_API_KEY,
       timeout: 30000,
       retry: { maxRetries: 0 },

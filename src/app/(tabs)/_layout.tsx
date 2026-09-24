@@ -1,3 +1,5 @@
+import { useCachedReceipts } from "@/features/receipt-cache-context";
+import { useQueryLifecycle } from "@/features/query-lifecycle";
 import { useQuery } from "convex/react";
 import { api } from "../../../convex/_generated/api";
 import { NativeTabs } from "expo-router/unstable-native-tabs";
@@ -7,7 +9,24 @@ import { useHousehold } from "@/features/household-context";
 export default function TabLayout() {
   const colors = useTheme();
   const { queue } = useHousehold();
-  const attention = useQuery(api.receipts.attentionCount);
+  const cache = useCachedReceipts();
+  const { active, online } = useQueryLifecycle();
+
+  const legacy = useQuery(
+    api.receipts.attentionCount,
+    !cache.available && active && online ? {} : "skip",
+  );
+
+  const attention = cache.available
+    ? {
+        count: cache.receipts.filter(
+          (receipt) =>
+            !receipt.excluded &&
+            (receipt.status === "needs_review" || receipt.status === "failed"),
+        ).length,
+        capped: !cache.complete,
+      }
+    : legacy;
 
   // Badge only what needs a person; processing receipts resolve on their own.
   const pending =

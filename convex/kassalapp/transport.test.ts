@@ -16,7 +16,7 @@ it("adapts OpenAPI boolean query values to Kassalapp's accepted encoding", async
     .mockResolvedValue(new Response('{"data":[]}', { status: 200 }));
 
   vi.stubGlobal("fetch", fetch);
-  await kassalappFetch("/products?search=Stratos&unique=true");
+  await kassalappFetch("/products?search=Stratos&unique=true", { fetch: globalThis.fetch });
   expect(new Request(present(fetch.mock.calls[0])[0]).url).toBe(
     "https://kassal.app/api/v1/products?search=Stratos&unique=1",
   );
@@ -34,7 +34,9 @@ it("retains the rate-limit status and Retry-After delay", async () => {
         new Response("", { status: 429, headers: { "Retry-After": "120" } }),
       ),
   );
-  await expect(kassalappFetch("/products")).rejects.toMatchObject({
+  await expect(
+    kassalappFetch("/products", { fetch: globalThis.fetch }),
+  ).rejects.toMatchObject({
     status: 429,
     retryAfterMs: 120000,
   });
@@ -44,7 +46,7 @@ it("retains the rate-limit status and Retry-After delay", async () => {
       .fn<typeof globalThis.fetch>()
       .mockResolvedValue(new Response("", { status: 401 })),
   );
-  await expect(kassalappFetch("/products")).rejects.toBeInstanceOf(
-    CatalogRequestError,
-  );
+  await expect(
+    kassalappFetch("/products", { fetch: globalThis.fetch }),
+  ).rejects.toBeInstanceOf(CatalogRequestError);
 });

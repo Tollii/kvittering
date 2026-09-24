@@ -1,6 +1,7 @@
 "use node";
 
 import { Ore } from "../src/lib/domain/ore";
+import { providerFetch } from "./providerTransport";
 
 import {
   readAttributes,
@@ -218,6 +219,7 @@ export const analyze = internalAction({
       throw new Error("Product analysis is unavailable.");
 
     const client = new TypeSafeClient({
+      fetch: providerFetch(ctx, "typesafe"),
       apiKey: env.TYPESAFE_API_KEY,
       timeout: 20000,
       retry: { maxRetries: 0 },

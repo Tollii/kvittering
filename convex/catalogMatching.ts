@@ -11,7 +11,8 @@ import {
   vWorkflowId,
 } from "@convex-dev/workflow";
 import { components, internal } from "./_generated/api";
-import { internalMutation, internalQuery, env } from "./_generated/server";
+import { internalQuery, env } from "./_generated/server";
+import { internalMutation } from "./serverFunctions";
 import { requireReceipt } from "./access";
 import schema from "./schema";
 import { findMapping } from "./products";
@@ -137,10 +138,15 @@ async function launch(
   id: Id<"receipts">,
   generation: number,
 ) {
-  return startWorkflow(ctx, internal.catalogMatching.process, {
-    id,
-    generation,
-  });
+  return startWorkflow(
+    ctx,
+    internal.catalogMatching.process,
+    {
+      id,
+      generation,
+    },
+    { onComplete: internal.retention.workflowCompleted, context: null },
+  );
 }
 
 export const start = internalMutation({

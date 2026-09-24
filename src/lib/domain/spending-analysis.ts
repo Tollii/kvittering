@@ -300,7 +300,10 @@ export function spendingAnalysis(
 }
 
 export function analysisSummary(
-  report: ReturnType<typeof spendingAnalysis>,
+  report: Pick<
+    ReturnType<typeof spendingAnalysis>,
+    "currentReceipts" | "previousReceipts" | "differenceOre"
+  > & { categories: { name: string; differenceOre: number }[] },
 ): string {
   if (!report.currentReceipts) return "Ingen registrerte kjøp i perioden.";
 

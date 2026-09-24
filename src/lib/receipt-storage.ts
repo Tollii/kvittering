@@ -1,3 +1,4 @@
+import type { RetryStore } from "./request-retry";
 import { parse } from "convex-helpers/validators";
 import { v } from "convex/values";
 import { migrateReceipt, migrateReceiptDatabase } from "./receipt-migrations";
@@ -29,7 +30,7 @@ function storage() {
   if (!database) {
     const opened = openDatabaseSync(`kvitto${storageSuffix}.db`);
     opened.execSync(
-      "PRAGMA journal_mode = WAL; CREATE TABLE IF NOT EXISTS receipt_queue (id TEXT PRIMARY KEY, owner TEXT NOT NULL, household TEXT NOT NULL, data TEXT NOT NULL); CREATE TABLE IF NOT EXISTS household_cache (owner TEXT PRIMARY KEY, data TEXT NOT NULL);",
+      "PRAGMA journal_mode = WAL; CREATE TABLE IF NOT EXISTS receipt_queue (id TEXT PRIMARY KEY, owner TEXT NOT NULL, household TEXT NOT NULL, data TEXT NOT NULL); CREATE TABLE IF NOT EXISTS household_cache (owner TEXT PRIMARY KEY, data TEXT NOT NULL); CREATE TABLE IF NOT EXISTS receipt_retry (id TEXT PRIMARY KEY, attempts INTEGER NOT NULL, retryAt REAL NOT NULL, restricted INTEGER NOT NULL);",
     );
     migrateReceiptDatabase(opened);
     database = opened;
@@ -76,6 +77,33 @@ export function imageFile(name: string) {
   return new File(directory(), name);
 }
 
+export const uploadRetries: RetryStore = {
+  read(id) {
+    const row = storage().getFirstSync<{
+      attempts: number;
+      retryAt: number;
+      restricted: number;
+    }>(
+      "SELECT attempts, retryAt, restricted FROM receipt_retry WHERE id = ?",
+      id,
+    );
+
+    return row ? { ...row, restricted: row.restricted === 1 } : null;
+  },
+  write(id, deadline) {
+    storage().runSync(
+      "INSERT OR REPLACE INTO receipt_retry (id, attempts, retryAt, restricted) VALUES (?, ?, ?, ?)",
+      id,
+      deadline.attempts,
+      deadline.retryAt,
+      Number(deadline.restricted),
+    );
+  },
+  remove(id) {
+    storage().runSync("DELETE FROM receipt_retry WHERE id = ?", id);
+  },
+};
+
 export const receiptStorage: QueueStore = {
   list(owner, householdId) {
     return getOrInsert(queueSnapshots, scopeKey(owner, householdId), () => {
@@ -97,6 +125,7 @@ export const receiptStorage: QueueStore = {
     publishQueue(entry.owner, entry.householdId);
   },
   remove(entry) {
+    uploadRetries.remove(entry.id);
     // Remove the durable record only after the server has accepted every image.
     storage().runSync("DELETE FROM receipt_queue WHERE id = ?", entry.id);
     publishQueue(entry.owner, entry.householdId);

@@ -19,6 +19,7 @@ export function receiptUploadTransport(
     reserve: (entry) =>
       releaseMutation(convex, api.receipts.reserve, {
         clientId: entry.id,
+        retryMetadata: true,
         imageCount: entry.images.length,
         householdId,
         backgroundUpload: !!ReceiptIntelligence?.uploadReceiptImage,

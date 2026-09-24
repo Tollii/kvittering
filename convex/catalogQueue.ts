@@ -9,11 +9,8 @@ import {
   vWorkflowId,
 } from "@convex-dev/workflow";
 import { components, internal } from "./_generated/api";
-import {
-  internalMutation,
-  internalQuery,
-  type MutationCtx,
-} from "./_generated/server";
+import { internalQuery, type MutationCtx } from "./_generated/server";
+import { internalMutation } from "./serverFunctions";
 import type { Doc, Id } from "./_generated/dataModel";
 import schema from "./schema";
 import {

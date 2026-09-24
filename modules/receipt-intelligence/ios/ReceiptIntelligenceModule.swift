@@ -51,6 +51,19 @@ public class ReceiptIntelligenceModule: Module {
       }
     }.runOnQueue(.main)
 
+    AsyncFunction("previewLocalReceipts") { (urls: [String], promise: Promise) in
+      Task { @MainActor in
+        guard self.preview == nil, let presenter = self.appContext?.utilities?.currentViewController() else {
+          promise.reject("PREVIEW_UNAVAILABLE", "Forhåndsvisningen er allerede åpen.")
+          return
+        }
+        let preview = ReceiptPreview { self.preview = nil }
+        self.preview = preview
+        do { try preview.presentLocal(urls: urls, from: presenter); promise.resolve(nil) }
+        catch { self.preview = nil; promise.reject("PREVIEW_FAILED", error.localizedDescription) }
+      }
+    }.runOnQueue(.main)
+
     /// Render each page of a PDF receipt to a JPEG file and return the file URIs in page order.
     AsyncFunction("renderPdf") { (uri: String, maxPages: Int) throws -> [String] in
       guard let url = URL(string: uri), url.isFileURL else { throw RenderError.unavailable("PDF-filen må finnes på enheten.") }

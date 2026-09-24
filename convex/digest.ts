@@ -1,5 +1,6 @@
 import { CalendarDate } from "../src/lib/domain/calendar";
 import type { Ore } from "../src/lib/domain/ore";
+import { dailyDigest } from "../src/lib/domain/daily-digest";
 import { receiptPeriodPage } from "./receipts";
 import { featureEnabled } from "./featureFlags";
 import { v } from "convex/values";
@@ -7,11 +8,8 @@ import {
   paginationOptsValidator,
   paginationResultValidator,
 } from "convex/server";
-import {
-  internalAction,
-  internalMutation,
-  internalQuery,
-} from "./_generated/server";
+import { internalAction, internalQuery } from "./_generated/server";
+import { internalMutation } from "./serverFunctions";
 import { internal } from "./_generated/api";
 import type { Doc, Id } from "./_generated/dataModel";
 import schema from "./schema";
@@ -109,6 +107,9 @@ export const forHousehold = internalAction({
     ctx,
     args,
   ): Promise<{ title: string; body: string } | null> => {
+    const summary = await ctx.runQuery(internal.digest.summary, args);
+
+    if (summary) return summary;
     const receipts: Doc<"receipts">[] = [];
     let cursor: string | null = null;
     let budget: Ore | null = null;
@@ -195,5 +196,37 @@ export const queueMessage = internalMutation({
       });
 
     return null;
+  },
+});
+
+/** At most 45 daily rows cover the weekly comparison and its calendar month. */
+export const summary = internalQuery({
+  args: { householdId: v.id("households"), today: v.string() },
+  returns: v.union(v.object({ title: v.string(), body: v.string() }), v.null()),
+  handler: async (ctx, { householdId, today }) => {
+    const state = await ctx.db
+      .query("receiptReadModel")
+      .withIndex("by_name", (q) => q.eq("name", "receipts-v1"))
+      .unique();
+
+    if (!state?.ready) return null;
+    const household = await ctx.db.get("households", householdId);
+
+    if (!household) return null;
+    const period = digestPeriod(today);
+
+    const days = await ctx.db
+      .query("receiptDailyTotals")
+      .withIndex("by_householdId_and_date", (q) =>
+        q
+          .eq("householdId", householdId)
+          .gte("date", period.start)
+          .lte("date", period.end),
+      )
+      .take(45);
+
+    const digest = dailyDigest(days, household.monthlyBudgetOre ?? null, today);
+
+    return { title: digest.title, body: digest.body };
   },
 });

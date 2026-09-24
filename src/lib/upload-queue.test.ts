@@ -1,4 +1,9 @@
 import { present, testId } from "./testing/receipts";
+import {
+  RequestDeferred,
+  type RetryDeadline,
+  type RetryStore,
+} from "./request-retry";
 import { describe, expect, it } from "vitest";
 import { userError } from "../../convex/userErrors";
 import {
@@ -42,14 +47,26 @@ function fixture() {
   };
 
   const clock = { now: 0 };
+  const deadlines = new Map<string, RetryDeadline>();
+
+  const retries: RetryStore = {
+    read: (id) => deadlines.get(id) ?? null,
+    write: (id, value) => {
+      deadlines.set(id, value);
+    },
+    remove: (id) => {
+      deadlines.delete(id);
+    },
+  };
 
   return {
     store,
     rows: () => rows,
     clock,
-    run: createQueueRunner(store, undefined, () => clock.now),
-    // Another app start: the durable queue remains, in-memory retry limits do not.
-    restart: () => createQueueRunner(store, undefined, () => clock.now),
+    retries,
+    advance: (milliseconds: number) => { clock.now += milliseconds; },
+    run: createQueueRunner(store, undefined, retries, () => clock.now),
+    restart: () => createQueueRunner(store, undefined, retries, () => clock.now),
   };
 }
 
@@ -69,8 +86,41 @@ const failingTransport = (failure: () => Error) => {
 };
 
 describe("durable receipt upload", () => {
+  it("retains queued images after quota rejection and uses the same capture on retry", async () => {
+    const { run, rows, advance } = fixture();
+    const original = structuredClone(rows()[0]);
+    let blocked = true;
+    let uploads = 0;
+    const captureIds: string[] = [];
+
+    const transport: UploadTransport = {
+      reserve: async (entry) => {
+        captureIds.push(entry.id);
+
+        if (blocked) throw new Error("Dagens grense for kvitteringer er nådd.");
+
+        return receiptId;
+      },
+      upload: async () => {
+        uploads++;
+      },
+      complete: async () => {},
+    };
+
+    await run("user", household, transport, () => true);
+    expect(rows()).toEqual([
+      { ...original, error: "Dagens grense for kvitteringer er nådd." },
+    ]);
+    expect(uploads).toBe(0);
+    blocked = false;
+    advance(retryPolicy.firstDelayMs);
+    await run("user", household, transport, () => true);
+    expect(captureIds).toEqual([original.id, original.id]);
+    expect(uploads).toBe(2);
+    expect(rows()).toEqual([]);
+  });
   it("resumes after a failed image without reserving or uploading completed images again", async () => {
-    const { run, rows, clock } = fixture();
+    const { run, rows, advance } = fixture();
 
     let reservations = 0,
       completions = 0,
@@ -97,7 +147,7 @@ describe("durable receipt upload", () => {
     expect(present(rows()[0]).uploaded).toEqual([true, false]);
     expect(present(rows()[0]).error).toBe("Connection lost");
     fail = false;
-    clock.now += retryPolicy.firstDelayMs;
+    advance(retryPolicy.firstDelayMs);
     await run("user", household, transport, () => true);
     expect(uploaded).toEqual([0, 1]);
     expect(reservations).toBe(1);
@@ -105,7 +155,7 @@ describe("durable receipt upload", () => {
     expect(rows()).toEqual([]);
   });
   it("keeps images when the final commit fails and retries only that commit", async () => {
-    const { run, rows, clock } = fixture();
+    const { run, rows, advance } = fixture();
 
     let uploads = 0,
       fail = true;
@@ -123,7 +173,7 @@ describe("durable receipt upload", () => {
     await run("user", household, transport, () => true);
     expect(rows()).toHaveLength(1);
     fail = false;
-    clock.now += retryPolicy.firstDelayMs;
+    advance(retryPolicy.firstDelayMs);
     await run("user", household, transport, () => true);
     expect(uploads).toBe(2);
     expect(rows()).toHaveLength(0);
@@ -234,4 +284,33 @@ describe("automatic upload retries", () => {
     expect(attempts.count).toBe(3);
     expect(rows()).toHaveLength(1);
   });
+});
+
+it("does not contact the server before its quota deadline, including after runner recreation", async () => {
+  const { run, store, retries, advance, rows } = fixture();
+  let calls = 0;
+
+  const transport: UploadTransport = {
+    reserve: async () => {
+      calls++;
+      throw new RequestDeferred("Vent til i morgen.", 86_400_000);
+    },
+    upload: async () => {},
+    complete: async () => {},
+  };
+
+  await run("user", household, transport, () => true);
+  advance(60_000);
+  await run("user", household, transport, () => true);
+  await createQueueRunner(
+    store,
+    () => {},
+    retries,
+    () => 60_000,
+  )("user", household, transport, () => true);
+  expect(calls).toBe(1);
+  expect(rows()[0].images).toEqual(["first.jpg", "second.jpg"]);
+  advance(86_400_000);
+  await run("user", household, transport, () => true);
+  expect(calls).toBe(2);
 });
