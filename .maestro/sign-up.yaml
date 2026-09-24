@@ -6,6 +6,7 @@ name: Sign up and start a household
 ---
 - launchApp:
     clearState: true
+    clearKeychain: true
     permissions:
       all: allow
 # Without Sign in with Apple (an unsigned simulator build), the app opens the
@@ -34,22 +35,7 @@ name: Sign up and start a household
 - hideKeyboard
 - tapOn:
     id: "sign-in-password"
-# A secure new-password field kept only the first character of a typed string,
-# so enter the password ("kvittoendetest") one character at a time.
-- inputText: "k"
-- inputText: "v"
-- inputText: "i"
-- inputText: "t"
-- inputText: "t"
-- inputText: "o"
-- inputText: "e"
-- inputText: "n"
-- inputText: "d"
-- inputText: "e"
-- inputText: "t"
-- inputText: "e"
-- inputText: "s"
-- inputText: "t"
+- inputText: "correct horse battery staple"
 - hideKeyboard
 # The button is enabled only when name, email, and password are valid.
 - assertVisible:

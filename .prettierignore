@@ -1,6 +1,7 @@
 # Generated files, dependencies, and build output.
 node_modules
 .expo
+.convex
 expo-env.d.ts
 convex/_generated
 convex/kassalapp/generated

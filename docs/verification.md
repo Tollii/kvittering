@@ -51,9 +51,32 @@ test executed, and a mutation report for changed domain rules.
 
 `End-to-end` runs the Maestro flows in `.maestro/` on the iOS Simulator
 against a local Convex backend with the mock receipt provider. The simulator
-build is cached by native fingerprint; a JavaScript-only change reuses it. While
+uses iOS 27.0 and Xcode 27.0 on GitHub's `xcode-27` preview runner. The build
+cache includes the native fingerprint, Xcode build, architecture, and simulator
+runtime; a JavaScript-only change reuses it. The script creates or reuses the
+dedicated `Kvitto End-to-End` simulator and fails if the requested runtime is
+unavailable. While
 the repository is private, it runs for changed flows, the `e2e` label, or a
 manual dispatch. Once public, it also runs for native changes and nightly.
+
+The test script disables password autofill on its selected simulator before
+launching the app. The system's strong-password sheet can otherwise intercept
+Maestro input. The app keeps its secure field and password-autofill settings.
+The sign-up flow enters the complete test password in one command and verifies
+that registration and household creation succeed.
+
+For local flow changes after a successful native build, reuse that build:
+
+```sh
+E2E_APP_CACHE=build/derived/Build/Products/Release-iphonesimulator/kvitto.app npm run e2e:ios
+```
+
+This replaces the JavaScript bundle and reruns the flows. Use the normal
+`npm run e2e:ios` command to rebuild after native dependencies or settings change.
+Use `E2E_DEVICE` to select another dedicated test simulator. The sign-up flow
+clears app data and the simulator keychain so earlier sessions cannot sign in.
+The local database and authentication secret are retained between runs. Changing
+that secret makes existing encrypted signing keys unreadable.
 
 Tests run in random order. A failure prints the seed; reproduce it with
 `npx vitest run --sequence.seed=<seed>`. A test that fails only in some orders

@@ -53,7 +53,11 @@ if ! grep -q "Convex functions ready" "$out/convex.log"; then
   exit 1
 fi
 
-npx convex env set BETTER_AUTH_SECRET "$(openssl rand -hex 32)" >/dev/null
+# Repeated local runs keep their database and its encrypted signing keys.
+environment_names="$(npx convex env list --names-only)"
+if ! grep -qx BETTER_AUTH_SECRET <<<"$environment_names"; then
+  npx convex env set BETTER_AUTH_SECRET "$(openssl rand -hex 32)" >/dev/null
+fi
 npx convex env set RECEIPT_PROVIDER mock >/dev/null
 grep "^EXPO_PUBLIC_CONVEX" .env.local
 
@@ -78,7 +82,7 @@ else
     -destination "generic/platform=iOS Simulator" \
     -derivedDataPath build/derived \
     CODE_SIGN_IDENTITY=- CODE_SIGN_STYLE=Manual DEVELOPMENT_TEAM= \
-    PROVISIONING_PROFILE_SPECIFIER= ONLY_ACTIVE_ARCH=YES \
+    PROVISIONING_PROFILE_SPECIFIER= ARCHS="$(uname -m)" ONLY_ACTIVE_ARCH=YES \
     >"$out/xcodebuild.log" 2>&1; then
     grep -E -A 20 "error:|BUILD FAILED|Command .* failed" "$out/xcodebuild.log" | head -n 150 >&2
     echo "error: the simulator build failed; the full log is $out/xcodebuild.log." >&2
@@ -90,6 +94,9 @@ fi
 
 echo "▸ Waiting for the simulator"
 xcrun simctl bootstatus "$device" -b >/dev/null
+# The system's strong-password sheet can intercept test input. Keep this
+# preference on the test simulator; the app retains password autofill support.
+xcrun simctl spawn "$device" defaults write com.apple.WebUI AutoFillPasswords -int 0
 # Maestro installs its driver on first use; do that while the app installs.
 maestro --device "$device" hierarchy >/dev/null 2>&1 &
 driver_pid=$!

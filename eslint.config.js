@@ -19,10 +19,12 @@ module.exports = defineConfig([
       ".agents/**",
       ".codex/**",
       ".expo/**",
+      ".convex/**",
       "ios/**",
       "android/**",
       "coverage/**",
       "dist/**",
+      "build/**",
     ],
   },
   {

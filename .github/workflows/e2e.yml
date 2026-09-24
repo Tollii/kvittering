@@ -68,10 +68,12 @@ jobs:
     name: iOS Simulator flows
     needs: scope
     if: needs.scope.outputs.run == 'true'
-    runs-on: macos-26
+    runs-on: xcode-27
     timeout-minutes: 75
     env:
       MAESTRO_VERSION: 2.10.0
+      DEVELOPER_DIR: /Applications/Xcode_27.0.app/Contents/Developer
+      E2E_IOS_RUNTIME: com.apple.CoreSimulator.SimRuntime.iOS-27-0
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
         with:
@@ -103,13 +105,15 @@ jobs:
           key: npm-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
       - name: Fingerprint the native runtime
         id: fingerprint
-        run: echo "hash=$(npx expo-updates fingerprint:generate --platform ios | jq -r .hash)" >> "$GITHUB_OUTPUT"
+        run: |
+          echo "hash=$(npx expo-updates fingerprint:generate --platform ios | jq -r .hash)" >> "$GITHUB_OUTPUT"
+          echo "xcode=$(xcodebuild -version | awk 'NR == 2 { print $3 }')" >> "$GITHUB_OUTPUT"
       - name: Restore the simulator build
         id: app
         uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: build/cache/kvitto.app
-          key: e2e-ios-app-signed-${{ steps.fingerprint.outputs.hash }}
+          key: e2e-ios-app-${{ runner.arch }}-${{ steps.fingerprint.outputs.xcode }}-${{ env.E2E_IOS_RUNTIME }}-${{ steps.fingerprint.outputs.hash }}
       # The Convex CLI downloads the latest local backend; reuse it within a week.
       - name: Choose the backend cache week
         id: week
@@ -150,7 +154,7 @@ jobs:
         if: always() && steps.built.outcome == 'success'
         with:
           path: build/cache/kvitto.app
-          key: e2e-ios-app-signed-${{ steps.fingerprint.outputs.hash }}
+          key: e2e-ios-app-${{ runner.arch }}-${{ steps.fingerprint.outputs.xcode }}-${{ env.E2E_IOS_RUNTIME }}-${{ steps.fingerprint.outputs.hash }}
       - name: Upload screenshots and logs
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
