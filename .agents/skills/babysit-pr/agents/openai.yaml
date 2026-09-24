@@ -1,0 +1,4 @@
+interface:
+  display_name: "Monitor a pull request"
+  short_description: "Follow Kvitto PR checks, reviews, and merge readiness"
+  default_prompt: "Use $babysit-pr to monitor the current Kvitto PR until CI and reviews are complete; merge only if I requested it."
