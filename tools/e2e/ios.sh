@@ -106,6 +106,7 @@ if ! maestro --device "$device" test .maestro \
   xcrun simctl spawn "$device" log show --last 10m --style compact \
     --predicate 'process == "kvitto"' 2>/dev/null >"$out/app.log" || true
   echo "Last app log lines:" >&2
-  grep -iE "error|exception|fatal|crash|terminat" "$out/app.log" | tail -n 40 >&2 || true
+  grep -E "com.facebook.react.log|Unhandled|Terminating|ReactNativeJS" "$out/app.log" |
+    tail -n 40 >&2 || true
   exit 1
 fi
