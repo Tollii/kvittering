@@ -31,7 +31,7 @@ lint, types, secret scanning, and contract-snapshot diagnostics were excluded.
 Application source is unchanged. Temporary tests are preserved as documentation
 in [reproductions](reproductions.md).
 
-The [plan index](../README.md#application-risk-review--24-september-2026) owns
+The [plan index](../README.md#application-risk-review-release-checks) owns
 execution status. P1 means a high-priority cost-control or data-loss risk. P2
 means a concrete defect or requirement with a narrower trigger. These priorities
 are not vulnerability scores.
