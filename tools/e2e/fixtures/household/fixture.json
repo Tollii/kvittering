@@ -1,0 +1,22 @@
+{
+  "account": {
+    "name": "E2E Tester",
+    "email": "reviewed-receipts@example.com",
+    "password": "correct horse battery staple"
+  },
+  "tables": {
+    "households": [
+      {
+        "name": "Test household",
+        "invitation": "0123456789abcdef0123456789abcdef"
+      }
+    ],
+    "members": [
+      {
+        "householdId": "${HOUSEHOLD_ID}",
+        "identity": "${USER_IDENTITY}",
+        "name": "E2E Tester"
+      }
+    ]
+  }
+}

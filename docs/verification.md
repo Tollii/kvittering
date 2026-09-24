@@ -104,6 +104,23 @@ and fails more precisely than the next.
 5. **A flow across screens, native modules, and the backend**: a Maestro flow
    in `.maestro/`. Keep flows few and focused on journeys whose failure would
    lose data or block people, such as signing in, capturing, and saving.
+   Root flows start empty; keep `.maestro/sign-up.yaml` there. To use seeded
+   data, put a flow in `.maestro/<fixture>/` and its data in
+   `tools/e2e/fixtures/<fixture>/fixture.json`. Run `npm run e2e:ios` as usual.
+   The runner clears the anonymous local deployment before each flow, creates
+   the fixture account through email sign-up, and imports tables with the
+   Convex CLI. Each flow must use `launchApp` with `clearState: true`.
+   Sign in with `${E2E_EMAIL}` and `${E2E_PASSWORD}` supplied by the runner.
+   A fixture has `tables` and one `account` (name, email, password of at least
+   12 characters). Use `includes: ["household"]` to reuse the base household;
+   included table rows are appended. Supply exactly one household. Use
+   `${HOUSEHOLD_ID}` and `${USER_IDENTITY}` as complete field values for app
+   references. `${USER_IDENTITY}` combines the auth issuer and user ID, as
+   Kvitto requires; `${USER_ID}` is the raw Better Auth ID.
+   Keep receipt amounts in øre and unknown product data null. The
+   `reviewed-receipts` fixture is an example with three reviewed receipts.
+   `npm run check` validates every fixture against the real table validators.
+   Per-flow seed logs, reports, and screenshots are in `build/e2e/flows/`.
 6. **A repository-wide rule**: a lint rule in `tools/eslint`, with valid and
    invalid cases in `tools/eslint/rules.test.cjs`. Its message must say how to
    fix the finding. Prefer this to a sentence in a document that asks people to
