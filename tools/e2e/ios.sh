@@ -88,5 +88,16 @@ if ! maestro --device "$device" test .maestro \
   echo "Visible text when the flow failed:" >&2
   maestro --device "$device" hierarchy >"$out/hierarchy.json" 2>/dev/null || true
   grep -oE '"(text|accessibilityText|hintText)" *: *"[^"]+"' "$out/hierarchy.json" | sort -u | head -n 60 >&2 || true
+  # A launch crash leaves a report and the app's last log lines.
+  report="$(find "$HOME/Library/Logs/DiagnosticReports" -name 'kvitto*' -newer "$out/convex.log" 2>/dev/null | head -n 1)"
+  if [[ -n "$report" ]]; then
+    cp "$report" "$out/"
+    echo "Crash report $report:" >&2
+    head -c 6000 "$report" >&2
+  fi
+  xcrun simctl spawn "$device" log show --last 10m --style compact \
+    --predicate 'process == "kvitto"' 2>/dev/null >"$out/app.log" || true
+  echo "Last app log lines:" >&2
+  grep -iE "error|exception|fatal|crash|terminat" "$out/app.log" | tail -n 40 >&2 || true
   exit 1
 fi
