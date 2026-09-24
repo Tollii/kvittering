@@ -4,8 +4,6 @@ Updated 22 September 2026. This is a maintenance record, not required agent cont
 
 The cleanup keeps seven repository entry points and sixteen distinct personal entry points. Skill count, description size, selection precision and invocation frequency determine where context reduction is useful. File length alone is not a reason to shorten or split a skill.
 
-The first cleanup removed useful material. The [preservation record](skill-preservation.md) now accounts for all 54 original sources, identifies their current destinations, and states what remains removed and why. It includes the earlier design-guidance correction and the subsequent review of all other skills.
-
 ## Context priorities
 
 1. Keep descriptions concise and specific because they participate in skill selection. Avoid long trigger lists and descriptions that attract unrelated work.
@@ -28,7 +26,7 @@ The strict review rubric, UI polish criteria, backup and migration procedures, a
 | [release-review](../.agents/skills/release-review/SKILL.md)                   | Installed-client, local queue, workflow replay, policy, native and OTA compatibility.                                                           |
 | [typesafe-ai](../.agents/skills/typesafe-ai/SKILL.md)                         | Judgment design, candidate coverage, uncertainty, composition, evaluation, documentation map and implementation patterns.                       |
 
-Of the original 35 repository entry points, 27 are consolidated into these entries, references or [backend operations](backend-operations.md). The provider transcript-upload skill is archived only; the preservation record explains that decision. Optional agent, billing, scheduling, domain and component-authoring guides remain available locally through the implementation skill.
+Of the original 35 repository entry points, 27 are consolidated into these entries, references or [backend operations](backend-operations.md). The provider transcript-upload skill is archived only. Optional agent, billing, scheduling, domain and component-authoring guides remain available locally through the implementation skill.
 
 Backend operations owns target selection, authorization scope, environment handling, fixtures and snapshot retention. Code edits and reviews do not imply deployment. Implementation and authorization guidance follows this application's Better Auth and household access model.
 
@@ -55,7 +53,7 @@ These changes affect other repositories on this machine. Each source is listed o
 | thermo-nuclear-code-quality-review | Strict gate, detailed standards, diagnostic questions, remedies and approval criteria.                                    |
 | wayfinder                          | Decision records, dependencies, evidence, ownership and session resumption.                                               |
 
-The preservation record links to each personal destination. These files are outside the repository and will not be included in a Kvitto Git commit. System and plugin-managed packages were not changed.
+The personal skills are outside the repository and are not included in a Kvitto Git commit. System and plugin-managed packages were not changed.
 
 ## Ownership and discovery
 
