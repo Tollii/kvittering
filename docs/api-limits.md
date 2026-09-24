@@ -42,7 +42,10 @@ are not refunded. A rejected allowance prevents the network call. If quota
 storage fails, the request fails without contacting the provider.
 
 Receipt extraction permits at most 16,000 output tokens per request. Receipt
-uploads already permit at most eight images of 10 MiB each. These constraints
+new uploads permit at most five images of 10 MiB each. Existing server
+reservations made under the old eight-image rule can still finish with their
+persisted image count. That temporary compatibility exception also applies to
+the extraction provider input; client metadata cannot request it. These constraints
 and request caps limit use; **they are not exact currency budgets**. Token prices,
 input size, model selection, and provider billing rules still determine cost.
 A monetary ceiling requires a priced reservation model or an enforceable limit
@@ -73,3 +76,19 @@ Older clients keep their existing receipt API contracts and receive quota errors
 They may still show email registration, but the server rejects it when disabled.
 No minimum version change or local queue migration is required. Device upgrade,
 offline startup, and an actual old binary must still be checked before release.
+
+## Five-image transition
+
+Deploy the client with queue recovery before enforcing the new reservation
+limit. A new receipt can contain one through five images. Existing server
+reservations with six through eight images remain idempotent and can finish.
+Their stored image count, not the caller's version, controls this exception.
+
+An older unreserved queue is retained after the server rejects its image count.
+The updated Inbox lets the person select two groups of at most five images.
+This creates two receipts only after explicit selection. The transaction keeps
+all original files and rolls back on a write failure. Regrouping is unavailable
+while an upload attempt is active, until the server has rejected the old count,
+or after reservation. Unknown future payloads remain untouched. No queue schema
+version change is needed. Test this transition on installed binaries before
+release; this local change does not deploy the stricter backend.

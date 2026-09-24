@@ -1,3 +1,4 @@
+import { legacyReceiptImages } from "./domain/receipt-images";
 import { z } from "zod";
 import { v } from "convex/values";
 import { parse } from "convex-helpers/validators";
@@ -41,7 +42,7 @@ export function migrateReceipt(value: unknown): LocalReceipt {
     !result.owner ||
     !Number.isFinite(result.createdAt) ||
     result.images.length < 1 ||
-    result.images.length > 8 ||
+    result.images.length > legacyReceiptImages ||
     result.images.length !== result.uploaded.length ||
     result.images.some(
       (name) =>

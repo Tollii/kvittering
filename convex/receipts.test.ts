@@ -944,3 +944,53 @@ it("propagates changed aliases in one finite scan and skips unchanged decisions"
     vi.useRealTimers();
   }
 });
+
+it("accepts up to five new images and preserves an existing eight-image reservation", async () => {
+  const { t, first, householdId } = await setup();
+
+  for (const imageCount of [0, 6, 8, 1.5, 100])
+    await expect(
+      first.mutation(api.receipts.reserve, {
+        householdId,
+        imageCount,
+        clientId: `image-limit-${String(imageCount).padStart(8, "0")}`,
+      }),
+    ).rejects.toThrow(/Ugyldig|Maks 5/);
+
+  for (const imageCount of [1, 5]) {
+    const id = await first.mutation(api.receipts.reserve, {
+      householdId,
+      imageCount,
+      clientId: `image-valid-${imageCount}-request`,
+    });
+
+    expect(
+      (await first.query(api.receipts.detail, { id }))?.receipt.imageCount,
+    ).toBe(imageCount);
+    await expect(
+      first.query(internal.receipts.imageAccess, { id, position: imageCount }),
+    ).rejects.toThrow(/Ugyldig|Maks 5/);
+  }
+
+  const id = await t.run((ctx) => {
+    const { _id, _creationTime, ...fields } = receiptFixture({
+      householdId,
+      imageCount: 8,
+      clientId: "legacy-eight-image-request",
+      status: "uploading",
+    });
+
+    return ctx.db.insert("receipts", fields);
+  });
+
+  expect(
+    await first.mutation(api.receipts.reserve, {
+      householdId,
+      imageCount: 8,
+      clientId: "legacy-eight-image-request",
+    }),
+  ).toBe(id);
+  expect(
+    await first.query(internal.receipts.imageAccess, { id, position: 7 }),
+  ).toMatchObject({ receipt: { _id: id } });
+});

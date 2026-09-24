@@ -91,3 +91,20 @@ The integration test checks scheduled work across two pages, manual category
 precedence, a later receipt outside the boundary, one revision per target,
 idempotent continuation, and an unchanged repeated save. All 354 tests and
 `check:ci` passed. No association backfill is needed.
+
+## 009 — Five images and legacy queue recovery
+
+New capture/import, durable admission, and server reservations share a five-image
+policy. Existing reservations remain recoverable up to their persisted count of
+eight. This is an explicit temporary provider-input exception for old data, not
+a client-version bypass. Existing unreserved queues retain all files after a
+count rejection. Inbox offers deliberate image selection into two groups, in
+one SQLite transaction, only when no upload attempt is active.
+
+Checks cover new counts, position bounds, legacy reservation reuse, image/PDF
+import rejection and retry, queue operation locking, transaction rollback,
+account scope, reserved entries, and unknown future payload preservation. Native
+PDF code already rejects oversized documents before rendering; it does not
+truncate them. Signed-device camera, background upload, and installed-client
+upgrade flows remain release checks. Client recovery must precede backend
+count enforcement. No backend or native release was published here.

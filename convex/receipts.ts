@@ -9,6 +9,11 @@ import {
   isReceiptProcessing,
   receiptStatusValidator,
 } from "../src/lib/domain/receipt-state";
+import {
+  maxReceiptImages,
+  legacyReceiptImages,
+  receiptImageLimitMessage,
+} from "../src/lib/domain/receipt-images";
 import { trackWorkflow } from "./retention";
 import { consumeReceiptQuota } from "./rateLimits";
 import { notifyReceiptActivities } from "./liveActivities";
@@ -28,7 +33,7 @@ import { recordCorrections } from "./corrections";
 import { lineEvidenceKey } from "../src/lib/catalog/matching";
 import { productChange } from "./products";
 import { resolveProductSelections } from "./catalogLinks";
-import { v } from "convex/values";
+import { ConvexError, v } from "convex/values";
 import {
   type PaginationOptions,
   paginationOptsValidator,
@@ -123,7 +128,7 @@ export const reserve = mutation({
       !/^[\w-]{16,80}$/.test(args.clientId) ||
       !Number.isInteger(args.imageCount) ||
       args.imageCount < 1 ||
-      args.imageCount > 8
+      args.imageCount > legacyReceiptImages
     )
       throw userError("Ugyldig opplasting.");
 
@@ -143,6 +148,8 @@ export const reserve = mutation({
       return existing._id;
     }
 
+    if (args.imageCount > maxReceiptImages)
+      throw new ConvexError(receiptImageLimitMessage);
     await consumeReceiptQuota(ctx, member, args.retryMetadata);
 
     return ctx.db.insert("receipts", {

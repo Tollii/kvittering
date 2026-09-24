@@ -41,6 +41,7 @@ import {
   cacheHousehold,
   receiptStorage,
   uploadRetries,
+  regroupQueuedReceipt,
 } from "@/lib/receipt-storage";
 import { visibleHousehold } from "@/lib/household";
 import { createQueueRunner, type LocalReceipt } from "@/lib/upload-queue";
@@ -329,6 +330,11 @@ function HouseholdProvider({
         queue,
         synchronize,
         retryFailedUploads,
+        regroup: (id, selected) => {
+          if (drainQueue.isRunning())
+            throw new Error("Vent til opplastingsforsøket er ferdig.");
+          regroupQueuedReceipt(owner, household.id, id, selected);
+        },
       }}
     >
       <ReceiptCacheProvider

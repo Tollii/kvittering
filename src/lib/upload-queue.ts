@@ -63,7 +63,7 @@ export function createQueueRunner(
   let running = false;
   const attempts = new Map<string, RetryState>();
 
-  return async (
+  const run = async (
     owner: string,
     householdId: Id<"households">,
     transport: UploadTransport,
@@ -179,4 +179,6 @@ export function createQueueRunner(
       running = false;
     }
   };
+
+  return Object.assign(run, { isRunning: () => running });
 }

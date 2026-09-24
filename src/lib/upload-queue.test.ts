@@ -314,3 +314,33 @@ it("does not contact the server before its quota deadline, including after runne
   await run("user", household, transport, () => true);
   expect(calls).toBe(2);
 });
+
+it("reports an active reservation until its failure is persisted", async () => {
+  const { run, rows } = fixture();
+
+  let rejectReservation: (cause: Error) => void = (cause) => {
+    throw cause;
+  };
+
+  const reservation = new Promise<typeof receiptId>((_, reject) => {
+    rejectReservation = reject;
+  });
+
+  const pending = run(
+    "user",
+    household,
+    {
+      reserve: async () => reservation,
+      upload: async () => {},
+      complete: async () => {},
+    },
+    () => true,
+  );
+
+  expect(run.isRunning()).toBe(true);
+  rejectReservation(new Error("Image limit"));
+  await pending;
+  expect(run.isRunning()).toBe(false);
+  expect(rows()[0].error).toBe("Image limit");
+  expect(rows()[0].images).toEqual(["first.jpg", "second.jpg"]);
+});

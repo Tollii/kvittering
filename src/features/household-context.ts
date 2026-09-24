@@ -13,6 +13,7 @@ export type SessionData = {
   online: boolean;
   queue: LocalReceipt[];
   synchronize: () => Promise<void>;
+  regroup: (id: string, selected: number[]) => void;
   retryFailedUploads: () => Promise<void>;
 };
 
