@@ -1,5 +1,5 @@
 import { useEffect } from "react";
-import { useHousehold } from "./session";
+import { useHousehold } from "./household-context";
 import { storageSuffix } from "@/lib/deployment-storage";
 import { updatePurchaseWidget } from "@/lib/purchase-widget";
 import { purchaseWidgetData } from "@/lib/purchase-widget-data";

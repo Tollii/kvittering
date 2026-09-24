@@ -1,4 +1,4 @@
-import type { ImportedFile } from "@/lib/receipt-import";
+import type { ImportedFile } from "./receipt-import";
 
 export type ImportBatch = {
   id: number;

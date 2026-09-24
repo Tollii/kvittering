@@ -2,7 +2,7 @@ import { useQuery } from "convex/react";
 import { api } from "../../../convex/_generated/api";
 import { NativeTabs } from "expo-router/unstable-native-tabs";
 import { useTheme } from "@/constants/theme";
-import { useHousehold } from "@/features/session";
+import { useHousehold } from "@/features/household-context";
 
 export default function TabLayout() {
   const colors = useTheme();

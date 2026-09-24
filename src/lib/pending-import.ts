@@ -1,5 +1,5 @@
 import { useSyncExternalStore } from "react";
-import { createImportQueue } from "@/features/capture-import";
+import { createImportQueue } from "@/lib/capture-import";
 
 const imports = createImportQueue();
 

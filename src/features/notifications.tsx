@@ -17,7 +17,7 @@ import { router } from "expo-router";
 import { useConvex, useQuery, type ConvexReactClient } from "convex/react";
 import { api } from "../../convex/_generated/api";
 import { Button, Copy, Notice } from "@/components/ui";
-import { useHousehold } from "./session";
+import { useHousehold } from "./household-context";
 
 const tokenKey = "kvitto.push-token";
 

@@ -4,7 +4,7 @@ import Storage from "expo-sqlite/kv-store";
 import ReceiptIntelligence from "../../modules/receipt-intelligence/src/ReceiptIntelligenceModule";
 import { api } from "../../convex/_generated/api";
 import { Copy, Toggle } from "@/components/ui";
-import { useHousehold } from "./session";
+import { useHousehold } from "./household-context";
 import { reportError } from "@/lib/observability";
 import { storageSuffix } from "@/lib/deployment-storage";
 

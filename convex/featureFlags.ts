@@ -6,7 +6,7 @@ import {
   type QueryCtx,
   type MutationCtx,
 } from "./_generated/server";
-import { deploymentChannel } from "./releasePolicy";
+import { deploymentChannel } from "./deployment";
 import {
   platformValidator,
   channelValidator,

@@ -2,7 +2,7 @@ import { useEffect } from "react";
 import { router, Stack, useLocalSearchParams } from "expo-router";
 import { Button, Copy, Loading, Notice, Screen } from "@/components/ui";
 import { useReceiptHistory } from "@/features/receipt-queries";
-import { useHousehold } from "@/features/session";
+import { useHousehold } from "@/features/household-context";
 import { latestStoreReceipt, shortcutStore } from "@/lib/shortcut-selection";
 
 export default function ReceiptShortcut() {

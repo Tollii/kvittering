@@ -17,7 +17,7 @@ import {
 import { IllustratedEmpty } from "@/components/monument-artwork";
 import { ReceiptCard, openReceipt } from "@/components/receipt-card";
 import { SwipeToApprove } from "@/features/swipe-approve";
-import { useHousehold } from "@/features/session";
+import { useHousehold } from "@/features/household-context";
 import { useTheme } from "@/constants/theme";
 import { quickApproveData } from "@/lib/domain/receipt-review";
 

@@ -31,7 +31,7 @@ import {
   Panel,
   pressed,
 } from "@/components/ui";
-import { useHousehold } from "@/features/session";
+import { useHousehold } from "@/features/household-context";
 import { saveLocalReceipts } from "@/lib/receipt-storage";
 import {
   importReceiptFiles,
@@ -47,7 +47,7 @@ import {
   offerImportedFiles,
   usePendingImports,
 } from "@/lib/pending-import";
-import { nextImport, type ImportOutcome } from "@/features/capture-import";
+import { nextImport, type ImportOutcome } from "@/lib/capture-import";
 import { useTheme } from "@/constants/theme";
 
 const cameraBackground = "#101C51";

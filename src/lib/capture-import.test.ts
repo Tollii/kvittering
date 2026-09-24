@@ -1,5 +1,5 @@
 import { expect, it } from "vitest";
-import { createImportQueue, nextImport } from "../features/capture-import";
+import { createImportQueue, nextImport } from "./capture-import";
 
 it("starts waiting files after capture becomes idle", () => {
   const queue = createImportQueue();

@@ -14,7 +14,7 @@ import {
   useAppleAuthentication,
 } from "./apple-authentication";
 import { disableNotifications } from "./notifications";
-import { useHousehold } from "./session";
+import { useHousehold } from "./household-context";
 
 export function AccountSettings({ disabled }: Readonly<{ disabled: boolean }>) {
   const available = useAppleAuthentication();

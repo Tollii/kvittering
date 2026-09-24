@@ -144,6 +144,52 @@ module.exports = defineConfig([
     rules: { "kvitto/no-inline-literal-set": "error" },
   },
   {
+    files: ["src/**/*.{ts,tsx}", "convex/**/*.ts"],
+    rules: {
+      "import/no-cycle": ["error", { ignoreExternal: true }],
+    },
+  },
+  {
+    files: ["src/lib/**/*.ts", "convex/**/*.ts"],
+    ignores: ["**/*.test.ts"],
+    rules: {
+      // Dependencies point inward: screens and features use lib; lib and the
+      // backend never import screens, features, or components.
+      "import/no-restricted-paths": [
+        "error",
+        {
+          zones: [
+            {
+              target: ["./src/lib", "./convex"],
+              from: ["./src/app", "./src/features", "./src/components"],
+            },
+          ],
+        },
+      ],
+    },
+  },
+  {
+    files: ["src/lib/domain/**/*.ts", "src/lib/catalog/**/*.ts"],
+    rules: {
+      // Domain rules stay pure so tests and the backend can run them.
+      "no-restricted-imports": [
+        "error",
+        {
+          patterns: [
+            {
+              regex: "^(react|react-native|expo[^/]*|convex/react)(/|$)",
+              message: "Domain code must not depend on React or Expo.",
+            },
+            {
+              regex: "^@/(app|features|components)/",
+              message: "Domain code must not depend on UI modules.",
+            },
+          ],
+        },
+      ],
+    },
+  },
+  {
     files: ["convex/**/*.ts"],
     ignores: ["**/*.test.ts"],
     rules: {

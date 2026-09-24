@@ -9,7 +9,7 @@ import type { Id } from "../../convex/_generated/dataModel";
 import { releaseMutation } from "@/lib/releases/requests";
 import { reportError } from "@/lib/observability";
 import { storageSuffix } from "@/lib/deployment-storage";
-import { useHousehold } from "./session";
+import { useHousehold } from "./household-context";
 import { Button, Notice } from "@/components/ui";
 
 const key = "receipt-live-activity";

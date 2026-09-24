@@ -34,7 +34,7 @@ import {
 } from "@/components/ui";
 import { MonumentArtwork } from "@/components/monument-artwork";
 import { SpendingBars, SpendingDetails } from "@/components/spending-details";
-import { useHousehold } from "@/features/session";
+import { useHousehold } from "@/features/household-context";
 import {
   comparisonInsights,
   receiptCoverage,

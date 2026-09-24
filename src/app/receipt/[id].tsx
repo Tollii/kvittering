@@ -4,7 +4,7 @@ import { router, Stack, useLocalSearchParams } from "expo-router";
 import { useQuery } from "convex-helpers/react/cache";
 import { api } from "../../../convex/_generated/api";
 import { Button, Copy, Icon, Loading, Screen } from "@/components/ui";
-import { useHousehold } from "@/features/session";
+import { useHousehold } from "@/features/household-context";
 import { ReceiptEditor } from "@/features/receipt-editor";
 
 export default function ReceiptPage() {

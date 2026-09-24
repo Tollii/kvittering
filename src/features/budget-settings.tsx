@@ -5,7 +5,7 @@ import { useConvex } from "convex/react";
 import { api } from "../../convex/_generated/api";
 import { Button, Copy, Notice } from "@/components/ui";
 import { MoneyField } from "@/components/money-field";
-import { useHousehold } from "./session";
+import { useHousehold } from "./household-context";
 import { formatMoney } from "@/lib/domain/receipt";
 
 /** A single monthly number. Forbruk shows pace against it; Sunday's push reports it. */

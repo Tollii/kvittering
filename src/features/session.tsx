@@ -10,9 +10,7 @@ import { recordEvent, reportError } from "@/lib/observability";
 import { ReleasePolicyProvider, useReleasePolicy } from "./release-policy";
 import { receiptUploadTransport } from "@/lib/receipt-upload-transport";
 import {
-  createContext,
   useCallback,
-  useContext,
   useEffect,
   useRef,
   useState,
@@ -28,7 +26,6 @@ import {
   useQuery,
 } from "convex/react";
 import { api } from "../../convex/_generated/api";
-import type { FunctionReturnType } from "convex/server";
 import {
   authClient,
   convexSiteUrl,
@@ -40,7 +37,6 @@ import {
   cachedHousehold,
   cacheHousehold,
   receiptStorage,
-  type CachedHousehold,
 } from "@/lib/receipt-storage";
 import { visibleHousehold } from "@/lib/household";
 import { createQueueRunner, type LocalReceipt } from "@/lib/upload-queue";
@@ -48,36 +44,15 @@ import { Loading, Notice, Screen } from "@/components/ui";
 import { CatalogQueryProvider } from "./catalog-query-provider";
 import { NavigationQueryProvider } from "./navigation-query-provider";
 import { SignIn, HouseholdSetup } from "./sign-in";
-
-type Household = NonNullable<FunctionReturnType<typeof api.households.current>>;
-
-type SessionData = {
-  owner: string;
-  household: CachedHousehold;
-  details: Household | undefined;
-  online: boolean;
-  queue: LocalReceipt[];
-  synchronize: () => Promise<void>;
-  retryFailedUploads: () => Promise<void>;
-};
+import { SessionContext } from "./household-context";
 
 const emptyQueue: LocalReceipt[] = [];
-
-const SessionContext = createContext<SessionData | null>(null);
 
 const client = convexUrl
   ? new ConvexReactClient(convexUrl, { unsavedChangesWarning: false })
   : null;
 
 const drainQueue = createQueueRunner(receiptStorage, recordEvent);
-
-export function useHousehold() {
-  const value = useContext(SessionContext);
-
-  if (!value) throw new Error("Husstanden er ikke klar.");
-
-  return value;
-}
 
 function useSessionAuth() {
   const session = authClient.useSession();

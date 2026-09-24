@@ -1,4 +1,5 @@
 import { readFeatureFlags, writeFeatureFlags } from "./featureFlags";
+import { deploymentChannel } from "./deployment";
 import { featureNameValidator, legacyFeatures } from "../src/lib/featureFlags";
 import { ConvexError, v } from "convex/values";
 import {
@@ -20,22 +21,8 @@ import {
   type ClientRelease,
   type Feature,
   type Platform,
-  type Channel,
   type ReleasePolicy,
 } from "../src/lib/releases/policy";
-
-export function deploymentChannel(): Channel {
-  const value = process.env.RELEASE_CHANNEL ?? "development";
-
-  if (
-    value !== "development" &&
-    value !== "testflight" &&
-    value !== "production"
-  )
-    throw new Error("Invalid RELEASE_CHANNEL.");
-
-  return value;
-}
 
 export async function readPolicy(
   ctx: Pick<QueryCtx, "db">,

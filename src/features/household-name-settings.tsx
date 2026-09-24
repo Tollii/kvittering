@@ -2,7 +2,7 @@ import { useState } from "react";
 import { api } from "../../convex/_generated/api";
 import { Button, Field, Notice, Row, Sheet } from "@/components/ui";
 import { useReleaseMutation } from "@/lib/releases/requests";
-import { useHousehold } from "./session";
+import { useHousehold } from "./household-context";
 
 export function HouseholdNameSettings() {
   const { household, online } = useHousehold();
