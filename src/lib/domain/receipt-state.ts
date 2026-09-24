@@ -1,4 +1,6 @@
 import { v, type Infer } from "convex/values";
+import type { Doc } from "../../../convex/_generated/dataModel";
+import type { ReceiptData } from "./receipt";
 
 export const receiptStatusValidator = v.union(
   v.literal("uploading"),
@@ -11,10 +13,7 @@ export const receiptStatusValidator = v.union(
 
 export type ReceiptStatus = Infer<typeof receiptStatusValidator>;
 
-/**
- * Images are still arriving or being read. The receipt's data may change, so
- * it cannot be edited, retried, or enriched yet.
- */
+/** Images are still uploading or being read, so the receipt's data may be missing or replaced. */
 export function isReceiptProcessing(status: ReceiptStatus): boolean {
   switch (status) {
     case "uploading":
@@ -70,4 +69,16 @@ export function needsAttention(status: ReceiptStatus): boolean {
     case "reviewed":
       return false;
   }
+}
+
+/** A stored receipt whose reader result is present. */
+export type ExtractedReceipt = Doc<"receipts"> & { data: ReceiptData };
+
+/** Parse a stored receipt once at an entry point so later steps can rely on its data. */
+export function extractedReceipt(
+  receipt: Doc<"receipts">,
+): ExtractedReceipt | null {
+  const { data } = receipt;
+
+  return data ? { ...receipt, data } : null;
 }

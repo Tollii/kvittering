@@ -1,5 +1,5 @@
 import { Ore } from "./ore";
-import type { Receipt, Contribution } from "./insights";
+import type { Receipt, PurchaseContribution } from "./insights";
 import {
   preparePurchases,
   overviewPurchasePolicy,
@@ -16,7 +16,7 @@ export type FamilyPurchase = {
   amountOre: Ore;
   quantity: PurchaseQuantity;
   coverage: Record<keyof PurchaseQuantity, number>;
-  contributions: (Contribution & { quantity: PurchaseQuantity })[];
+  contributions: (PurchaseContribution & { quantity: PurchaseQuantity })[];
 };
 
 export function familyInsights(receipts: Receipt[]) {

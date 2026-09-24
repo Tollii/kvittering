@@ -33,9 +33,10 @@ export const match = internalAction({
         : null;
 
     const deadline = Date.now() + 45000;
-    let available = !!client;
+    let model = client;
+    const retailer = args.data.store;
 
-    if (!args.data.store) return decisions;
+    if (!retailer) return decisions;
 
     for (let offset = 0; offset < lines.length; offset += 12) {
       const batch = lines.slice(offset, offset + 12);
@@ -46,7 +47,7 @@ export const match = internalAction({
           position: offset + index,
           ...(await ctx.runQuery(internal.products.prepare, {
             id: args.id,
-            retailer: args.data.store!,
+            retailer,
             line,
           })),
         })),
@@ -63,7 +64,7 @@ export const match = internalAction({
         return false;
       });
 
-      if (!unresolved.length || !available || Date.now() >= deadline) continue;
+      if (!unresolved.length || !model || Date.now() >= deadline) continue;
 
       try {
         const questions = Object.fromEntries(
@@ -91,7 +92,7 @@ export const match = internalAction({
           }),
         );
 
-        const response = await client!.systemOne({
+        const response = await model.systemOne({
           model: env.TYPESAFE_MODEL ?? "jev-latest",
           state: {
             items: unresolved.map((item) => ({
@@ -126,7 +127,7 @@ export const match = internalAction({
         });
       } catch {
         // Keep exact mappings available, but stop model calls after a provider failure.
-        available = false;
+        model = null;
       }
     }
 

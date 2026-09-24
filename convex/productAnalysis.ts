@@ -1,4 +1,4 @@
-import { hasReceiptBeenRead } from "../src/lib/domain/receipt-status";
+import { hasReceiptBeenRead } from "../src/lib/domain/receipt-state";
 import { featureEnabled } from "./featureFlags";
 import { clientMutation as mutation } from "./clientFunctions";
 import { productAttributesValidator } from "../src/lib/domain/product-attributes";
@@ -27,6 +27,11 @@ import {
 import { productSearch } from "../src/lib/catalog/search";
 import { catalogProductValidator } from "../src/lib/catalog/model";
 import { lineValidator } from "../src/lib/domain/receipt";
+import {
+  extractedReceipt,
+  type ExtractedReceipt,
+} from "../src/lib/domain/receipt-state";
+import { getOrInsert } from "../src/lib/map-cache";
 
 const snapshot = {
   id: v.id("receipts"),
@@ -39,17 +44,20 @@ const manager = new WorkflowManager(components.productAnalysisWorkflow, {
   workpoolOptions: { maxParallelism: 1 },
 });
 
+/** The receipt snapshot this analysis run was started for, or null once it is stale. */
 function current(
-  receipt: Doc<"receipts"> | null,
+  row: Doc<"receipts"> | null,
   args: { generation: number; revision: number; version: number },
-) {
-  return (
+): ExtractedReceipt | null {
+  const receipt = row && extractedReceipt(row);
+
+  return receipt &&
     args.version === productAnalysisVersion &&
-    !!receipt?.data &&
     !receipt.excluded &&
     receipt.generation === args.generation &&
     receipt.revision === args.revision
-  );
+    ? receipt
+    : null;
 }
 
 export const process = manager
@@ -155,11 +163,8 @@ export const ensure = mutation({
 export const read = internalQuery({
   args: snapshot,
   returns: v.union(schema.doc("receipts"), v.null()),
-  handler: async (ctx, args) => {
-    const receipt = await ctx.db.get("receipts", args.id);
-
-    return current(receipt, args) ? receipt : null;
-  },
+  handler: async (ctx, args) =>
+    current(await ctx.db.get("receipts", args.id), args),
 });
 
 const preparedProfileValidator = v.object({
@@ -173,34 +178,34 @@ export type PreparedProfile = Infer<typeof preparedProfileValidator>;
 
 async function prepareProfiles(
   ctx: QueryCtx,
-  receipt: Doc<"receipts">,
+  receipt: ExtractedReceipt,
   lineIds: string[],
 ): Promise<PreparedProfile[]> {
-  const profiles = new Map<string, Doc<"productProfiles"> | null>();
-  const catalogs = new Map<string, Doc<"catalogProducts"> | null>();
-  const categories = new Map<string, Doc<"productFamilies">[]>();
-  const names = new Map<string, Doc<"productFamilies">[]>();
+  const profiles = new Map<string, Promise<Doc<"productProfiles"> | null>>();
+  const catalogs = new Map<string, Promise<Doc<"catalogProducts"> | null>>();
+  const categories = new Map<string, Promise<Doc<"productFamilies">[]>>();
+  const names = new Map<string, Promise<Doc<"productFamilies">[]>>();
   const result: PreparedProfile[] = [];
 
   for (const lineId of lineIds) {
-    const line = receipt.data!.lines.find(
+    const line = receipt.data.lines.find(
       (item) => item.id === lineId && item.kind === "product",
     );
 
     if (!line) continue;
-    const key = productProfileKey(line);
 
-    if (!profiles.has(key))
-      profiles.set(
-        key,
-        await ctx.db
+    const profile = await getOrInsert(
+      profiles,
+      productProfileKey(line),
+      (key) =>
+        ctx.db
           .query("productProfiles")
           .withIndex("by_householdId_and_key", (q) =>
             q.eq("householdId", receipt.householdId).eq("key", key),
           )
           .unique(),
-      );
-    const profile = profiles.get(key) ?? null;
+    );
+
     let families: Doc<"productFamilies">[] = [];
     let catalog = null;
 
@@ -211,12 +216,11 @@ async function prepareProfiles(
 
       if (family?.householdId === receipt.householdId) families = [family];
     } else {
-      const category = line.categoryId ?? "fallback.unclear";
-
-      if (!categories.has(category))
-        categories.set(
-          category,
-          await ctx.db
+      const byCategory = await getOrInsert(
+        categories,
+        line.categoryId ?? "fallback.unclear",
+        (category) =>
+          ctx.db
             .query("productFamilies")
             .withIndex("by_householdId_and_categoryId", (q) =>
               q
@@ -224,40 +228,35 @@ async function prepareProfiles(
                 .eq("categoryId", category),
             )
             .take(80),
-        );
-      const name = familyName(line);
+      );
 
-      if (!names.has(name))
-        names.set(
-          name,
-          await ctx.db
-            .query("productFamilies")
-            .withSearchIndex("search_name", (q) =>
-              q.search("name", name).eq("householdId", receipt.householdId),
-            )
-            .take(20),
-        );
+      const byName = await getOrInsert(names, familyName(line), (name) =>
+        ctx.db
+          .query("productFamilies")
+          .withSearchIndex("search_name", (q) =>
+            q.search("name", name).eq("householdId", receipt.householdId),
+          )
+          .take(20),
+      );
+
       families = [
         ...new Map(
-          [...categories.get(category)!, ...names.get(name)!].map((family) => [
-            family._id,
-            family,
-          ]),
+          [...byCategory, ...byName].map((family) => [family._id, family]),
         ).values(),
       ];
 
       if (line.catalogProduct) {
-        const key = line.catalogProduct.key;
-
-        if (!catalogs.has(key))
-          catalogs.set(
-            key,
-            await ctx.db
+        const cached = await getOrInsert(
+          catalogs,
+          line.catalogProduct.key,
+          (key) =>
+            ctx.db
               .query("catalogProducts")
               .withIndex("by_key", (q) => q.eq("key", key))
               .unique(),
-          );
-        catalog = catalogs.get(key)?.product ?? null;
+        );
+
+        catalog = cached?.product ?? null;
       }
     }
 
@@ -271,10 +270,10 @@ export const prepare = internalQuery({
   args: { ...snapshot, lineId: v.string() },
   returns: v.union(v.null(), preparedProfileValidator),
   handler: async (ctx, args) => {
-    const receipt = await ctx.db.get("receipts", args.id);
+    const receipt = current(await ctx.db.get("receipts", args.id), args);
 
-    return current(receipt, args)
-      ? ((await prepareProfiles(ctx, receipt!, [args.lineId]))[0] ?? null)
+    return receipt
+      ? ((await prepareProfiles(ctx, receipt, [args.lineId]))[0] ?? null)
       : null;
   },
 });
@@ -285,11 +284,9 @@ export const prepareBatch = internalQuery({
   handler: async (ctx, args) => {
     if (args.lineIds.length > 12)
       throw new Error("Analysis batch exceeds 12 lines.");
-    const receipt = await ctx.db.get("receipts", args.id);
+    const receipt = current(await ctx.db.get("receipts", args.id), args);
 
-    return current(receipt, args)
-      ? prepareProfiles(ctx, receipt!, args.lineIds)
-      : null;
+    return receipt ? prepareProfiles(ctx, receipt, args.lineIds) : null;
   },
 });
 
@@ -316,11 +313,11 @@ const profileWriteValidator = v.object({
 async function writeProfile(
   ctx: MutationCtx,
   args: Infer<typeof profileWriteValidator>,
-  receipt: Doc<"receipts"> | null,
+  receipt: ExtractedReceipt | null,
 ): Promise<Id<"productProfiles"> | null> {
-  if (!current(receipt, args)) return null;
+  if (!receipt) return null;
 
-  const line = receipt!.data!.lines.find(
+  const line = receipt.data.lines.find(
     (item) => item.id === args.lineId && item.kind === "product",
   );
 
@@ -330,7 +327,7 @@ async function writeProfile(
   const cached = await ctx.db
     .query("productProfiles")
     .withIndex("by_householdId_and_key", (q) =>
-      q.eq("householdId", receipt!.householdId).eq("key", key),
+      q.eq("householdId", receipt.householdId).eq("key", key),
     )
     .unique();
 
@@ -351,14 +348,14 @@ async function writeProfile(
     const existing = await ctx.db
       .query("productFamilies")
       .withIndex("by_householdId_and_key", (q) =>
-        q.eq("householdId", receipt!.householdId).eq("key", familyKey),
+        q.eq("householdId", receipt.householdId).eq("key", familyKey),
       )
       .unique();
 
     familyId =
       existing?._id ??
       (await ctx.db.insert("productFamilies", {
-        householdId: receipt!.householdId,
+        householdId: receipt.householdId,
         key: familyKey,
         name,
         categoryId: line.categoryId ?? "fallback.unclear",
@@ -371,7 +368,7 @@ async function writeProfile(
   } else if (args.family) {
     const family = await ctx.db.get("productFamilies", args.family);
 
-    if (family?.householdId !== receipt!.householdId)
+    if (family?.householdId !== receipt.householdId)
       throw new Error("Invalid product family.");
     familyId = family._id;
     const name = normalizeFamilyName(family.representative.name);
@@ -390,7 +387,7 @@ async function writeProfile(
     throw new Error("Invalid package quantity.");
 
   return ctx.db.insert("productProfiles", {
-    householdId: receipt!.householdId,
+    householdId: receipt.householdId,
     key,
     familyId,
     package: args.package,
@@ -403,7 +400,11 @@ export const saveProfile = internalMutation({
   args: profileWriteValidator.fields,
   returns: v.union(v.id("productProfiles"), v.null()),
   handler: async (ctx, args) =>
-    writeProfile(ctx, args, await ctx.db.get("receipts", args.id)),
+    writeProfile(
+      ctx,
+      args,
+      current(await ctx.db.get("receipts", args.id), args),
+    ),
 });
 
 export const saveProfiles = internalMutation({
@@ -412,7 +413,7 @@ export const saveProfiles = internalMutation({
   handler: async (ctx, args) => {
     if (args.decisions.length > 12)
       throw new Error("Analysis batch exceeds 12 lines.");
-    const receipt = await ctx.db.get("receipts", args.id);
+    const receipt = current(await ctx.db.get("receipts", args.id), args);
     const ids: Id<"productProfiles">[] = [];
 
     for (const decision of args.decisions) {
@@ -436,15 +437,15 @@ export const readProfiles = internalQuery({
   handler: async (ctx, args) => {
     if (args.ids.length > 12)
       throw new Error("Analysis batch exceeds 12 profiles.");
-    const receipt = await ctx.db.get("receipts", args.id);
+    const receipt = current(await ctx.db.get("receipts", args.id), args);
 
-    if (!current(receipt, args)) return [];
+    if (!receipt) return [];
     const rows = [];
 
     for (const id of new Set(args.ids)) {
       const profile = await ctx.db.get("productProfiles", id);
 
-      if (!profile || profile.householdId !== receipt!.householdId)
+      if (!profile || profile.householdId !== receipt.householdId)
         throw new Error("Invalid profile.");
 
       const family = profile.familyId
@@ -453,7 +454,7 @@ export const readProfiles = internalQuery({
 
       rows.push({
         profile,
-        family: family?.householdId === receipt!.householdId ? family : null,
+        family: family?.householdId === receipt.householdId ? family : null,
       });
     }
 
@@ -469,12 +470,12 @@ export const finish = internalMutation({
   },
   returns: v.null(),
   handler: async (ctx, args) => {
-    const receipt = await ctx.db.get("receipts", args.id);
+    const receipt = current(await ctx.db.get("receipts", args.id), args);
 
-    if (!current(receipt, args)) return null;
+    if (!receipt) return null;
 
     const results = args.results.filter((result) =>
-      receipt!.data!.lines.some(
+      receipt.data.lines.some(
         (line) =>
           line.kind === "product" &&
           line.id === result.lineId &&

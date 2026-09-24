@@ -33,7 +33,9 @@ export function recordCategoryDecision(
 }
 
 /** Lines a person approves count; suggestions the reader made on its own do not. */
-export function learnableLine(line: ReceiptLine): boolean {
+export function learnableLine(
+  line: ReceiptLine,
+): line is ReceiptLine & { categoryId: string } {
   return (
     line.kind === "product" &&
     !!line.categoryId &&

@@ -1,4 +1,4 @@
-import { needsAttention } from "@/lib/domain/receipt-status";
+import { needsAttention } from "@/lib/domain/receipt-state";
 import { ReceiptActivityButton } from "@/features/receipt-activity";
 import { useCompleteReceipts } from "@/features/receipt-queries";
 import { router } from "expo-router";

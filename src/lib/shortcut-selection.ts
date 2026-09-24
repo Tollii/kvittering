@@ -1,4 +1,4 @@
-import { hasReceiptBeenRead } from "./domain/receipt-status";
+import { hasReceiptBeenRead } from "./domain/receipt-state";
 import { z } from "zod";
 import type { FunctionReturnType } from "convex/server";
 import type { api } from "../../convex/_generated/api";
@@ -32,12 +32,14 @@ export function latestStoreReceipt(
   const term = store.trim().toLocaleLowerCase("nb-NO");
 
   if (!term) return null;
-  let latest: ReceiptSummary | null = null;
+  let latest: { receipt: ReceiptSummary; date: string } | null = null;
 
   for (const receipt of receipts) {
+    const date = receipt.purchaseDate;
+
     if (
       receipt.excluded ||
-      !receipt.purchaseDate ||
+      !date ||
       !hasReceiptBeenRead(receipt.status) ||
       !receipt.store?.toLocaleLowerCase("nb-NO").includes(term)
     )
@@ -45,12 +47,12 @@ export function latestStoreReceipt(
 
     if (
       !latest ||
-      receipt.purchaseDate > latest.purchaseDate! ||
-      (receipt.purchaseDate === latest.purchaseDate &&
-        receipt._creationTime > latest._creationTime)
+      date > latest.date ||
+      (date === latest.date &&
+        receipt._creationTime > latest.receipt._creationTime)
     )
-      latest = receipt;
+      latest = { receipt, date };
   }
 
-  return latest;
+  return latest?.receipt ?? null;
 }

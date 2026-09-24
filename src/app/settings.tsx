@@ -114,14 +114,15 @@ export default function Settings() {
                     variant="tint"
                     icon="doc.on.doc"
                     disabled={!details || busy}
-                    onPress={() =>
-                      void run(async () => {
-                        await Clipboard.setStringAsync(
-                          details!.household.invitation,
-                        );
-                        setMessage("Koden er kopiert.");
-                      })
-                    }
+                    onPress={() => {
+                      if (details)
+                        void run(async () => {
+                          await Clipboard.setStringAsync(
+                            details.household.invitation,
+                          );
+                          setMessage("Koden er kopiert.");
+                        });
+                    }}
                   />
                 </View>
                 <View style={{ flex: 1 }}>
@@ -129,13 +130,14 @@ export default function Settings() {
                     title="Del"
                     icon="square.and.arrow.up"
                     disabled={!details || busy}
-                    onPress={() =>
-                      void run(() =>
-                        Share.share({
-                          message: `Bli med i ${household.name} i Kvitto. Invitasjonskode: ${details!.household.invitation}`,
-                        }),
-                      )
-                    }
+                    onPress={() => {
+                      if (details)
+                        void run(() =>
+                          Share.share({
+                            message: `Bli med i ${household.name} i Kvitto. Invitasjonskode: ${details.household.invitation}`,
+                          }),
+                        );
+                    }}
                   />
                 </View>
               </View>

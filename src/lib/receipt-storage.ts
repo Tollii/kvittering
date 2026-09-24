@@ -7,6 +7,7 @@ import { randomUUID } from "expo-crypto";
 import type { Id } from "../../convex/_generated/dataModel";
 import type { LocalReceipt, QueueStore } from "./upload-queue";
 import { storageSuffix } from "./deployment-storage";
+import { getOrInsert } from "./map-cache";
 
 const listeners = new Set<() => void>();
 
@@ -77,9 +78,7 @@ export function imageFile(name: string) {
 
 export const receiptStorage: QueueStore = {
   list(owner, householdId) {
-    const key = scopeKey(owner, householdId);
-
-    if (!queueSnapshots.has(key)) {
+    return getOrInsert(queueSnapshots, scopeKey(owner, householdId), () => {
       const entries = storage()
         .getAllSync<{ data: string }>(
           "SELECT data FROM receipt_queue WHERE owner = ? AND household = ? ORDER BY rowid",
@@ -89,10 +88,9 @@ export const receiptStorage: QueueStore = {
         .map((row) => freezeReceipt(migrateReceipt(JSON.parse(row.data))));
 
       Object.freeze(entries);
-      queueSnapshots.set(key, entries);
-    }
 
-    return queueSnapshots.get(key)!;
+      return entries;
+    });
   },
   update(entry) {
     writeEntry(entry);
@@ -180,24 +178,19 @@ export function parseCachedHousehold(value: unknown): CachedHousehold | null {
 }
 
 export function cachedHousehold(owner: string): CachedHousehold | null {
-  if (!householdSnapshots.has(owner)) {
+  return getOrInsert(householdSnapshots, owner, () => {
     const row = storage().getFirstSync<{ data: string }>(
       "SELECT data FROM household_cache WHERE owner = ?",
       owner,
     );
 
-    let value: CachedHousehold | null = null;
-
     try {
-      value = row ? parseCachedHousehold(JSON.parse(row.data)) : null;
+      return row ? parseCachedHousehold(JSON.parse(row.data)) : null;
     } catch {
       /* Disposable cache only. */
+      return null;
     }
-
-    householdSnapshots.set(owner, value);
-  }
-
-  return householdSnapshots.get(owner)!;
+  });
 }
 
 export function cacheHousehold(owner: string, value: CachedHousehold | null) {

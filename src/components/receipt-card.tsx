@@ -1,5 +1,5 @@
 import { Ore } from "@/lib/domain/ore";
-import { isReceiptProcessing } from "@/lib/domain/receipt-status";
+import { isReceiptProcessing } from "@/lib/domain/receipt-state";
 import { router } from "expo-router";
 import {
   ActivityIndicator,

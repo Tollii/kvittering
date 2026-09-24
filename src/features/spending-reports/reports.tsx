@@ -67,12 +67,12 @@ export function useSpendingReports({
   const uncertainCategories = totals.selected.reduce(
     (count, receipt) =>
       count +
-      (receipt.data?.lines.filter(
+      receipt.data.lines.filter(
         (line) =>
           line.kind === "product" &&
           (line.categoryId === "fallback.unclear" ||
             line.issues.some(isCategoryUncertain)),
-      ).length ?? 0),
+      ).length,
     0,
   );
 

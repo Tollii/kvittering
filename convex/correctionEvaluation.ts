@@ -54,19 +54,21 @@ export const evaluate = action({
       throw new Error("Kategoritesten er ikke tilgjengelig.");
     const seen = new Set<string>();
 
-    const examples = history.entries.filter((entry) => {
+    const examples = history.entries.flatMap((entry) => {
+      const { expected } = entry;
+
       if (
         entry.field !== "category" ||
-        !entry.expected ||
-        !categoryById.has(entry.expected)
+        !expected ||
+        !categoryById.has(expected)
       )
-        return false;
+        return [];
       const key = categoryMemoryKey(entry.store, entry.name) ?? entry._id;
 
-      if (seen.has(key)) return false;
+      if (seen.has(key)) return [];
       seen.add(key);
 
-      return true;
+      return [{ ...entry, expected }];
     });
 
     const model = env.TYPESAFE_MODEL ?? "jev-latest";
@@ -108,7 +110,7 @@ export const evaluate = action({
       return {
         id: entry._id,
         name: entry.name,
-        expected: entry.expected!,
+        expected: entry.expected,
         actual: answer.choice,
         confidence: answer.confidence,
       };

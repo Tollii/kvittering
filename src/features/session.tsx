@@ -48,8 +48,13 @@ import { SessionContext } from "./household-context";
 
 const emptyQueue: LocalReceipt[] = [];
 
-const client = convexUrl
-  ? new ConvexReactClient(convexUrl, { unsavedChangesWarning: false })
+const convex = convexUrl
+  ? {
+      url: convexUrl,
+      client: new ConvexReactClient(convexUrl, {
+        unsavedChangesWarning: false,
+      }),
+    }
   : null;
 
 const drainQueue = createQueueRunner(receiptStorage, recordEvent);
@@ -78,7 +83,7 @@ function useSessionAuth() {
 export function SessionProvider({
   children,
 }: Readonly<{ children: ReactNode }>) {
-  if (!client || !convexSiteUrl)
+  if (!convex || !convexSiteUrl)
     return (
       <Screen title="Kvitto">
         <Notice>
@@ -89,9 +94,9 @@ export function SessionProvider({
     );
 
   return (
-    <ConvexProviderWithAuth client={client} useAuth={useSessionAuth}>
+    <ConvexProviderWithAuth client={convex.client} useAuth={useSessionAuth}>
       <FeatureFlagsProvider>
-        <ReleasePolicyProvider>
+        <ReleasePolicyProvider convexUrl={convex.url}>
           <SessionGate>{children}</SessionGate>
         </ReleasePolicyProvider>
       </FeatureFlagsProvider>

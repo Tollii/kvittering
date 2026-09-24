@@ -256,7 +256,7 @@ export function ReceiptLineEditor({
                 accessibilityLabel={`Bekreft kategorien ${categoryLabel} for ${line.name}`}
                 onPress={() => {
                   tapFeedback();
-                  onChange(confirmLineCategory(line, line.categoryId!));
+                  onChange(confirmLineCategory(line, line.categoryId));
                 }}
                 style={(state) => [
                   {

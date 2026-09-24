@@ -8,6 +8,7 @@ import type { Doc } from "../../../convex/_generated/dataModel";
 import { categoryById } from "./categories";
 import { type ReceiptLine } from "./receipt";
 import type { StorePurchase } from "./store-spending";
+import type { ExtractedReceipt } from "./receipt-state";
 
 export type Receipt = Doc<"receipts">;
 
@@ -21,6 +22,12 @@ export type Contribution = {
 export function contributionKey({ receipt, line }: Contribution) {
   return `${receipt._id}:${line?.id ?? "receipt"}`;
 }
+
+/** A prepared purchase's contribution: its receipt was read and its line is known. */
+export type PurchaseContribution = Contribution & {
+  receipt: ExtractedReceipt;
+  line: ReceiptLine;
+};
 
 export type SpendingGroup = {
   id: string;
@@ -284,16 +291,20 @@ export function comparisonInsights(
     reviewedOnly,
   );
 
-  const changes = [
-    ...new Set([...current.groups, ...previous.groups].map((g) => g.id)),
-  ]
-    .map((id) => {
+  // Each group keeps its current name; groups absent this month keep their previous one.
+  const names = new Map(current.groups.map((g) => [g.id, g.name]));
+
+  for (const group of previous.groups)
+    if (!names.has(group.id)) names.set(group.id, group.name);
+
+  const changes = [...names]
+    .map(([id, name]) => {
       const now = current.groups.find((g) => g.id === id);
       const before = previous.groups.find((g) => g.id === id);
 
       return {
         id,
-        name: now?.name ?? before!.name,
+        name,
         current: now?.amountOre ?? Ore.zero,
         previous: before?.amountOre ?? Ore.zero,
         difference: Ore.subtract(
@@ -342,17 +353,17 @@ export function matchLabel(line: ReceiptLine) {
 
 /** Purchase totals after item discounts. Returns and unknown dates are omitted. */
 export function productPrices(contributions: Contribution[]) {
-  const purchases = contributions.filter(
-    (c) => c.line && c.amountOre > 0 && c.receipt.data?.purchaseDate,
-  );
+  const observations = contributions
+    .flatMap((contribution) => {
+      const date = contribution.receipt.data?.purchaseDate;
 
-  const observations = purchases
-    .map((contribution) => ({ contribution, ore: contribution.amountOre }))
+      return contribution.line && contribution.amountOre > 0 && date
+        ? [{ contribution, date, ore: contribution.amountOre }]
+        : [];
+    })
     .sort(
       (a, b) =>
-        a.contribution.receipt.data!.purchaseDate!.localeCompare(
-          b.contribution.receipt.data!.purchaseDate!,
-        ) ||
+        a.date.localeCompare(b.date) ||
         a.contribution.receipt._creationTime -
           b.contribution.receipt._creationTime,
     );

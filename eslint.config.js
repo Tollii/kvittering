@@ -141,6 +141,12 @@ module.exports = defineConfig([
     rules: { "kvitto/no-ore-arithmetic": "off" },
   },
   {
+    files: ["**/*.{ts,tsx,mts}"],
+    ignores: ["**/*.test.{ts,tsx}"],
+    // Parse absent values once at a boundary instead of asserting them present.
+    rules: { "@typescript-eslint/no-non-null-assertion": "error" },
+  },
+  {
     files: ["**/*.{js,cjs,mjs}"],
     // Expo, Metro and ESLint configuration and rule tests use CommonJS.
     rules: { "sonarjs/no-require-or-define": "off" },

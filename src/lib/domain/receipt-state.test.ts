@@ -6,7 +6,7 @@ import {
   isReceiptProcessing,
   needsAttention,
   type ReceiptStatus,
-} from "./receipt-status";
+} from "./receipt-state";
 
 const statuses: ReceiptStatus[] = [
   "uploading",

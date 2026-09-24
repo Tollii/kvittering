@@ -62,15 +62,15 @@ export function FamilyPurchases({
         <Panel style={{ gap: 0, paddingVertical: 4 }}>
           {selected.contributions.map((item, index) => (
             <View
-              key={`${item.receipt._id}:${item.line!.id}`}
+              key={`${item.receipt._id}:${item.line.id}`}
               style={{
                 borderTopWidth: index ? 1 : 0,
                 borderTopColor: colors.line,
               }}
             >
               <Row
-                title={item.line!.catalogProduct?.name ?? item.line!.name}
-                detail={`${formatDate(item.receipt.data!.purchaseDate)} · ${formatPurchaseQuantity(item.quantity)}`}
+                title={item.line.catalogProduct?.name ?? item.line.name}
+                detail={`${formatDate(item.receipt.data.purchaseDate)} · ${formatPurchaseQuantity(item.quantity)}`}
                 value={Ore.format(item.amountOre)}
                 onPress={() => {
                   onClose();

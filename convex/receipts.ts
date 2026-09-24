@@ -3,7 +3,7 @@ import {
   attentionStatuses,
   isReceiptProcessing,
   receiptStatusValidator,
-} from "../src/lib/domain/receipt-status";
+} from "../src/lib/domain/receipt-state";
 import { notifyReceiptActivities } from "./liveActivities";
 import type { Id } from "./_generated/dataModel";
 import {

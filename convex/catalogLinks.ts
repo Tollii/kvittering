@@ -21,11 +21,13 @@ export async function resolveCatalogMatch(
   line: ReceiptLine,
   decision: CatalogDecision,
 ): Promise<CatalogProduct | null> {
-  if (!decision.productKey) return null;
+  const { productKey } = decision;
+
+  if (!productKey) return null;
 
   const existing = await ctx.db
     .query("catalogProducts")
-    .withIndex("by_key", (q) => q.eq("key", decision.productKey!))
+    .withIndex("by_key", (q) => q.eq("key", productKey))
     .unique();
 
   if (!decision.equivalentKeys)
@@ -45,18 +47,16 @@ export async function resolveCatalogMatch(
     ),
   );
 
-  if (
-    records.some(
-      (record) => !record || !compatibleCatalogProduct(line, record.product),
-    )
-  )
-    return null;
+  const products = records.flatMap((record) =>
+    record && compatibleCatalogProduct(line, record.product)
+      ? [record.product]
+      : [],
+  );
 
-  const group = groupCatalogProducts(
-    records.map((record) => record!.product),
-  ).find(
-    (candidate) =>
-      candidate.key === decision.productKey && candidate.equivalence,
+  if (products.length !== records.length) return null;
+
+  const group = groupCatalogProducts(products).find(
+    (candidate) => candidate.key === productKey && candidate.equivalence,
   );
 
   if (!group) return null;

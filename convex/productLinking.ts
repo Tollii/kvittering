@@ -22,15 +22,26 @@ import { catalogProductValidator } from "../src/lib/catalog/model";
 import { findMapping } from "./products";
 import { resolveProductSelections } from "./catalogLinks";
 import { commitReceiptChange, receiptCommitValidator } from "./receiptChanges";
+import type { ReceiptData } from "../src/lib/domain/receipt";
+import type { ExtractedReceipt } from "../src/lib/domain/receipt-state";
 
-function eligible(receipt: Doc<"receipts">) {
-  return (
+/** A read receipt whose store is known, so its products can be linked. */
+type LinkableReceipt = ExtractedReceipt & {
+  data: ReceiptData & { store: string };
+};
+
+function linkable(receipt: Doc<"receipts">): LinkableReceipt | null {
+  const { data } = receipt;
+  const store = data?.store;
+
+  return data &&
+    store?.trim() &&
     (receipt.status === "reviewed" || receipt.status === "needs_review") &&
     !receipt.excluded &&
     (!receipt.duplicateOf || receipt.duplicateResolved) &&
-    receipt.catalogStatus !== "pending" &&
-    !!receipt.data?.store?.trim()
-  );
+    receipt.catalogStatus !== "pending"
+    ? { ...receipt, data: { ...data, store } }
+    : null;
 }
 
 /** Read bounded history pages but send only unresolved product evidence to the queue. */
@@ -55,11 +66,13 @@ export const page = query({
 
     return {
       ...result,
-      page: result.page.flatMap((receipt) => {
-        if (!eligible(receipt)) return [];
+      page: result.page.flatMap((row) => {
+        const receipt = linkable(row);
 
-        const lines = receipt
-          .data!.lines.filter(needsProductLink)
+        if (!receipt) return [];
+
+        const lines = receipt.data.lines
+          .filter(needsProductLink)
           .map(matchingLine);
 
         return lines.length
@@ -68,8 +81,8 @@ export const page = query({
                 receiptId: receipt._id,
                 revision: receipt.revision,
                 generation: receipt.generation,
-                store: receipt.data!.store!,
-                date: receipt.data!.purchaseDate,
+                store: receipt.data.store,
+                date: receipt.data.purchaseDate,
                 lines,
               },
             ]
@@ -84,10 +97,10 @@ export const candidates = query({
   args: { receiptId: v.id("receipts"), lineId: v.string() },
   returns: v.array(catalogProductValidator),
   handler: async (ctx, { receiptId, lineId }) => {
-    const { receipt } = await requireReceipt(ctx, receiptId);
-    const line = receipt.data?.lines.find((item) => item.id === lineId);
+    const receipt = linkable((await requireReceipt(ctx, receiptId)).receipt);
+    const line = receipt?.data.lines.find((item) => item.id === lineId);
 
-    if (!eligible(receipt) || !line || !needsProductLink(line)) return [];
+    if (!receipt || !line || !needsProductLink(line)) return [];
 
     const decision = receipt.catalogDecisions?.find(
       (item) =>
@@ -129,25 +142,23 @@ export const choose = mutation({
   },
   returns: receiptCommitValidator,
   handler: async (ctx, args) => {
-    const { receipt, member } = await requireReceipt(ctx, args.receiptId);
+    const { receipt: row, member } = await requireReceipt(ctx, args.receiptId);
 
-    if (
-      receipt.revision !== args.revision ||
-      receipt.generation !== args.generation
-    )
+    if (row.revision !== args.revision || row.generation !== args.generation)
       throw new Error("Kvitteringen er endret. Prøv igjen med siste versjon.");
-    const line = receipt.data?.lines.find((item) => item.id === args.lineId);
+    const receipt = linkable(row);
+    const line = receipt?.data.lines.find((item) => item.id === args.lineId);
 
-    if (!eligible(receipt) || !line || !needsProductLink(line))
+    if (!receipt || !line || !needsProductLink(line))
       throw new Error("Varen er ikke lenger klar for produktkobling.");
-    const retailer = matchingKey(receipt.data!.store!);
+    const retailer = matchingKey(receipt.data.store);
     const before = await findMapping(ctx, member.householdId, retailer, line);
 
     const data = await resolveProductSelections(
       ctx,
       member.householdId,
       member.identity,
-      receipt.data!,
+      receipt.data,
       [{ ...args.choice, lineId: line.id }],
     );
 
@@ -190,16 +201,17 @@ export const undo = mutation({
   args: { receiptId: v.id("receipts"), revision: v.number() },
   returns: v.null(),
   handler: async (ctx, { receiptId, revision }) => {
-    const { receipt, member } = await requireReceipt(ctx, receiptId);
-    const undo = receipt.productLinkUndo;
+    const { receipt: row, member } = await requireReceipt(ctx, receiptId);
+    const receipt = linkable(row);
+    const undo = receipt?.productLinkUndo;
 
     if (
+      !receipt ||
       !undo ||
       undo.editor !== member.identity ||
       receipt.revision !== revision ||
       undo.revision !== revision ||
-      undo.generation !== receipt.generation ||
-      !eligible(receipt)
+      undo.generation !== receipt.generation
     )
       throw new Error("Valget kan ikke angres fordi kvitteringen er endret.");
     const mapping = await ctx.db.get("productMappings", undo.mappingId);
@@ -224,8 +236,8 @@ export const undo = mutation({
       receiptId,
       expected: receipt,
       data: {
-        ...receipt.data!,
-        lines: receipt.data!.lines.map((line) =>
+        ...receipt.data,
+        lines: receipt.data.lines.map((line) =>
           line.id === undo.lineId
             ? withProductReference(line, undo.reference)
             : line,

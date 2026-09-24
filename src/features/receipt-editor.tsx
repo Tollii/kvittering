@@ -1,4 +1,4 @@
-import { isReceiptProcessing } from "@/lib/domain/receipt-status";
+import { isReceiptProcessing } from "@/lib/domain/receipt-state";
 import { releaseMutation } from "@/lib/releases/requests";
 import { usePreventRemove } from "expo-router/react-navigation";
 import {

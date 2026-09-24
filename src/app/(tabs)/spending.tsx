@@ -161,7 +161,7 @@ function Spending({ initialMonth }: Readonly<{ initialMonth: string }>) {
   };
 
   const accounting = totals.selected.flatMap((receipt) =>
-    receipt.data!.lines.map((line) => ({
+    receipt.data.lines.map((line) => ({
       receipt,
       line,
       amountOre: line.amountOre ?? Ore.zero,

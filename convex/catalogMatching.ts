@@ -1,4 +1,4 @@
-import { isReceiptProcessing } from "../src/lib/domain/receipt-status";
+import { isReceiptProcessing } from "../src/lib/domain/receipt-state";
 import { commitReceiptChange } from "./receiptChanges";
 import { isCategoryUncertain } from "../src/lib/domain/receipt-issues";
 import { featureEnabled } from "./featureFlags";

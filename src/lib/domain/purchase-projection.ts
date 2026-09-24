@@ -1,5 +1,6 @@
 import { Ore } from "./ore";
 import type { Receipt } from "./insights";
+import { extractedReceipt, type ExtractedReceipt } from "./receipt-state";
 import { reconcile, spendingLines, type ReceiptLine } from "./receipt";
 import {
   productAnalysisVersion,
@@ -29,7 +30,7 @@ export const comparisonPurchasePolicy: PurchasePolicy = {
 };
 
 export type PreparedPurchase = {
-  receipt: Receipt;
+  receipt: ExtractedReceipt;
   line: ReceiptLine & { netOre: Ore };
   amountOre: Ore;
   analysis: ProductAnalysisResult | undefined;
@@ -50,11 +51,13 @@ export function preparePurchases(
   receipts: readonly Receipt[],
   policy: PurchasePolicy,
 ) {
-  return receipts.flatMap((receipt) => {
-    const data = receipt.data;
+  return receipts.flatMap((row) => {
+    const receipt = extractedReceipt(row);
+
+    if (!receipt) return [];
+    const { data } = receipt;
 
     if (
-      !data ||
       receipt.excluded ||
       (policy.currency === "NOK" && data.currency !== "NOK") ||
       (policy.provisional === "exclude" && receipt.status !== "reviewed") ||

@@ -121,7 +121,7 @@ export async function learnCategories(
 
     const next = recordCategoryDecision(
       existing,
-      line.categoryId!,
+      line.categoryId,
       rememberLineIds.includes(line.id) ? categoryMemoryThreshold : 1,
     );
 

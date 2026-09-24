@@ -110,7 +110,11 @@ export async function ensureRequest(
     refresh: !!existing,
   });
 
-  return (await ctx.db.get("catalogRequests", id))!;
+  const saved = await ctx.db.get("catalogRequests", id);
+
+  if (!saved) throw new Error("Catalog request was not saved.");
+
+  return saved;
 }
 
 export const request = internalMutation({
