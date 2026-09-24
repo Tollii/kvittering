@@ -8,15 +8,29 @@ name: Sign up and start a household
     clearState: true
     permissions:
       all: allow
+# Without Sign in with Apple (an unsigned simulator build), the app opens the
+# email login form directly; with it, the welcome screen offers email sign-up.
 - extendedWaitUntil:
-    visible: "Opprett konto med e-post"
+    visible: "Opprett konto med e-post|Ny her\\? Opprett konto"
     timeout: 60000
-- tapOn: "Opprett konto med e-post"
-- tapOn: "Navn"
+- runFlow:
+    when:
+      visible: "Opprett konto med e-post"
+    commands:
+      - tapOn: "Opprett konto med e-post"
+- runFlow:
+    when:
+      visible: "Ny her\\? Opprett konto"
+    commands:
+      - tapOn: "Ny her\\? Opprett konto"
+- tapOn:
+    id: "sign-in-name"
 - inputText: "E2E Tester"
-- tapOn: "E-post"
+- tapOn:
+    id: "sign-in-email"
 - inputText: ${E2E_EMAIL}
-- tapOn: "Passord"
+- tapOn:
+    id: "sign-in-password"
 - inputText: "correct horse battery staple"
 # Submitting from the keyboard avoids matching the "Opprett konto" heading.
 - pressKey: Enter

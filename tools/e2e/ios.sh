@@ -80,7 +80,13 @@ xcrun simctl bootstatus "$device" -b
 xcrun simctl install "$device" "$app"
 
 echo "▸ Running Maestro flows"
-maestro --device "$device" test .maestro \
+if ! maestro --device "$device" test .maestro \
   --env E2E_EMAIL="e2e-$(date +%s)@example.com" \
   --format junit --output "$out/maestro.xml" \
-  --debug-output "$out/maestro"
+  --debug-output "$out/maestro"; then
+  # Name what the screen showed; screenshots are in the uploaded artifact.
+  echo "Visible text when the flow failed:" >&2
+  maestro --device "$device" hierarchy >"$out/hierarchy.json" 2>/dev/null || true
+  grep -oE '"(text|accessibilityText|hintText)" *: *"[^"]+"' "$out/hierarchy.json" | sort -u | head -n 60 >&2 || true
+  exit 1
+fi

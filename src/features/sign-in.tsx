@@ -189,6 +189,7 @@ export function SignIn() {
               {register && (
                 <Field
                   label="Navn"
+                  testID="sign-in-name"
                   value={name}
                   onChangeText={setName}
                   autoComplete="name"
@@ -199,6 +200,7 @@ export function SignIn() {
               )}
               <Field
                 label="E-post"
+                testID="sign-in-email"
                 value={email}
                 onChangeText={setEmail}
                 autoCapitalize="none"
@@ -211,6 +213,7 @@ export function SignIn() {
               />
               <Field
                 label="Passord"
+                testID="sign-in-password"
                 value={password}
                 onChangeText={setPassword}
                 returnKeyType={register ? "done" : "go"}
