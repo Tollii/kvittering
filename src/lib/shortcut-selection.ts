@@ -1,3 +1,4 @@
+import { CalendarMonth } from "./domain/calendar";
 import { hasReceiptBeenRead } from "./domain/receipt-state";
 import { z } from "zod";
 import type { FunctionReturnType } from "convex/server";
@@ -15,13 +16,13 @@ export function shortcutStore(
 
 export function shortcutMonth(
   value: string | string[] | undefined,
-): string | null {
-  return (
-    z
-      .string()
-      .regex(/^(19\d{2}|[2-9]\d{3})-(0[1-9]|1[0-2])$/)
-      .safeParse(value).data ?? null
-  );
+): CalendarMonth | null {
+  const text = z
+    .string()
+    .regex(/^(19\d{2}|[2-9]\d{3})-(0[1-9]|1[0-2])$/)
+    .safeParse(value).data;
+
+  return text ? CalendarMonth.parse(text) : null;
 }
 
 /** Call only after all search pages arrive; upload time does not determine purchase order. */

@@ -1,3 +1,4 @@
+import { date } from "../testing/calendar";
 import { present, testId } from "../testing/receipts";
 import { Ore } from "./ore";
 import { spendingExplanations } from "./spending-explanations";
@@ -12,9 +13,9 @@ import { analysisPeriod, spendingAnalysis } from "./spending-analysis";
 import { attributeInsights } from "./attribute-insights";
 import { readAttributes } from "./product-attributes";
 
-function receipt(date: string, ore: number, ml: number | null): Receipt {
+function receipt(day: string, ore: number, ml: number | null): Receipt {
   const data = batteryFixture();
-  data.purchaseDate = date;
+  data.purchaseDate = date(day);
   data.lines = [
     {
       ...emptyLine("cola"),
@@ -34,12 +35,12 @@ function receipt(date: string, ore: number, ml: number | null): Receipt {
   );
 
   return {
-    _id: testId<"receipts">(date),
+    _id: testId<"receipts">(day),
     _creationTime: 0,
     householdId: testId<"households">("home"),
     uploadedBy: "test",
     uploaderName: "Test",
-    clientId: date,
+    clientId: day,
     imageCount: 1,
     generation: 1,
     revision: 0,
@@ -67,7 +68,7 @@ function receipt(date: string, ore: number, ml: number | null): Receipt {
   };
 }
 
-const period = analysisPeriod("2026-09-19", "month", "2026-09-19");
+const period = analysisPeriod(date("2026-09-19"), "month", date("2026-09-19"));
 
 it("separates quantity and unit-price effects and conserves every øre", () => {
   const report = spendingAnalysis(
@@ -152,16 +153,20 @@ it("does not assign price or quantity effects to stale, incomplete or negative m
 });
 
 it("compares partial periods and handles Monday, year boundaries, and February", () => {
-  expect(analysisPeriod("2026-01-01", "week", "2026-01-01")).toEqual({
+  expect(
+    analysisPeriod(date("2026-01-01"), "week", date("2026-01-01")),
+  ).toEqual({
     start: "2025-12-29",
     end: "2026-01-01",
     previousStart: "2025-12-22",
     previousEnd: "2025-12-25",
   });
-  expect(analysisPeriod("2024-03-30", "month", "2024-03-30").previousEnd).toBe(
-    "2024-02-29",
-  );
-  expect(analysisPeriod("2026-08-01", "month", "2026-09-19")).toEqual({
+  expect(
+    analysisPeriod(date("2024-03-30"), "month", date("2024-03-30")).previousEnd,
+  ).toBe("2024-02-29");
+  expect(
+    analysisPeriod(date("2026-08-01"), "month", date("2026-09-19")),
+  ).toEqual({
     start: "2026-08-01",
     end: "2026-08-31",
     previousStart: "2026-07-01",

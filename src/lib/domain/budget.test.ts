@@ -1,20 +1,22 @@
+import { date, month } from "../testing/calendar";
+import { CalendarMonth } from "./calendar";
 import { Ore } from "./ore";
 import { receiptFixture } from "../testing/receipts";
 import { expect, it } from "vitest";
-import { budgetPace, paceLabel, weeklyDigest, daysInMonth } from "./budget";
+import { budgetPace, paceLabel, weeklyDigest } from "./budget";
 import { weeklyShopFixture } from "./receipt";
 
 // Intl formats money with non-breaking spaces.
 const plain = (text: string) => text.replace(/\s/g, " ");
 
 it("measures pace against the elapsed share of the month", () => {
-  expect(daysInMonth("2026-09")).toBe(30);
+  expect(CalendarMonth.days(month("2026-09"))).toBe(30);
 
   const pace = budgetPace(
     Ore.of(600000),
     Ore.of(372000),
-    "2026-09",
-    "2026-09-18",
+    month("2026-09"),
+    date("2026-09-18"),
   );
 
   expect(pace.dayOfMonth).toBe(18);
@@ -27,10 +29,20 @@ it("measures pace against the elapsed share of the month", () => {
     "Dag 18 av 30 · 62 % brukt · 2 280,00 kr igjen",
   );
   expect(
-    budgetPace(Ore.of(600000), Ore.of(450000), "2026-09", "2026-09-18").status,
+    budgetPace(
+      Ore.of(600000),
+      Ore.of(450000),
+      month("2026-09"),
+      date("2026-09-18"),
+    ).status,
   ).toBe("over");
   expect(
-    budgetPace(Ore.of(600000), Ore.of(200000), "2026-09", "2026-09-18").status,
+    budgetPace(
+      Ore.of(600000),
+      Ore.of(200000),
+      month("2026-09"),
+      date("2026-09-18"),
+    ).status,
   ).toBe("under");
 });
 
@@ -38,15 +50,16 @@ it("treats past months as complete and future months as untouched", () => {
   const past = budgetPace(
     Ore.of(600000),
     Ore.of(650000),
-    "2026-08",
-    "2026-09-18",
+    month("2026-08"),
+    date("2026-09-18"),
   );
 
   expect(past.dayOfMonth).toBe(31);
   expect(past.dailyAllowanceOre).toBeNull();
   expect(plain(paceLabel(past))).toBe("108 % av budsjettet · 500,00 kr over");
   expect(
-    budgetPace(Ore.of(600000), Ore.of(0), "2026-10", "2026-09-18").dayOfMonth,
+    budgetPace(Ore.of(600000), Ore.of(0), month("2026-10"), date("2026-09-18"))
+      .dayOfMonth,
   ).toBe(0);
 });
 
@@ -56,7 +69,7 @@ it("summarises the week from Monday with the budget position", () => {
       _id: purchaseDate,
       excluded: false,
       status: "reviewed",
-      data: { ...weeklyShopFixture(), purchaseDate },
+      data: { ...weeklyShopFixture(), purchaseDate: date(purchaseDate) },
     });
 
   const receipts = [
@@ -65,7 +78,7 @@ it("summarises the week from Monday with the budget position", () => {
     receipt("2026-09-12"),
   ];
 
-  const digest = weeklyDigest(receipts, Ore.of(600000), "2026-09-18");
+  const digest = weeklyDigest(receipts, Ore.of(600000), date("2026-09-18"));
   expect(digest.weekStart).toBe("2026-09-14");
   expect(digest.weekReceipts).toBe(2);
   // products 35500 - discounts 4220 per receipt (coffee amount unknown counts as 0)
@@ -74,7 +87,7 @@ it("summarises the week from Monday with the budget position", () => {
     "Denne uken: 625,60 kr · 2 kvitteringer",
   );
   expect(digest.body).toContain("dag 18 av 30");
-  expect(weeklyDigest([], null, "2026-09-18").title).toBe(
+  expect(weeklyDigest([], null, date("2026-09-18")).title).toBe(
     "Ingen kvitteringer denne uken",
   );
 });

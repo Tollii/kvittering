@@ -6,6 +6,52 @@ const quoted = /^["'`]/;
 module.exports = {
   meta: { name: "kvitto" },
   rules: {
+    "no-calendar-string-ops": {
+      meta: {
+        type: "problem",
+        schema: [],
+        messages: {
+          operation:
+            "Use the CalendarDate and CalendarMonth operations instead of string methods or interpolation; they parse, clamp, and shift dates correctly.",
+        },
+      },
+      create(context) {
+        const services = context.sourceCode.parserServices;
+
+        if (!services?.program) return {};
+        const checker = services.program.getTypeChecker();
+        const brands = /dateBrand|monthBrand/;
+
+        function isCalendar(node) {
+          const type = checker.getTypeAtLocation(
+            services.esTreeNodeToTSNodeMap.get(node),
+          );
+
+          return (type.isUnion() ? type.types : [type]).some((part) =>
+            part
+              .getProperties()
+              .some((property) => brands.test(property.getName())),
+          );
+        }
+
+        return {
+          MemberExpression(node) {
+            if (
+              node.property.type === "Identifier" &&
+              node.property.name !== "length" &&
+              isCalendar(node.object) &&
+              node.parent.type === "CallExpression" &&
+              node.parent.callee === node
+            )
+              context.report({ node, messageId: "operation" });
+          },
+          TemplateLiteral(node) {
+            if (node.expressions.some(isCalendar))
+              context.report({ node, messageId: "operation" });
+          },
+        };
+      },
+    },
     "no-ore-arithmetic": {
       meta: {
         type: "problem",

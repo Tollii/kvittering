@@ -1,3 +1,4 @@
+import { isDecidedCategory } from "@/lib/domain/categories";
 import { isReceiptProcessing } from "@/lib/domain/receipt-state";
 import { releaseMutation } from "@/lib/releases/requests";
 import { usePreventRemove } from "expo-router/react-navigation";
@@ -251,8 +252,7 @@ export function ReceiptEditor({
           return (
             line &&
             line.kind === "product" &&
-            !!line.categoryId &&
-            line.categoryId !== "fallback.unclear" &&
+            isDecidedCategory(line.categoryId) &&
             aliasKey(data, line) !== null
           );
         }),

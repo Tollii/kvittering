@@ -29,7 +29,7 @@ import {
 } from "../src/lib/catalog/matching";
 import { normalizeSearch } from "../src/lib/catalog/policy";
 import { matchingKey } from "../src/lib/domain/product-matching";
-import { categoryById } from "../src/lib/domain/categories";
+import { isDecidedCategory } from "../src/lib/domain/categories";
 import { lineValidator } from "../src/lib/domain/receipt";
 import type { Id } from "./_generated/dataModel";
 
@@ -354,9 +354,7 @@ export const apply = internalMutation({
       if (
         !line.manual &&
         !(line.categoryAliasKey ?? line.productKey) &&
-        decision.categoryId &&
-        categoryById.has(decision.categoryId) &&
-        decision.categoryId !== "fallback.unclear" &&
+        isDecidedCategory(decision.categoryId) &&
         decision.categoryConfidence >= 0.85 &&
         (line.categoryId !== decision.categoryId ||
           line.issues.some(isCategoryUncertain))

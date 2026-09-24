@@ -1,12 +1,11 @@
+import { CalendarDate, CalendarMonth } from "./calendar";
 import { Ore } from "./ore";
 import {
   analysisPeriod,
   analysisSummary,
   spendingAnalysis,
-  earlierDate,
 } from "./spending-analysis";
 import { monthlyInsights, type Receipt } from "./insights";
-import { osloDate } from "./receipt";
 
 export type BudgetPace = {
   dayOfMonth: number;
@@ -23,28 +22,22 @@ export type BudgetPace = {
   status: "under" | "on" | "over";
 };
 
-export function daysInMonth(month: string) {
-  return new Date(
-    Date.UTC(Number(month.slice(0, 4)), Number(month.slice(5, 7)), 0),
-  ).getUTCDate();
-}
-
 /** Where the month stands against a budget. Past months are complete; future ones untouched. */
 export function budgetPace(
   budgetOre: Ore,
   spentOre: Ore,
-  month: string,
-  today = osloDate(),
+  month: CalendarMonth,
+  today = CalendarDate.today(),
 ): BudgetPace {
-  const days = daysInMonth(month);
-  const currentMonth = today.slice(0, 7);
+  const days = CalendarMonth.days(month);
+  const currentMonth = CalendarDate.month(today);
 
   const dayOfMonth =
-    month < currentMonth
+    CalendarMonth.compare(month, currentMonth) < 0
       ? days
-      : month > currentMonth
+      : CalendarMonth.compare(month, currentMonth) > 0
         ? 0
-        : Number(today.slice(8, 10));
+        : CalendarDate.day(today);
 
   const elapsedShare = days ? dayOfMonth / days : 0;
   const spentShare = budgetOre > 0 ? Ore.ratio(spentOre, budgetOre) : 0;
@@ -94,7 +87,7 @@ export function paceLabel(pace: BudgetPace): string {
 export function weeklyDigest(
   receipts: Receipt[],
   budgetOre: Ore | null,
-  today = osloDate(),
+  today = CalendarDate.today(),
 ) {
   const analysis = spendingAnalysis(
     receipts,
@@ -104,11 +97,12 @@ export function weeklyDigest(
   const weekStart = analysis.period.start;
   const weekSpentOre = analysis.currentOre;
   const weekReceipts = analysis.currentReceipts;
-  const month = monthlyInsights(receipts, today.slice(0, 7));
+  const currentMonth = CalendarDate.month(today);
+  const month = monthlyInsights(receipts, currentMonth);
 
   const pace =
     budgetOre && budgetOre > 0
-      ? budgetPace(budgetOre, month.products, today.slice(0, 7), today)
+      ? budgetPace(budgetOre, month.products, currentMonth, today)
       : null;
 
   const parts = [
@@ -135,15 +129,13 @@ export function weeklyDigest(
 }
 
 /** Required week comparison and whole calendar month, including future-dated month entries. */
-export function digestPeriod(today: string) {
+export function digestPeriod(today: CalendarDate) {
   const week = analysisPeriod(today, "week", today);
-  const month = today.slice(0, 7);
-
-  const monthStart = `${month}-01`;
+  const month = CalendarDate.month(today);
 
   return {
-    // ISO dates order lexically; the digest covers whichever period began first.
-    start: earlierDate(week.previousStart, monthStart),
-    end: `${month}-${daysInMonth(month)}`,
+    // The digest covers whichever period began first.
+    start: CalendarDate.earlier(week.previousStart, CalendarMonth.first(month)),
+    end: CalendarMonth.last(month),
   };
 }

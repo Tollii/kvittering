@@ -1,3 +1,4 @@
+import { unclearCategoryId } from "../src/lib/domain/categories";
 import { isReceiptBeingRead } from "../src/lib/domain/receipt-state";
 import { notifyReceiptActivities } from "./liveActivities";
 import { linkCatalogProduct } from "./catalogLinks";
@@ -97,7 +98,7 @@ export const processReceipt = workflow
 
           if (
             result.confidence < categoryReviewThreshold ||
-            result.categoryId === "fallback.unclear"
+            result.categoryId === unclearCategoryId
           )
             line.issues.push(categoryUncertainIssue);
         }

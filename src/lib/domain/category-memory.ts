@@ -1,6 +1,6 @@
 import { normalizeAlias, type ReceiptLine } from "./receipt";
 import { isCategoryUncertain } from "./receipt-review";
-import { categoryById } from "./categories";
+import { isCategoryId, isDecidedCategory, type CategoryId } from "./categories";
 
 /**
  * What the household has approved before, keyed only by store and receipt
@@ -24,7 +24,7 @@ export function categoryMemoryKey(
 /** One more approval for a category; a different decision starts over. */
 export function recordCategoryDecision(
   existing: CategoryMemory | null,
-  categoryId: string,
+  categoryId: CategoryId,
   weight = 1,
 ): CategoryMemory {
   return existing && existing.categoryId === categoryId
@@ -35,12 +35,10 @@ export function recordCategoryDecision(
 /** Lines a person approves count; suggestions the reader made on its own do not. */
 export function learnableLine(
   line: ReceiptLine,
-): line is ReceiptLine & { categoryId: string } {
+): line is ReceiptLine & { categoryId: CategoryId } {
   return (
     line.kind === "product" &&
-    !!line.categoryId &&
-    categoryById.has(line.categoryId) &&
-    line.categoryId !== "fallback.unclear" &&
+    isDecidedCategory(line.categoryId) &&
     !line.issues.some(isCategoryUncertain)
   );
 }
@@ -53,7 +51,7 @@ export function applyCategoryMemory(
   if (
     line.kind !== "product" ||
     line.manual ||
-    !categoryById.has(memory.categoryId) ||
+    !isCategoryId(memory.categoryId) ||
     memory.confirmations < categoryMemoryThreshold
   )
     return false;

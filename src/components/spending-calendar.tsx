@@ -1,7 +1,7 @@
+import { CalendarDate, CalendarMonth } from "@/lib/domain/calendar";
 import { Ore } from "@/lib/domain/ore";
 import { Pressable, View, useWindowDimensions } from "react-native";
 import { Copy, Empty, Row } from "./ui";
-import { formatDate } from "@/lib/format-date";
 import { useTheme } from "@/constants/theme";
 import {
   spendingCalendar,
@@ -25,17 +25,17 @@ export function SpendingCalendar({
   onSelect,
 }: Readonly<{
   receipts: Receipt[];
-  month: string;
+  month: CalendarMonth;
   onSelect: (group: SpendingGroup) => void;
 }>) {
   const colors = useTheme();
   const { fontScale, width } = useWindowDimensions();
 
-  const days = spendingCalendar(receipts, Number(month.slice(0, 4))).filter(
-    (day) => day.date.startsWith(month),
+  const days = spendingCalendar(receipts, CalendarMonth.year(month)).filter(
+    (day) => CalendarDate.month(day.date) === month,
   );
 
-  const offset = (new Date(`${month}-01T12:00:00Z`).getUTCDay() + 6) % 7;
+  const offset = CalendarDate.weekday(CalendarMonth.first(month));
 
   // Use a stronger colour for days with more purchases.
   const shade = (level: number) =>
@@ -58,7 +58,7 @@ export function SpendingCalendar({
         {purchases.map((day) => (
           <Row
             key={day.date}
-            title={formatDate(day.date)}
+            title={CalendarDate.format(day.date)}
             detail={`${day.contributions.length} ${day.contributions.length === 1 ? "kvittering" : "kvitteringer"}`}
             value={Ore.format(day.amountOre)}
             onPress={day.future ? undefined : () => selectDay(day)}
@@ -101,7 +101,7 @@ export function SpendingCalendar({
                   <Pressable
                     key={day.date}
                     accessibilityRole="button"
-                    accessibilityLabel={`${day.date}, ${Ore.format(day.amountOre)}, ${day.contributions.length} kvitteringer`}
+                    accessibilityLabel={`${CalendarDate.format(day.date)}, ${Ore.format(day.amountOre)}, ${day.contributions.length} kvitteringer`}
                     disabled={day.future || !day.contributions.length}
                     accessibilityState={{
                       disabled: day.future || !day.contributions.length,
@@ -133,7 +133,7 @@ export function SpendingCalendar({
                             : colors.text,
                         }}
                       >
-                        {Number(day.date.slice(-2))}
+                        {CalendarDate.day(day.date)}
                       </Copy>
                       {day.contributions.length > 0 && (
                         <Copy

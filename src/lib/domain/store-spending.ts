@@ -1,3 +1,4 @@
+import { CalendarDate } from "./calendar";
 import { Ore } from "./ore";
 import type { Id } from "../../../convex/_generated/dataModel";
 import { retailerCode } from "../catalog/matching";
@@ -6,7 +7,7 @@ import { normalizeSearch } from "../catalog/policy";
 
 export type StorePurchase = {
   receiptId: Id<"receipts">;
-  date?: string;
+  date?: CalendarDate;
   retailer?: string;
   branch?: PhysicalStore;
   amountOre: Ore;
@@ -51,7 +52,7 @@ export function storeSpending(purchases: readonly StorePurchase[]) {
 
   const ordered = [...purchases].sort(
     (a, b) =>
-      (b.date ?? "").localeCompare(a.date ?? "") ||
+      CalendarDate.compare(b.date, a.date) ||
       a.receiptId.localeCompare(b.receiptId),
   );
 
@@ -108,7 +109,7 @@ export function storeSpending(purchases: readonly StorePurchase[]) {
         ...group,
         purchases: [...group.purchases].sort(
           (a, b) =>
-            (b.date ?? "").localeCompare(a.date ?? "") ||
+            CalendarDate.compare(b.date, a.date) ||
             a.receiptId.localeCompare(b.receiptId),
         ),
       }))

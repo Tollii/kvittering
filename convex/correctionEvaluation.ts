@@ -12,7 +12,7 @@ import {
   classificationQuestion,
   parseLegacyClassification,
 } from "../src/lib/domain/classification";
-import { categoryById } from "../src/lib/domain/categories";
+import { isCategoryId } from "../src/lib/domain/categories";
 import { categoryMemoryKey } from "../src/lib/domain/category-memory";
 
 export type EvaluationResult = {
@@ -59,11 +59,7 @@ export const evaluate = action({
     const examples = history.entries.flatMap((entry) => {
       const { expected } = entry;
 
-      if (
-        entry.field !== "category" ||
-        !expected ||
-        !categoryById.has(expected)
-      )
+      if (entry.field !== "category" || !expected || !isCategoryId(expected))
         return [];
       const key = categoryMemoryKey(entry.store, entry.name) ?? entry._id;
 
@@ -106,7 +102,7 @@ export const evaluate = action({
     const results = examples.map((entry, index) => {
       const answer = response.answers[`category_${index}`];
 
-      if (answer?.type !== "choice" || !categoryById.has(answer.choice))
+      if (answer?.type !== "choice" || !isCategoryId(answer.choice))
         throw new Error("Kategoritesten ga et ugyldig svar.");
 
       return {

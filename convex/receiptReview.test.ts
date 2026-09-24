@@ -1,3 +1,4 @@
+import type { CalendarDate } from "../src/lib/domain/calendar";
 import { present } from "../src/lib/testing/receipts";
 import { Ore } from "../src/lib/domain/ore";
 import {
@@ -221,7 +222,8 @@ it("returns a readable rejection for an impossible date without saving", async (
     user.mutation(api.receipts.save, {
       id,
       revision: 0,
-      data: { ...data, purchaseDate: "2026-13-01" },
+      // SAFETY: A client can send any string; the mutation must reject it.
+      data: { ...data, purchaseDate: "2026-13-01" as CalendarDate },
       reviewed: false,
       rememberLineIds: [],
       duplicateResolved: false,

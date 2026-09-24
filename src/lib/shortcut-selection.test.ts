@@ -1,3 +1,4 @@
+import { date } from "./testing/calendar";
 import { Ore } from "./domain/ore";
 import { expect, it } from "vitest";
 import {
@@ -7,13 +8,13 @@ import {
 } from "./shortcut-selection";
 import { testId } from "./testing/receipts";
 
-function receipt(id: string, date: string | null, store = "Kiwi Storgata") {
+function receipt(id: string, day: string | null, store = "Kiwi Storgata") {
   return {
     _id: testId<"receipts">(id),
     _creationTime: 0,
     status: "reviewed" as const,
     store,
-    purchaseDate: date,
+    purchaseDate: day === null ? null : date(day),
     totalOre: Ore.of(1000),
     spendingOre: Ore.of(1000),
     excluded: false,

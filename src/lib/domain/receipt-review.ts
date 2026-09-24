@@ -16,7 +16,11 @@ import {
   type ReceiptData,
   type ReceiptLine,
 } from "./receipt";
-import { categoryById } from "./categories";
+import {
+  isDecidedCategory,
+  unclearCategoryId,
+  type CategoryId,
+} from "./categories";
 
 export { isCategoryUncertain } from "./receipt-issues";
 
@@ -25,10 +29,9 @@ export const categoryReviewThreshold = 0.5;
 /** A category decision resolves category uncertainty, not reading or amount errors. */
 export function confirmLineCategory(
   line: ReceiptLine,
-  categoryId: string,
+  categoryId: CategoryId,
 ): ReceiptLine {
-  if (line.kind !== "product" || !categoryById.has(categoryId))
-    throw new Error("Velg en gyldig varekategori.");
+  if (line.kind !== "product") throw new Error("Velg en gyldig varekategori.");
 
   return {
     ...line,
@@ -36,7 +39,7 @@ export function confirmLineCategory(
     manual: true,
     confidence: 1,
     issues:
-      categoryId === "fallback.unclear"
+      categoryId === unclearCategoryId
         ? line.issues
         : line.issues.filter((issue) => !isCategoryUncertain(issue)),
   };
@@ -45,12 +48,10 @@ export function confirmLineCategory(
 /** A line whose only open question is its suggested category can be confirmed in one step. */
 export function canConfirmSuggestedCategory(
   line: ReceiptLine,
-): line is ReceiptLine & { categoryId: string } {
+): line is ReceiptLine & { categoryId: CategoryId } {
   return (
     line.kind === "product" &&
-    !!line.categoryId &&
-    line.categoryId !== "fallback.unclear" &&
-    categoryById.has(line.categoryId) &&
+    isDecidedCategory(line.categoryId) &&
     line.issues.some(isCategoryUncertain)
   );
 }

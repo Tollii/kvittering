@@ -1,3 +1,4 @@
+import { date } from "../testing/calendar";
 import { present } from "../testing/receipts";
 import { describe, expect, it } from "vitest";
 import { extractionSchema, prepareExtraction } from "./receipt-extraction";
@@ -119,7 +120,7 @@ describe("missing purchase year", () => {
 
     expect(data.purchaseDate).toBe("2027-08-20");
     expect(data.issues).toEqual([]);
-    extracted.purchaseDate = "2024-08-20";
+    extracted.purchaseDate = date("2024-08-20");
     expect(
       prepareExtraction(extractionSchema.parse(extracted), 1, referenceTime)
         .purchaseDate,

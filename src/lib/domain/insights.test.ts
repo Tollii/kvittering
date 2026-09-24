@@ -1,3 +1,4 @@
+import { date, month } from "../testing/calendar";
 import { present, receiptFixture, testId } from "../testing/receipts";
 import { Ore } from "./ore";
 import { expect, it } from "vitest";
@@ -12,14 +13,14 @@ import {
   type Contribution,
 } from "./insights";
 
-function receipt(date: string, ore = 1000): Receipt {
+function receipt(day: string, ore = 1000): Receipt {
   const data = batteryFixture();
-  data.purchaseDate = date;
+  data.purchaseDate = date(day);
   data.lines = [{ ...emptyLine("item"), amountOre: Ore.of(ore) }];
   data.totalOre = Ore.of(ore);
 
   return receiptFixture({
-    _id: date,
+    _id: day,
     _creationTime: 0,
     status: "reviewed",
     data,
@@ -34,9 +35,9 @@ it("compares the same part of the current month and excludes later purchases", (
       receipt("2026-08-10", 500),
       receipt("2026-08-20", 2000),
     ],
-    "2026-09",
+    month("2026-09"),
     false,
-    "2026-09-17",
+    date("2026-09-17"),
   );
 
   expect(result.current.products).toBe(1000);
@@ -46,17 +47,19 @@ it("compares the same part of the current month and excludes later purchases", (
 
 it("handles year boundaries, leap days and completed months", () => {
   expect(
-    comparisonInsights([], "2026-01", false, "2026-01-17").previousEnd,
+    comparisonInsights([], month("2026-01"), false, date("2026-01-17"))
+      .previousEnd,
   ).toBe("2025-12-17");
   expect(
-    comparisonInsights([], "2024-03", false, "2024-03-31").previousEnd,
+    comparisonInsights([], month("2024-03"), false, date("2024-03-31"))
+      .previousEnd,
   ).toBe("2024-02-29");
 
   const result = comparisonInsights(
     [receipt("2026-08-31")],
-    "2026-08",
+    month("2026-08"),
     false,
-    "2026-09-17",
+    date("2026-09-17"),
   );
 
   expect(result.current.products).toBe(1000);
@@ -64,12 +67,12 @@ it("handles year boundaries, leap days and completed months", () => {
 });
 
 function contribution(
-  date: string,
+  day: string,
   ore: number,
   size: number | null,
 ): Contribution {
   return {
-    receipt: receipt(date),
+    receipt: receipt(day),
     line: {
       ...emptyLine(),
       quantity: 1,
@@ -121,7 +124,7 @@ it("distinguishes automatic links from user confirmation and excludes duplicate 
 
 it("aggregates calendar dates with discounts, excludes pant, and applies receipt filters", () => {
   const data = batteryFixture();
-  data.purchaseDate = "2026-09-07";
+  data.purchaseDate = date("2026-09-07");
   const purchase = { ...receipt("2026-09-07"), data };
 
   const second = receiptFixture({

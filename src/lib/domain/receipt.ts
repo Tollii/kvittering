@@ -4,7 +4,13 @@ import { productReferenceValidator } from "./product-reference";
 import { parse as parseValue } from "convex-helpers/validators";
 import { receiptIssueText, type ReceiptIssue } from "./receipt-issues";
 import { v, type Infer } from "convex/values";
-import { categoryById } from "./categories";
+import {
+  isCategoryId,
+  parseCategoryId,
+  unclearCategoryId,
+  type CategoryId,
+} from "./categories";
+import { CalendarDate, calendarDateValidator } from "./calendar";
 import {
   catalogIdentityValidator,
   physicalStoreValidator,
@@ -73,7 +79,7 @@ export const receiptDataValidator = v.object({
   physicalStoreManual: v.boolean().optional(),
   store: nullableString,
   branch: nullableString,
-  purchaseDate: nullableString,
+  purchaseDate: v.union(calendarDateValidator, v.null()),
   purchaseTime: nullableString,
   receiptNumber: nullableString,
   currency: nullableString,
@@ -102,7 +108,7 @@ export function emptyLine(id: string = crypto.randomUUID()): ReceiptLine {
     brand: null,
     attributes: [],
     relatedLineId: null,
-    categoryId: "fallback.unclear",
+    categoryId: unclearCategoryId,
     confidence: null,
     tags: [],
     issues: [],
@@ -110,14 +116,6 @@ export function emptyLine(id: string = crypto.randomUUID()): ReceiptLine {
     productKey: null,
   };
 }
-
-export const osloDate = (time = Date.now()) =>
-  new Intl.DateTimeFormat("sv-SE", {
-    timeZone: "Europe/Oslo",
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-  }).format(time);
 
 export const normalizeAlias = (text: string) =>
   text.normalize("NFKC").trim().replace(/\s+/g, " ").toLocaleUpperCase("nb-NO");
@@ -155,10 +153,9 @@ export function parseReceipt(input: unknown): ReceiptParseOutcome {
     );
   }
 
-  // Older receipts use a separate category for energy drinks, now part of soft drinks.
+  // Older receipts may store category ids that have since been merged.
   for (const line of data.lines)
-    if (line.categoryId === "drinks.energy-drinks")
-      line.categoryId = "drinks.soft-drinks";
+    line.categoryId = parseCategoryId(line.categoryId) ?? line.categoryId;
 
   const checked = checkReceipt(data);
 
@@ -199,7 +196,7 @@ export function checkReceipt(data: ReceiptData): ReceiptCheck {
       if (value !== null && (!Number.isFinite(value) || value <= 0))
         return invalid("Mengde må være større enn null.");
 
-    if (line.categoryId && !categoryById.has(line.categoryId))
+    if (line.categoryId && !isCategoryId(line.categoryId))
       return invalid("Ukjent kategori.");
 
     if (
@@ -217,22 +214,11 @@ export function checkReceipt(data: ReceiptData): ReceiptCheck {
   )
     return invalid("Totalen må være hele øre.");
 
-  if (data.purchaseDate && !isCalendarDate(data.purchaseDate))
+  if (data.purchaseDate && !CalendarDate.parse(data.purchaseDate))
     return invalid("Ugyldig dato.");
 
   // SAFETY: The checks above establish all ParsedReceipt domain invariants.
   return { kind: "valid", receipt: data as ParsedReceipt };
-}
-
-/** A real calendar date in YYYY-MM-DD form, such as 2026-02-28 but not 2026-02-30. */
-function isCalendarDate(value: string) {
-  const date = new Date(value);
-
-  return (
-    /^\d{4}-\d{2}-\d{2}$/.test(value) &&
-    !Number.isNaN(date.getTime()) &&
-    date.toISOString().slice(0, 10) === value
-  );
 }
 
 /** For background steps where invalid data is a failure of that step. */
@@ -398,7 +384,7 @@ export function batteryFixture(): ReceiptData {
   return {
     store: "Eksempelbutikk",
     branch: null,
-    purchaseDate: "2026-09-17",
+    purchaseDate: CalendarDate.of(2026, 9, 17),
     purchaseTime: null,
     receiptNumber: null,
     currency: "NOK",
@@ -440,7 +426,7 @@ export function weeklyShopFixture(): ReceiptData {
     id: string,
     name: string,
     amountOre: Ore | null,
-    categoryId: string,
+    categoryId: CategoryId,
     extra: Partial<ReceiptLine> = {},
   ): ReceiptLine => ({
     ...emptyLine(id),
@@ -456,7 +442,7 @@ export function weeklyShopFixture(): ReceiptData {
   return {
     store: "REMA 1000",
     branch: "Kanalveien",
-    purchaseDate: "2026-09-12",
+    purchaseDate: CalendarDate.of(2026, 9, 12),
     purchaseTime: "17:42",
     receiptNumber: "4711",
     currency: "NOK",

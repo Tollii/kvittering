@@ -1,3 +1,4 @@
+import { CalendarDate } from "@/lib/domain/calendar";
 import { Ore } from "@/lib/domain/ore";
 import { completeReceiptTip } from "@/components/receipt-tip";
 import { useTheme } from "@/constants/theme";
@@ -19,7 +20,6 @@ import { ProductLinkingOptions } from "@/features/product-linking-options";
 import { CatalogProductPicker } from "@/features/catalog-product-sheet";
 import { useHousehold } from "@/features/household-context";
 import { useReleaseMutation } from "@/lib/releases/requests";
-import { formatDate } from "@/lib/format-date";
 import { errorFeedback, successFeedback } from "@/lib/haptics";
 import type { ReceiptCommitAcknowledgement } from "../../convex/receiptChanges";
 
@@ -107,7 +107,7 @@ export default function ProductLinking() {
             }}
           >
             <Copy size={13} style={{ color: colors.onHeroMuted }}>
-              {item.store} · {formatDate(item.date)}
+              {item.store} · {CalendarDate.format(item.date)}
             </Copy>
             <Copy size={24} weight="600" style={{ color: colors.onHero }}>
               {item.line.name}

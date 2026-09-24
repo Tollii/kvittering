@@ -1,3 +1,4 @@
+import { unclearCategoryId } from "../src/lib/domain/categories";
 import { userError } from "./userErrors";
 import { hasReceiptBeenRead } from "../src/lib/domain/receipt-state";
 import { featureEnabled } from "./featureFlags";
@@ -219,7 +220,7 @@ async function prepareProfiles(
     } else {
       const byCategory = await getOrInsert(
         categories,
-        line.categoryId ?? "fallback.unclear",
+        line.categoryId ?? unclearCategoryId,
         (category) =>
           ctx.db
             .query("productFamilies")
@@ -359,7 +360,7 @@ async function writeProfile(
         householdId: receipt.householdId,
         key: familyKey,
         name,
-        categoryId: line.categoryId ?? "fallback.unclear",
+        categoryId: line.categoryId ?? unclearCategoryId,
         representative: {
           name: line.catalogProduct?.name ?? line.name,
           brand: line.catalogProduct?.brand ?? line.brand,

@@ -1,3 +1,4 @@
+import { CalendarDate } from "@/lib/domain/calendar";
 import { Ore } from "@/lib/domain/ore";
 import { useState } from "react";
 import { Pressable, View } from "react-native";
@@ -9,7 +10,6 @@ import {
   partialQuantity,
 } from "@/lib/domain/family-insights";
 import type { Receipt } from "@/lib/domain/insights";
-import { formatDate } from "@/lib/format-date";
 import { openReceipt } from "./receipt-card";
 
 /** Sheet content: quantities of the same product across pack sizes and stores. */
@@ -70,7 +70,7 @@ export function FamilyPurchases({
             >
               <Row
                 title={item.line.catalogProduct?.name ?? item.line.name}
-                detail={`${formatDate(item.receipt.data.purchaseDate)} · ${formatPurchaseQuantity(item.quantity)}`}
+                detail={`${CalendarDate.format(item.receipt.data.purchaseDate)} · ${formatPurchaseQuantity(item.quantity)}`}
                 value={Ore.format(item.amountOre)}
                 onPress={() => {
                   onClose();
