@@ -17,3 +17,12 @@ formatting checks. Prove each new defect check fails before applying its fix
 where practical. Preserve old public and scheduled arguments. Local fixture
 rehearsals cover additive persisted-data changes; live deployment and signed
 device upgrade checks remain separate release work.
+
+## 002 — Evaluation service pause
+
+Category evaluation now uses the receipt-processing service guard. Shared
+service guards check both platform scopes, so caller-provided platform metadata
+cannot bypass a pause. A backend test first failed by reaching TypeSafe during
+the pause, then passed after the change. It also checks successful resumption
+and legacy callers. Current screens do not expose evaluation; its endpoint is
+retained for older installed clients.

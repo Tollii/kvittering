@@ -50,7 +50,7 @@ Use [featureFlags](featureFlags.md) for new single-flag operator changes. Curren
 The four original service flags default on because they represent existing features.
 `emailSignUp` defaults off and controls new email accounts on the server and in the sign-in screen. New experimental flags must default off. Remove a temporary flag once its release is established and the oldest supported client no longer needs the alternate path.
 
-- `receiptProcessing`: stops new reservations, image uploads, completion and retry. Local capture remains available, with images queued. Work already accepted by the server may finish.
+- `receiptProcessing`: stops new reservations, image uploads, completion, retry, and category evaluation. Local capture remains available, with images queued. Work already accepted by the server may finish.
 - `productLookup`: stops new catalog requests and queued catalog workers before external calls. Already-running requests may finish. Previously cached product information can remain visible.
 - `automaticProductMatching`: stops new matching jobs and automatic/manual enrichment requests. Existing workflows may finish.
 - `spendingAnalysis`: stops new product analysis jobs and weekly digests, and hides the analysis screen behind a service message. Existing analysis jobs may finish.

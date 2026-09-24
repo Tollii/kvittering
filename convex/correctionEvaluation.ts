@@ -48,7 +48,10 @@ export const evaluate = action({
     ),
   }),
   handler: async (ctx, { client: release }): Promise<EvaluationResult> => {
-    await ctx.runQuery(internal.releasePolicy.check, { client: release });
+    await ctx.runQuery(internal.releasePolicy.check, {
+      client: release,
+      feature: "receiptProcessing",
+    });
 
     const history: { entries: Doc<"corrections">[]; truncated: boolean } =
       await ctx.runQuery(api.corrections.list, {});

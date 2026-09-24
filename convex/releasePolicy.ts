@@ -1,4 +1,8 @@
-import { readFeatureFlags, writeFeatureFlags } from "./featureFlags";
+import {
+  readFeatureFlags,
+  writeFeatureFlags,
+  featureEnabled,
+} from "./featureFlags";
 import { deploymentChannel } from "./deployment";
 import { featureNameValidator, legacyFeatures } from "../src/lib/featureFlags";
 import { ConvexError, v } from "convex/values";
@@ -72,11 +76,7 @@ export async function requireCompatibleClient(
       policy,
     });
 
-  if (
-    feature &&
-    !(await readFeatureFlags(ctx, client?.platform ?? "ios", policy.channel))
-      .values[feature]
-  )
+  if (feature && !(await featureEnabled(ctx, feature)))
     throw new ConvexError({
       code: "SERVICE_PAUSED",
       message:

@@ -7,13 +7,16 @@ import {
 import { register as registerRateLimiter } from "@convex-dev/rate-limiter/test";
 import { convexTest } from "convex-test";
 import { afterEach, expect, it, vi } from "vitest";
-import { api } from "./_generated/api";
+import { api, internal } from "./_generated/api";
 import schema from "./schema";
 import { batteryFixture } from "../src/lib/domain/receipt";
 
 const modules = import.meta.glob("./**/*.ts");
 
-afterEach(() => vi.unstubAllEnvs());
+afterEach(() => {
+  vi.unstubAllEnvs();
+  vi.unstubAllGlobals();
+});
 
 async function setup() {
   vi.stubEnv("TYPESAFE_API_KEY", "");
@@ -261,4 +264,61 @@ it("keeps every matching line when a preview receipt exceeds the selection limit
         })),
     }),
   ).rejects.toThrow("20");
+});
+
+it("blocks category evaluation during a pause for legacy and other-platform callers", async () => {
+  const { t, first } = await setup();
+  vi.stubEnv("TYPESAFE_API_KEY", "test-placeholder");
+
+  const transport = vi.fn<typeof fetch>(async () =>
+    Response.json({
+      answers: {
+        category_0: {
+          type: "choice",
+          choice: "drinks.soft-drinks",
+          confidence: 1,
+        },
+      },
+    }),
+  );
+
+  vi.stubGlobal("fetch", transport);
+  await t.mutation(internal.featureFlags.set, {
+    platform: "ios",
+    name: "receiptProcessing",
+    enabled: false,
+    expectedRevision: 0,
+    operator: "test",
+    reason: "Pause classification",
+  });
+
+  for (const client of [
+    undefined,
+    {
+      version: "1.0.0",
+      build: "15",
+      platform: "android" as const,
+      channel: "development" as const,
+      apiVersion: 1,
+      updateId: null,
+      runtimeVersion: null,
+    },
+  ]) {
+    await expect(
+      first.action(api.correctionEvaluation.evaluate, { client }),
+    ).rejects.toThrow("SERVICE_PAUSED");
+  }
+
+  expect(transport).not.toHaveBeenCalled();
+  await t.mutation(internal.featureFlags.set, {
+    platform: "ios",
+    name: "receiptProcessing",
+    enabled: true,
+    expectedRevision: 1,
+    operator: "test",
+    reason: "Resume classification",
+  });
+  const result = await first.action(api.correctionEvaluation.evaluate, {});
+  expect(result).toMatchObject({ checked: 1, matched: 1 });
+  expect(transport).toHaveBeenCalledTimes(1);
 });

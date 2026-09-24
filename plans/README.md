@@ -26,7 +26,7 @@ working copy. Reuse that work; the baseline findings are not all still unchanged
 | Plan | Title | Priority | Dependencies | Status |
 | --- | --- | --- | --- | --- |
 | [001](application-risk-review/001-paid-work-admission.md) | Complete paid-work admission coverage | P1 | Existing receipt/provider limits in the other task | IN PROGRESS |
-| [002](application-risk-review/002-evaluation-service-pause.md) | Apply service pauses to category evaluation | P1 | None; coordinate with 001 | TODO |
+| [002](application-risk-review/002-evaluation-service-pause.md) | Apply service pauses to category evaluation | P1 | None; coordinate with 001 | DONE |
 | [003](application-risk-review/003-draft-preservation.md) | Preserve drafts through pending saves and required updates | P1 | None | TODO |
 | [004](application-risk-review/004-alias-processing-state.md) | Keep alias propagation from completing active processing | P2 | None | TODO |
 | [005](application-risk-review/005-correction-history-deletion.md) | Remove deleted receipt data from correction batches | P2 | None | TODO |
