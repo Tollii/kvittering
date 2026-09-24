@@ -1,3 +1,4 @@
+import { isReceiptProcessing } from "../src/lib/domain/receipt-state";
 import { commitReceiptChange } from "./receiptChanges";
 import { v } from "convex/values";
 import { type MutationCtx, type QueryCtx } from "./_generated/server";
@@ -210,11 +211,7 @@ async function applyChangesPage(
 
   for (const receipt of page.page) {
     // Completion applies current aliases after extraction owns the state transition.
-    if (
-      !receipt.data ||
-      ["processing", "uploading", "uploaded"].includes(receipt.status)
-    )
-      continue;
+    if (!receipt.data || isReceiptProcessing(receipt.status)) continue;
     const data = structuredClone(receipt.data);
     let editor: string | null = null;
 
@@ -223,7 +220,12 @@ async function applyChangesPage(
       const key = aliasKey(data, line);
       const alias = key ? aliases.get(key) : null;
 
-      if (key && alias && isCategoryId(alias.categoryId) && settleLineWithAlias(line, key, alias.categoryId))
+      if (
+        key &&
+        alias &&
+        isCategoryId(alias.categoryId) &&
+        settleLineWithAlias(line, key, alias.categoryId)
+      )
         editor = alias.confirmedBy;
     }
 

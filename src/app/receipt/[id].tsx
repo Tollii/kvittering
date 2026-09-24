@@ -14,7 +14,7 @@ export default function ReceiptPage() {
 
 function ReceiptDetail({ id }: Readonly<{ id: string }>) {
   const { online } = useHousehold();
-  const detail = useReceiptDetail(id ?? "");
+  const detail = useReceiptDetail(id);
 
   const [deletion, setDeletion] = useState<"idle" | "deleting" | "deleted">(
     "idle",

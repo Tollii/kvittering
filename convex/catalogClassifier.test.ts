@@ -203,7 +203,7 @@ it("bounds catalog question batches while retaining every line decision", async 
   vi.stubGlobal(
     "fetch",
     vi.fn<typeof fetch>(async (_url, init) => {
-      const body = JSON.parse(String(init?.body));
+      const body = readModelRequest(init);
       batches.push(Object.keys(body.questions).length);
 
       const answers = Object.fromEntries(

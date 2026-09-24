@@ -16,7 +16,9 @@ it("adapts OpenAPI boolean query values to Kassalapp's accepted encoding", async
     .mockResolvedValue(new Response('{"data":[]}', { status: 200 }));
 
   vi.stubGlobal("fetch", fetch);
-  await kassalappFetch("/products?search=Stratos&unique=true", { fetch: globalThis.fetch });
+  await kassalappFetch("/products?search=Stratos&unique=true", {
+    fetch: globalThis.fetch,
+  });
   expect(new Request(present(fetch.mock.calls[0])[0]).url).toBe(
     "https://kassal.app/api/v1/products?search=Stratos&unique=1",
   );

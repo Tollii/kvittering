@@ -9,7 +9,7 @@ import { storageSuffix } from "@/lib/deployment-storage";
 import { ReceiptDraftStorage } from "@/lib/receipt-draft-storage";
 import { ReceiptDraftController } from "@/lib/receipt-draft-controller";
 import { Notice, Screen } from "@/components/ui";
-import { useHousehold } from "./session";
+import { useHousehold } from "./household-context";
 import { ReceiptEditor } from "./receipt-editor";
 
 type EditorProps = Omit<
@@ -58,7 +58,7 @@ function ScopedReceiptEditor({
   if (snapshot.kind === "blocked")
     return (
       <Screen title="Lagret utkast">
-        <Notice error>{snapshot.message}</Notice>
+        <Notice tone="error">{snapshot.message}</Notice>
       </Screen>
     );
 

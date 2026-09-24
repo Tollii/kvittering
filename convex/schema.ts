@@ -79,7 +79,7 @@ export default defineSchema({
     sequence: v.number(),
     deleted: v.boolean(),
     createdAt: v.number(),
-    status: statusValidator,
+    status: receiptStatusValidator,
     store: v.union(v.string(), v.null()),
     purchaseDate: v.union(v.string(), v.null()),
     totalOre: v.union(v.number(), v.null()),

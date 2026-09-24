@@ -1,6 +1,7 @@
+import { present } from "./testing/receipts";
 import { expect, it, vi } from "vitest";
 import { importReceiptFiles, maxReceiptImages } from "./receipt-import";
-import { createImportQueue } from "../features/capture-import";
+import { createImportQueue } from "./capture-import";
 
 const native = vi.hoisted(() => ({
   pages: 1,
@@ -47,7 +48,9 @@ it("accepts five selected images and rejects six without losing the selected inp
       8,
     ),
   ).rejects.toThrow("Maks 5");
-  await expect(importReceiptFiles([files[0]], 0)).rejects.toThrow("Maks 5");
+  await expect(importReceiptFiles([present(files[0])], 0)).rejects.toThrow(
+    "Maks 5",
+  );
   expect(files).toEqual(originals);
 });
 
@@ -62,14 +65,14 @@ it("retains a rejected six-page PDF for explicit retry and never returns a trunc
   });
   const queue = createImportQueue();
   queue.offer([{ uri: "receipt.pdf", mimeType: "application/pdf" }]);
-  const batch = queue.snapshot()[0];
+  const batch = present(queue.snapshot()[0]);
   queue.claim(batch.id);
   native.pages = 6;
   await expect(importReceiptFiles(batch.files)).rejects.toThrow(
     "for mange sider",
   );
   queue.finish(batch.id, "failed");
-  expect(queue.snapshot()[0].files).toEqual(batch.files);
+  expect(present(queue.snapshot()[0]).files).toEqual(batch.files);
   native.pages = 5;
   queue.retry(batch.id);
   const retry = queue.claim(batch.id)!;

@@ -10,7 +10,7 @@ import { afterEach, expect, it, vi } from "vitest";
 import type { AlertButton } from "react-native";
 import type { usePreventRemove } from "expo-router/react-navigation";
 import { useDraftNavigation } from "../features/receipt-draft-navigation";
-import { createReceiptDraft } from "../features/receipt-draft";
+import { createReceiptDraft } from "./receipt-draft";
 import { ReceiptDraftController } from "./receipt-draft-controller";
 import { receiptFixture } from "./testing/receipts";
 import { batteryFixture } from "./domain/receipt";

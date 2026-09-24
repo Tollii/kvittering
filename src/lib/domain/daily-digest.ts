@@ -1,4 +1,6 @@
-import { categoryById } from "./categories";
+import { categoryOf } from "./categories";
+import { CalendarDate, CalendarMonth } from "./calendar";
+import { Ore } from "./ore";
 import { formatWeeklyDigest } from "./budget";
 import { analysisPeriod, analysisSummary } from "./spending-analysis";
 import {
@@ -15,8 +17,8 @@ export function dailyDigest(
     totals: SpendingTotals;
     categories: Record<string, number>;
   }[],
-  budget: number | null,
-  today: string,
+  budget: Ore | null,
+  today: CalendarDate,
 ) {
   const period = analysisPeriod(today, "week", today);
 
@@ -45,11 +47,14 @@ export function dailyDigest(
   const comparison = analysisSummary({
     currentReceipts: current.comparisonReceipts,
     previousReceipts: previous.comparisonReceipts,
-    differenceOre: current.comparisonProducts - previous.comparisonProducts,
+    differenceOre: Ore.subtract(
+      current.comparisonProducts,
+      previous.comparisonProducts,
+    ),
     categories: Object.entries(categories)
       .map(([id, differenceOre]) => ({
-        name: categoryById.get(id)?.name ?? "Ukjent",
-        differenceOre,
+        name: categoryOf(id).name,
+        differenceOre: Ore.of(differenceOre),
       }))
       .sort(
         (left, right) =>
@@ -63,7 +68,10 @@ export function dailyDigest(
       weekSpentOre: current.comparisonProducts,
       weekReceipts: current.comparisonReceipts,
       monthSpentOre: sum(
-        within(`${today.slice(0, 7)}-01`, `${today.slice(0, 7)}-31`),
+        within(
+          CalendarMonth.first(CalendarDate.month(today)),
+          CalendarMonth.last(CalendarDate.month(today)),
+        ),
       ).products,
       comparison: previous.comparisonReceipts ? comparison : null,
     },

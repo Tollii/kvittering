@@ -1,9 +1,9 @@
+import { present, receiptFixture } from "./testing/receipts";
 import { DatabaseSync } from "node:sqlite";
 import { expect, it } from "vitest";
 import { ReceiptDraftStorage } from "./receipt-draft-storage";
 import { ReceiptDraftController } from "./receipt-draft-controller";
 import type { ReceiptCacheDatabase } from "./receipt-cache";
-import { receiptFixture } from "./testing/receipts";
 import { batteryFixture } from "./domain/receipt";
 
 function fixture() {
@@ -52,12 +52,12 @@ it("restores exact edits and their baseline after restart without overwriting a 
     controller.dispatch({ type: "data", data });
     controller.dispatch({
       type: "remember",
-      ids: [data.lines[0].id],
+      ids: [present(data.lines[0]).id],
       value: true,
     });
     controller.dispatch({
       type: "product",
-      lineId: data.lines[0].id,
+      lineId: present(data.lines[0]).id,
       choice: { kind: "separate" },
     });
     controller.dispatch({
@@ -82,11 +82,15 @@ it("restores exact edits and their baseline after restart without overwriting a 
     expect(reopened.draft.remote.revision).toBe(5);
     expect(reopened.draft.operation.kind).toBe("idle");
     expect(reopened.draft.moneyErrors).toEqual({ total: "Incomplete amount" });
-    expect(reopened.draft.values.productChanges[data.lines[0].id]).toEqual({
+    expect(
+      reopened.draft.values.productChanges[present(data.lines[0]).id],
+    ).toEqual({
       kind: "separate",
     });
     expect(open("second").restore(receipt).dirty).toBe(false);
-    expect(open().restore(receipt).values.remember).toEqual([data.lines[0].id]);
+    expect(open().restore(receipt).values.remember).toEqual([
+      present(data.lines[0]).id,
+    ]);
   } finally {
     db.close();
   }
@@ -160,8 +164,11 @@ it("retains live edits and reports failed durable writes until storage recovers"
     expect(controller.read()).toMatchObject({
       kind: "ready",
       draft: { dirty: true, values: { excluded: true } },
-      storageError: expect.stringContaining("kunne ikke lagres"),
     });
+    const failed = controller.read();
+
+    if (failed.kind !== "ready") throw new Error("Draft is unavailable");
+    expect(failed.storageError).toContain("kunne ikke lagres");
     control.fail = false;
     controller.dispatch({ type: "finished" });
     expect(controller.read()).toMatchObject({ storageError: "" });

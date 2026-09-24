@@ -115,14 +115,14 @@ export function weeklyDigest(
 
 export function formatWeeklyDigest(
   values: {
-    weekStart: string;
-    weekSpentOre: number;
+    weekStart: CalendarDate;
+    weekSpentOre: Ore;
     weekReceipts: number;
-    monthSpentOre: number;
+    monthSpentOre: Ore;
     comparison: string | null;
   },
-  budgetOre: number | null,
-  today: string,
+  budgetOre: Ore | null,
+  today: CalendarDate,
 ) {
   const { weekStart, weekSpentOre, weekReceipts, monthSpentOre, comparison } =
     values;

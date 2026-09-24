@@ -1,7 +1,7 @@
 import { Alert } from "react-native";
 import { useNavigation } from "expo-router";
 import { usePreventRemove } from "expo-router/react-navigation";
-import type { ReceiptDraft } from "./receipt-draft";
+import type { ReceiptDraft } from "@/lib/receipt-draft";
 
 /** Pending saves retain the same navigation protection as all other unsaved edits. */
 export function useDraftNavigation(draft: ReceiptDraft, discard: () => void) {

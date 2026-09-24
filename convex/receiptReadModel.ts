@@ -107,8 +107,8 @@ export async function updateReceiptReadModel(
 
   if (
     previous?.purchaseDate !== summary.purchaseDate ||
-    JSON.stringify(previous?.totals) !== JSON.stringify(totals) ||
-    JSON.stringify(previous?.categories) !== JSON.stringify(summary.categories)
+    JSON.stringify(previous.totals) !== JSON.stringify(totals) ||
+    JSON.stringify(previous.categories) !== JSON.stringify(summary.categories)
   ) {
     if (previous)
       await adjustDay(

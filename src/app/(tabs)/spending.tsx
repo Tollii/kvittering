@@ -111,7 +111,7 @@ function Spending({ initialMonth }: Readonly<{ initialMonth: CalendarMonth }>) {
   const initialTotals = useInitialSpendingTotals(month, comparison.currentEnd);
 
   const initialPrevious = useInitialSpendingTotals(
-    CalendarMonth.previous(month),
+    CalendarMonth.shift(month, -1),
     comparison.previousEnd,
   );
 
@@ -139,8 +139,10 @@ function Spending({ initialMonth }: Readonly<{ initialMonth: CalendarMonth }>) {
   const change =
     (!loadingReceipts || initialPrevious) && previousProducts
       ? Math.round(
-          Ore.ratio(Ore.subtract(headline.products, previousProducts), Ore.abs(previousProducts)) *
-            100,
+          Ore.ratio(
+            Ore.subtract(headline.products, previousProducts),
+            Ore.abs(previousProducts),
+          ) * 100,
         )
       : null;
 

@@ -1,3 +1,4 @@
+import { z } from "zod";
 import { present } from "../src/lib/testing/receipts";
 import {
   readModelRequest,
@@ -326,10 +327,10 @@ it("blocks category evaluation during a pause for legacy and other-platform call
 it("removes deleted receipt payloads from mixed batches and preserves surviving undo", async () => {
   const { t, first, other, ids, correction } = await setup();
   await t.run(async (ctx) => {
-    const receipt = await ctx.db.get("receipts", ids[2]);
+    const receipt = await ctx.db.get("receipts", present(ids[2]));
     const data = receipt!.data!;
-    data.lines[0].manual = false;
-    await ctx.db.patch("receipts", ids[2], { data });
+    present(data.lines[0]).manual = false;
+    await ctx.db.patch("receipts", present(ids[2]), { data });
   });
 
   const preview = await first.query(api.corrections.preview, {
@@ -346,7 +347,10 @@ it("removes deleted receipt payloads from mixed batches and preserves surviving 
   });
 
   expect(preview.targets).toHaveLength(2);
-  await first.mutation(api.receipts.remove, { id: ids[1], revision: 1 });
+  await first.mutation(api.receipts.remove, {
+    id: present(ids[1]),
+    revision: 1,
+  });
 
   const scheduled = await t.run((ctx) =>
     ctx.db.system.query("_scheduled_functions").collect(),
@@ -356,31 +360,34 @@ it("removes deleted receipt payloads from mixed batches and preserves surviving 
     scheduled.some(
       (job) =>
         job.name === "retention:deletedReceiptBatches" &&
-        job.args[0].receiptId === ids[1],
+        z.object({ receiptId: z.string() }).parse(job.args[0]).receiptId ===
+          present(ids[1]),
     ),
   ).toBe(true);
   await t.mutation(internal.retention.deletedReceiptBatches, {
     householdId: correction.householdId,
-    receiptId: ids[1],
+    receiptId: present(ids[1]),
   });
   await t.mutation(internal.retention.deletedReceiptBatches, {
     householdId: correction.householdId,
-    receiptId: ids[1],
+    receiptId: present(ids[1]),
   });
   const batches = await first.query(api.corrections.batches, {});
-  expect(batches[0].changes.map((change) => change.receiptId)).toEqual([
-    ids[2],
-  ]);
+  expect(present(batches[0]).changes.map((change) => change.receiptId)).toEqual(
+    [present(ids[2])],
+  );
   expect(
     (await t.run((ctx) => ctx.db.get("correctionBatches", batchId)))?.changes,
-  ).toEqual(batches[0].changes);
+  ).toEqual(present(batches[0]).changes);
   expect(await other.query(api.corrections.batches, {})).toEqual([]);
   await first.mutation(api.corrections.undo, { id: batchId });
   expect(
-    (await first.query(api.receipts.detail, { id: ids[2] }))?.receipt.data
-      ?.lines[0].categoryId,
+    (await first.query(api.receipts.detail, { id: present(ids[2]) }))?.receipt
+      .data?.lines[0]?.categoryId,
   ).toBe("other-purchases.batteries");
-  expect(await first.query(api.receipts.detail, { id: ids[1] })).toBeNull();
+  expect(
+    await first.query(api.receipts.detail, { id: present(ids[1]) }),
+  ).toBeNull();
 });
 
 it("repairs historical orphan batches without changing live receipt history", async () => {
@@ -389,18 +396,22 @@ it("repairs historical orphan batches without changing live receipt history", as
   const batchId = await first.mutation(api.corrections.apply, {
     id: correction._id,
     targets: [
-      { receiptId: ids[1], revision: 0, lineId: batteryFixture().lines[0].id },
+      {
+        receiptId: present(ids[1]),
+        revision: 0,
+        lineId: present(batteryFixture().lines[0]).id,
+      },
     ],
   });
 
   await t.mutation(internal.retention.orphanedCorrection, {
     batchId,
-    receiptId: ids[1],
+    receiptId: present(ids[1]),
   });
   expect(
     await t.run((ctx) => ctx.db.get("correctionBatches", batchId)),
   ).not.toBeNull();
-  await t.run((ctx) => ctx.db.delete("receipts", ids[1]));
+  await t.run((ctx) => ctx.db.delete("receipts", present(ids[1])));
   await t.mutation(internal.retention.orphanedCorrectionBatches, {});
 
   const jobs = await t.run((ctx) =>
@@ -411,16 +422,17 @@ it("repairs historical orphan batches without changing live receipt history", as
     jobs.some(
       (job) =>
         job.name === "retention:orphanedCorrection" &&
-        job.args[0].batchId === batchId,
+        z.object({ batchId: z.string() }).parse(job.args[0]).batchId ===
+          batchId,
     ),
   ).toBe(true);
   await t.mutation(internal.retention.orphanedCorrection, {
     batchId,
-    receiptId: ids[1],
+    receiptId: present(ids[1]),
   });
   await t.mutation(internal.retention.orphanedCorrection, {
     batchId,
-    receiptId: ids[1],
+    receiptId: present(ids[1]),
   });
   expect(await first.query(api.corrections.batches, {})).toEqual([]);
   expect(

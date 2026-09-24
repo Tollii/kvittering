@@ -199,6 +199,7 @@ it("rejects stale commits without data or history changes and returns a small sa
 
 it("returns a readable rejection for an impossible date without saving", async () => {
   const t = convexTest(schema, modules);
+  registerRateLimiter(t);
 
   const user = t.withIdentity({
     subject: "person",

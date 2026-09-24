@@ -5,10 +5,7 @@ import type { Id } from "../../convex/_generated/dataModel";
 import type { ReceiptCacheDatabase } from "./receipt-cache";
 import { receiptDataValidator } from "./domain/receipt";
 import { productChoiceValidator } from "./domain/product-reference";
-import {
-  createReceiptDraft,
-  type ReceiptDraft,
-} from "../features/receipt-draft";
+import { createReceiptDraft, type ReceiptDraft } from "./receipt-draft";
 import type { Receipt } from "./domain/insights";
 
 const savedDraft = v.object({

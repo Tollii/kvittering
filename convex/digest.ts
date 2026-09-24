@@ -7,7 +7,7 @@ import {
   addCategoryTotals,
 } from "../src/lib/domain/receipt-summary";
 import { dailyDigest } from "../src/lib/domain/daily-digest";
-import { receiptPeriodPage } from "./receipts";
+import { receiptPeriodPage } from "./receiptPeriod";
 import { featureEnabled } from "./featureFlags";
 import { v } from "convex/values";
 import {
@@ -158,7 +158,11 @@ export const forHousehold = internalAction({
       cursor = result.receipts.continueCursor;
     }
 
-    const digest = dailyDigest([...days.values()], budget, digestDate(args.today));
+    const digest = dailyDigest(
+      [...days.values()],
+      budget,
+      digestDate(args.today),
+    );
 
     return { title: digest.title, body: digest.body };
   },
@@ -236,7 +240,7 @@ export const summary = internalQuery({
     const household = await ctx.db.get("households", householdId);
 
     if (!household) return null;
-    const period = digestPeriod(today);
+    const period = digestPeriod(digestDate(today));
 
     const days = await ctx.db
       .query("receiptDailyTotals")
@@ -248,7 +252,11 @@ export const summary = internalQuery({
       )
       .take(45);
 
-    const digest = dailyDigest(days, household.monthlyBudgetOre ?? null, today);
+    const digest = dailyDigest(
+      days,
+      household.monthlyBudgetOre ?? null,
+      digestDate(today),
+    );
 
     return { title: digest.title, body: digest.body };
   },

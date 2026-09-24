@@ -96,7 +96,7 @@ async function consumeActorQuota(
     for (const [period, rate] of [
       [HOUR, allowance.hourly],
       [DAY, allowance.daily],
-    ]) {
+    ] as const) {
       const result = await limiter.limit(ctx, `${name}:${period}`, {
         key,
         config: { kind: "fixed window", period, rate, start: 0 },
@@ -179,7 +179,7 @@ export const consumeProvider = internalMutation({
     for (const [period, rate] of [
       [DAY, allowance.daily],
       [30 * DAY, allowance.thirtyDays],
-    ]) {
+    ] as const) {
       const result = await limiter.limit(ctx, `${provider}:${period}`, {
         config: { kind: "fixed window", rate, period, start: 0 },
       });

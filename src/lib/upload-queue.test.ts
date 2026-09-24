@@ -64,9 +64,12 @@ function fixture() {
     rows: () => rows,
     clock,
     retries,
-    advance: (milliseconds: number) => { clock.now += milliseconds; },
+    advance: (milliseconds: number) => {
+      clock.now += milliseconds;
+    },
     run: createQueueRunner(store, undefined, retries, () => clock.now),
-    restart: () => createQueueRunner(store, undefined, retries, () => clock.now),
+    restart: () =>
+      createQueueRunner(store, undefined, retries, () => clock.now),
   };
 }
 
@@ -88,7 +91,7 @@ const failingTransport = (failure: () => Error) => {
 describe("durable receipt upload", () => {
   it("retains queued images after quota rejection and uses the same capture on retry", async () => {
     const { run, rows, advance } = fixture();
-    const original = structuredClone(rows()[0]);
+    const original = structuredClone(present(rows()[0]));
     let blocked = true;
     let uploads = 0;
     const captureIds: string[] = [];
@@ -309,7 +312,7 @@ it("does not contact the server before its quota deadline, including after runne
     () => 60_000,
   )("user", household, transport, () => true);
   expect(calls).toBe(1);
-  expect(rows()[0].images).toEqual(["first.jpg", "second.jpg"]);
+  expect(present(rows()[0]).images).toEqual(["first.jpg", "second.jpg"]);
   advance(86_400_000);
   await run("user", household, transport, () => true);
   expect(calls).toBe(2);
@@ -341,6 +344,6 @@ it("reports an active reservation until its failure is persisted", async () => {
   rejectReservation(new Error("Image limit"));
   await pending;
   expect(run.isRunning()).toBe(false);
-  expect(rows()[0].error).toBe("Image limit");
-  expect(rows()[0].images).toEqual(["first.jpg", "second.jpg"]);
+  expect(present(rows()[0]).error).toBe("Image limit");
+  expect(present(rows()[0]).images).toEqual(["first.jpg", "second.jpg"]);
 });

@@ -171,3 +171,18 @@ not run. The client recovery flow must ship before stricter image-count
 enforcement. Existing eight-image reservations retain their original capacity.
 The historical correction cleanup remains an operator step after deployment.
 No code was pushed or deployed, and no release minimum was changed.
+
+
+## Integration with current main
+
+Rebased the audit and its API-safeguard base onto `5a8c16d`. Kept the current
+calendar, money, category, error, navigation, and automatic-retry contracts.
+Server quota deadlines remain durable and take precedence over manual retries;
+other failures retain the current per-process attempt cap. The draft reducer
+now belongs to the library layer, with storage and controller code. Focused
+receipt and catalog safeguard tests are in separate modules.
+
+The integrated branch passes `npm run check:ci`: 406 tests in 71 files, type
+checks, lint, unused-code checks, rule tests, and coverage collection. Native
+seeded-data tests and hosted PR checks follow the verification-tooling merge.
+This integration does not deploy a backend or publish a client update.

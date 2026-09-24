@@ -25,8 +25,7 @@ export function useProductLinkingQueue() {
   );
 
   useEffect(() => {
-    if (active && focused && items.length === 0 && status === "CanLoadMore")
-      loadMore(30);
+    if (active && items.length === 0 && status === "CanLoadMore") loadMore(30);
   }, [active, focused, items.length, status, loadMore]);
 
   return {

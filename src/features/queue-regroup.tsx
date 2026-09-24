@@ -7,7 +7,7 @@ import {
 } from "@/lib/domain/receipt-images";
 import { imageFile } from "@/lib/receipt-storage";
 import type { LocalReceipt } from "@/lib/upload-queue";
-import { useHousehold } from "./session";
+import { useHousehold } from "./household-context";
 
 /** Older unreserved queues keep every image until the person selects two receipt groups. */
 export function QueueRegroup({ entry }: Readonly<{ entry: LocalReceipt }>) {
@@ -28,7 +28,7 @@ export function QueueRegroup({ entry }: Readonly<{ entry: LocalReceipt }>) {
     <>
       <Button
         title="Del opp bilder"
-        secondary
+        variant="secondary"
         onPress={() => setVisible(true)}
       />
       <Sheet
@@ -37,7 +37,7 @@ export function QueueRegroup({ entry }: Readonly<{ entry: LocalReceipt }>) {
         onClose={() => setVisible(false)}
         footer={
           <>
-            {!!error && <Notice error>{error}</Notice>}
+            {!!error && <Notice tone="error">{error}</Notice>}
             <Button
               title="Lagre som to kvitteringer"
               disabled={

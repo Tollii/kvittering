@@ -1,3 +1,5 @@
+import { date as calendarDate } from "../src/lib/testing/calendar";
+import { present, receiptFixture } from "../src/lib/testing/receipts";
 import type { FunctionReturnType } from "convex/server";
 import { getConvexSize } from "convex/values";
 /// <reference types="vite/client" />
@@ -9,7 +11,6 @@ import schema from "./schema";
 import { weeklyShopFixture, parseReceipt } from "../src/lib/domain/receipt";
 import { weeklyDigest } from "../src/lib/domain/budget";
 import { updateReceiptReadModel } from "./receiptReadModel";
-import { receiptFixture } from "../src/lib/testing/receipts";
 
 const modules = import.meta.glob("./**/*.ts");
 
@@ -101,7 +102,10 @@ it("moves aggregate contributions on edits and keeps a deletion marker after rem
   // Rehearse legacy persisted data through the same transactional materializer as the receipt trigger.
   await t.run(async (ctx) => {
     await ctx.db.patch("receipts", id, {
-      data: { ...weeklyShopFixture(), purchaseDate: "2026-09-14" },
+      data: {
+        ...weeklyShopFixture(),
+        purchaseDate: calendarDate("2026-09-14"),
+      },
       status: "reviewed",
     });
     await updateReceiptReadModel(ctx, (await ctx.db.get("receipts", id))!);
@@ -112,7 +116,7 @@ it("moves aggregate contributions on edits and keeps a deletion marker after rem
   await user.mutation(api.receipts.save, {
     id,
     revision: 0,
-    data: { ...weeklyShopFixture(), purchaseDate: "2026-08-14" },
+    data: { ...weeklyShopFixture(), purchaseDate: calendarDate("2026-08-14") },
     reviewed: false,
     rememberLineIds: [],
     duplicateResolved: false,
@@ -157,10 +161,10 @@ it("returns the same digest from daily totals with duplicates, exclusions, forei
       const { _id, _creationTime, ...fields } = receiptFixture({
         householdId,
         excluded: index === 2,
-        duplicateOf: index === 3 ? result[0]._id : undefined,
+        duplicateOf: index === 3 ? present(result[0])._id : undefined,
         data: {
           ...weeklyShopFixture(),
-          purchaseDate: date,
+          purchaseDate: calendarDate(date),
           currency: index === 4 ? "SEK" : "NOK",
         },
       });
@@ -173,7 +177,7 @@ it("returns the same digest from daily totals with duplicates, exclusions, forei
   });
 
   await t.mutation(internal.receiptSync.backfill, {});
-  const expected = weeklyDigest(receipts, null, "2026-09-18");
+  const expected = weeklyDigest(receipts, null, calendarDate("2026-09-18"));
   expect(
     await t.query(internal.digest.summary, {
       householdId,
@@ -215,7 +219,10 @@ it("continues after concurrent changes move records beyond a bounded synchroniza
   expect(first.changes).toHaveLength(20);
   expect(first.done).toBe(false);
   // This receipt has not yet been delivered. Its deletion must survive the old boundary.
-  await user.mutation(api.receipts.remove, { id: ids[30], revision: 0 });
+  await user.mutation(api.receipts.remove, {
+    id: present(ids[30]),
+    revision: 0,
+  });
   let cursor = first.through;
   const seen = [...first.changes];
 
@@ -238,7 +245,7 @@ it("continues after concurrent changes move records beyond a bounded synchroniza
         through: latest.sequence,
       })
     ).changes,
-  ).toEqual([{ id: ids[30], receipt: null }]);
+  ).toEqual([{ id: present(ids[30]), receipt: null }]);
   expect(
     (
       await user.query(api.receiptSync.changes, {
@@ -254,12 +261,12 @@ it("keeps large receipt pages bounded without dropping totals or synchronization
   const data = weeklyShopFixture();
   data.originalText = "a".repeat(60_000);
   data.lines = Array.from({ length: 300 }, (_, index) => ({
-    ...data.lines[0],
+    ...present(data.lines[0]),
     id: `large-line-${index}`,
     name: "a".repeat(500),
     originalText: "a".repeat(1500),
   }));
-  data.purchaseDate = "2026-09-18";
+  data.purchaseDate = calendarDate("2026-09-18");
   expect(parseReceipt(data).kind).toBe("parsed");
   expect(getConvexSize(data)).toBeLessThan(1024 * 1024);
   expect(getConvexSize(data) * 50).toBeGreaterThan(16 * 1024 * 1024);
@@ -318,10 +325,13 @@ it("keeps large receipt pages bounded without dropping totals or synchronization
   expect(filtered.page).toEqual([]);
   expect(filtered.isDone).toBe(false);
   expect(
-    (await user.query(api.receipts.editorContext, { id: receipts[0]._id }))
-      .recentCategories.length,
+    (
+      await user.query(api.receipts.editorContext, {
+        id: present(receipts[0])._id,
+      })
+    ).recentCategories.length,
   ).toBeLessThanOrEqual(600);
-  const expected = weeklyDigest(receipts, null, "2026-09-18");
+  const expected = weeklyDigest(receipts, null, calendarDate("2026-09-18"));
   expect(
     await t.action(internal.digest.forHousehold, {
       householdId,

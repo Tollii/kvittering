@@ -19,7 +19,7 @@ import {
   isDraftBusy,
   type ReceiptDraft,
   type ReceiptDraftAction,
-} from "@/features/receipt-draft";
+} from "@/lib/receipt-draft";
 import {
   Button,
   Copy,
@@ -472,7 +472,7 @@ export function ReceiptEditor({
         }
       >
         {!online && <Notice icon="wifi.slash">Uten nett</Notice>}
-        {!!storageError && <Notice error>{storageError}</Notice>}
+        {!!storageError && <Notice tone="error">{storageError}</Notice>}
         {receipt.revision !== revision && (
           <Panel>
             <Notice tone="warning">Endret på en annen enhet</Notice>

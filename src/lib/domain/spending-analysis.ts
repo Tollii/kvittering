@@ -303,7 +303,7 @@ export function analysisSummary(
   report: Pick<
     ReturnType<typeof spendingAnalysis>,
     "currentReceipts" | "previousReceipts" | "differenceOre"
-  > & { categories: { name: string; differenceOre: number }[] },
+  > & { categories: { name: string; differenceOre: Ore }[] },
 ): string {
   if (!report.currentReceipts) return "Ingen registrerte kjøp i perioden.";
 

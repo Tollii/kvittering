@@ -111,7 +111,7 @@ export async function cachedReceiptImages(id: Id<"receipts">, count: number) {
 
       if (temporary.size <= 0 || temporary.size > 10 * 1024 * 1024)
         throw new Error("Ugyldig bildestørrelse.");
-      temporary.move(file, { overwrite: true });
+      await temporary.move(file, { overwrite: true });
       trimImages(directory, new Set(files.map((image) => image.name)));
     } finally {
       if (temporary.exists && temporary.uri !== file.uri) temporary.delete();

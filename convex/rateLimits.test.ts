@@ -1,3 +1,4 @@
+import { z } from "zod";
 /// <reference types="vite/client" />
 import { convexTest } from "convex-test";
 import { register as registerRateLimiter } from "@convex-dev/rate-limiter/test";
@@ -426,10 +427,22 @@ it("sends five images and counts the OpenAI SDK retry before network I/O", async
   let images = 0;
 
   const transport = vi.fn<typeof fetch>(async (_url, init) => {
-    const body = JSON.parse(String(init?.body));
-    images = body.input[1].content.filter(
-      (item: { type: string }) => item.type === "input_image",
-    ).length;
+    const body = z
+      .object({
+        input: z.array(
+          z.object({
+            content: z.union([
+              z.string().transform(() => []),
+              z.array(z.object({ type: z.string() })),
+            ]),
+          }),
+        ),
+      })
+      .parse(JSON.parse(z.string().parse(init?.body)));
+
+    images = body.input
+      .flatMap((item) => item.content)
+      .filter((item: { type: string }) => item.type === "input_image").length;
 
     return new Response(null, { status: 503 });
   });

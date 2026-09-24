@@ -2,7 +2,7 @@ import {
   reduceReceiptDraft,
   type ReceiptDraft,
   type ReceiptDraftAction,
-} from "../features/receipt-draft";
+} from "./receipt-draft";
 import type { Receipt } from "./domain/insights";
 import type { DraftPersistence } from "./receipt-draft-storage";
 
@@ -40,7 +40,7 @@ export class ReceiptDraftController {
     };
   };
   dispatch = (action: ReceiptDraftAction) => {
-    if (this.snapshot.kind !== "ready") return;
+    if (this.snapshot.kind !== "ready" || !this.storage) return;
     const previous = this.snapshot.draft;
     const draft = reduceReceiptDraft(previous, action);
     let storageError = this.snapshot.storageError;
@@ -53,7 +53,7 @@ export class ReceiptDraftController {
       storageError
     ) {
       try {
-        this.storage!.write(draft);
+        this.storage.write(draft);
         storageError = "";
       } catch {
         storageError =

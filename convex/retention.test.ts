@@ -1,3 +1,4 @@
+import { z } from "zod";
 import { createFunctionHandle } from "convex/server";
 import { register as registerWorkflow } from "@convex-dev/workflow/test";
 import { register as registerRateLimiter } from "@convex-dev/rate-limiter/test";
@@ -230,7 +231,8 @@ it.each([false, true])(
       jobs.some(
         (job) =>
           job.name === "retention:deletedReceiptWorkflows" &&
-          job.args[0].receiptId === receiptId,
+          z.object({ receiptId: z.string() }).parse(job.args[0]).receiptId ===
+            receiptId,
       ),
     ).toBe(true);
     await t.mutation(internal.retention.deletedReceiptWorkflows, { receiptId });

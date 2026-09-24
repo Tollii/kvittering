@@ -172,7 +172,9 @@ export const backfill = internalMutation({
         ready: false,
       });
 
-      state = (await ctx.db.get("receiptReadModel", id))!;
+      state = await ctx.db.get("receiptReadModel", id);
+
+      if (!state) throw new Error("Receipt read model was not created.");
     }
 
     const options = {

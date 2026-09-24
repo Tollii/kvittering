@@ -266,7 +266,7 @@ it("retains local history pagination across tabs and keeps searches separate", a
 
   await show(History);
   expect(result!.results).toHaveLength(30);
-  await act(() => result!.loadMore(30));
+  await act(async () => result!.loadMore(30));
   enabled = false;
   await show(History);
   enabled = true;

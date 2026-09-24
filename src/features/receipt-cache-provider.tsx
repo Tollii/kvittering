@@ -53,22 +53,24 @@ export function ReceiptCacheProvider({
   useEffect(() => {
     if (!head?.ready || !active || !online || !isAuthenticated)
       return undefined;
-    let cancelled = false;
+    const through = head.sequence;
+    const control = { cancelled: false };
+    const isCancelled = () => control.cancelled;
     let timer: ReturnType<typeof setTimeout> | undefined;
 
     async function synchronize() {
       try {
-        while (!cancelled) {
+        while (!isCancelled()) {
           const current = cache.read();
 
-          if (current.complete && current.sequence >= head!.sequence) break;
+          if (current.complete && current.sequence >= through) break;
 
           const page = await convex.query(api.receiptSync.changes, {
             after: current.sequence,
-            through: head!.sequence,
+            through: through,
           });
 
-          if (cancelled) return;
+          if (isCancelled()) return;
           cache.apply(current.sequence, page);
 
           for (const change of page.changes)
@@ -77,9 +79,9 @@ export function ReceiptCacheProvider({
           if (page.done) break;
         }
 
-        if (!cancelled) setFailure(0);
+        if (!isCancelled()) setFailure(0);
       } catch (error) {
-        if (cancelled) return;
+        if (isCancelled()) return;
         reportError(error, "receipt.synchronization");
         setFailure((count) => count + 1);
         timer = setTimeout(
@@ -92,7 +94,7 @@ export function ReceiptCacheProvider({
     void synchronize();
 
     return () => {
-      cancelled = true;
+      control.cancelled = true;
 
       if (timer) clearTimeout(timer);
     };

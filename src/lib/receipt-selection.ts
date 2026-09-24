@@ -1,3 +1,4 @@
+import { CalendarDate } from "./domain/calendar";
 import type { FunctionArgs } from "convex/server";
 import type { api } from "../../convex/_generated/api";
 import type { Receipt } from "./domain/insights";
@@ -58,7 +59,12 @@ export function selectReceiptHistory(receipts: Receipt[], search: string) {
     )
     .sort(
       (left, right) =>
-        (right.purchaseDate ?? "").localeCompare(left.purchaseDate ?? "") ||
-        right._creationTime - left._creationTime,
+        (right.purchaseDate && left.purchaseDate
+          ? CalendarDate.compare(right.purchaseDate, left.purchaseDate)
+          : right.purchaseDate
+            ? 1
+            : left.purchaseDate
+              ? -1
+              : 0) || right._creationTime - left._creationTime,
     );
 }

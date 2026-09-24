@@ -162,7 +162,9 @@ export const inventoryWorkflows = internalMutation({
         receiptId ?? undefined,
       );
 
-      const record = (await ctx.db.get("workflowJournals", id))!;
+      const record = await ctx.db.get("workflowJournals", id);
+
+      if (!record) throw new Error("Workflow journal was not created.");
 
       const deleted =
         receiptId !== null && !(await ctx.db.get("receipts", receiptId));

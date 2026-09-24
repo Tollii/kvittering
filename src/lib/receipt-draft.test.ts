@@ -1,9 +1,6 @@
 import { receiptFixture } from "./testing/receipts";
 import { describe, expect, it } from "vitest";
-import {
-  createReceiptDraft,
-  reduceReceiptDraft,
-} from "../features/receipt-draft";
+import { createReceiptDraft, reduceReceiptDraft } from "./receipt-draft";
 
 const receipt = receiptFixture({
   revision: 1,

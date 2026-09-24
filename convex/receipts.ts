@@ -1,3 +1,5 @@
+import { beginUploadedReceipt } from "./receiptUploadCompletion";
+import { receiptPeriodPage } from "./receiptPeriod";
 import {
   CalendarDate,
   calendarDateValidator,
@@ -17,7 +19,7 @@ import {
 import { trackWorkflow } from "./retention";
 import { consumeReceiptQuota } from "./rateLimits";
 import { notifyReceiptActivities } from "./liveActivities";
-import type { Id } from "./_generated/dataModel";
+
 import {
   productIdentityKey,
   productSelectionValidator,
@@ -35,16 +37,10 @@ import { productChange } from "./products";
 import { resolveProductSelections } from "./catalogLinks";
 import { ConvexError, v } from "convex/values";
 import {
-  type PaginationOptions,
   paginationOptsValidator,
   paginationResultValidator,
 } from "convex/server";
-import {
-  query,
-  internalQuery,
-  type QueryCtx,
-  type MutationCtx,
-} from "./_generated/server";
+import { query, internalQuery } from "./_generated/server";
 import { internalMutation } from "./serverFunctions";
 import { internal } from "./_generated/api";
 import schema from "./schema";
@@ -169,31 +165,6 @@ export const reserve = mutation({
     });
   },
 });
-
-async function beginUploadedReceipt(
-  ctx: MutationCtx,
-  id: Id<"receipts">,
-  imageCount: number,
-) {
-  await ctx.db.patch("receipts", id, { status: "uploaded", generation: 1 });
-
-  const workflowId = await start(
-    ctx,
-    internal.processing.processReceipt,
-    { id, generation: 1 },
-    {
-      onComplete: internal.retention.workflowCompleted,
-      context: { component: "processing", receiptId: id },
-    },
-  );
-
-  await trackWorkflow(ctx, workflowId, "processing", id);
-  console.info("receipt.upload_completed", {
-    receiptId: id,
-    generation: 1,
-    imageCount,
-  });
-}
 
 /** All images are in storage: hand the receipt to the server workflow. The phone is done. */
 export const completeUpload = mutation({
@@ -898,26 +869,3 @@ export const attentionCount = query({
     };
   },
 });
-
-/** Shared indexed period contract for interactive reports and bounded background reads. */
-export function receiptPeriodPage(
-  ctx: QueryCtx,
-  householdId: Id<"households">,
-  start: CalendarDate,
-  end: CalendarDate,
-  paginationOpts: PaginationOptions,
-) {
-  return ctx.db
-    .query("receipts")
-    .withIndex("by_householdId_and_purchaseDate", (q) =>
-      q
-        .eq("householdId", householdId)
-        .gte("data.purchaseDate", start)
-        .lte("data.purchaseDate", end),
-    )
-    .paginate({
-      ...paginationOpts,
-      maximumRowsRead: 100,
-      maximumBytesRead: 500_000,
-    });
-}

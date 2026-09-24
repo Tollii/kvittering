@@ -61,8 +61,6 @@ export const lineLabels: Record<ReceiptLine["kind"], string> = {
   vat: "MVA (telles ikke)",
 };
 
-export type { ProductChoice } from "@/lib/domain/product-reference";
-
 type Props = {
   line: ReceiptLine;
   lines: ReceiptLine[];

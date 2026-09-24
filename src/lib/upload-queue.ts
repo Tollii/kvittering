@@ -145,7 +145,10 @@ export function createQueueRunner(
           });
         } catch (cause) {
           if (cause instanceof RequestDeferred)
-            retries.write(entry.id, retryDeadline((previous?.attempts ?? 0) + 1, clock(), cause));
+            retries.write(
+              entry.id,
+              retryDeadline((previous?.attempts ?? 0) + 1, clock(), cause),
+            );
           else retries.remove(entry.id);
           entry.error =
             cause instanceof Error ? cause.message : "Opplastingen mislyktes.";
