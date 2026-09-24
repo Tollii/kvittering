@@ -11,8 +11,6 @@ import {
   type ParsedProductEvidence,
 } from "./product-evidence";
 
-export { measure, type Measure } from "./product-evidence";
-
 export type QuantityEvidence = {
   receipt: ParsedProductEvidence;
   catalog:

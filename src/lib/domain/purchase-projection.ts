@@ -45,21 +45,6 @@ export function currentAnalysis(receipt: Receipt) {
     : undefined;
 }
 
-export function currentLineAnalysis(
-  receipt: Receipt,
-  line: ReceiptLine,
-): ProductAnalysisResult | undefined {
-  const analysis = currentAnalysis(receipt);
-
-  if (analysis?.state !== "complete") return;
-
-  return analysis.results.find(
-    (result) =>
-      result.lineId === line.id &&
-      result.evidenceKey === purchaseEvidenceKey(line),
-  );
-}
-
 /** One preparation pass owns inclusion, accounting, and current analysis evidence. */
 export function preparePurchases(
   receipts: readonly Receipt[],

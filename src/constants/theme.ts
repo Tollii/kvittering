@@ -68,8 +68,6 @@ export function useTheme(): Theme {
   return useColorScheme() === "dark" ? dark : light;
 }
 
-export const themes = { light, dark };
-
 export const radius = {
   sheet: 24,
   card: 24,

@@ -44,3 +44,7 @@ example
 /android
 
 .env.local
+
+# Mutation testing workspace
+.stryker-tmp/
+reports/

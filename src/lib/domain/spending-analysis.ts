@@ -10,8 +10,6 @@ import {
 } from "./product-families";
 import { categoryById } from "./categories";
 
-export { currentLineAnalysis } from "./purchase-projection";
-
 export type AnalysisPeriod = {
   start: string;
   end: string;

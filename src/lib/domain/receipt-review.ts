@@ -18,7 +18,7 @@ import {
 } from "./receipt";
 import { categoryById } from "./categories";
 
-export { categoryUncertainIssue, isCategoryUncertain } from "./receipt-issues";
+export { isCategoryUncertain } from "./receipt-issues";
 
 export const categoryReviewThreshold = 0.5;
 
@@ -75,19 +75,6 @@ export function lineReviewIssues(line: ReceiptLine): ReceiptIssue[] {
     issues.push({ code: "name_missing" });
 
   return uniqueIssues(issues);
-}
-
-export function receiptReviewIssues(data: ReceiptData): string[] {
-  return [
-    ...new Set([
-      ...data.issues.map((issue) => receiptIssueText(parseReceiptIssue(issue))),
-      ...reconcile(data).issues,
-      ...(!data.store?.trim() ? ["Butikken mangler."] : []),
-      ...(!data.lines.some((line) => line.kind === "product")
-        ? ["Ingen varer er lest."]
-        : []),
-    ]),
-  ];
 }
 
 /**
