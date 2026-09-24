@@ -181,7 +181,9 @@ be resolved, and outstanding requests for changes still block merging.
 The workflow runs only code from `main`, without installing dependencies or
 executing PR code. Bot status/comments and pushes to main refresh it. A 15-minute schedule
 checks CI completion, thread resolutions, and requests without bot events;
-manual dispatch refreshes it immediately. API errors leave the check pending.
+manual dispatch refreshes it immediately. Each refresh reuses the current
+commit’s check and marks it pending before reading evidence. Later API errors
+leave it pending.
 Changed files, reviews, and review threads are paginated. A truncated file list
 blocks the check. The gate uses a documented CodeRabbit summary format; a bot
 format change fails closed and requires an adapter update.

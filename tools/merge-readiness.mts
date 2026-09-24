@@ -109,16 +109,29 @@ for (const pull of pages<Pull>(`${root}/pulls?state=open&base=main`)) {
     external_id: `merge-readiness:${pull.number}`,
   };
 
-  // Publish pending before reading evidence, so API failures cannot leave an old green result.
-  const pending = values.publish
-    ? github<{ id: number }>(
-        `${root}/check-runs`,
-        JSON.stringify({
-          ...check,
-          status: "in_progress",
-        }),
-      )
-    : undefined;
+  // Refresh one check per commit. API failures leave that same check pending.
+  let pending: { id: number } | undefined;
+
+  if (values.publish) {
+    const existing = github<{
+      check_runs: { id: number; external_id: string; app: { id: number } }[];
+    }>(
+      `${root}/commits/${head}/check-runs?check_name=Merge%20readiness&filter=latest&per_page=100`,
+    ).check_runs.find(
+      (run) => run.external_id === check.external_id && run.app.id === 15368,
+    );
+
+    pending = existing
+      ? github<{ id: number }>(
+          `${root}/check-runs/${existing.id}`,
+          JSON.stringify({ status: "in_progress" }),
+          "PATCH",
+        )
+      : github<{ id: number }>(
+          `${root}/check-runs`,
+          JSON.stringify({ ...check, status: "in_progress" }),
+        );
+  }
 
   const files = pages<{ filename: string; previous_filename?: string }>(
     `${root}/pulls/${pull.number}/files`,
