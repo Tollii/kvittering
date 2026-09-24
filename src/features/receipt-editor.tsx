@@ -1,3 +1,4 @@
+import { isReceiptProcessing } from "@/lib/domain/receipt-status";
 import { releaseMutation } from "@/lib/releases/requests";
 import { usePreventRemove } from "expo-router/react-navigation";
 import {
@@ -142,9 +143,7 @@ export function ReceiptEditor({
     ]);
   });
 
-  const processing = ["processing", "uploaded", "uploading"].includes(
-    receipt.status,
-  );
+  const processing = isReceiptProcessing(receipt.status);
 
   const totals = data ? reconcile(data) : null;
   const unresolvedDuplicate = !!receipt.duplicateOf && !duplicateResolved;

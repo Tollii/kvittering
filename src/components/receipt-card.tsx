@@ -1,3 +1,4 @@
+import { isReceiptProcessing } from "@/lib/domain/receipt-status";
 import { router } from "expo-router";
 import {
   ActivityIndicator,
@@ -50,7 +51,7 @@ export function ReceiptCard({
   const colors = useTheme();
   const { fontScale } = useWindowDimensions();
   const stacked = fontScale > 1.3;
-  const busy = ["uploading", "uploaded", "processing"].includes(receipt.status);
+  const busy = isReceiptProcessing(receipt.status);
   const needs = receipt.status === "needs_review" ? receiptNeeds(receipt) : [];
 
   const reviewLabel = needs.length ? `. ${needs.join(", ")}` : "";

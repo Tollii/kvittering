@@ -1,3 +1,4 @@
+import { isReceiptProcessing } from "../src/lib/domain/receipt-status";
 import { commitReceiptChange } from "./receiptChanges";
 import { isCategoryUncertain } from "../src/lib/domain/receipt-issues";
 import { featureEnabled } from "./featureFlags";
@@ -189,10 +190,7 @@ export const enrich = mutation({
 
     if (onlyIfMissing && receipt.catalogStatus) return null;
 
-    if (
-      !receipt.data ||
-      ["uploading", "uploaded", "processing"].includes(receipt.status)
-    )
+    if (!receipt.data || isReceiptProcessing(receipt.status))
       throw new Error("Vent til kvitteringen er lest.");
 
     if (!env.KASSALAPP_API_KEY)

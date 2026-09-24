@@ -1,3 +1,7 @@
+import {
+  isReceiptProcessing,
+  receiptStatusValidator,
+} from "../src/lib/domain/receipt-status";
 import { notifyReceiptActivities } from "./liveActivities";
 import type { Id } from "./_generated/dataModel";
 import {
@@ -29,7 +33,7 @@ import {
   type MutationCtx,
 } from "./_generated/server";
 import { internal } from "./_generated/api";
-import schema, { statusValidator } from "./schema";
+import schema from "./schema";
 import { requireMember, requireReceipt } from "./access";
 import {
   reconcile,
@@ -187,7 +191,7 @@ export const retry = mutation({
   handler: async (ctx, { id }) => {
     const { receipt } = await requireReceipt(ctx, id);
 
-    if (["processing", "uploaded", "uploading"].includes(receipt.status))
+    if (isReceiptProcessing(receipt.status))
       throw new Error("Kvitteringen behandles allerede.");
     const generation = receipt.generation + 1;
     await ctx.db.patch("receipts", id, {
@@ -227,11 +231,7 @@ export const save = mutation({
     if (receipt.revision !== args.revision)
       throw new Error("Kvitteringen ble endret av en annen. Åpne den på nytt.");
 
-    if (
-      receipt.status === "processing" ||
-      receipt.status === "uploaded" ||
-      receipt.status === "uploading"
-    )
+    if (isReceiptProcessing(receipt.status))
       throw new Error("Vent til behandlingen er ferdig.");
     args = { ...args, data: structuredClone(args.data) };
     validateReceipt(args.data);
@@ -599,7 +599,7 @@ export const history = query({
     v.object({
       _id: v.id("receipts"),
       _creationTime: v.number(),
-      status: statusValidator,
+      status: receiptStatusValidator,
       store: v.union(v.string(), v.null()),
       purchaseDate: v.union(v.string(), v.null()),
       totalOre: v.union(v.number(), v.null()),

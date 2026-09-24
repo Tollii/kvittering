@@ -1,3 +1,4 @@
+import { receiptStatusValidator } from "../src/lib/domain/receipt-status";
 import { productReferenceValidator } from "../src/lib/domain/product-reference";
 import { productLinkUndoValidator } from "../src/lib/domain/product-linking";
 import {
@@ -25,15 +26,6 @@ import {
   productAnalysisValidator,
 } from "../src/lib/domain/product-families";
 
-export const statusValidator = v.union(
-  v.literal("uploading"),
-  v.literal("uploaded"),
-  v.literal("processing"),
-  v.literal("needs_review"),
-  v.literal("reviewed"),
-  v.literal("failed"),
-);
-
 export const receiptFields = {
   householdId: v.id("households"),
   uploadedBy: v.string(),
@@ -41,7 +33,7 @@ export const receiptFields = {
   clientId: v.string(),
   imageCount: v.number(),
   backgroundUpload: v.boolean().optional(),
-  status: statusValidator,
+  status: receiptStatusValidator,
   revision: v.number(),
   generation: v.number(),
   data: v.union(receiptDataValidator, v.null()),
