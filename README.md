@@ -1,57 +1,89 @@
 # Kvitto
 
-Household grocery receipts for iPhone. Photograph or share a receipt; Kvitto
-reads it, categorizes the lines, links products, and reports what the household
-buys. Expo 57 / React Native, with a Convex backend.
+Kvitto captures household grocery receipts and explains purchases. It uses Expo 57 / React Native on iOS and Convex for authentication, storage, and processing. Reports describe purchases, not consumption; missing evidence remains unknown.
 
-## Develop
+## Documentation
 
-Needs Node.js 24 and Xcode 26.4 or later.
+- [Architecture](docs/architecture.md): responsibility boundaries, data flow, and reasons behind the design.
+- [Design principles](docs/principles.md): domain modeling and test design.
+- [Verification](docs/verification.md): current CI checks, test fixtures, and device-test procedures.
+- [Open work](plans/README.md): unresolved findings and design decisions.
+- [Release review](.agents/skills/release-review/SKILL.md): assess installed-client compatibility.
+- [Release operations](.agents/skills/release-operations/SKILL.md): publish a reviewed release or change live release controls.
+
+Configuration and source own exact values and behavior. [AGENTS.md](AGENTS.md) contains the shared agent instructions (`CLAUDE.md` links to it); [package.json](package.json) defines the commands.
+
+## Run on iPhone or the simulator
+
+Use Node.js 24 and Xcode 26.4 or later.
 
 ```sh
-npm install
-[ -e .env.local ] || cp .env.example .env.local  # then set your deployment and URLs
-npm run backend             # Convex dev deployment, in one terminal
-npm run ios:build           # build and open the app; later, npm start
+npm ci
+cp .env.example .env.local # Only if .env.local does not exist.
 ```
 
-Provider keys and `BETTER_AUTH_SECRET` belong in the Convex deployment, never in
-`EXPO_PUBLIC_*`. The simulator has no camera: import an image and use **Velg fra
-bilder**. [Development](docs/development.md) covers devices, backend settings,
-and staging.
+Set the deployment and both public Convex URLs in `.env.local`. Keep provider keys and `BETTER_AUTH_SECRET` in the Convex deployment. Do not put secrets in `EXPO_PUBLIC_*` variables.
 
-## Check
+Run the backend from the repository root:
 
-| When                | Command                 |
-| ------------------- | ----------------------- |
-| After each change   | `npm run check:changed` |
-| Before committing   | `npm run check`         |
-| iOS flows, on a Mac | `npm run e2e:ios`       |
+```sh
+npm run backend
+```
 
-CI must pass `CI result` before merging. [Verification](docs/verification.md)
-explains the checks and how to add one.
+In a second terminal, build and open the native app:
 
-## Release
+```sh
+npm run ios:build
+```
 
-Run the **TestFlight** workflow in GitHub Actions. It checks the code, deploys the
-staging backend, builds on Expo, and uploads to TestFlight. Review changes that
-affect installed apps with the [release policy](docs/releases.md).
+After the first build, use `npm start` to start Metro. Press `i` to open the simulator. Rebuild with `npm run ios:build` after changes to native packages or app plugins. On a physical iPhone, configure signing in Xcode and use `npx expo run:ios --device`.
 
-| Builds                | Convex deployment   |
-| --------------------- | ------------------- |
-| Local and development | `agile-falcon-148`  |
-| TestFlight            | `courteous-jay-215` |
+For a signed development build with the Apple credentials stored in Expo, use the
+`development` profile. Local EAS builds require Xcode, CocoaPods, and Fastlane.
 
-## Docs
+```sh
+npx eas-cli build --platform ios --profile development --local --output /tmp/kvitto-development.ipa
+npx expo start --dev-client --lan
+```
 
-[Features](docs/features.md) · [Architecture](docs/architecture.md) ·
-[Principles](docs/principles.md) · [Quality](docs/quality.md) ·
-[Native iOS](docs/native-ios.md) · [Releases](docs/releases.md) ·
-[Backend operations](docs/backend-operations.md) ·
-[Observability](docs/observability.md)
+The iPhone must be registered in the provisioning profile for this build. After
+installation, open Kvitto and connect to Metro on the Mac. Keep both devices on
+the same network and allow local network access when iOS asks. The development
+profile uses the existing Convex development deployment.
+
+The simulator has no receipt camera. Import an image into its photo library, then select **Velg fra bilder**. Check camera capture on a physical iPhone.
+
+## Backend configuration
+
+[eas.json](eas.json) maps development and TestFlight profiles to their backends and channels. Convex labels persistent TestFlight staging as type `prod`; this does not make it the public App Store backend. Development and staging data change independently.
+
+The local staging command uses `.env.staging.local`, which is ignored by Git. To set up another development machine, create a staging deploy key for the deployment selected from `eas.json`, using the installed Convex CLI's `deployment token create --help`. Save it to that file; leave `.env.local` for personal development. GitHub Actions needs its own key in `CONVEX_STAGING_DEPLOY_KEY`.
+
+Configure provider credentials in the selected Convex deployment. Required names and model defaults are read by [providers](convex/providers.ts), [authentication](convex/auth.ts), and the affected integration. Keep them out of `EXPO_PUBLIC_*` variables. Use separate provider accounts/projects and keys for development and staging where possible; separate keys in one account can still share billing or quota.
+
+For push, configure Apple credentials and use a signed physical iPhone. For Apple sign-in, widgets, or ActivityKit setup, follow the native capability checks in [release operations](.agents/skills/release-operations/SKILL.md#native-capabilities). Expo Go cannot verify these integrations.
+
+## Source references
+
+| Concern                                           | Source of truth                                                                                                                                               |
+| ------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Build identities, capabilities, and native assets | [app.json](app.json), [plugins](plugins/), [native module](modules/receipt-intelligence/)                                                                     |
+| Release commands and credentials                  | [package.json](package.json), [TestFlight workflow](.github/workflows/testflight.yml), [OTA workflow](.github/workflows/ota.yml)                              |
+| Diagnostics and redaction                         | [Sentry initialization](src/lib/sentry.ts), [event handling](src/lib/sentry-event.ts)                                                                         |
+| Formatting, lint, and coverage                    | [Prettier](.prettierrc.json), [ESLint](eslint.config.js), [Oxlint](.oxlintrc.json), [repository rules](oxlint.policy.config.mjs), [Vitest](vitest.config.mts) |
+
+Do not copy constants, enabled rules, event catalogs, or feature inventories into documentation. Explain a constraint or procedure only when the code does not make it clear.
+
+## Checks
+
+Use `npm run check:changed` during code development, `npm run check` before committing code, and `npm run check:ci` when tests or coverage configuration change. Fix findings without baselines or broad suppressions. Use `npm run lint:docs` for documentation references. See [verification](docs/verification.md) for the current CI and native-test procedures. After a Convex signature change, run `npm run contract:update` and review the resulting contract diff. Commands and tool configuration remain the source of truth for what each check runs.
+
+Expo API work uses the [Expo 57 documentation](https://docs.expo.dev/versions/v57.0.0/). Backend implementation uses the generated guidance through the [Convex skill](.agents/skills/convex/SKILL.md).
+
+## Sentry access
+
+Use the installed `sentry` CLI with saved OAuth credentials: `env -u SENTRY_AUTH_TOKEN sentry ...`. The source-map token cannot read issues. Do not load `.env.local` for an investigation or replace its build token with a user token. Configuration and redaction are in the source references above; use the `sentry-cli` skill for investigation commands.
 
 ## License
 
-[FSL-1.1-ALv2](LICENSE.md): use, modify, and self-host freely, but not to offer
-a competing product. Each release becomes Apache 2.0 two years after
-publication.
+See [FSL-1.1-ALv2](LICENSE.md) for the terms.

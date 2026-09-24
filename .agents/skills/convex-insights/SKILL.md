@@ -5,7 +5,7 @@ description: Investigate Kvitto backend failures, read limits, transaction conte
 
 # Backend investigation
 
-Read [observability](../../../docs/observability.md) and identify the deployment with [backend operations](../../../docs/backend-operations.md). An investigation starts read-only; a log entry does not authorize a repair or deployment.
+Identify the deployment with [backend setup](../../../README.md#backend-configuration). Resolve the effective target from command selectors, environment-file selection, and deployment-key scope without printing secrets. An investigation starts read-only; a log entry does not authorize a repair or deployment.
 
 Use the available Convex tools or CLI. Confirm their parameters rather than assuming another skill's tool names exist. Begin with a bounded time window and the affected request, function, or receipt identifier. Widen the window only when needed to establish a cause. Do not print receipt contents or credentials.
 

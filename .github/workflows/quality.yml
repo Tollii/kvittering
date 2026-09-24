@@ -2,7 +2,7 @@ name: Code quality
 
 # Every job below is required through `CI result`, except the advisory reports
 # (mutation and changed-line coverage). Make `CI result` the only required
-# status check; see docs/quality.md.
+# status check; see docs/verification.md.
 on:
   pull_request:
     types: [opened, synchronize, reopened, labeled, unlabeled]
