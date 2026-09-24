@@ -2,16 +2,18 @@
 
 Use Node.js 24 and `npm ci`. The checks require no server, account, or secrets.
 
-| Command               | Purpose                                                                   |
-| --------------------- | ------------------------------------------------------------------------- |
-| `npm run check:fast`  | Formatting, TypeScript, Oxlint, repository rules, and Expo/SonarJS checks |
-| `npm run check`       | Fast checks, custom lint-rule tests, and application tests                |
-| `npm run check:ci`    | The same checks with application coverage reports                         |
-| `npm run lint:fix`    | Apply available lint fixes; review the changes before committing          |
-| `npm run lint:oxlint` | Native Oxlint correctness and test checks                                 |
-| `npm run lint:policy` | All general anti-slop rules                                               |
-| `npm run lint:eslint` | Expo, React, type-aware TypeScript, repository, and SonarJS checks        |
-| `npm run test:rules`  | Custom rule tests in ESLint and the actual Oxlint CLI                     |
+| Command                 | Purpose                                                                   |
+| ----------------------- | ------------------------------------------------------------------------- |
+| `npm run check:fast`    | Formatting, TypeScript, Oxlint, repository rules, and Expo/SonarJS checks |
+| `npm run check`         | Fast checks, custom lint-rule tests, and application tests                |
+| `npm run check:ci`      | The same checks with application coverage reports                         |
+| `npm run lint:fix`      | Apply available lint fixes; review the changes before committing          |
+| `npm run lint:oxlint`   | Native Oxlint correctness and test checks                                 |
+| `npm run lint:policy`   | All general anti-slop rules                                               |
+| `npm run lint:eslint`   | Expo, React, type-aware TypeScript, repository, and SonarJS checks        |
+| `npm run lint:unused`   | Unused files, dependencies, and exports (knip)                            |
+| `npm run test:rules`    | Custom rule tests in ESLint and the actual Oxlint CLI                     |
+| `npm run test:mutation` | On-demand mutation report for domain rules (Stryker)                      |
 
 `Code quality / Quality checks` runs on pull requests and pushes to `main`.
 The TestFlight workflow runs `npm run check` before a new build. Set
@@ -85,6 +87,43 @@ server data through a Convex subscription or a TanStack query, which own
 caching, deduplication, cancellation, and the order of responses. Both
 repository rules run in ESLint and Oxlint.
 
+Further repository rules, in `tools/eslint/index.cjs`, run in ESLint:
+
+| Rule                            | Scope                | Rejects                                                                                                                             |
+| ------------------------------- | -------------------- | ----------------------------------------------------------------------------------------------------------------------------------- |
+| `kvitto/no-leaked-render`       | TypeScript           | `a && <View/>` when `a` can be `0`, `NaN`, or `""`; React Native crashes when such a value renders outside `<Text>`. Uses types.    |
+| `kvitto/no-ore-arithmetic`      | TypeScript           | `+ - * / %`, compound assignment, and negation on `Ore` amounts outside `ore.ts`. Uses types.                                       |
+| `kvitto/no-inline-literal-set`  | Application, backend | `["a", "b"].includes(x)`. Name the rule as a predicate beside its type, or a module-level `Set`.                                    |
+| `kvitto/convex-function-access` | Backend              | A public `query`, `mutation`, or `action` without an access check, unless a preceding `// Access:` comment states why it is public. |
+| `kvitto/no-db-query-filter`     | Backend              | `.filter()` on a database query. Select with an index range.                                                                        |
+| `kvitto/no-unbounded-collect`   | Backend              | `.collect()` on a database query. Use `.take(n)`, `.first()`, `.unique()`, or pagination.                                           |
+
+React rules also reject index keys, useless fragments, components defined
+during render (render props passed to navigation options are allowed), and
+deprecated APIs. `sonarjs/no-selector-parameter` reports a boolean argument
+that chooses between two behaviors; give each behavior its own function, or
+pass a named state such as `CaptureAvailability`.
+
+## Import direction
+
+Dependencies point inward. `src/app`, `src/features`, and `src/components` use
+`src/lib`; `src/lib` and `convex` never import them (`import/no-restricted-paths`,
+tests excepted). Domain and catalog modules under `src/lib/domain` and
+`src/lib/catalog` do not import React, React Native, Expo, or UI modules, so the
+backend and tests run them unchanged. `import/no-cycle` rejects dependency
+cycles.
+
+## Money
+
+Amounts are `Ore`, a whole number of øre branded at compile time. The `Ore`
+object is the only way to create or combine them: `Ore.of`, `fromKroner`,
+`parse`, `parseAmount`, `add`, `subtract`, `negate`, `abs`, `sum`, `min`, `max`,
+`median`, `scale`, `divide`, `round`, `ratio`, `per`, `toKroner`, `compare`,
+`format`, `formatInput`, and `formatWholeKroner`. Stored documents and client
+data keep plain numbers; `oreValidator` brands Convex fields without changing
+them. Unit prices are rates in fractional øre per unit, so they are plain
+numbers named `…UnitPrice`, not amounts.
+
 ## Type safety
 
 `any` is not permitted. `@typescript-eslint/no-explicit-any` rejects written
@@ -99,9 +138,13 @@ non-promises, throwing or rejecting with non-errors, unnecessary assertions,
 non-exhaustive `switch` statements over unions, and `@ts-ignore`.
 `@ts-expect-error` requires a description.
 
-`no-unnecessary-condition` is not enabled. Without
-`noUncheckedIndexedAccess`, it reports guards on array and record reads as
-unnecessary even though they protect absent values at runtime.
+`noUncheckedIndexedAccess` types array and record reads as possibly
+`undefined`. Pair parallel values in one object instead of reading two arrays
+by position, and name the one-element and non-empty cases with `soleElement`
+and `nonEmpty`. Tests read required elements with `present(value)`, which
+fails with a clear message. With index reads typed honestly,
+`no-unnecessary-condition` rejects guards the types already rule out.
+
 `no-non-null-assertion` is not enabled yet; existing assertions should be
 replaced by parsed or narrowed values as their code changes.
 
@@ -127,7 +170,7 @@ The exceptions are deliberate and declared in `eslint.config.js`:
 | -------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Cognitive/cyclomatic/expression complexity, nested control flow, SonarJS file/function line limits | Counts do not establish separate responsibilities. Review domain and transaction boundaries instead of splitting functions to meet a number. The core `max-lines` rule above sets the file limit. |
 | Duplicate strings, maximum union size                                                              | Repeated labels and validator literals do not always need constants; explicit unions preserve domain states.                                                                                      |
-| Nested conditional, selector parameter, mandatory final else, loop exit count                      | Compact value selection, boolean inputs, optional branches, and early exits are used deliberately.                                                                                                |
+| Nested conditional, mandatory final else, loop exit count                                          | Compact value selection, optional branches, and early exits are used deliberately.                                                                                                                |
 | File header, shorthand property grouping                                                           | No per-file copyright policy; group properties by meaning, not shorthand syntax.                                                                                                                  |
 | Wildcard import, filename/class-name agreement                                                     | SDK namespace imports and framework entry filenames are required conventions.                                                                                                                     |
 | Undefined assignment                                                                               | Convex uses `undefined` to clear fields; local state also uses it for absence.                                                                                                                    |
@@ -168,6 +211,21 @@ If an integration becomes difficult to manage, compare a small Effect version
 with the existing code before adopting it more widely. Do not duplicate Convex
 workflow retries with Effect retries.
 
-Useful next steps are a required PR status check, secret scanning, and scheduled
-dependency review. Consider unused-code detection only after configuring generated
-references, scheduled functions, Expo routes, and installed-client contracts.
+## Unused code, dependencies, and mutation testing
+
+`npm run lint:unused` runs knip over application, backend, and tooling code.
+`knip.jsonc` names entries that are loaded by path and dependencies required
+without an import. Before removing a reported export, check generated Convex
+references, scheduled functions, workflow callbacks, and installed clients.
+
+Dependabot proposes weekly npm updates and monthly GitHub Actions updates. Expo,
+React, and React Native minor and major versions are excluded; upgrade the SDK
+with `npx expo install --fix` and review it with the release policy.
+
+`npm run test:mutation` changes domain rules one at a time and reports which
+changes no test notices. Pass `-- --mutate src/lib/domain/<module>.ts` for one
+module. The HTML report is written to `coverage/mutation/`. It uses the command
+runner and `vitest.mutation.config.mts`, a node-environment copy of the domain
+tests. It is a review aid, not a CI gate or percentage target.
+
+A required PR status check and secret scanning remain useful next steps.
