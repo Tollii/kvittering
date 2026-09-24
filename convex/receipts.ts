@@ -38,6 +38,7 @@ import {
   aliasKey,
 } from "../src/lib/domain/receipt";
 import { canAcceptReceipt } from "../src/lib/domain/receipt-review";
+import { isReceiptProcessing } from "../src/lib/domain/receipt-state";
 import { learnCategories } from "./aliases";
 import { start } from "@convex-dev/workflow";
 
@@ -187,7 +188,7 @@ export const retry = mutation({
   handler: async (ctx, { id }) => {
     const { receipt } = await requireReceipt(ctx, id);
 
-    if (["processing", "uploaded", "uploading"].includes(receipt.status))
+    if (isReceiptProcessing(receipt.status))
       throw new Error("Kvitteringen behandles allerede.");
     const generation = receipt.generation + 1;
     await ctx.db.patch("receipts", id, {

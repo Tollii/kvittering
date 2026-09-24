@@ -29,6 +29,7 @@ import { normalizeSearch } from "../src/lib/catalog/policy";
 import { matchingKey } from "../src/lib/domain/product-matching";
 import { categoryById } from "../src/lib/domain/categories";
 import { lineValidator } from "../src/lib/domain/receipt";
+import { isReceiptProcessing } from "../src/lib/domain/receipt-state";
 import type { Id } from "./_generated/dataModel";
 
 import { catalogDecision } from "../src/lib/catalog/decisions";
@@ -189,10 +190,7 @@ export const enrich = mutation({
 
     if (onlyIfMissing && receipt.catalogStatus) return null;
 
-    if (
-      !receipt.data ||
-      ["uploading", "uploaded", "processing"].includes(receipt.status)
-    )
+    if (!receipt.data || isReceiptProcessing(receipt.status))
       throw new Error("Vent til kvitteringen er lest.");
 
     if (!env.KASSALAPP_API_KEY)

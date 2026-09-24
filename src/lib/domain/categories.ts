@@ -660,12 +660,11 @@ export type Category = CategoryDefinition & {
   groupName: string;
 };
 
-const groupNames = new Map<string, string>(categoryGroups);
-
-export const categories: Category[] = entries.map((entry) => ({
-  ...entry,
-  groupName: groupNames.get(entry.group)!,
-}));
+export const categories: Category[] = entries.flatMap((entry) =>
+  categoryGroups.flatMap(([group, groupName]) =>
+    group === entry.group ? [{ ...entry, groupName }] : [],
+  ),
+);
 
 export const categoryById = new Map<string, Category>(
   categories.map((category) => [category.id, category]),

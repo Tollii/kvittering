@@ -16,16 +16,19 @@ export function spendingExplanations(
     const field = kind === "price" ? "priceOre" : "quantityOre";
 
     const strongest = report.effects
-      .filter((effect) => effect[field] !== null && effect[field] !== 0)
+      .flatMap((effect) => {
+        const amount = effect[field];
+
+        return amount !== null && amount !== 0 ? [{ effect, amount }] : [];
+      })
       .sort(
         (a, b) =>
-          Math.abs(b[field]!) - Math.abs(a[field]!) || a.id.localeCompare(b.id),
+          Math.abs(b.amount) - Math.abs(a.amount) ||
+          a.effect.id.localeCompare(b.effect.id),
       )
       .slice(0, 2);
 
-    for (const effect of strongest) {
-      const amount = effect[field]!;
-
+    for (const { effect, amount } of strongest) {
       const change =
         kind === "price"
           ? `Pris per mengde var ${amount > 0 ? "høyere" : "lavere"}`

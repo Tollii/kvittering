@@ -61,17 +61,18 @@ const bases = ["packages", "units", "grams", "millilitres"] as const;
 function observations(purchases: PreparedPurchase[]) {
   return purchases.flatMap((purchase) => {
     const key = identity(purchase.line);
+    const { analysis } = purchase;
 
     if (
       !key ||
       purchase.amountOre <= 0 ||
       purchase.line.amountOre === null ||
-      !purchase.analysis
+      !analysis
     )
       return [];
 
     return bases.flatMap((basis) => {
-      const quantity = purchase.analysis!.quantity[basis];
+      const quantity = analysis.quantity[basis];
 
       return quantity !== null && Number.isFinite(quantity) && quantity > 0
         ? [

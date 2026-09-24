@@ -97,17 +97,15 @@ export function groupCatalogProducts(
         ),
     );
 
-    const signatures = new Map(
-      specific.map((candidate) => [
+    const signatures = new Set(
+      specific.map((candidate) =>
         JSON.stringify([candidate.family, candidate.brand, candidate.size]),
-        candidate,
-      ]),
+      ),
     );
 
-    const key =
-      signatures.size === 1
-        ? signatures.keys().next().value!
-        : JSON.stringify([item.family, item.brand, item.size]);
+    // One specific signature names the group; otherwise the item keeps its own.
+    const [key = JSON.stringify([item.family, item.brand, item.size])] =
+      signatures.size === 1 ? signatures : [];
 
     groups.set(key, [...(groups.get(key) ?? []), item.product]);
   }

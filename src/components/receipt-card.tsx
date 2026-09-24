@@ -11,6 +11,7 @@ import { formatDate } from "@/lib/format-date";
 import { reviewSummary } from "@/lib/domain/receipt-review";
 import type { Receipt } from "@/lib/domain/insights";
 import { formatMoney } from "@/lib/domain/receipt";
+import { isReceiptProcessing } from "@/lib/domain/receipt-state";
 
 export const statusLabels: Record<Receipt["status"], string> = {
   uploading: "Laster opp",
@@ -50,7 +51,7 @@ export function ReceiptCard({
   const colors = useTheme();
   const { fontScale } = useWindowDimensions();
   const stacked = fontScale > 1.3;
-  const busy = ["uploading", "uploaded", "processing"].includes(receipt.status);
+  const busy = isReceiptProcessing(receipt.status);
   const needs = receipt.status === "needs_review" ? receiptNeeds(receipt) : [];
 
   const reviewLabel = needs.length ? `. ${needs.join(", ")}` : "";

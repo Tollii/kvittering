@@ -70,8 +70,10 @@ export function reportError(
   if (now - (recentFailures.get(key) ?? -Infinity) < 5 * 60_000)
     return undefined;
 
-  if (recentFailures.size >= 100)
-    recentFailures.delete(recentFailures.keys().next().value!);
+  const oldest = recentFailures.keys().next();
+
+  if (recentFailures.size >= 100 && !oldest.done)
+    recentFailures.delete(oldest.value);
   recentFailures.set(key, now);
   const diagnostic = cause instanceof Error ? cause : new Error(message);
 

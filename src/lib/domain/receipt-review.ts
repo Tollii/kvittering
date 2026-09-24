@@ -38,7 +38,9 @@ export function confirmLineCategory(
 }
 
 /** A line whose only open question is its suggested category can be confirmed in one step. */
-export function canConfirmSuggestedCategory(line: ReceiptLine): boolean {
+export function canConfirmSuggestedCategory(
+  line: ReceiptLine,
+): line is ReceiptLine & { categoryId: string } {
   return (
     line.kind === "product" &&
     !!line.categoryId &&
@@ -54,7 +56,7 @@ export function confirmSuggestedCategories(data: ReceiptData): ReceiptData {
     ...data,
     lines: data.lines.map((line) =>
       canConfirmSuggestedCategory(line)
-        ? confirmLineCategory(line, line.categoryId!)
+        ? confirmLineCategory(line, line.categoryId)
         : line,
     ),
   };
