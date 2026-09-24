@@ -129,8 +129,7 @@
     "format:check": "prettier --check .",
     "lint:docs": "node tools/check-docs.mts",
     "test:components": "jest",
-    "release:check": "node tools/release.mts client",
-    "merge:check": "node tools/merge-readiness.mts"
+    "release:check": "node tools/release.mts client"
   },
   "private": true,
   "overrides": {

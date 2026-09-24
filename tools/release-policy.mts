@@ -29,7 +29,7 @@ export function requireRecoveryClient(
     Date.parse(parsed.data.recoveryClient.verifiedAt) > now
   ) {
     throw new Error(
-      "Five-image deployment requires a reviewed staging recovery-client record with tester availability and a pending-upload upgrade check. See docs/releases.md.",
+      "Five-image deployment requires a reviewed staging recovery-client record with tester availability and a pending-upload upgrade check. See .agents/skills/release-operations/SKILL.md.",
     );
   }
 }

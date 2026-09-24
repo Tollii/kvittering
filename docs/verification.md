@@ -1,7 +1,7 @@
 # Verification
 
-A merge requires both `CI result` and `Merge readiness`. This guide describes
-the checks behind those results, how to run them yourself, and how to add a check
+A merge requires `CI result`, `E2E result`, and an independent approving review.
+This guide describes the checks behind those results, how to run them yourself, and how to add a check
 when you add behavior. It applies to people and agents alike.
 
 ## Run the checks
@@ -59,7 +59,7 @@ runtime; a JavaScript-only change reuses it. The script creates or reuses the
 dedicated `Kvitto End-to-End` simulator and fails if the requested runtime is
 unavailable. It runs for native configuration, authentication, receipt data,
 drafts, queues, migrations, release controls, and changed flows, including
-deletions. The same path classifier selects CI runs and validates merge evidence.
+deletions. A required aggregate job verifies that the selected native flows actually passed.
 The `e2e` label and manual dispatch select it for other changes. Public
 repositories also run nightly. Removing the label cannot skip a required flow.
 
@@ -163,38 +163,40 @@ to confirm that code was deleted.
 - Keep documentation references current; `npm run lint:docs` rejects links to
   missing files and headings and unknown `npm run` scripts.
 
-## Merge readiness and repository settings
+## Merge requirements and repository settings
 
-`npm run merge:check` reads the current open pull requests without changing them.
-It exits unsuccessfully if any request lacks required evidence. The trusted
-`Merge readiness` workflow publishes the same decision on each request's exact
-head commit. It reads Code quality and End-to-end workflow results through the
-GitHub API, requires the iOS job to have run when selected, and checks review
-threads. Missing, pending, failed, cancelled, or older results cannot pass.
+Require both `CI result` and `E2E result`. The latter runs after native verification
+and fails if selection failed, a required native job was skipped, or the native
+job failed or was cancelled. Unrelated changes pass without running the simulator.
+Both workflows support merge groups as well as pull requests. GitHub associates
+results with their commit; preserve strict up-to-date branch protection.
 
-CodeRabbit must have posted a substantive review for the current commit. Its
-rate-limited status, an in-progress message, or a comment reply does not count.
-New commits need a new review. Free review limits can therefore delay merging;
-the gate does not request reviews or bypass the limit. All review threads must
-be resolved, and outstanding requests for changes still block merging.
+Also require one independent approving review, dismiss stale approvals after
+new commits, and require conversation resolution. Enable CodeRabbit's
+`request_changes_workflow` so it requests changes for findings and approves only
+after the latest commit has been reviewed, required threads are resolved, and
+its pre-merge checks pass. A rate-limited or incomplete review cannot produce
+this automatic approval. An authorized independent human review can also meet
+GitHub's review requirement.
 
-The workflow runs only code from `main`, without installing dependencies or
-executing PR code. Bot status/comments and pushes to main refresh it. A 15-minute schedule
-checks CI completion, thread resolutions, and requests without bot events;
-manual dispatch refreshes it immediately. Each refresh reuses the current
-commit’s check and marks it pending before reading evidence. Later API errors
-leave it pending.
-Changed files, reviews, and review threads are paginated. A truncated file list
-blocks the check. The gate uses a documented CodeRabbit summary format; a bot
-format change fails closed and requires an adapter update.
+Keep GitHub Actions approval disabled (`can_approve_pull_request_reviews: false`)
+and default workflow permissions read-only. Binding a status name to the GitHub
+Actions app does not identify the workflow that produced it: a same-repository
+PR workflow can request check-write permission. GitHub's separate review
+requirement prevents that workflow from supplying its own approval. Repository
+administrators and independently authorized reviewers remain trusted actors.
 
-After this workflow is merged and has published a check, update the existing
-`main` branch protection to require `CI result` and `Merge readiness` from the
-GitHub Actions app (ID 15368). Preserve strict up-to-date checks, administrator
-enforcement, pull-request requirements, and conversation resolution. Do not
-require only `Quality checks`. This activation is a repository setting, not a
-file change. Do not enable a merge queue yet: the readiness gate verifies PR
-heads, not a queue's synthetic merge commit.
+Never use `@coderabbitai approve` or top-level `@coderabbitai resolve` to complete
+agent work. Those commands are explicit overrides and can bypass CodeRabbit's
+review-completion requirements. Reply to individual findings with evidence,
+resolve their threads after addressing them, and request `@coderabbitai review`
+when capacity is available. Do not weaken review filters to obtain approval.
+See [CodeRabbit's approval rules](https://docs.coderabbit.ai/pr-reviews/request-changes-workflow)
+and [GitHub's workflow approval policy](https://github.blog/changelog/2022-01-14-github-actions-prevent-github-actions-from-approving-pull-requests/).
 
-The `breaking-contract` and `e2e` labels remain available. Neither label bypasses
-merge readiness or permits release operations.
+Activate these repository settings after the new checks and CodeRabbit approval
+are verified. Require `CI result` and `E2E result` from the GitHub Actions app
+(ID 15368), retain strict up-to-date checks and administrator enforcement, and
+set the required approving review count to one. These settings are external to
+the repository. The `breaking-contract` and `e2e` labels remain available;
+neither label bypasses approval or permits release operations.

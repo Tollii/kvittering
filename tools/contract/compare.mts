@@ -31,7 +31,7 @@ for (const change of changes)
 
 if (breaking.length > 0) {
   console.log(
-    "\nInstalled apps or queued work may fail after this deploys. Keep the old contract, add a new function, or follow the release review in docs/releases.md. If the review accepts the break, add the `breaking-contract` label.",
+    "\nInstalled apps or queued work may fail after this deploys. Keep the old contract, add a new function, or follow the release review in .agents/skills/release-review/SKILL.md. If the review accepts the break, add the `breaking-contract` label.",
   );
 
   if (flag !== "--allow-breaking") process.exit(1);

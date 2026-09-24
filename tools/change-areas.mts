@@ -1,4 +1,4 @@
-/** Change classification shared by CI selection and the merge check. */
+/** Change classification shared by the review checklist and native CI selection. */
 type Area = {
   name: string;
   title: string;
@@ -18,7 +18,7 @@ export const areas: Area[] = [
     matches: (path) => path.startsWith("convex/") && !path.endsWith(".md"),
     checklist: [
       "The contract job compares `convex/contract.json` with the base branch. Run `npm run contract:update` after changing a function signature.",
-      "Keep arguments accepted by installed apps and by work already scheduled; see [releases](docs/releases.md).",
+      "Keep arguments accepted by installed apps and by work already scheduled; see [releases](.agents/skills/release-review/SKILL.md).",
       "For authorization, transactions, or bounded reads, use the `convex-reviewer` skill.",
     ],
   },

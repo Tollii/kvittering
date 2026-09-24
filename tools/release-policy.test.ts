@@ -24,6 +24,7 @@ describe("release admission", () => {
     expect(() => requireReleaseStage("additive", 5)).toThrow("eight-image");
     expect(() => requireReleaseStage("additive", 8)).not.toThrow();
     expect(() => requireReleaseStage("enforcement", 5)).not.toThrow();
+    expect(() => requireReleaseStage("enforcement", 8)).toThrow("Select");
     expect(() => requireReleaseStage(undefined, 5)).toThrow("Select");
   });
   it.each([
@@ -66,6 +67,13 @@ describe("release admission", () => {
     ).not.toThrow();
   });
   it.each([
+    {
+      ...availability,
+      recoveryClient: {
+        ...availability.recoveryClient,
+        evidence: "https://example.com/testflight",
+      },
+    },
     { ...availability, deployment: "other" },
     {
       ...availability,

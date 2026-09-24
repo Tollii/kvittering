@@ -3,7 +3,7 @@
  * uncommitted and untracked files. Agents run this after each change;
  * `npm run check` remains the complete check before committing.
  */
-import { existsSync } from "node:fs";
+import { existsSync, lstatSync } from "node:fs";
 import { spawnSync } from "node:child_process";
 import { changedFiles, mergeBase } from "./changes.mts";
 
@@ -18,17 +18,20 @@ if (changed.length === 0) {
 
 const existing = changed.filter(existsSync);
 
+// Prettier rejects explicit symbolic links; format the tracked source instead.
+const regularFiles = existing.filter((path) => lstatSync(path).isFile());
+
 const deleted = changed.length !== existing.length;
 
 const code = existing.filter((path) => /\.[cm]?[jt]sx?$/.test(path));
 
 const failures: string[] = [];
 
-if (existing.length > 0)
+if (regularFiles.length > 0)
   run("Formatting", "prettier/bin/prettier.cjs", [
     "--check",
     "--ignore-unknown",
-    ...existing,
+    ...regularFiles,
   ]);
 
 run("Types", "typescript/bin/tsc", ["--noEmit"]);

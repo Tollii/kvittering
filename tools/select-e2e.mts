@@ -1,4 +1,4 @@
-/** Select the same native verification that the trusted merge check requires. */
+/** Select native verification for changes that affect installed apps or durable data. */
 import { appendFileSync } from "node:fs";
 import { changedFiles } from "./changes.mts";
 import { requiresNativeFlows } from "./change-areas.mts";

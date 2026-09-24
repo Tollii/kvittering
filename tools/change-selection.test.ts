@@ -44,6 +44,11 @@ it("requires native verification when a durable-data file is renamed outside its
       env: {
         PATH: process.env.PATH,
         NODE_ENV: "test",
+        GIT_CONFIG_GLOBAL: "/dev/null",
+        GIT_CONFIG_NOSYSTEM: "1",
+        GIT_CONFIG_COUNT: "1",
+        GIT_CONFIG_KEY_0: "diff.renames",
+        GIT_CONFIG_VALUE_0: "true",
         EVENT: "pull_request",
         BASE: base,
         GITHUB_OUTPUT: output,

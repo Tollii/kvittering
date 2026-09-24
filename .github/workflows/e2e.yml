@@ -146,3 +146,23 @@ jobs:
           path: build/e2e/
           if-no-files-found: ignore
           retention-days: 14
+
+  result:
+    name: E2E result
+    if: always()
+    needs: [scope, ios]
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6.5.0
+        with:
+          node-version: 24
+      - name: Require the selected native verification
+        env:
+          SCOPE_RESULT: ${{ needs.scope.result }}
+          NATIVE_REQUIRED: ${{ needs.scope.outputs.run }}
+          NATIVE_RESULT: ${{ needs.ios.result }}
+        run: node tools/check-native-result.mts
