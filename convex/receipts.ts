@@ -571,6 +571,10 @@ export const remove = mutation({
     await ctx.db.delete("receipts", id);
     await notifyReceiptActivities(ctx, receipt.householdId);
     await ctx.runMutation(internal.receipts.cleanupDeleted, { id });
+    await ctx.scheduler.runAfter(0, internal.retention.deletedReceiptBatches, {
+      householdId: receipt.householdId,
+      receiptId: id,
+    });
 
     return null;
   },

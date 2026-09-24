@@ -34,3 +34,16 @@ household decisions, including decisions made while processing was active.
 Manual categories and edited receipt data keep their existing precedence. The
 new backend test reproduced premature completion before the fix. It now checks
 that extraction completes and remains idempotent. `check:ci` passed.
+
+## 005 — Correction history deletion
+
+Receipt deletion schedules a bounded scan of that household's existing batches.
+It removes only that receipt's changes and deletes empty batches. Mixed batches
+retain undo for surviving receipts. Each transaction reads one batch; its fixed
+creation boundary prevents new batches from extending the job.
+
+The internal `retention.orphanedCorrectionBatches` operation repairs older
+orphan copies with the same rule. Run it once after deployment; it was not run
+against a live deployment here. Fixture tests verify mixed-batch undo, private
+household access, repeated cleanup, and historical orphan repair. All 347 tests
+and `check:ci` passed. No schema migration or new association is required.

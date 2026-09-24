@@ -322,3 +322,108 @@ it("blocks category evaluation during a pause for legacy and other-platform call
   expect(result).toMatchObject({ checked: 1, matched: 1 });
   expect(transport).toHaveBeenCalledTimes(1);
 });
+
+it("removes deleted receipt payloads from mixed batches and preserves surviving undo", async () => {
+  const { t, first, other, ids, correction } = await setup();
+  await t.run(async (ctx) => {
+    const receipt = await ctx.db.get("receipts", ids[2]);
+    const data = receipt!.data!;
+    data.lines[0].manual = false;
+    await ctx.db.patch("receipts", ids[2], { data });
+  });
+
+  const preview = await first.query(api.corrections.preview, {
+    id: correction._id,
+  });
+
+  const batchId = await first.mutation(api.corrections.apply, {
+    id: correction._id,
+    targets: preview.targets.map(({ receiptId, revision, lineId }) => ({
+      receiptId,
+      revision,
+      lineId,
+    })),
+  });
+
+  expect(preview.targets).toHaveLength(2);
+  await first.mutation(api.receipts.remove, { id: ids[1], revision: 1 });
+
+  const scheduled = await t.run((ctx) =>
+    ctx.db.system.query("_scheduled_functions").collect(),
+  );
+
+  expect(
+    scheduled.some(
+      (job) =>
+        job.name === "retention:deletedReceiptBatches" &&
+        job.args[0].receiptId === ids[1],
+    ),
+  ).toBe(true);
+  await t.mutation(internal.retention.deletedReceiptBatches, {
+    householdId: correction.householdId,
+    receiptId: ids[1],
+  });
+  await t.mutation(internal.retention.deletedReceiptBatches, {
+    householdId: correction.householdId,
+    receiptId: ids[1],
+  });
+  const batches = await first.query(api.corrections.batches, {});
+  expect(batches[0].changes.map((change) => change.receiptId)).toEqual([
+    ids[2],
+  ]);
+  expect(
+    (await t.run((ctx) => ctx.db.get("correctionBatches", batchId)))?.changes,
+  ).toEqual(batches[0].changes);
+  expect(await other.query(api.corrections.batches, {})).toEqual([]);
+  await first.mutation(api.corrections.undo, { id: batchId });
+  expect(
+    (await first.query(api.receipts.detail, { id: ids[2] }))?.receipt.data
+      ?.lines[0].categoryId,
+  ).toBe("other-purchases.batteries");
+  expect(await first.query(api.receipts.detail, { id: ids[1] })).toBeNull();
+});
+
+it("repairs historical orphan batches without changing live receipt history", async () => {
+  const { t, first, ids, correction } = await setup();
+
+  const batchId = await first.mutation(api.corrections.apply, {
+    id: correction._id,
+    targets: [
+      { receiptId: ids[1], revision: 0, lineId: batteryFixture().lines[0].id },
+    ],
+  });
+
+  await t.mutation(internal.retention.orphanedCorrection, {
+    batchId,
+    receiptId: ids[1],
+  });
+  expect(
+    await t.run((ctx) => ctx.db.get("correctionBatches", batchId)),
+  ).not.toBeNull();
+  await t.run((ctx) => ctx.db.delete("receipts", ids[1]));
+  await t.mutation(internal.retention.orphanedCorrectionBatches, {});
+
+  const jobs = await t.run((ctx) =>
+    ctx.db.system.query("_scheduled_functions").collect(),
+  );
+
+  expect(
+    jobs.some(
+      (job) =>
+        job.name === "retention:orphanedCorrection" &&
+        job.args[0].batchId === batchId,
+    ),
+  ).toBe(true);
+  await t.mutation(internal.retention.orphanedCorrection, {
+    batchId,
+    receiptId: ids[1],
+  });
+  await t.mutation(internal.retention.orphanedCorrection, {
+    batchId,
+    receiptId: ids[1],
+  });
+  expect(await first.query(api.corrections.batches, {})).toEqual([]);
+  expect(
+    await t.run((ctx) => ctx.db.get("correctionBatches", batchId)),
+  ).toBeNull();
+});
