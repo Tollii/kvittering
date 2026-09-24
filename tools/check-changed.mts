@@ -51,6 +51,15 @@ if (code.length > 0) {
     "--passWithNoTests",
     ...code,
   ]);
+
+  const application = code.filter((path) => path.startsWith("src/"));
+
+  if (application.length > 0)
+    run("Related component tests", "jest/bin/jest.js", [
+      "--findRelatedTests",
+      "--passWithNoTests",
+      ...application,
+    ]);
 }
 
 if (changed.some((path) => path.startsWith("convex/")))
