@@ -254,6 +254,7 @@ function HouseholdProvider({
             active.current &&
             canUpload.current &&
             AppState.currentState === "active",
+          { retryFailed },
         );
         setQueueError("");
       } catch (error) {

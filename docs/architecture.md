@@ -20,7 +20,7 @@ The Expo application starts in `src/app/_layout.tsx`. Session context contains a
 ## Receipt flow
 
 1. Capture claims an import batch. It retains the batch until conversion succeeds or the user dismisses it.
-2. `receipt-storage.ts` copies images into durable storage and commits the queue to SQLite. It publishes immutable snapshots after commit. `receipt-upload-transport.ts` owns authenticated uploads; `upload-queue.ts` retains each completed step.
+2. `receipt-storage.ts` copies images into durable storage and commits the queue to SQLite. It publishes immutable snapshots after commit. `receipt-upload-transport.ts` owns authenticated uploads; `upload-queue.ts` retains each completed step. After a failure it retries automatically with backoff (15 seconds, doubling) for at most six attempts per app start. A `REJECTED` user error waits for the person's retry. These limits live in memory, so each app start tries every queued capture again; they never remove queued images.
 3. Convex processing extracts and parses receipt evidence, classifies products, checks duplicates, and applies saved household choices. `receiptChanges.ts` owns revision, history, status, and follow-up policy for receipt changes.
 4. Catalog matching and product analysis run on the server. Profile questions use bounded batches. Writes reject stale generation, revision, or evidence. Exhausted analysis can be retried explicitly; `productAnalysis.repair` is an operator recovery operation.
 5. `receipt-draft.ts` owns editor changes and save acknowledgement. Reactive queries deliver the saved receipt. Report selections keep identity and period, then derive their content from current data.

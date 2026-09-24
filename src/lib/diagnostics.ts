@@ -8,6 +8,7 @@ export type DiagnosticFields = {
   generation?: number;
   position?: number;
   imageCount?: number;
+  attempts?: number;
   durationMs?: number;
   operation?: string;
   status?: number;
