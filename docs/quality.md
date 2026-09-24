@@ -10,7 +10,7 @@ Use Node.js 24 and `npm ci`. The checks require no server, account, or secrets.
 | `npm run lint:fix`    | Apply available lint fixes; review the changes before committing          |
 | `npm run lint:oxlint` | Native Oxlint correctness and test checks                                 |
 | `npm run lint:policy` | All general anti-slop rules                                               |
-| `npm run lint:eslint` | Expo, React, repository, and SonarJS checks                               |
+| `npm run lint:eslint` | Expo, React, type-aware TypeScript, repository, and SonarJS checks        |
 | `npm run test:rules`  | Custom rule tests in ESLint and the actual Oxlint CLI                     |
 
 `Code quality / Quality checks` runs on pull requests and pushes to `main`.
@@ -78,6 +78,41 @@ rule does not resolve indirect type aliases and does not confuse a locally
 declared `Record` type with the TypeScript utility type. It has no automatic fix:
 only the caller can define the intended contract.
 
+The repository rule `kvitto/no-effect-fetch` rejects `fetch` and
+`XMLHttpRequest` inside `useEffect`, `useLayoutEffect`, and
+`useInsertionEffect` callbacks, including helpers declared inside them. Load
+server data through a Convex subscription or a TanStack query, which own
+caching, deduplication, cancellation, and the order of responses. Both
+repository rules run in ESLint and Oxlint.
+
+## Type safety
+
+`any` is not permitted. `@typescript-eslint/no-explicit-any` rejects written
+`any`, and the type-aware `no-unsafe-*` rules reject `any` that arrives from
+`JSON.parse`, library declarations, or test mocks when it is assigned, called,
+returned, passed on, or read. Parse such values at their boundary with the
+owner's schema: a Convex validator, a Zod schema, or a named parser. Values may
+still pass as `unknown` to such a parser.
+
+The same configuration rejects floating and misused promises, awaiting
+non-promises, throwing or rejecting with non-errors, unnecessary assertions,
+non-exhaustive `switch` statements over unions, and `@ts-ignore`.
+`@ts-expect-error` requires a description.
+
+`no-unnecessary-condition` is not enabled. Without
+`noUncheckedIndexedAccess`, it reports guards on array and record reads as
+unnecessary even though they protect absent values at runtime.
+`no-non-null-assertion` is not enabled yet; existing assertions should be
+replaced by parsed or narrowed values as their code changes.
+
+## File length
+
+`max-lines` rejects files with more than 750 lines of code, not counting blank
+lines and comments. A file of that size usually contains several
+responsibilities. Split it along those responsibilities rather than moving
+arbitrary blocks. Function length and complexity counts remain disabled; see
+the table below.
+
 ## SonarJS instead of a server
 
 The repository enables every non-deprecated rule exported by the installed
@@ -88,19 +123,19 @@ skipped. There is no findings baseline.
 
 The exceptions are deliberate and declared in `eslint.config.js`:
 
-| Rules                                                                                      | Reason                                                                                                                                       |
-| ------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------- |
-| Cognitive/cyclomatic/expression complexity, nested control flow, file/function line limits | Counts do not establish separate responsibilities. Review domain and transaction boundaries instead of splitting functions to meet a number. |
-| Duplicate strings, maximum union size                                                      | Repeated labels and validator literals do not always need constants; explicit unions preserve domain states.                                 |
-| Nested conditional, selector parameter, mandatory final else, loop exit count              | Compact value selection, boolean inputs, optional branches, and early exits are used deliberately.                                           |
-| File header, shorthand property grouping                                                   | No per-file copyright policy; group properties by meaning, not shorthand syntax.                                                             |
-| Wildcard import, filename/class-name agreement                                             | SDK namespace imports and framework entry filenames are required conventions.                                                                |
-| Undefined assignment                                                                       | Convex uses `undefined` to clear fields; local state also uses it for absence.                                                               |
-| String comparison                                                                          | ISO dates and stable identifiers use lexical ordering.                                                                                       |
-| Different-types comparison                                                                 | The rule reports valid comparisons between overlapping unions as always false. TypeScript checks incompatible comparisons.                   |
-| Unused variables                                                                           | The TypeScript rule owns this check and supports rest destructuring that omits fields.                                                       |
-| Require/define, in JavaScript configuration only                                           | Expo, Metro, and custom rule tooling use CommonJS.                                                                                           |
-| Invariant returns, in Convex only                                                          | Successful commands intentionally return `null`.                                                                                             |
+| Rules                                                                                              | Reason                                                                                                                                                                                            |
+| -------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Cognitive/cyclomatic/expression complexity, nested control flow, SonarJS file/function line limits | Counts do not establish separate responsibilities. Review domain and transaction boundaries instead of splitting functions to meet a number. The core `max-lines` rule above sets the file limit. |
+| Duplicate strings, maximum union size                                                              | Repeated labels and validator literals do not always need constants; explicit unions preserve domain states.                                                                                      |
+| Nested conditional, selector parameter, mandatory final else, loop exit count                      | Compact value selection, boolean inputs, optional branches, and early exits are used deliberately.                                                                                                |
+| File header, shorthand property grouping                                                           | No per-file copyright policy; group properties by meaning, not shorthand syntax.                                                                                                                  |
+| Wildcard import, filename/class-name agreement                                                     | SDK namespace imports and framework entry filenames are required conventions.                                                                                                                     |
+| Undefined assignment                                                                               | Convex uses `undefined` to clear fields; local state also uses it for absence.                                                                                                                    |
+| String comparison                                                                                  | ISO dates and stable identifiers use lexical ordering.                                                                                                                                            |
+| Different-types comparison                                                                         | The rule reports valid comparisons between overlapping unions as always false. TypeScript checks incompatible comparisons.                                                                        |
+| Unused variables                                                                                   | The TypeScript rule owns this check and supports rest destructuring that omits fields.                                                                                                            |
+| Require/define, in JavaScript configuration only                                                   | Expo, Metro, and custom rule tooling use CommonJS.                                                                                                                                                |
+| Invariant returns, in Convex only                                                                  | Successful commands intentionally return `null`.                                                                                                                                                  |
 
 Function names permit camelCase and PascalCase React components. Arrow parameters
 always have parentheses; short single-return bodies use expressions. Local
