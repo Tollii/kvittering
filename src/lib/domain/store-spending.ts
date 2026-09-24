@@ -1,3 +1,4 @@
+import { Ore } from "./ore";
 import type { Id } from "../../../convex/_generated/dataModel";
 import { retailerCode } from "../catalog/matching";
 import type { PhysicalStore } from "../catalog/model";
@@ -8,7 +9,7 @@ export type StorePurchase = {
   date?: string;
   retailer?: string;
   branch?: PhysicalStore;
-  amountOre: number;
+  amountOre: Ore;
   unknownAmounts: number;
   provisional: boolean;
 };
@@ -21,7 +22,7 @@ export type StoreSpendingGroup = {
   chain?: string;
   address?: string;
   location?: StoreLocation;
-  amountOre: number;
+  amountOre: Ore;
   unknownAmounts: number;
   purchases: StorePurchase[];
 };
@@ -69,14 +70,14 @@ export function storeSpending(purchases: readonly StorePurchase[]) {
       name: branch?.name,
       chain,
       address: branch?.address,
-      amountOre: 0,
+      amountOre: Ore.zero,
       unknownAmounts: 0,
       purchases: [],
     };
 
     // A later receipt can omit coordinates that an earlier receipt established.
     group.location ??= branch ? coordinates(branch) : undefined;
-    group.amountOre += purchase.amountOre;
+    group.amountOre = Ore.add(group.amountOre, purchase.amountOre);
     group.unknownAmounts += purchase.unknownAmounts;
     group.purchases.push(purchase);
     stores.set(id, group);
@@ -90,12 +91,12 @@ export function storeSpending(purchases: readonly StorePurchase[]) {
     const chain = chains.get(id) ?? {
       id,
       name: store.chain,
-      amountOre: 0,
+      amountOre: Ore.zero,
       unknownAmounts: 0,
       purchases: [],
     };
 
-    chain.amountOre += store.amountOre;
+    chain.amountOre = Ore.add(chain.amountOre, store.amountOre);
     chain.unknownAmounts += store.unknownAmounts;
     chain.purchases.push(...store.purchases);
     chains.set(id, chain);
@@ -111,7 +112,10 @@ export function storeSpending(purchases: readonly StorePurchase[]) {
             a.receiptId.localeCompare(b.receiptId),
         ),
       }))
-      .sort((a, b) => b.amountOre - a.amountOre || a.id.localeCompare(b.id));
+      .sort(
+        (a, b) =>
+          Ore.compare(b.amountOre, a.amountOre) || a.id.localeCompare(b.id),
+      );
 
   return { stores: rank(stores), chains: rank(chains) };
 }

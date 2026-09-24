@@ -6,7 +6,7 @@ import {
   type QueryCtx,
   type MutationCtx,
 } from "./_generated/server";
-import { deploymentChannel } from "./releasePolicy";
+import { deploymentChannel } from "./deployment";
 import {
   platformValidator,
   channelValidator,
@@ -100,6 +100,7 @@ export async function writeFeatureFlags(
   return revision;
 }
 
+// Access: public. Flags gate features before sign-in and hold no household data.
 export const get = query({
   args: { platform: platformValidator },
   returns: snapshotValidator,

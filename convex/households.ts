@@ -1,4 +1,5 @@
 import { userError } from "./userErrors";
+import { oreValidator } from "../src/lib/domain/ore";
 import { clientMutation as mutation } from "./clientFunctions";
 import { query } from "./_generated/server";
 import { v } from "convex/values";
@@ -128,7 +129,7 @@ export const join = mutation({
 });
 
 export const setBudget = mutation({
-  args: { monthlyBudgetOre: v.union(v.number(), v.null()) },
+  args: { monthlyBudgetOre: v.union(oreValidator, v.null()) },
   returns: v.null(),
   handler: async (ctx, args) => {
     const member = await requireMember(ctx);

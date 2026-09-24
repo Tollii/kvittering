@@ -1,4 +1,4 @@
-import { isUserError } from "./userErrors";
+import { userErrorDataSchema } from "../src/lib/user-errors";
 import { ConvexError, v } from "convex/values";
 import { parse } from "convex-helpers/validators";
 import { clientValidator } from "../src/lib/releases/policy";
@@ -11,6 +11,8 @@ import { errorDetails } from "../src/lib/diagnostics";
 const http = httpRouter();
 
 authComponent.registerRoutes(http, createAuth);
+
+const acceptedImageTypes = new Set(["image/jpeg", "image/png", "image/webp"]);
 
 function headers(request: Request) {
   return {
@@ -70,7 +72,7 @@ http.route({
         });
       const type = request.headers.get("Content-Type")?.split(";")[0];
 
-      if (!type || !["image/jpeg", "image/png", "image/webp"].includes(type))
+      if (!type || !acceptedImageTypes.has(type))
         return new Response("Bruk JPEG, PNG eller WebP.", {
           status: 415,
           headers: responseHeaders,
@@ -110,7 +112,10 @@ http.route({
       });
 
       // Installed upload clients read only release-policy errors from JSON bodies.
-      if (error instanceof ConvexError && !isUserError(error))
+      if (
+        error instanceof ConvexError &&
+        !userErrorDataSchema.safeParse(error.data).success
+      )
         return Response.json(error.data, {
           status: 409,
           headers: responseHeaders,

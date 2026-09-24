@@ -1,3 +1,4 @@
+import { present } from "../src/lib/testing/receipts";
 /// <reference types="vite/client" />
 import { convexTest } from "convex-test";
 import { expect, it, vi } from "vitest";
@@ -45,7 +46,7 @@ it("saves a product correction, reuses the retailer mapping and preserves the or
   const { t, user, receipt } = await setup();
   const id = await receipt();
   const data = batteryFixture();
-  data.lines[0].originalText = "attempted replacement";
+  present(data.lines[0]).originalText = "attempted replacement";
   await user.mutation(api.receipts.save, {
     id,
     revision: 0,
@@ -57,9 +58,11 @@ it("saves a product correction, reuses the retailer mapping and preserves the or
     productChanges: [{ lineId: "battery", productId: null, createNew: true }],
   });
   const saved = (await user.query(api.receipts.detail, { id }))!.receipt;
-  const line = saved.data!.lines[0];
+  const line = present(saved.data!.lines[0]);
   expect(line.productId).toBeTruthy();
-  expect(line.originalText).toBe(batteryFixture().lines[0].originalText);
+  expect(line.originalText).toBe(
+    present(batteryFixture().lines[0]).originalText,
+  );
 
   const repeated = {
     ...line,
@@ -96,8 +99,9 @@ it("saves a product correction, reuses the retailer mapping and preserves the or
     matches: [{ lineId: "battery", kind: "new", productId: null }],
   });
   expect(
-    (await user.query(api.receipts.detail, { id }))!.receipt.data!.lines[0]
-      .productId,
+    present(
+      (await user.query(api.receipts.detail, { id }))!.receipt.data!.lines[0],
+    ).productId,
   ).toBe(line.productId);
 });
 
@@ -123,7 +127,7 @@ it("keeps an explicit separation for future receipts and refuses foreign househo
     await t.query(internal.products.prepare, {
       id,
       retailer: "Eksempelbutikk",
-      line: batteryFixture().lines[0],
+      line: present(batteryFixture().lines[0]),
     }),
   ).toMatchObject({ saved: true, productId: null });
   const outsider = t.withIdentity({ subject: "other", issuer: "test" });
@@ -180,11 +184,15 @@ it("finishes uncertain processing and atomically reuses new product mappings on 
     });
   }
 
-  const one = (await user.query(api.receipts.detail, { id: first }))!.receipt
-    .data!.lines[0];
+  const one = present(
+    (await user.query(api.receipts.detail, { id: first }))!.receipt.data!
+      .lines[0],
+  );
 
-  const two = (await user.query(api.receipts.detail, { id: second }))!.receipt
-    .data!.lines[0];
+  const two = present(
+    (await user.query(api.receipts.detail, { id: second }))!.receipt.data!
+      .lines[0],
+  );
 
   expect(two.productId).toBe(one.productId);
   expect(
@@ -202,7 +210,7 @@ it("finishes uncertain processing and atomically reuses new product mappings on 
     ctx.db.patch("receipts", third, { status: "processing", generation: 1 }),
   );
   const data = batteryFixture();
-  data.lines[0].name = "Unreadable";
+  present(data.lines[0]).name = "Unreadable";
   await t.mutation(internal.processing.finish, {
     id: third,
     generation: 1,
@@ -217,7 +225,7 @@ it("finishes uncertain processing and atomically reuses new product mappings on 
 
   expect(uncertain.status).toBe("reviewed");
   expect(uncertain.autoAccepted).toBe(true);
-  expect(uncertain.data!.lines[0].productId).toBeNull();
+  expect(present(uncertain.data!.lines[0]).productId).toBeNull();
 });
 
 it("continues with separate items when the matching provider fails", async () => {
@@ -330,9 +338,11 @@ it("links catalog identity without creating a second household product and reuse
   });
   const { normalizeProducts } = await import("./kassalapp/normalize");
 
-  const product = normalizeProducts({
-    data: [{ id: 71, name: "Battery Remix" }],
-  })[0];
+  const product = present(
+    normalizeProducts({
+      data: [{ id: 71, name: "Battery Remix" }],
+    })[0],
+  );
 
   await t.run((ctx) =>
     ctx.db.insert("catalogProducts", {
@@ -352,8 +362,9 @@ it("links catalog identity without creating a second household product and reuse
     selections: [{ kind: "catalog", lineId: "battery", key: product.key }],
   });
 
-  const saved = (await user.query(api.receipts.detail, { id }))!.receipt.data!
-    .lines[0];
+  const saved = present(
+    (await user.query(api.receipts.detail, { id }))!.receipt.data!.lines[0],
+  );
 
   expect(saved.productReference).toMatchObject({
     kind: "catalog",
@@ -383,7 +394,9 @@ it("links catalog identity without creating a second household product and reuse
     provider: "test",
   });
   expect(
-    (await user.query(api.receipts.detail, { id: next }))!.receipt.data!
-      .lines[0].productReference,
+    present(
+      (await user.query(api.receipts.detail, { id: next }))!.receipt.data!
+        .lines[0],
+    ).productReference,
   ).toEqual(saved.productReference);
 });

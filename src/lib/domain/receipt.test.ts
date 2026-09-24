@@ -1,10 +1,10 @@
-import { receiptFixture } from "../testing/receipts";
+import { present, receiptFixture } from "../testing/receipts";
+import { Ore } from "./ore";
 import { describe, it, expect } from "vitest";
 import {
   batteryFixture,
   reconcile,
   emptyLine,
-  parseOre,
   spendingLines,
   validateReceipt,
   checkReceipt,
@@ -25,8 +25,8 @@ describe("receipt accounting", () => {
   it("does not count repeated savings summaries or included VAT", () => {
     const receipt = batteryFixture();
     receipt.lines.push(
-      { ...emptyLine("summary"), kind: "summary", amountOre: -259 },
-      { ...emptyLine("vat"), kind: "vat", amountOre: 304 },
+      { ...emptyLine("summary"), kind: "summary", amountOre: Ore.of(-259) },
+      { ...emptyLine("vat"), kind: "vat", amountOre: Ore.of(304) },
     );
     expect(reconcile(receipt).calculated).toBe(2531);
   });
@@ -36,15 +36,15 @@ describe("receipt accounting", () => {
       {
         ...emptyLine("weighted"),
         name: "BANAN",
-        amountOre: 1222,
+        amountOre: Ore.of(1222),
         quantity: 0.427,
         unit: "kg",
-        unitPriceOre: 2862,
+        unitPriceOre: Ore.of(2862),
       },
     ];
-    receipt.totalOre = 1222;
+    receipt.totalOre = Ore.of(1222);
     expect(reconcile(receipt).issues).toEqual([]);
-    receipt.lines[0].amountOre = 1400;
+    present(receipt.lines[0]).amountOre = Ore.of(1400);
     expect(reconcile(receipt).issues.join(" ")).toContain("Avvik mot betalt");
   });
   it("flags an unreadable total instead of replacing it with a sum", () => {
@@ -57,59 +57,50 @@ describe("receipt accounting", () => {
   });
   it("keeps a financial discrepancy", () => {
     const receipt = batteryFixture();
-    receipt.totalOre = 2600;
+    receipt.totalOre = Ore.of(2600);
     expect(reconcile(receipt).difference).toBe(-69);
     expect(receipt.totalOre).toBe(2600);
-  });
-  it("parses Norwegian decimals exactly and rejects extra decimals", () => {
-    expect(parseOre("−2,59")).toEqual({ kind: "amount", ore: -259 });
-    expect(parseOre("1 250,10")).toEqual({ kind: "amount", ore: 125010 });
-    expect(parseOre("")).toEqual({ kind: "amount", ore: null });
-    expect(parseOre("1,234")).toEqual({
-      kind: "invalid",
-      message: "Bruk et beløp med høyst to desimaler.",
-    });
-    expect(parseOre("2000000")).toEqual({
-      kind: "invalid",
-      message: "Beløpet er for stort.",
-    });
   });
   it("allocates receipt discounts without losing øre and retains unlinked discounts", () => {
     const receipt = batteryFixture();
     receipt.lines.push(
-      { ...emptyLine("second"), amountOre: 101 },
+      { ...emptyLine("second"), amountOre: Ore.of(101) },
       {
         ...emptyLine("receipt-discount"),
         kind: "receipt_discount",
-        amountOre: -101,
+        amountOre: Ore.of(-101),
       },
-      { ...emptyLine("unlinked"), kind: "item_discount", amountOre: -17 },
+      {
+        ...emptyLine("unlinked"),
+        kind: "item_discount",
+        amountOre: Ore.of(-17),
+      },
     );
     const result = spendingLines(receipt);
     expect(
-      result.products.reduce((sum, p) => sum + p.netOre, 0) +
-        result.unallocated,
+      Ore.sum([...result.products.map((p) => p.netOre), result.unallocated]),
     ).toBe(reconcile(receipt).productSpending);
     expect(result.unallocated).toBe(-17);
   });
   it("does not match aliases by abbreviated names or across stores", () => {
     const receipt = batteryFixture();
-    const key = aliasKey(receipt, receipt.lines[0]);
+    const key = aliasKey(receipt, present(receipt.lines[0]));
     receipt.store = "Other";
-    expect(aliasKey(receipt, receipt.lines[0])).not.toBe(key);
+    expect(aliasKey(receipt, present(receipt.lines[0]))).not.toBe(key);
     receipt.store = "Eksempelbutikk";
-    receipt.lines[0].name = "BATTERY";
-    expect(aliasKey(receipt, receipt.lines[0])).not.toBe(key);
+    present(receipt.lines[0]).name = "BATTERY";
+    expect(aliasKey(receipt, present(receipt.lines[0]))).not.toBe(key);
   });
   it("rejects fractional øre and duplicate line IDs", () => {
     const receipt = batteryFixture();
-    receipt.lines[0].amountOre = 1.1;
+    // SAFETY: A fractional amount is built deliberately to test the receipt boundary.
+    present(receipt.lines[0]).amountOre = 1.1 as Ore;
     expect(checkReceipt(receipt)).toEqual({
       kind: "invalid",
       message: "Beløp må være hele øre.",
     });
-    receipt.lines[0].amountOre = 2590;
-    receipt.lines.push(receipt.lines[0]);
+    present(receipt.lines[0]).amountOre = Ore.of(2590);
+    receipt.lines.push(present(receipt.lines[0]));
     expect(() => validateReceipt(receipt)).toThrow(
       "Varelinjene må ha ulike ID-er.",
     );
@@ -125,15 +116,17 @@ describe("receipt accounting", () => {
   );
   it("accepts the retired energy-drink category without changing the source receipt", () => {
     const receipt = batteryFixture();
-    receipt.lines[0].categoryId = "drinks.energy-drinks";
+    present(receipt.lines[0]).categoryId = "drinks.energy-drinks";
     const parsed = parseReceipt(receipt);
     expect(parsed.kind).toBe("parsed");
 
     if (parsed.kind !== "parsed") throw new Error(parsed.issue.message);
-    expect(parsed.receipt.lines[0].categoryId).toBe("drinks.soft-drinks");
+    expect(present(parsed.receipt.lines[0]).categoryId).toBe(
+      "drinks.soft-drinks",
+    );
     expect(parsed.receipt.totalOre).toBe(receipt.totalOre);
-    expect(receipt.lines[0].categoryId).toBe("drinks.energy-drinks");
-    receipt.lines[0].categoryId = "unknown.category";
+    expect(present(receipt.lines[0]).categoryId).toBe("drinks.energy-drinks");
+    present(receipt.lines[0]).categoryId = "unknown.category";
     expect(parseReceipt(receipt).kind).toBe("rejected");
   });
   it("keeps undated receipts visible and excluded receipts out of spending", () => {
@@ -166,16 +159,18 @@ describe("receipt accounting", () => {
 
 it("uses linked product evidence without sending prices or payment details to Jev", () => {
   const data = batteryFixture();
-  data.lines[1].name = "10% Battery energidrikk";
+  present(data.lines[1]).name = "10% Battery energidrikk";
   const input = classificationInputs(data);
-  expect(JSON.stringify(input[0].evidence)).toContain("Battery energidrikk");
-  expect(JSON.stringify(input[0].evidence)).not.toContain("2590");
-  expect(JSON.stringify(input[0].evidence)).not.toContain("25,90");
+  expect(JSON.stringify(present(input[0]).evidence)).toContain(
+    "Battery energidrikk",
+  );
+  expect(JSON.stringify(present(input[0]).evidence)).not.toContain("2590");
+  expect(JSON.stringify(present(input[0]).evidence)).not.toContain("25,90");
 });
 
 it("flags repeated discount lines instead of subtracting them silently", () => {
   const data = batteryFixture();
-  data.lines.push({ ...data.lines[1], id: "repeated" });
+  data.lines.push({ ...present(data.lines[1]), id: "repeated" });
   expect(reconcile(data).issues).toContain(
     "Like rabattlinjer må kontrolleres.",
   );
@@ -197,11 +192,11 @@ it("keeps unknown and foreign currencies out of NOK totals", () => {
 
 it("provides structured category evidence without unknown package fields or accounting data", async () => {
   const data = batteryFixture();
-  data.lines[0].name = "MONSTER PIPELINE PUNCH";
-  data.lines[0].brand = null;
-  data.lines[0].packageSize = null;
-  data.lines[0].packageUnit = null;
-  const state = classificationInputs(data)[0].evidence;
+  present(data.lines[0]).name = "MONSTER PIPELINE PUNCH";
+  present(data.lines[0]).brand = null;
+  present(data.lines[0]).packageSize = null;
+  present(data.lines[0]).packageUnit = null;
+  const state = present(classificationInputs(data)[0]).evidence;
   expect(state.name).toBe("MONSTER PIPELINE PUNCH");
   expect(state).not.toHaveProperty("packageSize");
   expect(state).not.toHaveProperty("brand");

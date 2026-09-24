@@ -1,4 +1,4 @@
-import { testId } from "./testing/receipts";
+import { present, testId } from "./testing/receipts";
 import { describe, expect, it } from "vitest";
 import { userError } from "../../convex/userErrors";
 import {
@@ -94,8 +94,8 @@ describe("durable receipt upload", () => {
     };
 
     await run("user", household, transport, () => true);
-    expect(rows()[0].uploaded).toEqual([true, false]);
-    expect(rows()[0].error).toBe("Connection lost");
+    expect(present(rows()[0]).uploaded).toEqual([true, false]);
+    expect(present(rows()[0]).error).toBe("Connection lost");
     fail = false;
     clock.now += retryPolicy.firstDelayMs;
     await run("user", household, transport, () => true);
@@ -153,7 +153,7 @@ describe("durable receipt upload", () => {
     expect(calls).toBe(0);
     await run("user", household, transport, () => active);
     expect(calls).toBe(1);
-    expect(rows()[0].uploaded).toEqual([false, false]);
+    expect(present(rows()[0]).uploaded).toEqual([false, false]);
   });
 });
 
@@ -182,7 +182,7 @@ it("schedules every background image before waiting and retains each successful 
   second.resolve();
   first.reject(new Error("Offline"));
   await running;
-  expect(rows()[0].uploaded).toEqual([false, true]);
+  expect(present(rows()[0]).uploaded).toEqual([false, true]);
   expect(committed).toBe(false);
 });
 
@@ -225,7 +225,7 @@ describe("automatic upload retries", () => {
     clock.now += 24 * 60 * 60 * 1000;
     await run("user", household, transport, () => true);
     expect(attempts.count).toBe(1);
-    expect(rows()[0].error).toContain("Husstanden er endret.");
+    expect(present(rows()[0]).error).toContain("Husstanden er endret.");
 
     await run("user", household, transport, () => true, { retryFailed: true });
     expect(attempts.count).toBe(2);

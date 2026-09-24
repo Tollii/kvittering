@@ -10,9 +10,7 @@ import { recordEvent, reportError } from "@/lib/observability";
 import { ReleasePolicyProvider, useReleasePolicy } from "./release-policy";
 import { receiptUploadTransport } from "@/lib/receipt-upload-transport";
 import {
-  createContext,
   useCallback,
-  useContext,
   useEffect,
   useRef,
   useState,
@@ -28,7 +26,6 @@ import {
   useQuery,
 } from "convex/react";
 import { api } from "../../convex/_generated/api";
-import type { FunctionReturnType } from "convex/server";
 import {
   authClient,
   convexSiteUrl,
@@ -40,28 +37,16 @@ import {
   cachedHousehold,
   cacheHousehold,
   receiptStorage,
-  type CachedHousehold,
 } from "@/lib/receipt-storage";
+import { visibleHousehold } from "@/lib/household";
 import { createQueueRunner, type LocalReceipt } from "@/lib/upload-queue";
 import { Loading, Notice, Screen } from "@/components/ui";
 import { CatalogQueryProvider } from "./catalog-query-provider";
 import { NavigationQueryProvider } from "./navigation-query-provider";
 import { SignIn, HouseholdSetup } from "./sign-in";
-
-type Household = NonNullable<FunctionReturnType<typeof api.households.current>>;
-
-type SessionData = {
-  owner: string;
-  household: CachedHousehold;
-  details: Household | undefined;
-  online: boolean;
-  queue: LocalReceipt[];
-  synchronize: (retryFailed?: boolean) => Promise<void>;
-};
+import { SessionContext } from "./household-context";
 
 const emptyQueue: LocalReceipt[] = [];
-
-const SessionContext = createContext<SessionData | null>(null);
 
 const convex = convexUrl
   ? {
@@ -73,14 +58,6 @@ const convex = convexUrl
   : null;
 
 const drainQueue = createQueueRunner(receiptStorage, recordEvent);
-
-export function useHousehold() {
-  const value = useContext(SessionContext);
-
-  if (!value) throw new Error("Husstanden er ikke klar.");
-
-  return value;
-}
 
 function useSessionAuth() {
   const session = authClient.useSession();
@@ -182,11 +159,7 @@ function HouseholdProvider({
     () => null,
   );
 
-  const household = details
-    ? { id: details.household._id, name: details.household.name }
-    : !online
-      ? cached
-      : null;
+  const household = visibleHousehold(details, cached);
 
   const queue = useSyncExternalStore(
     subscribeStorage,
@@ -215,11 +188,7 @@ function HouseholdProvider({
   useEffect(() => {
     if (details === undefined) return;
 
-    const value = details
-      ? { id: details.household._id, name: details.household.name }
-      : null;
-
-    cacheHousehold(owner, value);
+    cacheHousehold(owner, visibleHousehold(details, null));
   }, [details, owner]);
   const householdId = household?.id;
   useEffect(() => {
@@ -228,18 +197,17 @@ function HouseholdProvider({
     );
   }, [householdId, owner]);
 
+  const showQueueReadError = useCallback(() => {
+    if (active.current)
+      setQueueError("Kunne ikke lese kvitteringene på denne enheten.");
+  }, []);
+
   const synchronize = useCallback(
-    async (retryFailed = false) => {
+    async ({ retryFailed = false }: { retryFailed?: boolean } = {}) => {
       if (!householdId) return;
 
       try {
         if (!canUpload.current) return;
-
-        if (retryFailed) {
-          for (const entry of receiptStorage.list(owner, householdId)) {
-            receiptStorage.update({ ...entry, error: undefined });
-          }
-        }
 
         await drainQueue(
           owner,
@@ -254,18 +222,33 @@ function HouseholdProvider({
             active.current &&
             canUpload.current &&
             AppState.currentState === "active",
+          // A manual retry also lifts this app session's automatic retry limits.
           { retryFailed },
         );
         setQueueError("");
       } catch (error) {
         reportError(error, "receipt.queue_read");
-
-        if (active.current)
-          setQueueError("Kunne ikke lese kvitteringene på denne enheten.");
+        showQueueReadError();
       }
     },
-    [convex, householdId, owner],
+    [convex, householdId, owner, showQueueReadError],
   );
+
+  const retryFailedUploads = useCallback(async () => {
+    if (!householdId || !canUpload.current) return;
+
+    try {
+      for (const entry of receiptStorage.list(owner, householdId))
+        receiptStorage.update({ ...entry, error: undefined });
+    } catch (error) {
+      reportError(error, "receipt.queue_read");
+      showQueueReadError();
+
+      return;
+    }
+
+    await synchronize({ retryFailed: true });
+  }, [householdId, owner, synchronize, showQueueReadError]);
 
   useEffect(() => {
     const initialUpload = setTimeout(() => void synchronize(), 0);
@@ -310,6 +293,7 @@ function HouseholdProvider({
         online,
         queue,
         synchronize,
+        retryFailedUploads,
       }}
     >
       {auth.isAuthenticated && (
@@ -325,7 +309,7 @@ function HouseholdProvider({
             "Behandling av kvitteringer er satt på pause. Nye bilder blir lagret på enheten."}
         </Notice>
       )}
-      {queueError ? <Notice error>{queueError}</Notice> : null}
+      {queueError ? <Notice tone="error">{queueError}</Notice> : null}
       <CatalogQueryProvider
         key={`${owner}:${household.id}`}
         scope={`${owner}:${household.id}`}

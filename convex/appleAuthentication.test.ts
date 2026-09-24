@@ -1,3 +1,4 @@
+import { present } from "../src/lib/testing/receipts";
 /// <reference types="vite/client" />
 import { convexTest } from "convex-test";
 import { register } from "@convex-dev/better-auth/test";
@@ -41,6 +42,13 @@ const modules = import.meta.glob("./**/*.ts");
 
 const signedIn = z.object({
   user: z.object({ id: z.string(), name: z.string(), email: z.string() }),
+});
+
+/** The Better Auth component types adapter results as `any`. */
+const adapterRow = z.looseObject({ _id: z.string() });
+
+const accountPage = z.object({
+  page: z.array(z.looseObject({ userId: z.string() })),
 });
 
 let signingKey: CryptoKey;
@@ -161,7 +169,7 @@ function authentication() {
 function sessionCookie(response: Response) {
   return response.headers
     .getSetCookie()
-    .map((cookie) => cookie.split(";")[0])
+    .map((cookie) => present(cookie.split(";")[0]))
     .join("; ");
 }
 
@@ -273,16 +281,18 @@ it("requires explicit linking and preserves email login after linking a private 
   expect(registration.status).toBe(200);
   const original = signedIn.parse(await registration.json());
 
-  const session = await t.run((ctx) =>
-    ctx.runQuery(components.betterAuth.adapter.findOne, {
-      model: "session",
-      where: [{ field: "userId", value: original.user.id }],
-    }),
+  const session = adapterRow.parse(
+    await t.run((ctx) =>
+      ctx.runQuery(components.betterAuth.adapter.findOne, {
+        model: "session",
+        where: [{ field: "userId", value: original.user.id }],
+      }),
+    ),
   );
 
   const member = t.withIdentity({
     subject: original.user.id,
-    sessionId: session!._id,
+    sessionId: session._id,
   });
 
   expect(await member.query(api.auth.appleConnected)).toBe(false);
@@ -380,16 +390,18 @@ it("rejects linking an Apple identity already owned by another account", async (
   expect(other.status).toBe(200);
   const otherUser = signedIn.parse(await other.json()).user;
 
-  const otherSession = await t.run((ctx) =>
-    ctx.runQuery(components.betterAuth.adapter.findOne, {
-      model: "session",
-      where: [{ field: "userId", value: otherUser.id }],
-    }),
+  const otherSession = adapterRow.parse(
+    await t.run((ctx) =>
+      ctx.runQuery(components.betterAuth.adapter.findOne, {
+        model: "session",
+        where: [{ field: "userId", value: otherUser.id }],
+      }),
+    ),
   );
 
   const otherMember = t.withIdentity({
     subject: otherUser.id,
-    sessionId: otherSession!._id,
+    sessionId: otherSession._id,
   });
 
   expect(await otherMember.query(api.auth.appleConnected)).toBe(false);
@@ -403,16 +415,18 @@ it("rejects linking an Apple identity already owned by another account", async (
   expect(linked.ok).toBe(false);
   expect(await otherMember.query(api.auth.appleConnected)).toBe(false);
 
-  const accounts = await t.run((ctx) =>
-    ctx.runQuery(components.betterAuth.adapter.findMany, {
-      model: "account",
-      where: [{ field: "providerId", value: "apple" }],
-      paginationOpts: { cursor: null, numItems: 10 },
-    }),
+  const accounts = accountPage.parse(
+    await t.run((ctx) =>
+      ctx.runQuery(components.betterAuth.adapter.findMany, {
+        model: "account",
+        where: [{ field: "providerId", value: "apple" }],
+        paginationOpts: { cursor: null, numItems: 10 },
+      }),
+    ),
   );
 
   expect(accounts.page).toHaveLength(1);
-  expect(accounts.page[0].userId).toBe(
+  expect(present(accounts.page[0]).userId).toBe(
     signedIn.parse(await apple.json()).user.id,
   );
 });

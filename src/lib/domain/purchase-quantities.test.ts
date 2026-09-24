@@ -1,3 +1,4 @@
+import { present } from "../testing/receipts";
 import { describe, expect, it } from "vitest";
 import { batteryFixture } from "./receipt";
 import {
@@ -13,7 +14,7 @@ import {
 } from "./purchase-quantities";
 
 const line = () => ({
-  ...batteryFixture().lines[0],
+  ...present(batteryFixture().lines[0]),
   name: "COCA-COLA10PK BX",
   packageSize: null,
   packageUnit: null,

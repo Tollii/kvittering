@@ -1,3 +1,4 @@
+import { Ore } from "./domain/ore";
 import { expect, it } from "vitest";
 import {
   latestStoreReceipt,
@@ -13,8 +14,8 @@ function receipt(id: string, date: string | null, store = "Kiwi Storgata") {
     status: "reviewed" as const,
     store,
     purchaseDate: date,
-    totalOre: 1000,
-    spendingOre: 1000,
+    totalOre: Ore.of(1000),
+    spendingOre: Ore.of(1000),
     excluded: false,
   };
 }

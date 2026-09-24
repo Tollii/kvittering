@@ -32,11 +32,14 @@ type Subscription = {
   listeners: Set<() => void>;
 };
 
+/** The spied client method types arguments as `any`; the test uses JSON arguments. */
+const queryArguments = z.record(z.string(), z.json());
+
 let subscriptions: Map<string, Subscription>;
 
 let client: ConvexReactClient;
 
-// eslint-disable-next-line sonarjs/deprecation -- The installed React Native test renderer exercises subscription lifecycle behavior.
+// eslint-disable-next-line sonarjs/deprecation, @typescript-eslint/no-deprecated -- The installed React Native test renderer exercises subscription lifecycle behavior.
 let renderer: ReactTestRenderer | undefined;
 
 beforeEach(() => {
@@ -48,41 +51,49 @@ beforeEach(() => {
   subscriptions = new Map();
   client = new ConvexReactClient("https://navigation-test.convex.cloud");
   // Exercise real React/Convex hooks with a transport that drops unsubscribed data.
-  vi.spyOn(client, "watchQuery").mockImplementation((...[query, args = {}]) => {
-    const name = getFunctionName(query);
-    const key = JSON.stringify([name, convexToJson(args)]);
+  vi.spyOn(client, "watchQuery").mockImplementation(
+    (...[query, untypedArgs = {}]) => {
+      const args = queryArguments.parse(untypedArgs);
+      const name = getFunctionName(query);
+      const key = JSON.stringify([name, convexToJson(args)]);
 
-    return {
-      onUpdate(listener) {
-        let subscription = subscriptions.get(key);
+      return {
+        onUpdate(listener) {
+          let subscription = subscriptions.get(key);
 
-        if (!subscription) {
-          subscription = { name, args, value: undefined, listeners: new Set() };
-          subscriptions.set(key, subscription);
-        }
+          if (!subscription) {
+            subscription = {
+              name,
+              args,
+              value: undefined,
+              listeners: new Set(),
+            };
+            subscriptions.set(key, subscription);
+          }
 
-        subscription.listeners.add(listener);
+          subscription.listeners.add(listener);
 
-        return () => {
-          subscription.listeners.delete(listener);
+          return () => {
+            subscription.listeners.delete(listener);
 
-          if (!subscription.listeners.size) subscriptions.delete(key);
-        };
-      },
-      localQueryResult: () => {
-        const value = subscriptions.get(key)?.value;
+            if (!subscription.listeners.size) subscriptions.delete(key);
+          };
+        },
+        localQueryResult: () => {
+          const value = subscriptions.get(key)?.value;
 
-        if (value instanceof Error) throw value;
+          if (value instanceof Error) throw value;
 
-        return value;
-      },
-      journal: () => undefined,
-    };
-  });
+          return value;
+        },
+        journal: () => undefined,
+      };
+    },
+  );
 });
 
 afterEach(async () => {
-  await act(() => renderer?.unmount());
+  await act(async () => renderer?.unmount());
   renderer = undefined;
   // oxlint-disable-next-line vitest/no-standalone-expect -- Check cleanup after every rendered scenario.
   expect(subscriptions.size).toBe(0);
@@ -109,9 +120,9 @@ async function show(component: (() => null) | null, scope = "household-a") {
     ),
   );
 
-  await act(() => {
+  await act(async () => {
     if (renderer) renderer.update(tree);
-    // eslint-disable-next-line sonarjs/deprecation -- The installed React Native test renderer exercises subscription lifecycle behavior.
+    // eslint-disable-next-line sonarjs/deprecation, @typescript-eslint/no-deprecated -- The installed React Native test renderer exercises subscription lifecycle behavior.
     else renderer = create(tree);
   });
 }
@@ -133,7 +144,7 @@ async function publish(
   });
 
   expect(subscription, `subscription for ${name}`).toBeDefined();
-  await act(() => {
+  await act(async () => {
     subscription!.value = value;
 
     for (const listener of subscription!.listeners) listener();
@@ -230,7 +241,7 @@ it("retains history pagination across product tabs without mixing searches", asy
     isDone: false,
     continueCursor: "second",
   });
-  await act(() => result!.loadMore(30));
+  await act(async () => result!.loadMore(30));
   await publish(
     "receipts:history",
     { page: [{ _id: "second" }], isDone: true, continueCursor: "end" },
@@ -325,7 +336,7 @@ it("expires idle results and releases them when the household changes", async ()
   await show(Detail);
   await publish("receipts:detail", 100);
   await show(null);
-  await act(() => {
+  await act(async () => {
     vi.advanceTimersByTime(5 * 60_000);
   });
   expect(subscriptions.size).toBe(0);

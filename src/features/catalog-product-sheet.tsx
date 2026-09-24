@@ -1,3 +1,4 @@
+import { Ore } from "@/lib/domain/ore";
 import { useFeatureFlag } from "@/features/featureFlags";
 import { useCompleteReceipts } from "./receipt-queries";
 import { useState } from "react";
@@ -20,13 +21,12 @@ import {
   useCatalogSearch,
 } from "./catalog-queries";
 import type { CatalogIdentity, CatalogProduct } from "@/lib/catalog/model";
-import { formatMoney } from "@/lib/domain/receipt";
 import { formatDate } from "@/lib/format-date";
 import { catalogInsights } from "@/lib/catalog/insights";
 import { productSearch, rankCatalogProducts } from "@/lib/catalog/matching";
 import { catalogImageSources } from "@/lib/catalog/images";
 import { useTheme } from "@/constants/theme";
-import { useHousehold } from "./session";
+import { useHousehold } from "./household-context";
 
 export function CatalogProductPicker({
   name,
@@ -81,7 +81,7 @@ export function CatalogProductPicker({
         <Loading title="Henter produkter …" />
       )}
       {(query.isError || query.data?.status === "error") && (
-        <Notice error>
+        <Notice tone="error">
           {query.data?.message ?? "Kunne ikke hente produkter"}
         </Notice>
       )}
@@ -92,7 +92,7 @@ export function CatalogProductPicker({
             <View
               style={{ flexDirection: "row", gap: 12, alignItems: "center" }}
             >
-              {(product.image || product.ean) && (
+              {!!(product.image || product.ean) && (
                 <CatalogImage
                   key={product.key}
                   sources={catalogImageSources(product)}
@@ -221,22 +221,25 @@ export function CatalogProductSheet({
           {full.categories.join(" › ")}
         </Copy>
       )}
-      <Button title="Endre produktkobling" secondary onPress={onChange} />
+      <Button
+        title="Endre produktkobling"
+        variant="secondary"
+        onPress={onChange}
+      />
       {query.isFetching && !full && <Loading />}
       {(query.isError || query.data?.status === "error") && (
-        <Notice error>Produktdetaljene kunne ikke hentes nå.</Notice>
+        <Notice tone="error">Produktdetaljene kunne ikke hentes nå.</Notice>
       )}
       {purchases && completeReceipts && (
         <Panel>
           <Copy weight="600">Deres kjøp</Copy>
-          <Row title="Kjøpt for" value={formatMoney(purchases.amountOre)} />
+          <Row title="Kjøpt for" value={Ore.format(purchases.amountOre)} />
           <Copy muted size={13}>
             {
               new Set(purchases.contributions.map((item) => item.receipt._id))
                 .size
             }{" "}
             kvitteringer · etter varerabatt
-            {!completeReceipts ? " · henter flere kjøp" : ""}
           </Copy>
         </Panel>
       )}
@@ -257,7 +260,7 @@ export function CatalogProductSheet({
           ))}
         </Disclosure>
       )}
-      {full?.ingredients && (
+      {!!full?.ingredients && (
         <Disclosure title="Ingredienser">
           <Copy size={14}>{full.ingredients}</Copy>
         </Disclosure>
@@ -276,7 +279,7 @@ export function CatalogProductSheet({
       {!!full?.labels.length && (
         <Copy size={13}>{full.labels.join(" · ")}</Copy>
       )}
-      {product.ean && (
+      {!!product.ean && (
         <Copy muted size={12}>
           Strekkode: {product.ean}
         </Copy>
@@ -285,7 +288,7 @@ export function CatalogProductSheet({
         (!showPrices ? (
           <Button
             title="Hent butikkpriser"
-            secondary
+            variant="secondary"
             onPress={() => setShowPrices(true)}
           />
         ) : (
@@ -302,6 +305,7 @@ export function CatalogProductSheet({
             )}
             {prices.data?.prices.map((price, index) => (
               <Row
+                // eslint-disable-next-line react/no-array-index-key -- Provider prices have no identity and are never reordered.
                 key={`${price.store}-${index}`}
                 title={price.store}
                 detail={
@@ -309,7 +313,7 @@ export function CatalogProductSheet({
                     ? formatDate(price.checkedAt.slice(0, 10))
                     : "Dato ukjent"
                 }
-                value={formatMoney(price.priceOre)}
+                value={Ore.format(price.priceOre)}
               />
             ))}
             {prices.data?.status === "ready" && !prices.data.prices.length && (

@@ -1,5 +1,7 @@
 "use node";
 
+import { Ore } from "../src/lib/domain/ore";
+
 import {
   readAttributes,
   type ProductAttributes,
@@ -44,7 +46,38 @@ export function familyQuestion(families: { name: string }[], path = "") {
   return choice(`For ${path}product: ${familyRules}`, options);
 }
 
-type Answers = Record<string, { choice: string; confidence: number }>;
+type Answer = { choice: string; confidence: number };
+
+type Answers = Partial<Record<string, Answer>>;
+
+/** The answers one product profile needs, each present. */
+type ProfileAnswers = {
+  family: Answer;
+  count: Answer;
+  measure: Answer;
+  attribute_type: Answer;
+  attribute_sugar: Answer;
+  attribute_preparation: Answer;
+};
+
+function parseProfileAnswers(answers: Answers): ProfileAnswers {
+  const required = (key: keyof ProfileAnswers) => {
+    const answer = answers[key];
+
+    if (!answer) throw new Error(`Missing profile answer: ${key}`);
+
+    return answer;
+  };
+
+  return {
+    family: required("family"),
+    count: required("count"),
+    measure: required("measure"),
+    attribute_type: required("attribute_type"),
+    attribute_sugar: required("attribute_sugar"),
+    attribute_preparation: required("attribute_preparation"),
+  };
+}
 
 export function profileQuestions(context: PreparedProfile, path = "") {
   const line = context.line;
@@ -119,20 +152,10 @@ export function profileQuestions(context: PreparedProfile, path = "") {
 export function profileDecision(
   context: PreparedProfile,
   candidates: ReturnType<typeof packageCandidates>,
-  answers: Answers,
+  received: Answers,
 ) {
   const line = context.line;
-
-  for (const key of [
-    "family",
-    "count",
-    "measure",
-    "attribute_type",
-    "attribute_sugar",
-    "attribute_preparation",
-  ]) {
-    if (!answers[key]) throw new Error(`Missing profile answer: ${key}`);
-  }
+  const answers = parseProfileAnswers(received);
 
   const countIndex = /^count_(\d+)$/.exec(answers.count.choice);
 
@@ -228,9 +251,10 @@ export const analyze = internalAction({
         ).values(),
       ];
 
-      const requests = missing.map((item, index) =>
-        profileQuestions(item, `items[${index}].`),
-      );
+      const requests = missing.map((context, index) => ({
+        context,
+        ...profileQuestions(context, `items[${index}].`),
+      }));
 
       let ids = contexts.flatMap((item) =>
         item.profile ? [item.profile._id] : [],
@@ -250,12 +274,12 @@ export const analyze = internalAction({
           ),
         });
 
-        const decisions = missing.map((context, index) =>
+        const decisions = requests.map((request, index) =>
           profileDecision(
-            context,
-            requests[index].candidates,
+            request.context,
+            request.candidates,
             Object.fromEntries(
-              Object.keys(requests[index].questions).map((key) => [
+              Object.keys(request.questions).map((key) => [
                 key,
                 response.answers[`profile_${index}_${key}`],
               ]),
@@ -337,14 +361,15 @@ export const analyze = internalAction({
 
       batch.forEach((item, index) => {
         const answer = response.answers[`quantity_${index}`];
-        const selected = /^candidate_(\d+)$/.exec(answer.choice);
+        // An omitted answer selects no candidate.
+        const selected = answer && /^candidate_(\d+)$/.exec(answer.choice);
         results.push({
           lineId: item.line.id,
           evidenceKey: purchaseEvidenceKey(item.line),
           family: item.family,
           attributes: item.attributes,
           quantity:
-            (item.line.amountOre ?? 0) < 0
+            (item.line.amountOre ?? Ore.zero) < 0
               ? emptyPurchaseQuantity()
               : normalizePurchase(
                   item.profile,

@@ -12,7 +12,7 @@ import * as Clipboard from "expo-clipboard";
 import { randomUUID } from "expo-crypto";
 import { api } from "../../convex/_generated/api";
 import { Button, Copy, Icon, Notice, Row, Screen } from "@/components/ui";
-import { useHousehold } from "@/features/session";
+import { useHousehold } from "@/features/household-context";
 import { BudgetSettings } from "@/features/budget-settings";
 import { NotificationSettings } from "@/features/notifications";
 import { useTheme } from "@/constants/theme";
@@ -81,106 +81,104 @@ export default function Settings() {
           </View>
         </FormSection>
         {!full && (
-          <>
-            <FormSection title="Inviter partneren din">
-              <View style={{ gap: 12 }}>
-                <View
-                  style={{
-                    flexDirection: "row",
-                    alignItems: "center",
-                    gap: 10,
-                    padding: 12,
-                    borderRadius: 12,
-                    borderCurve: "continuous",
-                    backgroundColor: colors.surfaceRaised,
-                    borderWidth: 1,
-                    borderColor: colors.line,
-                  }}
+          <FormSection title="Inviter partneren din">
+            <View style={{ gap: 12 }}>
+              <View
+                style={{
+                  flexDirection: "row",
+                  alignItems: "center",
+                  gap: 10,
+                  padding: 12,
+                  borderRadius: 12,
+                  borderCurve: "continuous",
+                  backgroundColor: colors.surfaceRaised,
+                  borderWidth: 1,
+                  borderColor: colors.line,
+                }}
+              >
+                <Icon name="key" size={16} />
+                <Copy
+                  selectable
+                  size={14}
+                  weight="600"
+                  style={{ flex: 1, fontVariant: ["tabular-nums"] }}
                 >
-                  <Icon name="key" size={16} />
-                  <Copy
-                    selectable
-                    size={14}
-                    weight="600"
-                    style={{ flex: 1, fontVariant: ["tabular-nums"] }}
-                  >
-                    {details?.household.invitation ??
-                      "Koble til nettet for å hente koden."}
-                  </Copy>
-                </View>
-                <View style={{ flexDirection: "row", gap: 8 }}>
-                  <View style={{ flex: 1 }}>
-                    <Button
-                      title="Kopier"
-                      tint
-                      icon="doc.on.doc"
-                      disabled={!details || busy}
-                      onPress={() => {
-                        if (details)
-                          void run(async () => {
-                            await Clipboard.setStringAsync(
-                              details.household.invitation,
-                            );
-                            setMessage("Koden er kopiert.");
-                          });
-                      }}
-                    />
-                  </View>
-                  <View style={{ flex: 1 }}>
-                    <Button
-                      title="Del"
-                      icon="square.and.arrow.up"
-                      disabled={!details || busy}
-                      onPress={() => {
-                        if (details)
-                          void run(() =>
-                            Share.share({
-                              message: `Bli med i ${household.name} i Kvitto. Invitasjonskode: ${details.household.invitation}`,
-                            }),
-                          );
-                      }}
-                    />
-                  </View>
-                </View>
-                {!!message && (
-                  <Copy size={13} style={{ color: colors.success }}>
-                    {message}
-                  </Copy>
-                )}
-                <Row
-                  title="Lag ny invitasjonskode"
-                  onPress={
-                    !online || busy
-                      ? undefined
-                      : () =>
-                          Alert.alert(
-                            "Lage ny kode?",
-                            "Den gamle koden vil slutte å virke.",
-                            [
-                              { text: "Avbryt", style: "cancel" },
-                              {
-                                text: "Lag ny kode",
-                                onPress: () =>
-                                  void run(() =>
-                                    releaseMutation(
-                                      client,
-                                      api.households.rotateInvitation,
-                                      {
-                                        invitation: randomUUID().replaceAll(
-                                          "-",
-                                          "",
-                                        ),
-                                      },
-                                    ),
-                                  ),
-                              },
-                            ],
-                          )
-                  }
-                />
+                  {details?.household.invitation ??
+                    "Koble til nettet for å hente koden."}
+                </Copy>
               </View>
-            </FormSection>
-          </>
+              <View style={{ flexDirection: "row", gap: 8 }}>
+                <View style={{ flex: 1 }}>
+                  <Button
+                    title="Kopier"
+                    variant="tint"
+                    icon="doc.on.doc"
+                    disabled={!details || busy}
+                    onPress={() => {
+                      if (details)
+                        void run(async () => {
+                          await Clipboard.setStringAsync(
+                            details.household.invitation,
+                          );
+                          setMessage("Koden er kopiert.");
+                        });
+                    }}
+                  />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Button
+                    title="Del"
+                    icon="square.and.arrow.up"
+                    disabled={!details || busy}
+                    onPress={() => {
+                      if (details)
+                        void run(() =>
+                          Share.share({
+                            message: `Bli med i ${household.name} i Kvitto. Invitasjonskode: ${details.household.invitation}`,
+                          }),
+                        );
+                    }}
+                  />
+                </View>
+              </View>
+              {!!message && (
+                <Copy size={13} style={{ color: colors.success }}>
+                  {message}
+                </Copy>
+              )}
+              <Row
+                title="Lag ny invitasjonskode"
+                onPress={
+                  !online || busy
+                    ? undefined
+                    : () =>
+                        Alert.alert(
+                          "Lage ny kode?",
+                          "Den gamle koden vil slutte å virke.",
+                          [
+                            { text: "Avbryt", style: "cancel" },
+                            {
+                              text: "Lag ny kode",
+                              onPress: () =>
+                                void run(() =>
+                                  releaseMutation(
+                                    client,
+                                    api.households.rotateInvitation,
+                                    {
+                                      invitation: randomUUID().replaceAll(
+                                        "-",
+                                        "",
+                                      ),
+                                    },
+                                  ),
+                                ),
+                            },
+                          ],
+                        )
+                }
+              />
+            </View>
+          </FormSection>
         )}
         <FormSection title="Kategorisering">
           <Row
@@ -204,7 +202,7 @@ export default function Settings() {
         </FormSection>
         <FormSection title="Konto">
           <AccountSettings disabled={busy} />
-          {!!error && <Notice error>{error}</Notice>}
+          {!!error && <Notice tone="error">{error}</Notice>}
         </FormSection>
       </NativeForm>
     </Screen>

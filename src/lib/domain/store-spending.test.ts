@@ -1,4 +1,5 @@
-import { receiptFixture, testId } from "../testing/receipts";
+import { present, receiptFixture, testId } from "../testing/receipts";
+import { Ore } from "./ore";
 import { expect, it } from "vitest";
 import { storeSpending, type StorePurchase } from "./store-spending";
 import { monthlyInsights, type Receipt } from "./insights";
@@ -23,7 +24,7 @@ function purchase(
     date: "2026-09-01",
     retailer: "KIWI",
     branch,
-    amountOre: 1000,
+    amountOre: Ore.of(1000),
     unknownAmounts: 0,
     provisional: false,
     ...overrides,
@@ -38,8 +39,16 @@ it("groups stable branch IDs, keeps branches separate, and includes unlocated pu
       branch: { ...branch, name: "Kiwi Storgata" },
     }),
     purchase("c", { branch: { ...branch, id: 20, name: "KIWI Sentrum" } }),
-    purchase("d", { branch: undefined, retailer: "Kiwi", amountOre: 500 }),
-    purchase("e", { branch: undefined, retailer: undefined, amountOre: 100 }),
+    purchase("d", {
+      branch: undefined,
+      retailer: "Kiwi",
+      amountOre: Ore.of(500),
+    }),
+    purchase("e", {
+      branch: undefined,
+      retailer: undefined,
+      amountOre: Ore.of(100),
+    }),
   ];
 
   const before = structuredClone(input);
@@ -50,13 +59,12 @@ it("groups stable branch IDs, keeps branches separate, and includes unlocated pu
     ["unlocated:KIWI", 500],
     ["unlocated:unknown", 100],
   ]);
-  expect(result.stores[0].name).toBe("Kiwi Storgata");
-  expect(result.stores[0].purchases.map((item) => item.receiptId)).toEqual([
-    "b",
-    "a",
-  ]);
-  expect(result.chains[0].amountOre).toBe(3500);
-  expect(result.chains[0].purchases).toHaveLength(4);
+  expect(present(result.stores[0]).name).toBe("Kiwi Storgata");
+  expect(
+    present(result.stores[0]).purchases.map((item) => item.receiptId),
+  ).toEqual(["b", "a"]);
+  expect(present(result.chains[0]).amountOre).toBe(3500);
+  expect(present(result.chains[0]).purchases).toHaveLength(4);
   expect(input).toEqual(before);
 });
 
@@ -84,21 +92,27 @@ it("preserves known coordinates while refusing invalid or incomplete positions",
   expect(
     result.stores.find((store) => store.id === "branch:40")?.location,
   ).toEqual({ latitude: 0, longitude: 0 });
-  expect(result.chains[0].amountOre).toBe(5000);
+  expect(present(result.chains[0]).amountOre).toBe(5000);
 });
 
 it("retains refunds, unknown amounts and review state without inventing spending", () => {
   const result = storeSpending([
-    purchase("a", { amountOre: -1200 }),
-    purchase("b", { amountOre: 0, unknownAmounts: 2, provisional: true }),
+    purchase("a", { amountOre: Ore.of(-1200) }),
+    purchase("b", {
+      amountOre: Ore.of(0),
+      unknownAmounts: 2,
+      provisional: true,
+    }),
   ]);
 
   expect(result.stores[0]).toMatchObject({
-    amountOre: -1200,
+    amountOre: Ore.of(-1200),
     unknownAmounts: 2,
   });
-  expect(result.stores[0].purchases[1].provisional).toBe(true);
-  expect(result.chains[0].amountOre).toBe(-1200);
+  expect(present(present(result.stores[0]).purchases[1]).provisional).toBe(
+    true,
+  );
+  expect(present(result.chains[0]).amountOre).toBe(-1200);
   expect(storeSpending([])).toEqual({ stores: [], chains: [] });
 });
 
@@ -123,7 +137,7 @@ it("agrees with Forbruk accounting, period, currency, exclusion and review filte
     data: {
       ...data,
       physicalStore: null,
-      lines: [{ ...emptyLine(), amountOre: 1000 }, emptyLine()],
+      lines: [{ ...emptyLine(), amountOre: Ore.of(1000) }, emptyLine()],
     },
   });
 
@@ -151,10 +165,10 @@ it("agrees with Forbruk accounting, period, currency, exclusion and review filte
   const totals = monthlyInsights(receipts, "2026-09");
   const result = storeSpending(totals.storePurchases);
   expect(totals.products).toBe(3331);
-  expect(result.stores.reduce((sum, store) => sum + store.amountOre, 0)).toBe(
+  expect(Ore.sum(result.stores.map((store) => store.amountOre))).toBe(
     totals.products,
   );
-  expect(result.chains.reduce((sum, store) => sum + store.amountOre, 0)).toBe(
+  expect(Ore.sum(result.chains.map((store) => store.amountOre))).toBe(
     totals.products,
   );
   expect(
@@ -167,5 +181,5 @@ it("agrees with Forbruk accounting, period, currency, exclusion and review filte
   );
 
   expect(reviewed.stores).toHaveLength(1);
-  expect(reviewed.stores[0].amountOre).toBe(2331);
+  expect(present(reviewed.stores[0]).amountOre).toBe(2331);
 });

@@ -1,11 +1,17 @@
+import { soleElement } from "@/lib/domain/collections";
+import { Ore } from "@/lib/domain/ore";
 import { useEffect, useRef, useState } from "react";
 import { View } from "react-native";
 import MapView, { Marker } from "react-native-maps";
 import { useTheme } from "@/constants/theme";
 import { Copy } from "@/components/ui";
-import { formatMoney } from "@/lib/domain/receipt";
 import type { StoreMapProps } from "./store-map";
-import type { StoreLocation } from "@/lib/domain/store-spending";
+import { z } from "zod";
+
+/** The effect key is serialized so amount-only updates keep the map position. */
+const storeLocations = z.array(
+  z.object({ latitude: z.number(), longitude: z.number() }),
+);
 
 export function StoreMap({ stores, onSelect }: Readonly<StoreMapProps>) {
   const colors = useTheme();
@@ -21,11 +27,13 @@ export function StoreMap({ stores, onSelect }: Readonly<StoreMapProps>) {
 
   useEffect(() => {
     if (!ready) return;
-    const coordinates: StoreLocation[] = JSON.parse(coordinateKey);
+    const coordinates = storeLocations.parse(JSON.parse(coordinateKey));
 
-    if (coordinates.length === 1) {
+    const only = soleElement(coordinates);
+
+    if (only) {
       map.current?.animateToRegion(
-        { ...coordinates[0], latitudeDelta: 0.02, longitudeDelta: 0.02 },
+        { ...only, latitudeDelta: 0.02, longitudeDelta: 0.02 },
         0,
       );
     } else {
@@ -63,13 +71,13 @@ export function StoreMap({ stores, onSelect }: Readonly<StoreMapProps>) {
                 key={store.id}
                 coordinate={store.location}
                 title={store.name}
-                description={formatMoney(store.amountOre)}
+                description={Ore.format(store.amountOre)}
                 onPress={() => onSelect(store.id)}
               >
                 <View
                   accessible
                   accessibilityRole="button"
-                  accessibilityLabel={`${store.name}, ${formatMoney(store.amountOre)}`}
+                  accessibilityLabel={`${store.name}, ${Ore.format(store.amountOre)}`}
                   style={{
                     width: size,
                     height: size,

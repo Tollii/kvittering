@@ -1,3 +1,8 @@
+import { present } from "../src/lib/testing/receipts";
+import {
+  readModelRequest,
+  type ModelRequest,
+} from "../src/lib/testing/model-requests";
 /// <reference types="vite/client" />
 import { convexTest } from "convex-test";
 import { expect, it, vi, afterEach } from "vitest";
@@ -55,7 +60,7 @@ async function setup() {
       catalogStatus: "complete",
     }),
   );
-  const line = data.lines[0];
+  const line = present(data.lines[0]);
 
   return {
     t,
@@ -103,7 +108,7 @@ it("persists one family and cached profile for repeated decisions", async () => 
 
   expect(prepared?.profile?.package.unitsPerPackage).toBe(1);
   expect(prepared?.families).toHaveLength(1);
-  expect(prepared?.profile?.familyId).toBe(prepared?.families[0]._id);
+  expect(prepared?.profile?.familyId).toBe(present(prepared?.families[0])._id);
   expect(prepared?.profile?.attributes).toEqual(args.attributes);
 });
 
@@ -257,7 +262,7 @@ it("commits duplicate profile decisions once and rejects a stale batch", async (
   });
 
   expect(rows).toHaveLength(1);
-  expect(rows[0].family).not.toBeNull();
+  expect(present(rows[0]).family).not.toBeNull();
   expect(
     await t.run((ctx) => ctx.db.query("productFamilies").collect()),
   ).toHaveLength(1);
@@ -283,18 +288,18 @@ it("commits duplicate profile decisions once and rejects a stale batch", async (
 it("batches independent profiles and uses only quantity questions for cached profiles", async () => {
   const { t, id, data, args } = await setup();
   vi.stubEnv("TYPESAFE_API_KEY", "test-key");
-  const product = data.lines[0];
+  const product = present(data.lines[0]);
   data.lines = [
     product,
     { ...product, id: "same-product" },
     { ...product, id: "different-product", name: "Milk", originalText: "Milk" },
   ];
   await t.run((ctx) => ctx.db.patch("receipts", id, { data }));
-  const requests: { questions: Record<string, { type: string }> }[] = [];
+  const requests: ModelRequest[] = [];
   vi.stubGlobal(
     "fetch",
-    vi.fn(async (_url, init) => {
-      const request = JSON.parse(init.body);
+    vi.fn(async (_url: string, init?: RequestInit) => {
+      const request = readModelRequest(init);
       requests.push(request);
 
       return new Response(
@@ -330,15 +335,15 @@ it("batches independent profiles and uses only quantity questions for cached pro
       await t.action(internal.productAnalysisWorker.analyze, snapshot),
     ).toHaveLength(3);
     expect(requests).toHaveLength(2);
-    expect(Object.keys(requests[0].questions)).toHaveLength(12);
-    expect(Object.keys(requests[1].questions)).toHaveLength(3);
+    expect(Object.keys(present(requests[0]).questions)).toHaveLength(12);
+    expect(Object.keys(present(requests[1]).questions)).toHaveLength(3);
     requests.length = 0;
     expect(
       await t.action(internal.productAnalysisWorker.analyze, snapshot),
     ).toHaveLength(3);
     expect(requests).toHaveLength(1);
     expect(
-      Object.keys(requests[0].questions).every((key) =>
+      Object.keys(present(requests[0]).questions).every((key) =>
         key.startsWith("quantity_"),
       ),
     ).toBe(true);

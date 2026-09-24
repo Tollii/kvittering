@@ -1,3 +1,4 @@
+import { Ore } from "./ore";
 import { z } from "zod";
 import {
   emptyLine,
@@ -100,6 +101,7 @@ export function prepareExtraction(
 
   const data: ReceiptData = {
     ...extraction,
+    totalOre: Ore.parseAmount(extraction.totalOre, "Totalen må være hele øre."),
     purchaseDate,
     issues,
     lines: extraction.lines.map(
@@ -116,6 +118,11 @@ export function prepareExtraction(
         return {
           ...emptyLine(line.id),
           ...line,
+          amountOre: Ore.parseAmount(line.amountOre, "Beløp må være hele øre."),
+          unitPriceOre: Ore.parseAmount(
+            line.unitPriceOre,
+            "Beløp må være hele øre.",
+          ),
           sourceImages: validSources ? sources : [],
           issues: [
             ...new Set([

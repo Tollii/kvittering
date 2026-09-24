@@ -28,6 +28,7 @@ export type EvaluationResult = {
   }[];
 };
 
+// Access: reads corrections through api.corrections.list, which requires membership.
 /** Evaluate the latest human decision for each product against the current classifier. */
 export const evaluate = action({
   args: { client: clientValidator.optional() },

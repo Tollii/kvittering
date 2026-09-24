@@ -1,3 +1,4 @@
+import { present } from "../testing/receipts";
 import { expect, it } from "vitest";
 import { emptyLine } from "../domain/receipt";
 import { normalizeProducts } from "../../../convex/kassalapp/normalize";
@@ -24,7 +25,7 @@ it("accepts a named product without a receipt size at the 0.80 boundary", () => 
 
   expect(selectCatalogMatch(line, products, [0.799]).productKey).toBeNull();
   expect(selectCatalogMatch(line, products, [0.8])).toMatchObject({
-    productKey: products[0].key,
+    productKey: present(products[0]).key,
     reason: "model_match",
   });
 });
@@ -61,6 +62,6 @@ it("does not choose arbitrarily between plausible package sizes", () => {
     reason: "ambiguous",
   });
   expect(selectCatalogMatch(line, products, [0.2, 0.91]).productKey).toBe(
-    products[1].key,
+    present(products[1]).key,
   );
 });

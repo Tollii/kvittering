@@ -7,11 +7,15 @@ import { convex } from "@convex-dev/better-auth/plugins";
 import { expo } from "@better-auth/expo";
 import { betterAuth } from "better-auth/minimal";
 import { v } from "convex/values";
+import { z } from "zod";
 import { components, internal } from "./_generated/api";
 import appConfig from "../app.json";
 import type { DataModel } from "./_generated/dataModel";
 import authConfig from "./auth.config";
 import { env, query } from "./_generated/server";
+
+/** The component types adapter pages as `any`; only the count is needed. */
+const linkedAccounts = z.object({ page: z.array(z.unknown()) });
 
 const authFunctions: AuthFunctions = internal.auth;
 
@@ -23,7 +27,7 @@ export const authComponent = createClient<DataModel>(components.betterAuth, {
         if (account.providerId !== "apple") return;
 
         // The component invokes this within the account creation transaction.
-        const accounts = await ctx.runQuery(
+        const accounts: unknown = await ctx.runQuery(
           components.betterAuth.adapter.findMany,
           {
             model: "account",
@@ -35,7 +39,7 @@ export const authComponent = createClient<DataModel>(components.betterAuth, {
           },
         );
 
-        if (accounts.page.length > 1)
+        if (linkedAccounts.parse(accounts).page.length > 1)
           throw new Error(
             "Apple-kontoen er allerede koblet til en annen konto.",
           );
@@ -55,13 +59,17 @@ export const appleConnected = query({
     // The subscription can update before the client finishes signing out.
     if (!user) return null;
 
-    const account = await ctx.runQuery(components.betterAuth.adapter.findOne, {
-      model: "account",
-      where: [
-        { field: "userId", value: user._id },
-        { field: "providerId", value: "apple" },
-      ],
-    });
+    // The component types adapter results as `any`; only presence is needed.
+    const account: unknown = await ctx.runQuery(
+      components.betterAuth.adapter.findOne,
+      {
+        model: "account",
+        where: [
+          { field: "userId", value: user._id },
+          { field: "providerId", value: "apple" },
+        ],
+      },
+    );
 
     return account !== null;
   },

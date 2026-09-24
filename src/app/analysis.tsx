@@ -1,3 +1,4 @@
+import { Ore } from "@/lib/domain/ore";
 import { spendingExplanations } from "@/lib/domain/spending-explanations";
 import { useFeatureFlag } from "@/features/featureFlags";
 import {
@@ -27,7 +28,7 @@ import {
   spendingAnalysis,
   type AnalysisFrequency,
 } from "@/lib/domain/spending-analysis";
-import { formatMoney, osloDate } from "@/lib/domain/receipt";
+import { osloDate } from "@/lib/domain/receipt";
 import { formatDate } from "@/lib/format-date";
 
 export default function Analysis() {
@@ -62,13 +63,13 @@ export default function Analysis() {
     effect: report.effects.map((effect) => ({
       id: effect.id,
       name: `${effect.name} · begge perioder`,
-      amountOre: effect.currentOre + effect.previousOre,
+      amountOre: Ore.add(effect.currentOre, effect.previousOre),
       contributions: effect.contributions,
     })),
     category: report.categories.map((row) => ({
       id: row.id,
       name: `${row.name} · begge perioder`,
-      amountOre: row.currentOre + row.previousOre,
+      amountOre: Ore.add(row.currentOre, row.previousOre),
       contributions: row.contributions,
     })),
   });
@@ -137,7 +138,7 @@ export default function Analysis() {
       ) : (
         <>
           <Copy selectable size={34} weight="800">
-            {formatMoney(report.currentOre)}
+            {Ore.format(report.currentOre)}
           </Copy>
           <Copy selectable>{analysisSummary(report)}</Copy>
           <Copy muted size={13}>
@@ -186,15 +187,15 @@ export default function Analysis() {
                 <Panel style={{ gap: 0, paddingVertical: 4 }}>
                   <Row
                     title="Endret pris per mengde"
-                    value={formatMoney(report.priceOre)}
+                    value={Ore.format(report.priceOre)}
                   />
                   <Row
                     title="Endret kjøpt mengde"
-                    value={formatMoney(report.quantityOre)}
+                    value={Ore.format(report.quantityOre)}
                   />
                   <Row
                     title="Andre varer og ukjent mengde"
-                    value={formatMoney(report.unexplainedOre)}
+                    value={Ore.format(report.unexplainedOre)}
                   />
                 </Panel>
                 <Copy muted size={13}>
@@ -215,8 +216,8 @@ export default function Analysis() {
                   <Row
                     key={effect.id}
                     title={effect.name}
-                    value={formatMoney(effect.differenceOre)}
-                    detail={`${effect.previousQuantity} → ${effect.currentQuantity} ${effect.unit} · pris ${formatMoney(effect.priceOre)}, mengde ${formatMoney(effect.quantityOre)}`}
+                    value={Ore.format(effect.differenceOre)}
+                    detail={`${effect.previousQuantity} → ${effect.currentQuantity} ${effect.unit} · pris ${Ore.format(effect.priceOre)}, mengde ${Ore.format(effect.quantityOre)}`}
                     onPress={() =>
                       setSelection({
                         period: periodKey,
@@ -240,10 +241,10 @@ export default function Analysis() {
               title={row.name}
               detail={
                 report.previousReceipts
-                  ? `${formatMoney(row.previousOre)} → ${formatMoney(row.currentOre)}`
+                  ? `${Ore.format(row.previousOre)} → ${Ore.format(row.currentOre)}`
                   : undefined
               }
-              value={formatMoney(row.differenceOre)}
+              value={Ore.format(row.differenceOre)}
               onPress={() =>
                 setSelection({
                   period: periodKey,

@@ -19,13 +19,15 @@ function headers() {
   return result;
 }
 
+export const sendArgs = v.object({
+  receiptId: v.id("receipts"),
+  subscriptionId: v.id("deviceSubscriptions"),
+  attempt: v.number(),
+  reviewOnly: v.boolean().optional(),
+});
+
 export const send = internalAction({
-  args: {
-    receiptId: v.id("receipts"),
-    subscriptionId: v.id("deviceSubscriptions"),
-    attempt: v.number(),
-    reviewOnly: v.boolean().optional(),
-  },
+  args: sendArgs,
   returns: v.null(),
   handler: async (ctx, args) => {
     const target = await ctx.runQuery(internal.notifications.delivery, {

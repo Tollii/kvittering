@@ -1,3 +1,8 @@
+import { Ore } from "@/lib/domain/ore";
+import {
+  isMissingLineField,
+  receiptIssueText,
+} from "@/lib/domain/receipt-issues";
 import { useDebouncedSearch } from "./catalog-queries";
 import { productSearch } from "@/lib/catalog/search";
 import {
@@ -23,7 +28,11 @@ import {
 } from "@/components/ui";
 import { MoneyField } from "@/components/money-field";
 import { categoryById } from "@/lib/domain/categories";
-import { lineKinds, formatMoney, type ReceiptLine } from "@/lib/domain/receipt";
+import {
+  lineKinds,
+  isTotalsLine,
+  type ReceiptLine,
+} from "@/lib/domain/receipt";
 import {
   canConfirmSuggestedCategory,
   isCategoryUncertain,
@@ -100,10 +109,12 @@ export function ReceiptLineEditor({
   const { fontScale } = useWindowDimensions();
   const issues = lineReviewIssues(line);
   const categoryUncertain = line.issues.some(isCategoryUncertain);
-  const otherIssues = issues.filter((issue) => !isCategoryUncertain(issue));
 
-  const missingAmount =
-    line.amountOre === null && !["summary", "vat"].includes(line.kind);
+  const otherIssues = issues.filter(
+    (issue) => issue.code !== "category_uncertain",
+  );
+
+  const missingAmount = line.amountOre === null && !isTotalsLine(line.kind);
 
   const missingName = line.kind === "product" && !line.name.trim();
   const [expanded, setExpanded] = useState(false);
@@ -167,7 +178,7 @@ export function ReceiptLineEditor({
     >
       <Pressable
         accessibilityRole="button"
-        accessibilityLabel={`${expanded ? "Skjul" : "Rediger"} ${line.name || "ny vare"}, ${formatMoney(line.amountOre)}`}
+        accessibilityLabel={`${expanded ? "Skjul" : "Rediger"} ${line.name || "ny vare"}, ${Ore.format(line.amountOre)}`}
         accessibilityState={{ expanded }}
         onPress={() => setExpanded(!expanded)}
         style={({ pressed: down }) => ({
@@ -186,7 +197,7 @@ export function ReceiptLineEditor({
           >
             {line.name || (missingName ? "Navn mangler" : "Ny vare")}
           </Copy>
-          {(kindLabel || (line.quantity && line.quantity !== 1)) && (
+          {!!(kindLabel || (line.quantity && line.quantity !== 1)) && (
             <Copy size={12} muted>
               {[
                 kindLabel,
@@ -209,7 +220,7 @@ export function ReceiptLineEditor({
             color: missingAmount ? colors.warning : colors.text,
           }}
         >
-          {missingAmount ? "Beløp?" : formatMoney(line.amountOre)}
+          {missingAmount ? "Beløp?" : Ore.format(line.amountOre)}
         </Copy>
         <Icon
           name={expanded ? "chevron.up" : "chevron.down"}
@@ -289,7 +300,7 @@ export function ReceiptLineEditor({
               label={priceSignalLabel(priceSignal)}
               icon={priceSignal.ratio > 1 ? "arrow.up" : "arrow.down"}
               tone={priceSignal.ratio > 1 ? "warning" : "success"}
-              accessibilityLabel={`${priceSignalLabel(priceSignal)}. Vanlig pris ${formatMoney(priceSignal.typicalOre)}`}
+              accessibilityLabel={`${priceSignalLabel(priceSignal)}. Vanlig pris ${Ore.format(Ore.round(priceSignal.typicalUnitPrice))}`}
             />
           )}
           <Pressable
@@ -366,16 +377,10 @@ export function ReceiptLineEditor({
         />
       )}
       {otherIssues
-        .filter(
-          (issue) =>
-            !(
-              showEditor &&
-              ["Beløpet mangler.", "Varenavnet mangler."].includes(issue)
-            ),
-        )
+        .filter((issue) => !(showEditor && isMissingLineField(issue)))
         .map((issue) => (
           <View
-            key={issue}
+            key={receiptIssueText(issue)}
             style={{ flexDirection: "row", alignItems: "center", gap: 6 }}
           >
             <Icon
@@ -384,7 +389,7 @@ export function ReceiptLineEditor({
               color={colors.warning}
             />
             <Copy size={13} style={{ color: colors.warning, flex: 1 }}>
-              {issue}
+              {receiptIssueText(issue)}
             </Copy>
           </View>
         ))}
@@ -419,7 +424,7 @@ export function ReceiptLineEditor({
                     ? "Produktkobling endret"
                     : "Endre produktkobling"
                 }
-                secondary
+                variant="secondary"
                 compact
                 onPress={() => setProductOpen(!productOpen)}
               />
@@ -504,7 +509,7 @@ export function ReceiptLineEditor({
               </Notice>
               <Button
                 title="Dette stemmer"
-                tint
+                variant="tint"
                 compact
                 icon="checkmark"
                 onPress={() => {
@@ -519,7 +524,12 @@ export function ReceiptLineEditor({
             </>
           )}
           {expanded && (
-            <Button title="Fjern linje" danger compact onPress={onRemove} />
+            <Button
+              title="Fjern linje"
+              variant="danger"
+              compact
+              onPress={onRemove}
+            />
           )}
         </View>
       )}
@@ -529,7 +539,7 @@ export function ReceiptLineEditor({
           <View style={{ flexDirection: "row", gap: 8 }}>
             <Button
               title="Dette stemmer"
-              tint
+              variant="tint"
               compact
               icon="checkmark"
               onPress={() => {
@@ -543,7 +553,7 @@ export function ReceiptLineEditor({
             />
             <Button
               title="Rediger"
-              secondary
+              variant="secondary"
               compact
               onPress={() => setExpanded(true)}
             />
@@ -589,7 +599,7 @@ function ProductSelector({
         <View style={{ flex: 1 }}>
           <Button
             title="Opprett eget produkt"
-            secondary
+            variant="secondary"
             compact
             onPress={() => onChange({ kind: "new_household" })}
           />
@@ -597,7 +607,7 @@ function ProductSelector({
         <View style={{ flex: 1 }}>
           <Button
             title="Hold varen separat"
-            secondary
+            variant="secondary"
             compact
             onPress={() => onChange({ kind: "separate" })}
           />

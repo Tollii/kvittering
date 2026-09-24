@@ -67,11 +67,8 @@ export function releaseError(
     );
   }
 
-  if (
-    data &&
-    (data.code === "UPDATE_REQUIRED" || data.code === "SERVICE_PAUSED") &&
-    "policy" in data
-  ) {
+  // The remaining codes block requests and carry the policy that explains why.
+  if (data && "policy" in data) {
     recordEvent("release.request_blocked", {
       ...fields,
       operation,

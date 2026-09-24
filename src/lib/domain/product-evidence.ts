@@ -64,8 +64,8 @@ export function parseProductEvidence(
 
   append(input.packageSize ?? 0, input.packageUnit ?? "", "field");
 
-  for (const match of input.name.matchAll(measurePattern))
-    append(Number(match[1].replace(",", ".")), match[2].toLowerCase(), "text");
+  for (const [, amount = "", unit = ""] of input.name.matchAll(measurePattern))
+    append(Number(amount.replace(",", ".")), unit.toLowerCase(), "text");
   const counts = new Set<number>();
 
   if (

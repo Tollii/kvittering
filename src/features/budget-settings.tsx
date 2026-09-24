@@ -1,3 +1,4 @@
+import { Ore } from "@/lib/domain/ore";
 import { releaseMutation } from "@/lib/releases/requests";
 import { useState } from "react";
 import { View } from "react-native";
@@ -5,8 +6,7 @@ import { useConvex } from "convex/react";
 import { api } from "../../convex/_generated/api";
 import { Button, Copy, Notice } from "@/components/ui";
 import { MoneyField } from "@/components/money-field";
-import { useHousehold } from "./session";
-import { formatMoney } from "@/lib/domain/receipt";
+import { useHousehold } from "./household-context";
 
 /** A single monthly number. Forbruk shows pace against it; Sunday's push reports it. */
 export function BudgetSettings() {
@@ -15,10 +15,10 @@ export function BudgetSettings() {
   const current = details?.household.monthlyBudgetOre ?? null;
   const [baseline, setBaseline] = useState(current);
   const [generation, setGeneration] = useState(0);
-  const [value, setValue] = useState<number | null>(current);
+  const [value, setValue] = useState<Ore | null>(current);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
-  const [pending, setPending] = useState<number | null | undefined>(undefined);
+  const [pending, setPending] = useState<Ore | null | undefined>(undefined);
   const [saved, setSaved] = useState(false);
   const dirty = value !== baseline || error !== null;
 
@@ -31,7 +31,7 @@ export function BudgetSettings() {
     setGeneration(generation + 1);
   }
 
-  async function save(next: number | null) {
+  async function save(next: Ore | null) {
     setBusy(true);
     setError(null);
 
@@ -68,7 +68,7 @@ export function BudgetSettings() {
           Budsjettet er endret på en annen enhet. Din verdi vises fortsatt.
         </Notice>
       )}
-      {!!error && <Notice error>{error}</Notice>}
+      {!!error && <Notice tone="error">{error}</Notice>}
       <View style={{ flexDirection: "row", gap: 8 }}>
         <View style={{ flex: 1 }}>
           <Button
@@ -82,7 +82,7 @@ export function BudgetSettings() {
           <View style={{ flex: 1 }}>
             <Button
               title="Fjern budsjett"
-              secondary
+              variant="secondary"
               disabled={!online || busy}
               onPress={() => void save(null)}
             />
@@ -91,7 +91,7 @@ export function BudgetSettings() {
       </View>
       {saved && current !== null && (
         <Copy size={13} muted>
-          {formatMoney(current)} per måned
+          {Ore.format(current)} per måned
         </Copy>
       )}
     </View>

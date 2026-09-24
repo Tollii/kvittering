@@ -5,6 +5,7 @@
   "jsPlugins": [{ "name": "kvitto", "specifier": "./tools/eslint/index.cjs" }],
   "rules": {
     "kvitto/no-undefined-record": "error",
+    "kvitto/no-effect-fetch": "error",
     "vitest/no-focused-tests": "error",
     "oxc/no-accumulating-spread": "error"
   },

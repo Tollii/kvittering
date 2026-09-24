@@ -1,3 +1,6 @@
+import { present } from "../src/lib/testing/receipts";
+import { parse } from "convex-helpers/validators";
+import { sendArgs as pushSendArgs } from "./pushDelivery";
 /// <reference types="vite/client" />
 import { convexTest } from "convex-test";
 import { afterEach, expect, it, vi } from "vitest";
@@ -28,7 +31,7 @@ it("keeps automatic approval silent and rejects an already queued success notifi
     ctx.db.patch("receipts", id, { status: "processing", generation: 1 }),
   );
   const data = batteryFixture();
-  data.lines[0].issues = ["Kategorien er usikker."];
+  present(data.lines[0]).issues = ["Kategorien er usikker."];
   await t.mutation(internal.processing.finish, {
     id,
     generation: 1,
@@ -136,7 +139,7 @@ it("schedules only the uploader once, and skips delivery after review, unsubscri
     ctx.db.patch("receipts", id, { status: "processing", generation: 1 }),
   );
   const data = batteryFixture();
-  data.lines[0].issues = ["Varenavnet er usikkert."];
+  present(data.lines[0]).issues = ["Varenavnet er usikkert."];
   const args = { id, generation: 1, data, original: data, provider: "fixture" };
   await t.mutation(internal.processing.finish, args);
   expect(
@@ -149,7 +152,7 @@ it("schedules only the uploader once, and skips delivery after review, unsubscri
   );
 
   expect(deliveries).toHaveLength(1);
-  const sendArgs = deliveries[0].args[0];
+  const sendArgs = parse(pushSendArgs, present(deliveries[0]).args[0]);
   expect(sendArgs.receiptId).toBe(id);
 
   const target = await t.query(internal.notifications.delivery, {
@@ -167,7 +170,7 @@ it("schedules only the uploader once, and skips delivery after review, unsubscri
   expect(
     await t.run((ctx) => ctx.db.system.query("_scheduled_functions").take(10)),
   ).toHaveLength(1);
-  data.lines[0].issues = [];
+  present(data.lines[0]).issues = [];
   await uploader.mutation(api.receipts.save, {
     id,
     revision: 0,
@@ -271,7 +274,7 @@ it("authorizes reminders before scheduling and replaces repeated requests", asyn
   );
 
   expect(reminders).toHaveLength(1);
-  expect(reminders[0].scheduledId).not.toBe(first!.scheduledId);
+  expect(present(reminders[0]).scheduledId).not.toBe(first!.scheduledId);
   expect(
     await t.run((ctx) =>
       ctx.db.system.get("_scheduled_functions", first!.scheduledId),
@@ -325,7 +328,13 @@ it("delivers a due reminder once and keeps receipt delivery private", async () =
     ctx.db.system.query("_scheduled_functions").collect(),
   );
 
-  expect(jobs.filter((job) => job.args[0]?.reviewOnly)).toHaveLength(1);
+  expect(
+    jobs.filter(
+      (job) =>
+        job.name === "pushDelivery:send" &&
+        parse(pushSendArgs, job.args[0]).reviewOnly,
+    ),
+  ).toHaveLength(1);
   expect(await t.query(internal.notifications.delivery, due)).not.toBeNull();
   await uploader.mutation(api.notifications.unsubscribe, subscription);
   expect(await t.query(internal.notifications.delivery, due)).toBeNull();
@@ -361,6 +370,12 @@ it("drops reminders after review, exclusion, or deletion", async () => {
       ctx.db.system.query("_scheduled_functions").collect(),
     );
 
-    expect(jobs.filter((job) => job.args[0]?.reviewOnly)).toEqual([]);
+    expect(
+      jobs.filter(
+        (job) =>
+          job.name === "pushDelivery:send" &&
+          parse(pushSendArgs, job.args[0]).reviewOnly,
+      ),
+    ).toEqual([]);
   }
 });

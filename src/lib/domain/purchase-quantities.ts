@@ -11,8 +11,6 @@ import {
   type ParsedProductEvidence,
 } from "./product-evidence";
 
-export { measure, type Measure } from "./product-evidence";
-
 export type QuantityEvidence = {
   receipt: ParsedProductEvidence;
   catalog:
@@ -118,23 +116,23 @@ export function purchaseCandidates(
       });
   }
 
-  for (const match of line.originalText.matchAll(
+  for (const [whole, text = "", unit = ""] of line.originalText.matchAll(
     /(?:^|\s)(\d+(?:[.,]\d+)?)\s*(kg|g|ml|cl|dl|l|stk|[x×])\b/gi,
   )) {
-    const amount = Number(match[1].replace(",", "."));
-    const value = measure(amount, match[2]);
+    const amount = Number(text.replace(",", "."));
+    const value = measure(amount, unit);
 
     if (value)
       candidates.push({
         ...value,
         kind: value.unit,
-        source: `Receipt text: ${match[0].trim()}`,
+        source: `Receipt text: ${whole.trim()}`,
       });
     else if (amount > 0)
       candidates.push({
         amount,
         kind: "packages",
-        source: `Receipt text: ${match[0].trim()}`,
+        source: `Receipt text: ${whole.trim()}`,
       });
   }
 

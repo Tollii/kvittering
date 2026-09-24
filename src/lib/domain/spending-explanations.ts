@@ -1,5 +1,5 @@
+import { Ore } from "./ore";
 import type { spendingAnalysis } from "./spending-analysis";
-import { formatMoney } from "./receipt";
 import type { SpendingGroup } from "./insights";
 
 export type SpendingExplanation = SpendingGroup & { detail: string };
@@ -38,9 +38,9 @@ export function spendingExplanations(
         id: `${kind}:${effect.id}`,
         name: `${effect.name} · begge perioder`,
         // The detail sheet totals the supporting purchases from both periods.
-        amountOre: effect.currentOre + effect.previousOre,
+        amountOre: Ore.add(effect.currentOre, effect.previousOre),
         contributions: effect.contributions,
-        detail: `${change}. Bidrag til endringen: ${formatMoney(amount)}.`,
+        detail: `${change}. Bidrag til endringen: ${Ore.format(amount)}.`,
       });
     }
   }
@@ -49,7 +49,7 @@ export function spendingExplanations(
     explanations.push({
       ...purchase,
       id: `current:${purchase.id}`,
-      detail: `${formatMoney(purchase.amountOre)} i denne perioden. Produktfamilien er ikke identifisert i forrige periode.`,
+      detail: `${Ore.format(purchase.amountOre)} i denne perioden. Produktfamilien er ikke identifisert i forrige periode.`,
     });
   }
 

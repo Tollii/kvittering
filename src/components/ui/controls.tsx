@@ -63,12 +63,12 @@ export function IconButton({
   );
 }
 
+export type ButtonVariant = "primary" | "secondary" | "tint" | "danger";
+
 export function Button({
   title,
   onPress,
-  secondary = false,
-  tint = false,
-  danger = false,
+  variant = "primary",
   disabled = false,
   busy = false,
   compact = false,
@@ -77,10 +77,8 @@ export function Button({
 }: Readonly<{
   title: string;
   onPress: () => void;
-  secondary?: boolean;
-  /** Soft cobalt background for a secondary action. */
-  tint?: boolean;
-  danger?: boolean;
+  /** `tint` is a soft cobalt background for a secondary action. */
+  variant?: ButtonVariant;
   disabled?: boolean;
   busy?: boolean;
   compact?: boolean;
@@ -89,21 +87,12 @@ export function Button({
 }>) {
   const colors = useTheme();
 
-  const foreground = danger
-    ? colors.danger
-    : secondary
-      ? colors.text
-      : tint
-        ? colors.primary
-        : colors.onPrimary;
-
-  const background = danger
-    ? colors.dangerSoft
-    : secondary
-      ? colors.muted
-      : tint
-        ? colors.primarySoft
-        : colors.primary;
+  const { foreground, background } = {
+    primary: { foreground: colors.onPrimary, background: colors.primary },
+    secondary: { foreground: colors.text, background: colors.muted },
+    tint: { foreground: colors.primary, background: colors.primarySoft },
+    danger: { foreground: colors.danger, background: colors.dangerSoft },
+  }[variant];
 
   return (
     <Pressable
@@ -270,7 +259,7 @@ export function Field({
             <Button
               title="Ferdig"
               compact
-              secondary
+              variant="secondary"
               onPress={Keyboard.dismiss}
             />
           </View>

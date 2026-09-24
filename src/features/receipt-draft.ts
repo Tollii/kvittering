@@ -49,6 +49,28 @@ export type ReceiptDraftAction =
   | { type: "failed"; error: string }
   | { type: "finished" | "deleted" };
 
+/** A save was sent and its result is not yet reflected in the snapshot. */
+function isSaveInFlight(operation: Operation): boolean {
+  return operation.kind === "saving" || operation.kind === "awaiting-snapshot";
+}
+
+/** A save, delete, or other request to the server has not returned. */
+function isRequestRunning(operation: Operation): boolean {
+  return (
+    operation.kind === "saving" ||
+    operation.kind === "deleting" ||
+    operation.kind === "working"
+  );
+}
+
+/** The editor accepts no new action until the current one settles. */
+export function isDraftBusy(draft: ReceiptDraft): boolean {
+  return (
+    isRequestRunning(draft.operation) ||
+    draft.operation.kind === "awaiting-snapshot"
+  );
+}
+
 export function createReceiptDraft(receipt: Receipt): ReceiptDraft {
   return {
     baseline: receipt,
@@ -100,7 +122,7 @@ export function reduceReceiptDraft(
     values: { ...state.values, ...values },
     dirty: true,
     editVersion: state.editVersion + 1,
-    operation: ["saving", "awaiting-snapshot"].includes(state.operation.kind)
+    operation: isSaveInFlight(state.operation)
       ? state.operation
       : { kind: "idle" },
   });
@@ -180,11 +202,7 @@ export function reduceReceiptDraft(
       if (state.operation.kind === "awaiting-snapshot")
         return acceptSavedSnapshot(next);
 
-      if (
-        state.dirty ||
-        ["saving", "deleting", "working"].includes(state.operation.kind)
-      )
-        return next;
+      if (state.dirty || isRequestRunning(state.operation)) return next;
 
       return {
         ...createReceiptDraft(action.receipt),

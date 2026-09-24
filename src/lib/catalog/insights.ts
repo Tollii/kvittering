@@ -1,3 +1,4 @@
+import { Ore } from "../domain/ore";
 import {
   preparePurchases,
   overviewPurchasePolicy,
@@ -23,11 +24,11 @@ export function catalogInsights(receipts: Receipt[]) {
     const group = groups.get(id) ?? {
       id,
       name,
-      amountOre: 0,
+      amountOre: Ore.zero,
       contributions: [],
     };
 
-    group.amountOre += contribution.amountOre;
+    group.amountOre = Ore.add(group.amountOre, contribution.amountOre);
     group.contributions.push(contribution);
     groups.set(id, group);
   }
@@ -64,7 +65,7 @@ export function catalogInsights(receipts: Receipt[]) {
   }
 
   const sorted = (groups: Map<string, SpendingGroup>) =>
-    [...groups.values()].sort((a, b) => b.amountOre - a.amountOre);
+    [...groups.values()].sort((a, b) => Ore.compare(b.amountOre, a.amountOre));
 
   return {
     linked,

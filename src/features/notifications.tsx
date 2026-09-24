@@ -17,9 +17,12 @@ import { router } from "expo-router";
 import { useConvex, useQuery, type ConvexReactClient } from "convex/react";
 import { api } from "../../convex/_generated/api";
 import { Button, Copy, Notice } from "@/components/ui";
-import { useHousehold } from "./session";
+import { useHousehold } from "./household-context";
 
 const tokenKey = "kvitto.push-token";
+
+/** Expo types app config `extra` as `any`. */
+const easExtra = z.object({ eas: z.object({ projectId: z.string() }) });
 
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
@@ -52,7 +55,7 @@ export function NotificationSettings() {
   );
 
   const projectId =
-    Constants.expoConfig?.extra?.eas?.projectId ??
+    easExtra.safeParse(Constants.expoConfig?.extra).data?.eas.projectId ??
     Constants.easConfig?.projectId;
 
   const available =
@@ -126,8 +129,7 @@ export function NotificationSettings() {
       {available && (
         <Button
           title={enabled ? "Slå av varsler" : "Slå på varsler"}
-          tint={!enabled}
-          secondary={!!enabled}
+          variant={enabled ? "secondary" : "tint"}
           icon={enabled ? "bell.slash" : "bell"}
           busy={busy}
           onPress={() => void change()}
@@ -135,12 +137,12 @@ export function NotificationSettings() {
       )}
       {!granted && (
         <Button
-          secondary
+          variant="secondary"
           title="Åpne innstillinger"
           onPress={() => void Linking.openSettings()}
         />
       )}
-      {!!error && <Notice error>{error}</Notice>}
+      {!!error && <Notice tone="error">{error}</Notice>}
     </View>
   );
 }
@@ -151,7 +153,9 @@ export function NotificationRouting() {
   const [error, setError] = useState("");
   const [confirmation, setConfirmation] = useState("");
   useEffect(() => {
-    let active = true;
+    // Aborted when the effect is cleaned up; pending work then stops.
+    const effect = new AbortController();
+    const stopped = () => effect.signal.aborted;
     const handled = new Set<string>();
     void Notifications.setNotificationCategoryAsync(receiptReviewCategory, [
       {
@@ -203,7 +207,7 @@ export function NotificationRouting() {
 
         if (!result) throw new Error("Receipt unavailable");
 
-        if (!active) return;
+        if (stopped()) return;
 
         if (result.receipt.householdId !== household.id)
           throw new Error("Receipt unavailable");
@@ -211,7 +215,7 @@ export function NotificationRouting() {
         if (response.actionIdentifier === remindReceiptAction) {
           const token = await SecureStore.getItemAsync(tokenKey);
 
-          if (!active) return;
+          if (stopped()) return;
 
           if (!token) throw new Error("Notifications disabled");
           const evening = nextReviewEvening(new Date());
@@ -221,7 +225,7 @@ export function NotificationRouting() {
             at: evening.getTime(),
           });
 
-          if (active)
+          if (!stopped())
             setConfirmation(
               `Påminnelse satt til ${evening.toLocaleString("nb-NO", { day: "numeric", month: "long", hour: "2-digit", minute: "2-digit" })}.`,
             );
@@ -231,7 +235,7 @@ export function NotificationRouting() {
       } catch (cause) {
         reportError(cause, "notifications.response");
 
-        if (active)
+        if (!stopped())
           setError(
             response.actionIdentifier === remindReceiptAction
               ? "Kunne ikke sette påminnelsen. Kontroller nettet og at varsler er på og kvitteringen fortsatt trenger kontroll."
@@ -253,13 +257,13 @@ export function NotificationRouting() {
     );
 
     return () => {
-      active = false;
+      effect.abort();
       subscription.remove();
     };
   }, [client, household.id]);
 
   return error ? (
-    <Notice error>{error}</Notice>
+    <Notice tone="error">{error}</Notice>
   ) : confirmation ? (
     <Notice>{confirmation}</Notice>
   ) : null;

@@ -1,4 +1,5 @@
-import { receiptFixture, testId } from "../testing/receipts";
+import { present, receiptFixture, testId } from "../testing/receipts";
+import { Ore } from "./ore";
 import { expect, it } from "vitest";
 import {
   matchingKey,
@@ -53,8 +54,8 @@ it("rejects conflicting sizes, brands and zero variants before semantic matching
 it("groups linked products across receipt descriptions and keeps unknown items separate", () => {
   const data = batteryFixture();
   const id = testId<"products">("product-id");
-  data.lines[0].productId = id;
-  data.lines[0].productName = "Battery Remix";
+  present(data.lines[0]).productId = id;
+  present(data.lines[0]).productName = "Battery Remix";
   const first = receiptFixture({ _id: "first", data });
 
   const second = receiptFixture({
@@ -62,21 +63,21 @@ it("groups linked products across receipt descriptions and keeps unknown items s
     _id: "second",
     data: {
       ...data,
-      totalOre: 3131,
+      totalOre: Ore.of(3131),
       lines: data.lines.map((l) => ({
         ...l,
         name: l.id === "battery" ? "BAT REMIX" : l.name,
-        amountOre: l.id === "battery" ? 3190 : l.amountOre,
+        amountOre: l.id === "battery" ? Ore.of(3190) : l.amountOre,
       })),
     },
   });
 
   const history = productHistory([first, second]);
   expect(history).toHaveLength(1);
-  expect(history[0].purchases.size).toBe(2);
-  expect(history[0].amountOre).toBe(5262);
-  expect(history[0].name).toBe("Battery Remix");
-  expect(history[0].contributions.map((c) => c.amountOre)).toEqual([
+  expect(present(history[0]).purchases.size).toBe(2);
+  expect(present(history[0]).amountOre).toBe(5262);
+  expect(present(history[0]).name).toBe("Battery Remix");
+  expect(present(history[0]).contributions.map((c) => c.amountOre)).toEqual([
     2331, 2931,
   ]);
 

@@ -1,3 +1,4 @@
+import { soleElement } from "../domain/collections";
 import {
   parseProductEvidence,
   normalizeMeasureText,
@@ -12,6 +13,27 @@ import type { CatalogProduct, PhysicalStore } from "./model";
 import { normalizeSearch } from "./policy";
 import { productSearch } from "./search";
 import { organicProduct } from "./equivalence";
+
+/** Container words that differ between listings of the same product. */
+const containerWords = new Set(["flaske", "boks", "pet"]);
+
+/** Package and marketing words that do not distinguish products. */
+const neutralWords = new Set([
+  "x",
+  "pk",
+  "stk",
+  "bx",
+  "sugar",
+  "sukker",
+  "original",
+  "classic",
+  "regular",
+  "sleek",
+  "glass",
+  "kartong",
+  "beger",
+  "pose",
+]);
 
 export { productSearch } from "./search";
 
@@ -84,7 +106,7 @@ function productWords(name: string) {
     normalizeMeasureText(productSearch(name))
       .replace(/\b(uten sukker|sugar free|sukkerfri)\b/g, "zero")
       .split(/[^\p{L}\p{N}]+/u)
-      .filter((word) => word && !["flaske", "boks", "pet"].includes(word)),
+      .filter((word) => word && !containerWords.has(word)),
   );
 }
 
@@ -115,22 +137,7 @@ export function rankCatalogProducts(name: string, products: CatalogProduct[]) {
 function neutralWord(word: string) {
   return (
     /^\d+(?:[.,]\d+)?(?:g|ml|pk|stk|bx|x)?$/.test(word) ||
-    [
-      "x",
-      "pk",
-      "stk",
-      "bx",
-      "sugar",
-      "sukker",
-      "original",
-      "classic",
-      "regular",
-      "sleek",
-      "glass",
-      "kartong",
-      "beger",
-      "pose",
-    ].includes(word)
+    neutralWords.has(word)
   );
 }
 
@@ -190,10 +197,11 @@ export function automaticCatalogProduct(
       .map(({ product }) => product),
   );
 
-  if (contained.length)
-    return contained.length === 1 && !hasUnresolvedCount(contained[0])
-      ? contained[0]
-      : null;
+  if (contained.length) {
+    const only = soleElement(contained);
+
+    return only && !hasUnresolvedCount(only) ? only : null;
+  }
 
   const candidates = unique(
     ranked
@@ -208,10 +216,9 @@ export function automaticCatalogProduct(
       .map(({ product }) => product),
   );
 
-  if (candidates.length !== 1) return null;
-  const candidate = candidates[0];
+  const candidate = soleElement(candidates);
 
-  if (!candidate.ean || !candidate.brand || hasUnresolvedCount(candidate))
+  if (!candidate?.ean || !candidate.brand || hasUnresolvedCount(candidate))
     return null;
   const brandWords = productWords(candidate.brand);
 

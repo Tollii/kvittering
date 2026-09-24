@@ -1,3 +1,4 @@
+import { present } from "../testing/receipts";
 import { expect, it } from "vitest";
 import { parse } from "convex-helpers/validators";
 import {
@@ -17,14 +18,16 @@ import { requestKey, resultLifetime, day } from "./policy";
 import { catalogProductValidator, emptyCatalogResult } from "./model";
 
 it("parses missing and null provider metadata into optional catalog fields", () => {
-  const [missing, nullable] = normalizeProducts({
+  const products = normalizeProducts({
     data: [
       { id: 1, name: "Fresh baguette" },
       { id: 2, name: "Fresh baguette", brand: null, weight: null, image: null },
     ],
   });
 
-  for (const product of [missing, nullable]) {
+  expect(products).toHaveLength(2);
+
+  for (const product of products) {
     expect(parse(catalogProductValidator, product)).toEqual(product);
     expect(product.brand).toBeUndefined();
     expect(product.weight).toBeUndefined();
@@ -32,7 +35,7 @@ it("parses missing and null provider metadata into optional catalog fields", () 
   }
 
   expect(() =>
-    parse(catalogProductValidator, { ...missing, brand: null }),
+    parse(catalogProductValidator, { ...present(products[0]), brand: null }),
   ).toThrow(Error);
 });
 
@@ -59,19 +62,21 @@ it("combines listings with the same EAN while retaining distinct variants and un
     ingredients: "Kakao",
     image: "https://example.com/product.png",
   });
-  expect(products[2].key).not.toBe(products[3].key);
+  expect(present(products[2]).key).not.toBe(present(products[3]).key);
 });
 
 it("rejects conflicting size, brand and sugar-free variants", () => {
-  const product = normalizeProducts({
-    data: {
-      id: 1,
-      name: "Cola Zero",
-      brand: "Example",
-      weight: 500,
-      weight_unit: "ml",
-    },
-  })[0];
+  const product = present(
+    normalizeProducts({
+      data: {
+        id: 1,
+        name: "Cola Zero",
+        brand: "Example",
+        weight: 500,
+        weight_unit: "ml",
+      },
+    })[0],
+  );
 
   const line = { ...emptyLine(), name: "Cola Zero 50cl", brand: "Example" };
   expect(compatibleCatalogProduct(line, product)).toBe(true);
@@ -118,19 +123,23 @@ it("links ordinary Coca-Cola by receipt text even when Light is the first search
   });
 
   const line = { ...emptyLine(), name: "COCA-COLA 500ML" };
-  expect(rankCatalogProducts(line.name, products)[0].product.key).toBe(
-    products[1].key,
+  expect(present(rankCatalogProducts(line.name, products)[0]).product.key).toBe(
+    present(products[1]).key,
   );
-  expect(automaticCatalogProduct(line, products)?.key).toBe(products[1].key);
+  expect(automaticCatalogProduct(line, products)?.key).toBe(
+    present(products[1]).key,
+  );
   expect(
     automaticCatalogProduct({ ...line, name: "Coca Cola 0,5L" }, products)?.key,
-  ).toBe(products[1].key);
-  expect(compatibleCatalogProduct(line, products[0])).toBe(false);
-  expect(automaticCatalogProduct(line, [products[0], products[2]])).toBeNull();
+  ).toBe(present(products[1]).key);
+  expect(compatibleCatalogProduct(line, present(products[0]))).toBe(false);
+  expect(
+    automaticCatalogProduct(line, [present(products[0]), present(products[2])]),
+  ).toBeNull();
   expect(
     automaticCatalogProduct(line, [
       ...products,
-      { ...products[1], key: "ean:12345678", ean: "12345678" },
+      { ...present(products[1]), key: "ean:12345678", ean: "12345678" },
     ]),
   ).toBeNull();
 });
@@ -144,7 +153,9 @@ it("links the only compatible product when package evidence agrees and additions
   });
 
   const line = { ...emptyLine(), name: "BATTERY WHIRL" };
-  expect(automaticCatalogProduct(line, products)?.key).toBe(products[0].key);
+  expect(automaticCatalogProduct(line, products)?.key).toBe(
+    present(products[0]).key,
+  );
   // A second size makes the receipt ambiguous again.
   expect(
     automaticCatalogProduct(line, [
@@ -174,7 +185,7 @@ it("links the only compatible product when package evidence agrees and additions
 
   expect(
     automaticCatalogProduct({ ...line, name: "COCA-COLA10PK BX" }, cola)?.key,
-  ).toBe(cola[0].key);
+  ).toBe(present(cola[0]).key);
 });
 
 it("does not let an exact name hide an unresolved size or pack alternative", () => {
@@ -195,13 +206,15 @@ it("does not let an exact name hide an unresolved size or pack alternative", () 
   });
 
   expect(automaticCatalogProduct(line, products.slice(0, 2))).toBeNull();
-  expect(automaticCatalogProduct(line, [products[0], products[2]])).toBeNull();
-  expect(automaticCatalogProduct(line, [products[2]])).toBeNull();
-  expect(compatibleCatalogProduct(line, products[2])).toBe(true);
+  expect(
+    automaticCatalogProduct(line, [present(products[0]), present(products[2])]),
+  ).toBeNull();
+  expect(automaticCatalogProduct(line, [present(products[2])])).toBeNull();
+  expect(compatibleCatalogProduct(line, present(products[2]))).toBe(true);
   expect(
     compatibleCatalogProduct(
       { ...line, packageSize: 10, packageUnit: "pk" },
-      products[2],
+      present(products[2]),
     ),
   ).toBe(false);
 });
@@ -232,7 +245,7 @@ it("keeps multipacks, flavours, generic fresh food and missing package evidence 
   });
 
   const line = { ...emptyLine(), name: "COCA-COLA 500ML" };
-  expect(compatibleCatalogProduct(line, products[0])).toBe(true);
+  expect(compatibleCatalogProduct(line, present(products[0]))).toBe(true);
   expect(automaticCatalogProduct(line, products)).toBeNull();
   expect(
     automaticCatalogProduct({ ...line, name: "Agurk" }, products),
@@ -243,7 +256,7 @@ it("keeps multipacks, flavours, generic fresh food and missing package evidence 
   expect(
     compatibleCatalogProduct(
       { ...line, name: "COCA-COLA10PK BX", packageSize: 10, packageUnit: "pk" },
-      products[3],
+      present(products[3]),
     ),
   ).toBe(true);
 });
@@ -309,11 +322,15 @@ it.each([
   { name: "STRATOS SPRØTT", brand: "Freia" },
 ])("does not infer identity from one search result: %j", (evidence) => {
   const line = { ...stratosLine, ...evidence, receiptName: evidence.name };
-  expect(automaticCatalogProduct(line, [stratosProducts[0]])).toBeNull();
+  expect(
+    automaticCatalogProduct(line, [present(stratosProducts[0])]),
+  ).toBeNull();
 });
 
 it("requires a barcode for a branded match with additional catalog words", () => {
-  expect(automaticCatalogProduct(stratosLine, [stratosProducts[1]])).toBeNull();
+  expect(
+    automaticCatalogProduct(stratosLine, [present(stratosProducts[1])]),
+  ).toBeNull();
 });
 
 it("requires a unique branch match and keeps price data separate from product identity", () => {
@@ -330,7 +347,10 @@ it("requires a unique branch match and keeps price data separate from product id
 
   expect(exactPhysicalStore("Majorstuen", stores)?.id).toBe(1);
   expect(
-    exactPhysicalStore("Majorstuen", [...stores, { ...stores[0], id: 2 }]),
+    exactPhysicalStore("Majorstuen", [
+      ...stores,
+      { ...present(stores[0]), id: 2 },
+    ]),
   ).toBeNull();
 
   const result = normalizePrices({
@@ -358,5 +378,5 @@ it("recovers an omitted weight unit only from an explicit, consistent product na
   });
 
   expect(result[0]).toMatchObject({ weight: 150, weightUnit: "g" });
-  expect(result[1].weightUnit).toBeUndefined();
+  expect(present(result[1]).weightUnit).toBeUndefined();
 });

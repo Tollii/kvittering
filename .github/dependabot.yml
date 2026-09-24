@@ -1,0 +1,35 @@
+# Dependency updates arrive as pull requests that run the same quality checks.
+# Expo SDK packages move together through `npx expo install --fix`, so their
+# major and minor versions are not proposed individually.
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 5
+    groups:
+      development:
+        dependency-type: development
+        update-types: [minor, patch]
+      production-patches:
+        dependency-type: production
+        update-types: [patch]
+    ignore:
+      - dependency-name: "expo"
+        update-types: [version-update:semver-major, version-update:semver-minor]
+      - dependency-name: "expo-*"
+        update-types: [version-update:semver-major, version-update:semver-minor]
+      - dependency-name: "@expo/*"
+        update-types: [version-update:semver-major, version-update:semver-minor]
+      - dependency-name: "react"
+        update-types: [version-update:semver-major, version-update:semver-minor]
+      - dependency-name: "react-native"
+        update-types: [version-update:semver-major, version-update:semver-minor]
+      - dependency-name: "react-native-*"
+        update-types: [version-update:semver-major, version-update:semver-minor]
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: monthly

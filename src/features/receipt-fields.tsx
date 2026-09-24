@@ -48,7 +48,7 @@ export function ReceiptFields({
       onClose={close}
       footer={
         <>
-          {!!totalError && <Notice error>{totalError}</Notice>}
+          {!!totalError && <Notice tone="error">{totalError}</Notice>}
           <Button
             title="Ferdig"
             icon="checkmark"
@@ -116,11 +116,10 @@ export function ReceiptFields({
               onValueChange={(_event, date) => {
                 if (Platform.OS !== "ios") setShowDate(false);
 
-                if (date)
-                  onChange({
-                    ...data,
-                    purchaseDate: `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`,
-                  });
+                onChange({
+                  ...data,
+                  purchaseDate: `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`,
+                });
               }}
             />
           )}

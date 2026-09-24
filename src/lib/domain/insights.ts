@@ -1,3 +1,4 @@
+import { Ore } from "./ore";
 import { productIdentityKey, productReference } from "./product-reference";
 import {
   preparePurchases,
@@ -14,8 +15,13 @@ export type Receipt = Doc<"receipts">;
 export type Contribution = {
   receipt: Receipt;
   line: ReceiptLine | null;
-  amountOre: number;
+  amountOre: Ore;
 };
+
+/** A receipt contributes once per line, or once as a whole when it has no lines. */
+export function contributionKey({ receipt, line }: Contribution) {
+  return `${receipt._id}:${line?.id ?? "receipt"}`;
+}
 
 /** A prepared purchase's contribution: its receipt was read and its line is known. */
 export type PurchaseContribution = Contribution & {
@@ -26,16 +32,21 @@ export type PurchaseContribution = Contribution & {
 export type SpendingGroup = {
   id: string;
   name: string;
-  amountOre: number;
+  amountOre: Ore;
   contributions: Contribution[];
 };
 
-export function monthBefore(month: string) {
-  const [year, number] = month.split("-").map(Number);
-  const date = new Date(Date.UTC(year, number - 2, 1));
+/** The "YYYY-MM" month `offset` months after `month`. */
+export function shiftMonth(month: string, offset: number) {
+  const year = Number(month.slice(0, 4));
+  const number = Number(month.slice(5, 7));
 
-  return date.toISOString().slice(0, 7);
+  return new Date(Date.UTC(year, number - 1 + offset, 1))
+    .toISOString()
+    .slice(0, 7);
 }
+
+export const monthBefore = (month: string) => shiftMonth(month, -1);
 
 export function receiptMonth(receipt: Receipt) {
   return receipt.data?.purchaseDate?.slice(0, 7) ?? null;
@@ -62,11 +73,11 @@ export function monthlyInsights(
   const category = new Map<string, SpendingGroup>();
   const stores = new Map<string, SpendingGroup>();
 
-  let paid = 0,
-    products = 0,
-    discounts = 0,
-    deposits = 0,
-    returns = 0,
+  let paid = Ore.zero,
+    products = Ore.zero,
+    discounts = Ore.zero,
+    deposits = Ore.zero,
+    returns = Ore.zero,
     unknownTotals = 0,
     unknownAmounts = 0;
 
@@ -76,19 +87,25 @@ export function monthlyInsights(
     name: string,
     contribution: Contribution,
   ) => {
-    const group = map.get(id) ?? { id, name, amountOre: 0, contributions: [] };
-    group.amountOre += contribution.amountOre;
+    const group = map.get(id) ?? {
+      id,
+      name,
+      amountOre: Ore.zero,
+      contributions: [],
+    };
+
+    group.amountOre = Ore.add(group.amountOre, contribution.amountOre);
     group.contributions.push(contribution);
     map.set(id, group);
   };
 
   for (const { receipt, data, totals, purchases, unallocated } of prepared) {
     unknownAmounts += totals.unknown;
-    paid += data.totalOre ?? 0;
-    products += totals.productSpending;
-    discounts += totals.discounts;
-    deposits += totals.deposits;
-    returns += totals.returns;
+    paid = Ore.add(paid, data.totalOre ?? Ore.zero);
+    products = Ore.add(products, totals.productSpending);
+    discounts = Ore.add(discounts, totals.discounts);
+    deposits = Ore.add(deposits, totals.deposits);
+    returns = Ore.add(returns, totals.returns);
 
     if (data.totalOre === null) unknownTotals++;
 
@@ -184,11 +201,15 @@ export function monthlyInsights(
       (receipt) => receipt.duplicateOf && !receipt.duplicateResolved,
     ),
     provisional: selected.filter((r) => r.status !== "reviewed").length,
-    categories: [...category.values()].sort(
-      (a, b) => b.amountOre - a.amountOre,
+    categories: [...category.values()].sort((a, b) =>
+      Ore.compare(b.amountOre, a.amountOre),
     ),
-    groups: [...groups.values()].sort((a, b) => b.amountOre - a.amountOre),
-    stores: [...stores.values()].sort((a, b) => b.amountOre - a.amountOre),
+    groups: [...groups.values()].sort((a, b) =>
+      Ore.compare(b.amountOre, a.amountOre),
+    ),
+    stores: [...stores.values()].sort((a, b) =>
+      Ore.compare(b.amountOre, a.amountOre),
+    ),
     undated: receipts.filter(
       (r) => !r.excluded && r.data && !r.data.purchaseDate,
     ),
@@ -204,7 +225,7 @@ export function productHistory(receipts: Receipt[]) {
       linked: boolean;
       quantity: number;
       purchases: Set<string>;
-      amountOre: number;
+      amountOre: Ore;
       contributions: Contribution[];
     }
   >();
@@ -223,11 +244,11 @@ export function productHistory(receipts: Receipt[]) {
         linked: productIdentityKey(line) !== null,
         quantity: 0,
         purchases: new Set<string>(),
-        amountOre: 0,
+        amountOre: Ore.zero,
         contributions: [],
       };
 
-      product.amountOre += line.netOre;
+      product.amountOre = Ore.add(product.amountOre, line.netOre);
       product.quantity += line.quantity ?? 0;
       product.purchases.add(receipt._id);
       product.contributions.push({ receipt, line, amountOre: line.netOre });
@@ -235,7 +256,9 @@ export function productHistory(receipts: Receipt[]) {
     }
   }
 
-  return [...products.values()].sort((a, b) => b.amountOre - a.amountOre);
+  return [...products.values()].sort((a, b) =>
+    Ore.compare(b.amountOre, a.amountOre),
+  );
 }
 
 /** Current months compare equal calendar ranges; completed months compare in full. */
@@ -282,14 +305,17 @@ export function comparisonInsights(
       return {
         id,
         name,
-        current: now?.amountOre ?? 0,
-        previous: before?.amountOre ?? 0,
-        difference: (now?.amountOre ?? 0) - (before?.amountOre ?? 0),
+        current: now?.amountOre ?? Ore.zero,
+        previous: before?.amountOre ?? Ore.zero,
+        difference: Ore.subtract(
+          now?.amountOre ?? Ore.zero,
+          before?.amountOre ?? Ore.zero,
+        ),
         currentContributions: now?.contributions ?? [],
         previousContributions: before?.contributions ?? [],
       };
     })
-    .sort((a, b) => Math.abs(b.difference) - Math.abs(a.difference));
+    .sort((a, b) => Ore.compare(Ore.abs(b.difference), Ore.abs(a.difference)));
 
   return { current, previous, currentEnd, previousEnd, partial, changes };
 }
@@ -342,21 +368,14 @@ export function productPrices(contributions: Contribution[]) {
           b.contribution.receipt._creationTime,
     );
 
-  const sorted = observations.map((p) => p.ore).sort((a, b) => a - b);
-  const middle = Math.floor(sorted.length / 2);
-
-  const typical = !sorted.length
-    ? null
-    : sorted.length % 2
-      ? sorted[middle]
-      : Math.round((sorted[middle - 1] + sorted[middle]) / 2);
+  const amounts = observations.map((p) => p.ore);
 
   return {
     observations,
     omitted: contributions.length - observations.length,
     latest: observations.at(-1)?.ore ?? null,
-    lowest: sorted[0] ?? null,
-    typical,
+    lowest: amounts.length ? Ore.min(amounts) : null,
+    typical: Ore.median(amounts),
   };
 }
 
@@ -371,7 +390,7 @@ export function spendingCalendar(
     string,
     {
       date: string;
-      amountOre: number;
+      amountOre: Ore;
       contributions: Contribution[];
       provisional: number;
       unknown: number;
@@ -386,7 +405,7 @@ export function spendingCalendar(
     const key = date.toISOString().slice(0, 10);
     days.set(key, {
       date: key,
-      amountOre: 0,
+      amountOre: Ore.zero,
       contributions: [],
       provisional: 0,
       unknown: 0,
@@ -403,7 +422,7 @@ export function spendingCalendar(
     const day = days.get(date);
 
     if (!day) continue;
-    day.amountOre += totals.productSpending;
+    day.amountOre = Ore.add(day.amountOre, totals.productSpending);
     day.unknown += totals.unknown;
     day.provisional += receipt.status === "reviewed" ? 0 : 1;
     day.contributions.push({
@@ -413,17 +432,14 @@ export function spendingCalendar(
     });
   }
 
-  const maximum = Math.max(
-    0,
-    ...[...days.values()].map((day) => day.amountOre),
-  );
+  const maximum = Ore.max([...days.values()].map((day) => day.amountOre));
 
   return [...days.values()].map((day) => ({
     ...day,
     future: day.date > today,
     level:
       day.amountOre > 0 && maximum > 0
-        ? Math.max(1, Math.ceil((day.amountOre / maximum) * 4))
+        ? Math.max(1, Math.ceil(Ore.ratio(day.amountOre, maximum) * 4))
         : 0,
   }));
 }

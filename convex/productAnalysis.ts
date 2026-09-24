@@ -1,4 +1,5 @@
 import { userError } from "./userErrors";
+import { hasReceiptBeenRead } from "../src/lib/domain/receipt-state";
 import { featureEnabled } from "./featureFlags";
 import { clientMutation as mutation } from "./clientFunctions";
 import { productAttributesValidator } from "../src/lib/domain/product-attributes";
@@ -98,7 +99,7 @@ async function launch(
     !receipt.data ||
     receipt.excluded ||
     receipt.catalogStatus === "pending" ||
-    !["reviewed", "needs_review"].includes(receipt.status) ||
+    !hasReceiptBeenRead(receipt.status) ||
     !env.TYPESAFE_API_KEY
   )
     return "ineligible" as const;

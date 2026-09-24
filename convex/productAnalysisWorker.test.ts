@@ -1,10 +1,11 @@
+import { present } from "../src/lib/testing/receipts";
 import { expect, it } from "vitest";
 import { batteryFixture } from "../src/lib/domain/receipt";
 import { profileDecision, profileQuestions } from "./productAnalysisWorker";
 
 it("scopes independent profile questions and rejects an incomplete response", () => {
   const context = {
-    line: batteryFixture().lines[0],
+    line: present(batteryFixture().lines[0]),
     profile: null,
     families: [],
     catalog: null,

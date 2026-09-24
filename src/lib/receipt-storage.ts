@@ -133,7 +133,7 @@ export function saveLocalReceipts(
           const name = `${id}-${position}.jpg`;
           const file = imageFile(name);
           files.push(file);
-          new File(uri).copy(file);
+          new File(uri).copySync(file);
 
           return name;
         });

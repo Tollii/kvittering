@@ -64,36 +64,41 @@ export async function classifyCatalogProducts(
     };
   });
 
-  const results: CatalogDecision[] = prepared.map((item) => ({
-    lineId: item.line.id,
-    evidenceKey: lineEvidenceKey(item.line),
-    productKey: item.match?.key ?? null,
-    equivalentKeys: item.match?.equivalence?.candidateKeys,
-    categoryId: null,
-    categoryConfidence: 0,
-    candidates: item.candidates.map((product) => ({
-      key: product.key,
-      name: product.name,
-      probability: null,
-      compatible: compatibleCatalogProduct(item.line, product),
-    })),
-    reason: item.product
-      ? "saved_match"
-      : item.match
-        ? item.match.equivalence
-          ? "equivalent_match"
-          : "exact_match"
-        : item.candidates.length
-          ? "unavailable"
-          : "no_candidates",
-  }));
+  // Each prepared line carries the decision it produces.
+  const entries = prepared.map((item) => {
+    const result: CatalogDecision = {
+      lineId: item.line.id,
+      evidenceKey: lineEvidenceKey(item.line),
+      productKey: item.match?.key ?? null,
+      equivalentKeys: item.match?.equivalence?.candidateKeys,
+      categoryId: null,
+      categoryConfidence: 0,
+      candidates: item.candidates.map((product) => ({
+        key: product.key,
+        name: product.name,
+        probability: null,
+        compatible: compatibleCatalogProduct(item.line, product),
+      })),
+      reason: item.product
+        ? "saved_match"
+        : item.match
+          ? item.match.equivalence
+            ? "equivalent_match"
+            : "exact_match"
+          : item.candidates.length
+            ? "unavailable"
+            : "no_candidates",
+    };
+
+    return { item, result };
+  });
 
   // Keep individual keys for the manual picker, with one score per group.
   const decisions = () =>
-    results.map((result, index) => ({
+    entries.map(({ item, result }) => ({
       ...result,
-      candidates: prepared[index].originals.flatMap((product) => {
-        const group = prepared[index].candidates.find(
+      candidates: item.originals.flatMap((product) => {
+        const group = item.candidates.find(
           (candidate) =>
             candidate.key === product.key ||
             candidate.equivalence?.candidateKeys.includes(product.key),
@@ -155,12 +160,12 @@ export async function classifyCatalogProducts(
       questions,
     });
 
-    prepared.forEach((item, index) => {
+    entries.forEach(({ item, result }, index) => {
       const category = response.answers[`category_${index}`];
 
       if (category?.type === "choice" && category.confidence >= 0.85) {
-        results[index].categoryId = category.choice;
-        results[index].categoryConfidence = category.confidence;
+        result.categoryId = category.choice;
+        result.categoryConfidence = category.confidence;
       }
 
       if (item.match || !item.candidates.length) return;
@@ -177,22 +182,21 @@ export async function classifyCatalogProducts(
       });
 
       Object.assign(
-        results[index],
+        result,
         selectCatalogMatch(item.line, item.candidates, probabilities),
       );
 
       if (probabilities.some((probability) => probability === null)) {
-        results[index].productKey = null;
-        results[index].equivalentKeys = undefined;
-        results[index].reason = "provider_error";
+        result.productKey = null;
+        result.equivalentKeys = undefined;
+        result.reason = "provider_error";
       }
     });
   } catch {
     // Keep exact matches usable, and distinguish provider failures from negative decisions.
-    prepared.forEach((item, index) => {
+    for (const { item, result } of entries)
       if (!item.match && item.candidates.length)
-        results[index].reason = "provider_error";
-    });
+        result.reason = "provider_error";
   }
 
   return decisions();

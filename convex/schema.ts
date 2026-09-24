@@ -1,3 +1,5 @@
+import { oreValidator } from "../src/lib/domain/ore";
+import { receiptStatusValidator } from "../src/lib/domain/receipt-state";
 import { productReferenceValidator } from "../src/lib/domain/product-reference";
 import { productLinkUndoValidator } from "../src/lib/domain/product-linking";
 import {
@@ -25,15 +27,6 @@ import {
   productAnalysisValidator,
 } from "../src/lib/domain/product-families";
 
-export const statusValidator = v.union(
-  v.literal("uploading"),
-  v.literal("uploaded"),
-  v.literal("processing"),
-  v.literal("needs_review"),
-  v.literal("reviewed"),
-  v.literal("failed"),
-);
-
 export const receiptFields = {
   householdId: v.id("households"),
   uploadedBy: v.string(),
@@ -41,7 +34,7 @@ export const receiptFields = {
   clientId: v.string(),
   imageCount: v.number(),
   backgroundUpload: v.boolean().optional(),
-  status: statusValidator,
+  status: receiptStatusValidator,
   revision: v.number(),
   generation: v.number(),
   data: v.union(receiptDataValidator, v.null()),
@@ -239,7 +232,7 @@ export default defineSchema({
     name: v.string(),
     invitation: v.string(),
     /** Monthly product-spending budget in øre; unset means no budget. */
-    monthlyBudgetOre: v.number().optional(),
+    monthlyBudgetOre: oreValidator.optional(),
   }).index("by_invitation", ["invitation"]),
   members: defineTable({
     householdId: v.id("households"),
@@ -254,6 +247,11 @@ export default defineSchema({
       "data.purchaseDate",
     ])
     .index("by_householdId_and_status", ["householdId", "status"])
+    .index("by_householdId_and_status_and_excluded", [
+      "householdId",
+      "status",
+      "excluded",
+    ])
     .index("by_duplicateOf", ["duplicateOf"])
     .index("by_householdId", ["householdId"])
     .index("by_householdId_and_clientId", ["householdId", "clientId"]),

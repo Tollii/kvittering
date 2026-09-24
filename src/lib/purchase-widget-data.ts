@@ -1,4 +1,4 @@
-import { formatMoney } from "./domain/receipt";
+import { Ore } from "./domain/ore";
 
 export type PurchaseWidgetData = {
   month: string;
@@ -23,12 +23,13 @@ export function purchaseWidgetData({
   now,
 }: Readonly<{
   month: string;
-  amountOre: number;
-  budgetOre: number | null;
+  amountOre: Ore;
+  budgetOre: Ore | null;
   provisional: number;
   now: Date;
 }>): PurchaseWidgetData {
-  const remaining = budgetOre === null ? null : budgetOre - amountOre;
+  const remaining =
+    budgetOre === null ? null : Ore.subtract(budgetOre, amountOre);
 
   return {
     month: new Intl.DateTimeFormat("nb-NO", {
@@ -36,11 +37,11 @@ export function purchaseWidgetData({
       year: "numeric",
       timeZone: "Europe/Oslo",
     }).format(new Date(`${month}-01T12:00:00Z`)),
-    amount: formatMoney(amountOre),
+    amount: Ore.format(amountOre),
     budget:
       remaining === null
         ? "Uten månedsbudsjett"
-        : `${formatMoney(Math.abs(remaining))} ${remaining < 0 ? "over budsjett" : "igjen"}`,
+        : `${Ore.format(Ore.abs(remaining))} ${remaining < 0 ? "over budsjett" : "igjen"}`,
     updated: `${provisional ? "Foreløpig · " : ""}${new Intl.DateTimeFormat("nb-NO", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit", timeZone: "Europe/Oslo" }).format(now)}`,
   };
 }

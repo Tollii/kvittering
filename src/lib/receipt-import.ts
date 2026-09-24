@@ -1,3 +1,4 @@
+import { soleElement } from "./domain/collections";
 import { Image } from "react-native";
 import { ImageManipulator, SaveFormat } from "expo-image-manipulator";
 import ReceiptIntelligence from "../../modules/receipt-intelligence/src/ReceiptIntelligenceModule";
@@ -85,8 +86,10 @@ export async function importReceiptFiles(
     if (uris.length > room) throw new Error(`Maks ${maxReceiptImages} bilder`);
   }
 
+  const only = soleElement(files);
+
   return {
     uris,
-    singleDocument: files.length === 1 && isPdf(files[0]) && uris.length > 1,
+    singleDocument: !!only && isPdf(only) && uris.length > 1,
   };
 }

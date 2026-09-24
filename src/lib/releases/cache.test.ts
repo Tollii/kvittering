@@ -1,3 +1,4 @@
+import { z } from "zod";
 import { expect, it, vi } from "vitest";
 import { cachePolicy, readCachedPolicy } from "./cache";
 import { defaultFeatureFlags } from "../featureFlags";
@@ -36,9 +37,9 @@ it("retains update requirements and disabled flags for an older client after rol
   const flags = { ...defaultFeatureFlags(), productLookup: false };
   cachePolicy(policy, 100, flags);
 
-  const saved = JSON.parse(
-    storage.get("release-policy-v1-test:testflight:ios")!,
-  );
+  const saved = z
+    .object({ policy: z.unknown() })
+    .parse(JSON.parse(storage.get("release-policy-v1-test:testflight:ios")!));
 
   const legacy = parsePolicy(saved.policy);
   expect(updateRequirement(legacy)).toBe("required");
