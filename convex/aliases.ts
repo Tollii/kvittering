@@ -165,7 +165,14 @@ export const applyToMatching = internalMutation({
       .paginate({ cursor: args.cursor, numItems: 10 });
 
     for (const receipt of page.page) {
-      if (!receipt.data) continue;
+      // Completion applies current aliases after the extraction owns the state transition.
+      if (
+        !receipt.data ||
+        receipt.status === "processing" ||
+        receipt.status === "uploading" ||
+        receipt.status === "uploaded"
+      )
+        continue;
       let changed = false;
       const data = structuredClone(receipt.data);
 

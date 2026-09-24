@@ -26,3 +26,11 @@ cannot bypass a pause. A backend test first failed by reaching TypeSafe during
 the pause, then passed after the change. It also checks successful resumption
 and legacy callers. Current screens do not expose evaluation; its endpoint is
 retained for older installed clients.
+
+## 004 — Alias propagation during processing
+
+Alias propagation skips active receipts. Extraction completion applies current
+household decisions, including decisions made while processing was active.
+Manual categories and edited receipt data keep their existing precedence. The
+new backend test reproduced premature completion before the fix. It now checks
+that extraction completes and remains idempotent. `check:ci` passed.

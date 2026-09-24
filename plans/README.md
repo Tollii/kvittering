@@ -7,7 +7,7 @@ Review complete. Implementation is now authorized on this branch, starting from
 [implementation record](application-risk-review/implementation.md). Original audit baseline:
 `96331941a84ca8fcb23da55b06478afacfce3eac`, from
 `claude/happy-archimedes-lyjuqa` before merge. Dedicated review branch:
-`codex/application-risk-review`. Application source is unchanged.
+`codex/application-risk-review`. Implementation changes follow the audit.
 
 Read the [risk report](application-risk-review/report.md),
 [public surface inventory](application-risk-review/public-surface.md),
@@ -28,7 +28,7 @@ working copy. Reuse that work; the baseline findings are not all still unchanged
 | [001](application-risk-review/001-paid-work-admission.md) | Complete paid-work admission coverage | P1 | Existing receipt/provider limits in the other task | IN PROGRESS |
 | [002](application-risk-review/002-evaluation-service-pause.md) | Apply service pauses to category evaluation | P1 | None; coordinate with 001 | DONE |
 | [003](application-risk-review/003-draft-preservation.md) | Preserve drafts through pending saves and required updates | P1 | None | TODO |
-| [004](application-risk-review/004-alias-processing-state.md) | Keep alias propagation from completing active processing | P2 | None | TODO |
+| [004](application-risk-review/004-alias-processing-state.md) | Keep alias propagation from completing active processing | P2 | None | DONE |
 | [005](application-risk-review/005-correction-history-deletion.md) | Remove deleted receipt data from correction batches | P2 | None | TODO |
 | [006](application-risk-review/006-workflow-retention.md) | Complete workflow payload retention | P2 | Existing retention callback; coordinate with 005 | IN PROGRESS |
 | [007](application-risk-review/007-receipt-read-budgets.md) | Complete receipt read budgets | P2 | Existing summaries and cache in the other task | IN PROGRESS |

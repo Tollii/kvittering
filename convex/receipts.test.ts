@@ -7,7 +7,11 @@ import { convexTest } from "convex-test";
 import { expect, it } from "vitest";
 import { api, internal } from "./_generated/api";
 import schema from "./schema";
-import { batteryFixture, weeklyShopFixture } from "../src/lib/domain/receipt";
+import {
+  aliasKey,
+  batteryFixture,
+  weeklyShopFixture,
+} from "../src/lib/domain/receipt";
 
 const modules = import.meta.glob("./**/*.ts");
 
@@ -764,4 +768,58 @@ it("finds a dated duplicate beyond the former insertion-order limit", async () =
   expect(page.receipts.page.some((receipt) => receipt._id === originalId)).toBe(
     true,
   );
+});
+
+it("retains an active extraction when remembered categories propagate", async () => {
+  const { t, first, householdId } = await setup();
+
+  const id = await first.mutation(api.receipts.reserve, {
+    householdId,
+    clientId: "alias-processing-request",
+    imageCount: 1,
+  });
+
+  const data = batteryFixture();
+  data.lines[0].categoryId = "fallback.unclear";
+  await t.run(async (ctx) => {
+    await ctx.db.patch("receipts", id, {
+      data,
+      status: "processing",
+      generation: 1,
+    });
+    await ctx.db.insert("aliases", {
+      householdId,
+      key: aliasKey(data, data.lines[0])!,
+      categoryId: "drinks.soft-drinks",
+      confirmedBy: "test|first",
+    });
+  });
+  await t.mutation(internal.aliases.applyToMatching, {
+    householdId,
+    key: aliasKey(data, data.lines[0])!,
+    cursor: null,
+  });
+  expect((await first.query(api.receipts.detail, { id }))?.receipt.status).toBe(
+    "processing",
+  );
+  const extracted = { ...data, receiptNumber: "new-extraction" };
+
+  const completion = {
+    id,
+    generation: 1,
+    data: extracted,
+    original: extracted,
+    provider: "test",
+  };
+
+  await t.mutation(internal.processing.finish, completion);
+  await t.mutation(internal.processing.finish, completion);
+  const result = await first.query(api.receipts.detail, { id });
+  expect(result?.receipt.data).toMatchObject({
+    receiptNumber: "new-extraction",
+  });
+  expect(result?.receipt.data?.lines[0].categoryId).toBe("drinks.soft-drinks");
+  expect(
+    await t.run((ctx) => ctx.db.query("extractions").collect()),
+  ).toHaveLength(1);
 });

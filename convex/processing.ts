@@ -275,9 +275,10 @@ export const finish = internalMutation({
     const data =
       receipt.revision > 0 && receipt.data ? receipt.data : args.data;
 
+    // Propagation skips active receipts. Apply decisions made while this run was active.
+    await applyHouseholdAliases(ctx, receipt.householdId, data);
+
     if (data === args.data) {
-      // Remembered household decisions settle categories for every engine.
-      await applyHouseholdAliases(ctx, receipt.householdId, data);
       const retailer = matchingKey(data.store ?? "");
 
       for (const line of data.lines) {
