@@ -252,14 +252,20 @@ it("propagates changed aliases in one finite scan and skips unchanged decisions"
 it("accepts up to five new images and preserves an existing eight-image reservation", async () => {
   const { t, first, householdId } = await setup();
 
-  for (const imageCount of [0, 6, 8, 1.5, 100])
+  for (const [imageCount, message] of [
+    [0, /Ugyldig/],
+    [1.5, /Ugyldig/],
+    [100, /Ugyldig/],
+    [6, /Maks 5.*Bildene er beholdt/],
+    [8, /Maks 5.*Bildene er beholdt/],
+  ] as const)
     await expect(
       first.mutation(api.receipts.reserve, {
         householdId,
         imageCount,
         clientId: `image-limit-${String(imageCount).padStart(8, "0")}`,
       }),
-    ).rejects.toThrow(/Ugyldig|Maks 5/);
+    ).rejects.toThrow(message);
 
   for (const imageCount of [1, 5]) {
     const id = await first.mutation(api.receipts.reserve, {

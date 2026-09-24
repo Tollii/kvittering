@@ -63,14 +63,8 @@ export const workflowCompleted = internalMutation({
   },
   returns: v.null(),
   handler: async (ctx, { workflowId, context }) => {
-    if (!context) {
-      for (const component of ["processing", "analysis"] as const)
-        await ctx.scheduler.runAfter(0, internal.retention.inventoryWorkflows, {
-          component,
-        });
-
-      return null;
-    }
+    // The daily inventory registers legacy journals without one scan per callback.
+    if (!context) return null;
 
     const id = await trackWorkflow(
       ctx,
@@ -98,14 +92,8 @@ export const workflowJournal = internalMutation({
   args: { workflowId: vWorkflowId, component: workflowComponent.optional() },
   returns: v.null(),
   handler: async (ctx, { workflowId, component }) => {
-    if (!component) {
-      for (const owner of ["processing", "analysis"] as const)
-        await ctx.scheduler.runAfter(0, internal.retention.inventoryWorkflows, {
-          component: owner,
-        });
-
-      return null;
-    }
+    // The daily inventory resolves legacy jobs without duplicating component scans.
+    if (!component) return null;
 
     const record = await ctx.db
       .query("workflowJournals")
