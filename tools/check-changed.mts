@@ -80,15 +80,23 @@ if (failures.length > 0) {
 
 console.log(`\nChanged files pass the fast checks (base ${base}).`);
 
-/** Run a package's own script with this Node, or Node itself when `script` is null. */
+/**
+ * Run a package's own script with this Node, or Node itself when `script` is
+ * null. Only a failing step prints its output, so the findings stay readable.
+ */
 function run(name: string, script: string | null, args: string[]) {
-  console.log(`\n▸ ${name}`);
-
   const result = spawnSync(
     process.execPath,
     script ? [`node_modules/${script}`, ...args] : args,
-    { stdio: "inherit" },
+    { encoding: "utf8", maxBuffer: 64 * 1024 * 1024 },
   );
 
-  if (result.status !== 0) failures.push(name);
+  if (result.status === 0) {
+    console.log(`✓ ${name}`);
+
+    return;
+  }
+
+  failures.push(name);
+  console.log(`✗ ${name}\n${result.stdout}${result.stderr}`);
 }

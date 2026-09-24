@@ -11,7 +11,7 @@ Kvitto helps households capture receipts and understand grocery purchases. It us
 
 ## Verification
 
-Use `npm run check:fast` during development, `npm run check` before committing code changes, and `npm run check:ci` when changing tests or coverage configuration. Fix findings without baselines or broad suppressions. For documentation-only changes, check formatting and links. See [quality checks](docs/quality.md).
+Run `npm run check:changed` after each change, `npm run check` before committing code changes, and `npm run check:ci` when changing tests or coverage configuration. Fix findings without baselines, broad suppressions, skips, or retries. For documentation-only changes, `npm run check:changed` checks formatting and links. When adding behavior, add the check that proves it and show that it fails without the change; see [verification](docs/verification.md). After changing a Convex function signature, run `npm run contract:update`. See [quality checks](docs/quality.md).
 
 ## Read for the task
 
