@@ -1,7 +1,5 @@
 # CI and review decisions
 
-Adapted from the OpenAI Codex skill; see [source and license](../SKILL.md).
-
 ## Classify failures
 
 A failure is caused by the branch when logs connect it to changed code: a type error, lint error, deterministic test failure, or incorrect build configuration. Fix the cause and run the relevant project checks.

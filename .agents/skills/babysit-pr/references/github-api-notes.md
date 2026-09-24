@@ -1,7 +1,5 @@
 # GitHub CLI and API notes
 
-Adapted from the OpenAI Codex skill; see [source and license](../SKILL.md).
-
 ## Primary commands used
 
 ### PR metadata

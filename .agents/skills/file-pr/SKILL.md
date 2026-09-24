@@ -9,8 +9,6 @@ metadata:
 
 # File a pull request
 
-Adapted from Andreas's personal `file-pr` skill.
-
 Before filing, check whether a PR for this branch already exists. Reuse an existing PR instead of creating a duplicate. Inspect the working tree and index, and include only changes within the requested scope. Preserve unrelated work; use an isolated worktree when needed.
 
 Fetch `origin` and rebase the PR branch onto the latest `origin/main` before opening the PR. Resolve conflicts, then review the local diff against `origin/main` to confirm that it matches the user's goal. Run the relevant checks from the [README](../../../README.md) on the final changes. If rebasing a published branch requires a rewritten push, use an explicit `--force-with-lease` against the remote head you inspected.

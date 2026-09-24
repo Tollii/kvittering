@@ -9,9 +9,6 @@ metadata:
 
 # Monitor a pull request
 
-Adapted from OpenAI's [babysit-pr skill](https://github.com/openai/codex/tree/dbb875d23cfd1a327cf6b51d7b50dad4b4601268/.codex/skills/babysit-pr).
-The watcher and its tests are copied without changes. The instructions and reference documents are adapted for Kvitto. See [LICENSE](LICENSE) and [NOTICE](NOTICE).
-
 ## Scope and completion
 
 Accept a PR number, URL, or the current branch (`--pr auto`). Confirm the repository, head branch, head commit, and requested outcome. Reuse any merge authorization already given by the user.
