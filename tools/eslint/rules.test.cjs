@@ -62,14 +62,14 @@ const typedTester = new RuleTester({
     parserOptions: {
       ecmaFeatures: { jsx: true },
       project: "./tsconfig.json",
-      tsconfigRootDir: join(__dirname, "fixtures"),
+      tsconfigRootDir: join(process.cwd(), "tools", "eslint", "fixtures"),
     },
   },
 });
 
 const typed = (code) => ({
   code,
-  filename: join(__dirname, "fixtures", "file.tsx"),
+  filename: join(process.cwd(), "tools", "eslint", "fixtures", "file.tsx"),
 });
 
 typedTester.run("no-leaked-render", plugin.rules["no-leaked-render"], {
