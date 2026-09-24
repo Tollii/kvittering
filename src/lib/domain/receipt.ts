@@ -5,7 +5,12 @@ import { productReferenceValidator } from "./product-reference";
 import { parse as parseValue } from "convex-helpers/validators";
 import { receiptIssueText, type ReceiptIssue } from "./receipt-issues";
 import { v, type Infer } from "convex/values";
-import { categoryById } from "./categories";
+import {
+  isCategoryId,
+  parseCategoryId,
+  type CategoryId,
+  unclearCategoryId,
+} from "./categories";
 import {
   catalogIdentityValidator,
   physicalStoreValidator,
@@ -103,7 +108,7 @@ export function emptyLine(id: string = crypto.randomUUID()): ReceiptLine {
     brand: null,
     attributes: [],
     relatedLineId: null,
-    categoryId: "fallback.unclear",
+    categoryId: unclearCategoryId,
     confidence: null,
     tags: [],
     issues: [],
@@ -141,10 +146,9 @@ export function parseReceipt(input: unknown): ReceiptParseOutcome {
   try {
     const data = structuredClone(parseValue(receiptDataValidator, input));
 
-    // Older receipts use a separate category for energy drinks, now part of soft drinks.
+    // Older receipts may store category ids that have since been merged.
     for (const line of data.lines)
-      if (line.categoryId === "drinks.energy-drinks")
-        line.categoryId = "drinks.soft-drinks";
+      line.categoryId = parseCategoryId(line.categoryId) ?? line.categoryId;
 
     return { kind: "parsed", receipt: validateReceipt(data) };
   } catch (cause) {
@@ -178,7 +182,7 @@ export function validateReceipt(data: ReceiptData): ParsedReceipt {
       if (value !== null && (!Number.isFinite(value) || value <= 0))
         throw new Error("Mengde må være større enn null.");
 
-    if (line.categoryId && !categoryById.has(line.categoryId))
+    if (line.categoryId && !isCategoryId(line.categoryId))
       throw new Error("Ukjent kategori.");
 
     if (
@@ -399,7 +403,7 @@ export function weeklyShopFixture(): ReceiptData {
     id: string,
     name: string,
     amountOre: Ore | null,
-    categoryId: string,
+    categoryId: CategoryId,
     extra: Partial<ReceiptLine> = {},
   ): ReceiptLine => ({
     ...emptyLine(id),

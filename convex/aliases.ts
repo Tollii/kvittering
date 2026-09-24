@@ -8,7 +8,7 @@ import {
 import { internal } from "./_generated/api";
 import type { Id } from "./_generated/dataModel";
 import { aliasKey, type ReceiptData } from "../src/lib/domain/receipt";
-import { categoryById } from "../src/lib/domain/categories";
+import { isCategoryId, type CategoryId } from "../src/lib/domain/categories";
 import {
   applyCategoryMemory,
   categoryMemoryKey,
@@ -26,7 +26,7 @@ import { isCategoryUncertain } from "../src/lib/domain/receipt-review";
 export function settleLineWithAlias(
   line: ReceiptData["lines"][number],
   key: string,
-  categoryId: string,
+  categoryId: CategoryId,
 ): boolean {
   const nextCategory = line.manual ? line.categoryId : categoryId;
   const issues = line.issues.filter((issue) => !isCategoryUncertain(issue));
@@ -70,7 +70,7 @@ export async function applyHouseholdAliases(
           .unique()
       : null;
 
-    if (alias && key && categoryById.has(alias.categoryId)) {
+    if (alias && key && isCategoryId(alias.categoryId)) {
       settleLineWithAlias(line, key, alias.categoryId);
       continue;
     }
@@ -159,7 +159,8 @@ export const applyToMatching = internalMutation({
       )
       .unique();
 
-    if (!alias || !categoryById.has(alias.categoryId)) return null;
+    if (!alias || !isCategoryId(alias.categoryId)) return null;
+    const categoryId = alias.categoryId;
 
     const page = await ctx.db
       .query("receipts")
@@ -175,8 +176,7 @@ export const applyToMatching = internalMutation({
         if (line.kind !== "product" || aliasKey(data, line) !== args.key)
           continue;
 
-        if (settleLineWithAlias(line, args.key, alias.categoryId))
-          changed = true;
+        if (settleLineWithAlias(line, args.key, categoryId)) changed = true;
       }
 
       if (changed) {

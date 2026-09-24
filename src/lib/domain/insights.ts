@@ -6,7 +6,7 @@ import {
   overviewPurchasePolicy,
 } from "./purchase-projection";
 import type { Doc } from "../../../convex/_generated/dataModel";
-import { categoryById } from "./categories";
+import { categoryOf } from "./categories";
 import { type ReceiptLine } from "./receipt";
 import type { StorePurchase } from "./store-spending";
 import type { ExtractedReceipt } from "./receipt-state";
@@ -104,17 +104,12 @@ export function monthlyInsights(
     if (data.totalOre === null) unknownTotals++;
 
     for (const { line } of purchases) {
-      const found = categoryById.get(line.categoryId ?? "");
-      add(
-        category,
-        line.categoryId ?? "fallback.unclear",
-        found?.name ?? "Ukjent vare",
-        {
-          receipt,
-          line,
-          amountOre: line.netOre,
-        },
-      );
+      const found = categoryOf(line.categoryId);
+      add(category, found.id, found.name, {
+        receipt,
+        line,
+        amountOre: line.netOre,
+      });
     }
 
     if (unallocated)
@@ -133,22 +128,17 @@ export function monthlyInsights(
   const groups = new Map<string, SpendingGroup>();
 
   for (const leaf of category.values()) {
-    const found = categoryById.get(leaf.id);
+    // Unallocated discounts have no category and read as unclear.
+    const found = categoryOf(leaf.id);
 
     for (const contribution of leaf.contributions)
-      add(
-        groups,
-        found?.group ?? "fallback",
-        found?.groupName ?? "Uavklart",
-        contribution,
-      );
+      add(groups, found.group, found.groupName, contribution);
   }
 
   const purchaseTypes = new Map<string, SpendingGroup>();
 
   for (const leaf of category.values()) {
-    const found = categoryById.get(leaf.id);
-    const type = found?.purchaseType ?? "unknown";
+    const type = categoryOf(leaf.id).purchaseType;
 
     const names = {
       food: "Mat og drikke",

@@ -16,10 +16,18 @@ import {
   SectionTitle,
   Sheet,
 } from "@/components/ui";
-import { categoryById } from "@/lib/domain/categories";
+import {
+  category,
+  isDecidedCategory,
+  parseCategoryId,
+} from "@/lib/domain/categories";
 
-const categoryName = (id: string | null) =>
-  id ? (categoryById.get(id)?.name ?? id) : "Ingen";
+/** Corrections record ids as stored, which may predate the current categories. */
+const categoryName = (id: string | null) => {
+  const parsed = parseCategoryId(id);
+
+  return parsed ? category(parsed).name : (id ?? "Ingen");
+};
 
 export default function Corrections() {
   const historyPage = usePaginatedQuery(
@@ -121,10 +129,7 @@ export default function Corrections() {
               }
               value={entry.store ?? undefined}
               onPress={
-                entry.field === "category" &&
-                entry.expected &&
-                entry.expected !== "fallback.unclear" &&
-                categoryById.has(entry.expected)
+                entry.field === "category" && isDecidedCategory(entry.expected)
                   ? () => {
                       setTargetKeys([]);
                       setSelected(entry._id);

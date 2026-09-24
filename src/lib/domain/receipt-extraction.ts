@@ -1,3 +1,4 @@
+import { unclearCategoryId } from "./categories";
 import { CalendarDate } from "./calendar";
 import { Ore } from "./ore";
 import { z } from "zod";
@@ -133,7 +134,7 @@ export function prepareExtraction(
           ],
           receiptName: line.name,
           manual: false,
-          categoryId: line.kind === "product" ? "fallback.unclear" : null,
+          categoryId: line.kind === "product" ? unclearCategoryId : null,
         };
       },
     ),

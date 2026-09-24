@@ -10,7 +10,10 @@ import { query, type MutationCtx, type QueryCtx } from "./_generated/server";
 import schema from "./schema";
 import type { Doc, Id } from "./_generated/dataModel";
 import { requireMember } from "./access";
-import { categoryById } from "../src/lib/domain/categories";
+import {
+  isDecidedCategory,
+  type CategoryId,
+} from "../src/lib/domain/categories";
 import { categoryMemoryKey } from "../src/lib/domain/category-memory";
 import {
   classificationInputs,
@@ -112,7 +115,7 @@ export const list = query({
 /** A category correction that can be applied to other receipts. */
 type CategoryCorrection = Doc<"corrections"> & {
   field: "category";
-  expected: string;
+  expected: CategoryId;
 };
 
 async function requireCorrection(
@@ -127,9 +130,7 @@ async function requireCorrection(
 
   if (
     correction.field !== "category" ||
-    !correction.expected ||
-    !categoryById.has(correction.expected) ||
-    correction.expected === "fallback.unclear"
+    !isDecidedCategory(correction.expected)
   )
     throw new Error("Denne rettelsen kan ikke brukes på flere varer.");
 

@@ -43,7 +43,7 @@ import {
   type SpendingGroup,
 } from "@/lib/domain/insights";
 import { isDiscountLine } from "@/lib/domain/receipt";
-import { categoryById } from "@/lib/domain/categories";
+import { categoryOf } from "@/lib/domain/categories";
 import { receiptNeeds } from "@/components/receipt-card";
 import { useTheme } from "@/constants/theme";
 import { budgetPace, paceLabel } from "@/lib/domain/budget";
@@ -136,7 +136,7 @@ function Spending({ initialMonth }: Readonly<{ initialMonth: CalendarMonth }>) {
         : group
           ? totals.categories.filter(
               (category) =>
-                categoryById.get(category.id)?.group === group ||
+                categoryOf(category.id).group === group ||
                 (group === "fallback" && category.id === "unallocated"),
             )
           : totals.groups;
@@ -451,7 +451,7 @@ function Spending({ initialMonth }: Readonly<{ initialMonth: CalendarMonth }>) {
                   Alle kategorier
                 </Copy>
                 <Copy size={14} muted>
-                  · {categoryById.get(rows[0]?.id ?? "")?.groupName}
+                  · {categoryOf(rows[0]?.id).groupName}
                 </Copy>
               </Pressable>
             )}

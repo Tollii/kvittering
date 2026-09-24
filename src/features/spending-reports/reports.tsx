@@ -1,3 +1,4 @@
+import { unclearCategoryId } from "@/lib/domain/categories";
 import { CalendarDate, CalendarMonth } from "@/lib/domain/calendar";
 import { Ore } from "@/lib/domain/ore";
 import { type ComponentProps, type ReactNode } from "react";
@@ -70,7 +71,7 @@ export function useSpendingReports({
       receipt.data.lines.filter(
         (line) =>
           line.kind === "product" &&
-          (line.categoryId === "fallback.unclear" ||
+          (line.categoryId === unclearCategoryId ||
             line.issues.some(isCategoryUncertain)),
       ).length,
     0,

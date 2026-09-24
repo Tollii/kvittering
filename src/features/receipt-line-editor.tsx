@@ -27,7 +27,11 @@ import {
   pressed,
 } from "@/components/ui";
 import { MoneyField } from "@/components/money-field";
-import { categoryById } from "@/lib/domain/categories";
+import {
+  category,
+  parseCategoryId,
+  unclearCategoryId,
+} from "@/lib/domain/categories";
 import {
   lineKinds,
   isTotalsLine,
@@ -152,8 +156,11 @@ export function ReceiptLineEditor({
           ? "Tilsvarende produkt"
           : "Produkt";
 
-  const category = categoryById.get(line.categoryId ?? "");
-  const categoryLabel = category?.name ?? "Velg kategori";
+  const categoryId = parseCategoryId(line.categoryId);
+
+  const categoryLabel = categoryId
+    ? category(categoryId).name
+    : "Velg kategori";
 
   const confidenceLabel =
     line.confidence != null
@@ -285,7 +292,7 @@ export function ReceiptLineEditor({
           ) : (
             <Chip
               label={
-                categoryUncertain && line.categoryId === "fallback.unclear"
+                categoryUncertain && line.categoryId === unclearCategoryId
                   ? "Velg kategori"
                   : categoryLabel
               }
@@ -492,7 +499,7 @@ export function ReceiptLineEditor({
               onChange={(kind) =>
                 patch({
                   kind,
-                  categoryId: kind === "product" ? "fallback.unclear" : null,
+                  categoryId: kind === "product" ? unclearCategoryId : null,
                   issues: line.issues.filter(
                     (issue) => !isCategoryUncertain(issue),
                   ),

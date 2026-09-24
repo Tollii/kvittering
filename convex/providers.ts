@@ -18,7 +18,7 @@ import {
   uncertaintyInstructions,
   prepareExtraction,
 } from "../src/lib/domain/receipt-extraction";
-import { categories } from "../src/lib/domain/categories";
+import { categories, unclearCategoryId } from "../src/lib/domain/categories";
 import {
   classificationQuestion,
   classificationEvidence,
@@ -138,7 +138,7 @@ export const classify = internalAction({
       return {
         classifications: args.products.map((p) => ({
           id: p.id,
-          categoryId: "fallback.unclear",
+          categoryId: unclearCategoryId,
           confidence: 0,
         })),
         provider: "mock: classification unavailable",

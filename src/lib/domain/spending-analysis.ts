@@ -9,7 +9,7 @@ import {
   productProfileKey,
   type ProductAnalysisResult,
 } from "./product-families";
-import { categoryById } from "./categories";
+import { categoryOf } from "./categories";
 
 export type AnalysisPeriod = {
   start: CalendarDate;
@@ -143,11 +143,11 @@ export function spendingAnalysis(
       for (const { line, analysis: result } of purchases) {
         productLines++;
         const contribution = { receipt, line, amountOre: line.netOre };
-        const categoryId = line.categoryId ?? "fallback.unclear";
+        const found = categoryOf(line.categoryId);
 
-        const category = categories.get(categoryId) ?? {
-          id: categoryId,
-          name: categoryById.get(categoryId)?.name ?? "Ukjent",
+        const category = categories.get(found.id) ?? {
+          id: found.id,
+          name: found.name,
           currentOre: Ore.zero,
           previousOre: Ore.zero,
           differenceOre: Ore.zero,
@@ -162,7 +162,7 @@ export function spendingAnalysis(
         const key = side === "current" ? "currentOre" : "previousOre";
         category[key] = Ore.add(category[key], line.netOre);
         category.contributions.push(contribution);
-        categories.set(categoryId, category);
+        categories.set(found.id, category);
 
         if (!result?.family) continue;
 
