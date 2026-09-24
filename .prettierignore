@@ -10,6 +10,7 @@ api/kassalapp.openapi.json
 ios
 android
 dist
+build
 coverage
 
 # External rules, agent assets, and archived review material.

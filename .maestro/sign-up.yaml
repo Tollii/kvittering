@@ -1,0 +1,32 @@
+# A new household member signs up with email, starts a household, and reaches
+# the main tabs. This covers native start-up, authentication, Convex
+# subscriptions, and the first household mutation against a real backend.
+appId: no.tolnes.kvitto
+name: Sign up and start a household
+---
+- launchApp:
+    clearState: true
+    permissions:
+      all: allow
+- extendedWaitUntil:
+    visible: "Opprett konto med e-post"
+    timeout: 60000
+- tapOn: "Opprett konto med e-post"
+- tapOn: "Navn"
+- inputText: "E2E Tester"
+- tapOn: "E-post"
+- inputText: ${E2E_EMAIL}
+- tapOn: "Passord"
+- inputText: "correct horse battery staple"
+# Submitting from the keyboard avoids matching the "Opprett konto" heading.
+- pressKey: Enter
+- extendedWaitUntil:
+    visible: "Start med mine kvitteringer"
+    timeout: 30000
+- tapOn: "Start med mine kvitteringer"
+- extendedWaitUntil:
+    visible: "Innboks"
+    timeout: 30000
+- tapOn: "Innboks"
+- tapOn: "Historikk"
+- assertVisible: "Historikk"

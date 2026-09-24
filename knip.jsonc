@@ -7,7 +7,6 @@
     "plugins/*.js",
     "tools/eslint/*.cjs",
     "tools/*.mts",
-    "tools/contract/compare.mts",
     "vitest.mutation.config.mts",
   ],
   // Vendored rule source and rule-test fixtures are not application code.
