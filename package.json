@@ -98,7 +98,7 @@
     "android": "expo run:android",
     "ios": "expo run:ios",
     "lint": "npm run lint:oxlint && npm run lint:policy && npm run lint:eslint && npm run lint:unused && npm run lint:docs",
-    "typecheck": "tsc --noEmit && tsc --noEmit -p tools/tsconfig.json",
+    "typecheck": "tsc --noEmit && tsc --noEmit -p convex && tsc --noEmit -p tools/tsconfig.json",
     "test": "vitest run",
     "backend": "convex dev",
     "backend:staging": "convex deploy --env-file .env.staging.local",

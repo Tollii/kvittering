@@ -111,8 +111,7 @@ export function receiptComparisonCategories(
 
   return Object.fromEntries(
     monthlyInsights([receipt], CalendarDate.month(date))
-      .categories.values()
-      .filter((category) => category.id !== "unallocated")
+      .categories.filter((category) => category.id !== "unallocated")
       .map((category) => [category.id, category.amountOre]),
   );
 }

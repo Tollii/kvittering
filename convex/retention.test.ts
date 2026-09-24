@@ -264,7 +264,23 @@ it("inventories legacy terminal journals in the correct component and retains a 
     generationNumber: 0,
     runResult: { kind: "failed", error: "old failure" },
   });
-  await t.mutation(internal.retention.workflowJournal, { workflowId });
+
+  const scheduledBefore = await t.run((ctx) =>
+    ctx.db.system.query("_scheduled_functions").collect(),
+  );
+
+  for (let index = 0; index < 10; index++) {
+    await t.mutation(internal.retention.workflowCompleted, {
+      workflowId,
+      result: { kind: "failed", error: "old failure" },
+      context: null,
+    });
+    await t.mutation(internal.retention.workflowJournal, { workflowId });
+  }
+
+  expect(
+    await t.run((ctx) => ctx.db.system.query("_scheduled_functions").collect()),
+  ).toEqual(scheduledBefore);
   await t.mutation(internal.retention.inventoryWorkflows, {
     component: "analysis",
   });
@@ -273,6 +289,19 @@ it("inventories legacy terminal journals in the correct component and retains a 
   });
   expect(
     await t.run((ctx) => ctx.db.query("workflowJournals").collect()),
+  ).toHaveLength(1);
+  await t.mutation(internal.retention.workflowJournal, {
+    workflowId,
+    component: "analysis",
+  });
+  expect(
+    (
+      await t.query(owner.workflow.listSteps, {
+        workflowId,
+        order: "asc",
+        paginationOpts: { cursor: null, numItems: 10 },
+      })
+    ).page,
   ).toHaveLength(1);
   vi.setSystemTime(Date.now() + 30 * 24 * 60 * 60_000);
   await t.mutation(internal.retention.workflowJournal, {
