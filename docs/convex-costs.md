@@ -89,9 +89,11 @@ component API; it does not directly delete component tables or active work.
    available. Existing server reservations keep their original capacity.
    No minimum app version needs to change.
 
-The combined branch therefore needs staged backend deployment. The regular
-TestFlight command deploys its selected backend revision before building the app;
-do not use that command on the combined head for the initial rollout.
+The combined branch therefore needs staged backend deployment. The
+[release commands](releases.md#enforced-release-checks) require an explicit backend
+stage. TestFlight and OTA commands check backfill readiness and never deploy the
+backend. Five-image enforcement additionally requires a reviewed recovery-client
+availability record.
 
 Local Convex tests cover backfill retries, legacy records, concurrent changes,
 aggregate edits and deletions, authorization, and the old digest calculation.

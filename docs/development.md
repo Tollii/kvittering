@@ -76,11 +76,14 @@ Sign in with the existing credentials and enable notifications again in the stag
 Run `npm run backend` for local development. Deploy staging explicitly with:
 
 ```sh
-npm run backend:staging
+npm run backend:staging -- --stage additive
 ```
 
-This uses a staging-only deploy key in the git-ignored `.env.staging.local`, leaving
-`.env.local` unchanged. To configure another development machine:
+This requires eight-image source for the additive stage. The combined five-image
+source is rejected. For the later enforcement stage, use `--stage enforcement`
+after the [release checks](releases.md#enforced-release-checks) pass. The command
+uses a staging-only deploy key from the git-ignored `.env.staging.local` or the
+process environment, leaving `.env.local` unchanged. To configure another development machine:
 
 ```sh
 npx convex deployment token create staging-local-deploy --deployment courteous-jay-215 --save-env .env.staging.local
@@ -113,7 +116,8 @@ The workflow summary links to the build and TestFlight.
 Before the first run, add an [Expo access token](https://expo.dev/accounts/atolnes/settings/access-tokens)
 as the GitHub repository secret `EXPO_TOKEN`. The token's account must have access
 to `@atolness-team/kvitto`. Add a deploy key for staging as `CONVEX_STAGING_DEPLOY_KEY`.
-The workflow deploys the backend to staging before building the app. Apple signing and submission credentials are already
+The workflow checks staging backfill readiness but does not deploy the backend.
+Deploy the appropriate backend stage separately. Apple signing and submission credentials are already
 stored in Expo. The workflow file must be on the repository's default branch to
 show the **Run workflow** button.
 
@@ -121,8 +125,8 @@ The `testflight` build profile uses the EAS `preview` environment and Convex sta
 The `development` profile and local Metro builds use the personal Convex deployment.
 The `submit-existing` operation accepts only builds made with the `testflight` profile;
 older `production` builds still point to the personal backend and must be rebuilt.
-For a release from your computer, use `npm run testflight`. This deploys staging before
-building and submitting the iOS app.
+For a release from your computer, use `npm run testflight`. This checks staging readiness before
+building and submitting the iOS app; it does not deploy staging.
 
 ## Notes
 

@@ -21,8 +21,8 @@ Use Node.js 24 and `npm ci`. The checks require no server, account, or secrets.
 | `npm run e2e:ios`         | Maestro flows on the iOS Simulator with a local backend (macOS)           |
 
 `Code quality` runs on pull requests, merge queue groups, and pushes to `main`.
-Its `CI result` job passes only when every required job passes; make it the
-only required status check. [Verification](verification.md) lists the jobs, the
+Its `CI result` job passes only when every required quality job passes. Require
+`Merge readiness` as well for native verification and completed review. [Verification](verification.md) lists the jobs, the
 advisory reports, the end-to-end workflow, and how to add checks. The
 TestFlight and OTA workflows run `npm run check` before publishing.
 

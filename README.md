@@ -28,7 +28,7 @@ and staging.
 | Before committing   | `npm run check`         |
 | iOS flows, on a Mac | `npm run e2e:ios`       |
 
-CI must pass `CI result` before merging. [Verification](docs/verification.md)
+Merging requires `CI result` and `Merge readiness`. [Verification](docs/verification.md)
 explains the checks and how to add one.
 
 ## Release

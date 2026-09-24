@@ -78,7 +78,9 @@ After review, publish compatible JavaScript/assets with:
 npm run update:testflight -- --message 'Describe the change'
 ```
 
-This deploys the compatible staging backend first, then publishes to the TestFlight channel with the preview EAS environment. The GitHub OTA workflow performs the same sequence. Neither operation changes minimum versions.
+This checks staging read-model readiness, then publishes to the TestFlight channel
+with the preview EAS environment. The GitHub OTA workflow performs the same
+sequence. Neither operation deploys the backend or changes minimum versions.
 
 Native code, native packages, permissions, plugins or entitlements require a new build. A fingerprint mismatch can correctly produce an update that no existing binary can use; do not force it onto an older runtime. Use EAS update history to republish a known-good compatible update or roll back to the embedded update. Review local data migrations before rollback. OTA does not roll back Convex data or deployment changes.
 
@@ -95,3 +97,38 @@ client, then enforce five images. Follow the full sequence in
 Cached image Quick Look is an optional native method. Older binaries use the
 image sheet. Existing HTTPS preview calls and workflow step arguments remain
 supported.
+
+## Enforced release checks
+
+Build and OTA commands no longer deploy a backend as a side effect. Local and
+GitHub release commands run `npm run release:check` first. It reads only the
+`receipts-v1` readiness flag on staging and fails if the backfill is incomplete,
+missing, or cannot be read. This also applies to submitting an existing build.
+Release from a clean, committed checkout. This check does not establish native
+runtime compatibility or authorize publication.
+
+Backend deployment is separate:
+
+- `npm run backend:staging -- --stage additive` accepts only source with the
+  existing eight-image limit. Prepare that reviewed additive revision before
+  initial deployment; the combined five-image source is refused.
+- `npm run backend:staging -- --stage enforcement` accepts five-image source
+  only after a live backfill check and a reviewed recovery-client record in
+  [`releases/staging.json`](../releases/staging.json).
+
+The record starts with `recoveryClient: null`, so enforcement is blocked. Once
+Apple makes the recovery build available, record its native `build`, full
+`sourceCommit`, UTC `verifiedAt`, `verifiedBy`, and App Store Connect `evidence`
+URL. Set `availableToTesters` and `pendingUploadUpgradePassed` to true only after
+checking tester access and upgrading an old installation with pending uploads.
+These fields belong inside `recoveryClient`; keep the deployment identifier.
+Review and commit this evidence. Build completion, upload success, CI, and a
+source review do not prove availability. Clear the record if access is withdrawn.
+
+The target is fixed to `courteous-jay-215`. The wrapper validates its deploy-key
+prefix and rejects conflicting selectors or credential sources. The installed
+CLI gives this deployment-specific key precedence over the personal `.env.local`.
+The wrapper passes the key only through the child environment. It does not print credential values. Raw
+provider CLIs remain operator tools; contributors with deployment credentials
+can bypass repository scripts. Do not give an agent those credentials for
+ordinary code changes.

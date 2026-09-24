@@ -1,7 +1,7 @@
 # Verification
 
-A green `CI result` should mean the change can merge. This guide describes the
-checks behind that result, how to run them yourself, and how to add a check
+A merge requires both `CI result` and `Merge readiness`. This guide describes
+the checks behind those results, how to run them yourself, and how to add a check
 when you add behavior. It applies to people and agents alike.
 
 ## Run the checks
@@ -57,9 +57,11 @@ uses iOS 27.0 and Xcode 27.0 on GitHub's `xcode-27` preview runner. The build
 cache includes the native fingerprint, Xcode build, architecture, and simulator
 runtime; a JavaScript-only change reuses it. The script creates or reuses the
 dedicated `Kvitto End-to-End` simulator and fails if the requested runtime is
-unavailable. While
-the repository is private, it runs for changed flows, the `e2e` label, or a
-manual dispatch. Once public, it also runs for native changes and nightly.
+unavailable. It runs for native configuration, authentication, receipt data,
+drafts, queues, migrations, release controls, and changed flows, including
+deletions. The same path classifier selects CI runs and validates merge evidence.
+The `e2e` label and manual dispatch select it for other changes. Public
+repositories also run nightly. Removing the label cannot skip a required flow.
 
 The test script disables password autofill on its selected simulator before
 launching the app. The system's strong-password sheet can otherwise intercept
@@ -161,13 +163,36 @@ to confirm that code was deleted.
 - Keep documentation references current; `npm run lint:docs` rejects links to
   missing files and headings and unknown `npm run` scripts.
 
-## Repository settings
+## Merge readiness and repository settings
 
-These GitHub settings make the checks binding. They are not stored in the
-repository:
+`npm run merge:check` reads the current open pull requests without changing them.
+It exits unsuccessfully if any request lacks required evidence. The trusted
+`Merge readiness` workflow publishes the same decision on each request's exact
+head commit. It reads Code quality and End-to-end workflow results through the
+GitHub API, requires the iOS job to have run when selected, and checks review
+threads. Missing, pending, failed, cancelled, or older results cannot pass.
 
-- A branch ruleset for `main` that requires the `CI result` status check and
-  pull requests before merging.
-- The merge queue for `main`, so each change is tested with the changes merged
-  before it. The quality workflow already runs on `merge_group`.
-- The `breaking-contract` and `e2e` labels.
+CodeRabbit must have posted a substantive review for the current commit. Its
+rate-limited status, an in-progress message, or a comment reply does not count.
+New commits need a new review. Free review limits can therefore delay merging;
+the gate does not request reviews or bypass the limit. All review threads must
+be resolved, and outstanding requests for changes still block merging.
+
+The workflow runs only code from `main`, without installing dependencies or
+executing PR code. Bot status/comments and pushes to main refresh it. A 15-minute schedule
+checks CI completion, thread resolutions, and requests without bot events;
+manual dispatch refreshes it immediately. API errors leave the check pending.
+Changed files, reviews, and review threads are paginated. A truncated file list
+blocks the check. The gate uses a documented CodeRabbit summary format; a bot
+format change fails closed and requires an adapter update.
+
+After this workflow is merged and has published a check, update the existing
+`main` branch protection to require `CI result` and `Merge readiness` from the
+GitHub Actions app (ID 15368). Preserve strict up-to-date checks, administrator
+enforcement, pull-request requirements, and conversation resolution. Do not
+require only `Quality checks`. This activation is a repository setting, not a
+file change. Do not enable a merge queue yet: the readiness gate verifies PR
+heads, not a queue's synthetic merge commit.
+
+The `breaking-contract` and `e2e` labels remain available. Neither label bypasses
+merge readiness or permits release operations.

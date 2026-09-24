@@ -37,15 +37,11 @@ jobs:
       - run: npm ci
       - name: Check application and compatibility tests
         run: npm run check
-      - name: Deploy compatible staging backend
+      - name: Check staging release readiness
         env:
           CONVEX_DEPLOY_KEY: ${{ secrets.CONVEX_STAGING_DEPLOY_KEY }}
-        run: |
-          if [[ "$CONVEX_DEPLOY_KEY" != 'prod:courteous-jay-215|'* ]]; then
-            echo "::error::Expected a deploy key for staging (courteous-jay-215)."
-            exit 1
-          fi
-          npx convex deploy
+        run: npm run release:check
+
       - name: Publish compatible iOS update
         env:
           UPDATE_MESSAGE: ${{ inputs.message }}
