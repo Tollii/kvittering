@@ -21,6 +21,9 @@ import { useHousehold } from "./session";
 
 const tokenKey = "kvitto.push-token";
 
+/** Expo types app config `extra` as `any`. */
+const easExtra = z.object({ eas: z.object({ projectId: z.string() }) });
+
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
     shouldPlaySound: false,
@@ -52,7 +55,7 @@ export function NotificationSettings() {
   );
 
   const projectId =
-    Constants.expoConfig?.extra?.eas?.projectId ??
+    easExtra.safeParse(Constants.expoConfig?.extra).data?.eas.projectId ??
     Constants.easConfig?.projectId;
 
   const available =

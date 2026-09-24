@@ -225,7 +225,7 @@ export const finish = internalMutation({
         .withIndex("by_householdId_and_purchaseDate", (q) =>
           q
             .eq("householdId", receipt.householdId)
-            .eq("data.purchaseDate", args.data.purchaseDate!),
+            .eq("data.purchaseDate", args.data.purchaseDate),
         )
         .filter((q) => q.lte(q.field("_creationTime"), through))
         .order("desc")

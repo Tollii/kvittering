@@ -1,3 +1,7 @@
+import {
+  readModelRequest,
+  type ModelRequest,
+} from "../src/lib/testing/model-requests";
 /// <reference types="vite/client" />
 import { convexTest } from "convex-test";
 import { expect, it, vi, afterEach } from "vitest";
@@ -290,11 +294,11 @@ it("batches independent profiles and uses only quantity questions for cached pro
     { ...product, id: "different-product", name: "Milk", originalText: "Milk" },
   ];
   await t.run((ctx) => ctx.db.patch("receipts", id, { data }));
-  const requests: { questions: Record<string, { type: string }> }[] = [];
+  const requests: ModelRequest[] = [];
   vi.stubGlobal(
     "fetch",
-    vi.fn(async (_url, init) => {
-      const request = JSON.parse(init.body);
+    vi.fn(async (_url: string, init?: RequestInit) => {
+      const request = readModelRequest(init);
       requests.push(request);
 
       return new Response(

@@ -22,12 +22,14 @@ const device = v.object({
 });
 
 /** A fixed insertion boundary visits each existing device once during normal traversal. */
+export const sendAllArgs = v.object({
+  cursor: v.string().optional(),
+  through: v.number().optional(),
+  today: v.string().optional(),
+});
+
 export const sendAll = internalMutation({
-  args: {
-    cursor: v.string().optional(),
-    through: v.number().optional(),
-    today: v.string().optional(),
-  },
+  args: sendAllArgs,
   returns: v.number(),
   handler: async (ctx, args) => {
     if (!(await featureEnabled(ctx, "spendingAnalysis"))) return 0;
@@ -128,8 +130,13 @@ export const forHousehold = internalAction({
   },
 });
 
+export const deliverBatchArgs = v.object({
+  today: v.string(),
+  devices: v.array(device),
+});
+
 export const deliverBatch = internalAction({
-  args: { today: v.string(), devices: v.array(device) },
+  args: deliverBatchArgs,
   returns: v.null(),
   handler: async (ctx, { today, devices }) => {
     const digests = new Map<

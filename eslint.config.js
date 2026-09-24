@@ -85,11 +85,35 @@ module.exports = defineConfig([
         tsconfigRootDir: path.dirname(require.resolve("./package.json")),
       },
     },
-    // Rest destructuring deliberately omits persisted metadata.
     rules: {
+      // Rest destructuring deliberately omits persisted metadata.
       "@typescript-eslint/no-unused-vars": [
         "warn",
         { ignoreRestSiblings: true, argsIgnorePattern: "^_" },
+      ],
+      // `any` disables checking; parse external data into declared types instead.
+      "@typescript-eslint/no-explicit-any": "error",
+      "@typescript-eslint/no-unsafe-assignment": "error",
+      "@typescript-eslint/no-unsafe-member-access": "error",
+      "@typescript-eslint/no-unsafe-argument": "error",
+      "@typescript-eslint/no-unsafe-return": "error",
+      "@typescript-eslint/no-unsafe-call": "error",
+      "@typescript-eslint/no-unsafe-function-type": "error",
+      "@typescript-eslint/no-unnecessary-type-assertion": "error",
+      "@typescript-eslint/ban-ts-comment": [
+        "error",
+        { "ts-expect-error": "allow-with-description" },
+      ],
+      // A dropped promise loses its failure and its ordering.
+      "@typescript-eslint/no-floating-promises": "error",
+      "@typescript-eslint/no-misused-promises": "error",
+      "@typescript-eslint/await-thenable": "error",
+      "@typescript-eslint/only-throw-error": "error",
+      "@typescript-eslint/prefer-promise-reject-errors": "error",
+      "@typescript-eslint/no-base-to-string": "error",
+      "@typescript-eslint/switch-exhaustiveness-check": [
+        "error",
+        { considerDefaultExhaustiveForUnions: true },
       ],
     },
   },

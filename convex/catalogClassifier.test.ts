@@ -1,3 +1,7 @@
+import {
+  readModelRequest,
+  type ModelRequest,
+} from "../src/lib/testing/model-requests";
 import { afterEach, expect, it, vi } from "vitest";
 import { TypeSafeClient } from "@typesafe-ai/sdk";
 import { classifyCatalogProducts } from "./catalogClassifier";
@@ -27,15 +31,12 @@ const client = () =>
 afterEach(() => vi.unstubAllGlobals());
 
 it("sends all receipt matches and category questions in one model request", async () => {
-  const requests: {
-    state: { products: unknown[] };
-    questions: Record<string, { type: string }>;
-  }[] = [];
+  const requests: ModelRequest[] = [];
 
   vi.stubGlobal(
     "fetch",
-    vi.fn(async (_url, init) => {
-      const request: (typeof requests)[number] = JSON.parse(init.body);
+    vi.fn(async (_url: string, init?: RequestInit) => {
+      const request = readModelRequest(init);
       requests.push(request);
 
       const answers = Object.fromEntries(
@@ -69,7 +70,7 @@ it("sends all receipt matches and category questions in one model request", asyn
   );
 
   expect(requests).toHaveLength(1);
-  expect(requests[0].state.products).toHaveLength(12);
+  expect(requests[0].state?.products).toHaveLength(12);
   expect(Object.keys(requests[0].questions)).toHaveLength(24);
   expect(result).toHaveLength(12);
   expect(
@@ -120,12 +121,12 @@ it("scores duplicate catalog records together and keeps their individual diagnos
   let questionCount = 0;
   vi.stubGlobal(
     "fetch",
-    vi.fn(async (_url, init) => {
-      const request = JSON.parse(init.body);
+    vi.fn(async (_url: string, init?: RequestInit) => {
+      const request = readModelRequest(init);
       questionCount = Object.keys(request.questions).length;
-      expect(request.state.products[0].catalogCandidates).toHaveLength(1);
+      expect(request.state?.products?.[0].catalogCandidates).toHaveLength(1);
       expect(
-        request.state.products[0].catalogCandidates[0].alternativeNames,
+        request.state?.products?.[0].catalogCandidates?.[0].alternativeNames,
       ).toHaveLength(2);
 
       return new Response(

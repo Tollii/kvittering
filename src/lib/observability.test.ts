@@ -62,12 +62,10 @@ describe("operational diagnostics", () => {
 
     reportError(error, "release.policy_refresh");
 
-    expect(Sentry.captureException).toHaveBeenCalledWith(
+    expect(vi.mocked(Sentry.captureException).mock.lastCall).toMatchObject([
       error,
-      expect.objectContaining({
-        tags: expect.objectContaining({ operation: "release.policy_refresh" }),
-      }),
-    );
+      { tags: { operation: "release.policy_refresh" } },
+    ]);
   });
 
   it("keeps correlation and stack frames without sending receipt or provider payloads", () => {

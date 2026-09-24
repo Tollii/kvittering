@@ -1,3 +1,7 @@
+import {
+  readModelRequest,
+  type ModelRequest,
+} from "../src/lib/testing/model-requests";
 /// <reference types="vite/client" />
 import { convexTest } from "convex-test";
 import { afterEach, expect, it, vi } from "vitest";
@@ -165,15 +169,12 @@ it("evaluates only the caller's latest category decisions in one request", async
   });
   vi.stubEnv("TYPESAFE_API_KEY", "test-key");
 
-  const requests: {
-    state: { products: unknown[] };
-    questions: Record<string, { type: string }>;
-  }[] = [];
+  const requests: ModelRequest[] = [];
 
   vi.stubGlobal(
     "fetch",
-    vi.fn(async (_url, init) => {
-      const request = JSON.parse(init.body);
+    vi.fn(async (_url: string, init?: RequestInit) => {
+      const request = readModelRequest(init);
       requests.push(request);
 
       return new Response(
@@ -207,7 +208,7 @@ it("evaluates only the caller's latest category decisions in one request", async
     const result = await first.action(api.correctionEvaluation.evaluate, {});
     expect(result).toMatchObject({ checked: 1, matched: 1 });
     expect(requests).toHaveLength(1);
-    expect(requests[0].state.products).toHaveLength(1);
+    expect(requests[0].state?.products).toHaveLength(1);
   } finally {
     vi.unstubAllGlobals();
   }

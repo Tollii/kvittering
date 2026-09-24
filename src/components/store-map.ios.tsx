@@ -5,7 +5,12 @@ import { useTheme } from "@/constants/theme";
 import { Copy } from "@/components/ui";
 import { formatMoney } from "@/lib/domain/receipt";
 import type { StoreMapProps } from "./store-map";
-import type { StoreLocation } from "@/lib/domain/store-spending";
+import { z } from "zod";
+
+/** The effect key is serialized so amount-only updates keep the map position. */
+const storeLocations = z.array(
+  z.object({ latitude: z.number(), longitude: z.number() }),
+);
 
 export function StoreMap({ stores, onSelect }: Readonly<StoreMapProps>) {
   const colors = useTheme();
@@ -21,7 +26,7 @@ export function StoreMap({ stores, onSelect }: Readonly<StoreMapProps>) {
 
   useEffect(() => {
     if (!ready) return;
-    const coordinates: StoreLocation[] = JSON.parse(coordinateKey);
+    const coordinates = storeLocations.parse(JSON.parse(coordinateKey));
 
     if (coordinates.length === 1) {
       map.current?.animateToRegion(

@@ -1,18 +1,27 @@
 import Storage from "expo-sqlite/kv-store";
+import { z } from "zod";
 import { storageSuffix } from "../deployment-storage";
 import { installedRelease } from "./client";
 import { parseVersionPolicy, type VersionPolicy } from "./policy";
 import { legacyFeatures, type FeatureFlags } from "../featureFlags";
+
+/** The policy itself is parsed by its owner; this checks the cache envelope. */
+const cachedPolicy = z.object({
+  policy: z.unknown(),
+  fetchedAt: z.number().nonnegative(),
+});
 
 const prefix = `release-policy-v1${storageSuffix}:${installedRelease.channel}:${installedRelease.platform}`;
 
 export function readCachedPolicy():
   { policy: VersionPolicy; fetchedAt: number } | undefined {
   try {
-    const raw = JSON.parse(Storage.getItemSync(prefix) ?? "null");
+    const raw = cachedPolicy.safeParse(
+      JSON.parse(Storage.getItemSync(prefix) ?? "null"),
+    );
 
-    if (!raw || !Number.isFinite(raw.fetchedAt) || raw.fetchedAt < 0) return;
-    const policy = parseVersionPolicy(raw.policy);
+    if (!raw.success) return;
+    const policy = parseVersionPolicy(raw.data.policy);
 
     if (
       policy.channel !== installedRelease.channel ||
@@ -20,7 +29,7 @@ export function readCachedPolicy():
     )
       return;
 
-    return { policy, fetchedAt: Math.min(raw.fetchedAt, Date.now()) };
+    return { policy, fetchedAt: Math.min(raw.data.fetchedAt, Date.now()) };
   } catch {
     return;
   }

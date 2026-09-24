@@ -7,6 +7,7 @@ import {
 } from "react";
 import { useQuery } from "convex/react";
 import Storage from "expo-sqlite/kv-store";
+import { z } from "zod";
 import { api } from "../../convex/_generated/api";
 import { installedRelease } from "@/lib/releases/client";
 import { storageSuffix } from "@/lib/deployment-storage";
@@ -31,6 +32,11 @@ const fallback = (): FeatureFlagSnapshot => ({
   values: defaultFeatureFlags(),
 });
 
+/** Older clients cached flags inside the release policy; the snapshot parser owns the values. */
+const legacyPolicy = z.object({
+  policy: z.looseObject({ features: z.unknown() }),
+});
+
 function readSnapshot(): FeatureFlagSnapshot {
   try {
     const saved = Storage.getItemSync(storageKey);
@@ -38,11 +44,18 @@ function readSnapshot(): FeatureFlagSnapshot {
     if (saved) return parseFeatureFlagSnapshot(JSON.parse(saved), scope);
     // Retain configured disabled values on the first offline start after this upgrade.
     const legacyKey = `release-policy-v1${storageSuffix}:${scope.channel}:${scope.platform}`;
-    const legacy = JSON.parse(Storage.getItemSync(legacyKey) ?? "null")?.policy;
 
-    if (legacy)
+    const legacy = legacyPolicy.safeParse(
+      JSON.parse(Storage.getItemSync(legacyKey) ?? "null"),
+    );
+
+    if (legacy.success)
       return parseFeatureFlagSnapshot(
-        { ...legacy, revision: 0, values: legacy.features },
+        {
+          ...legacy.data.policy,
+          revision: 0,
+          values: legacy.data.policy.features,
+        },
         scope,
       );
   } catch {

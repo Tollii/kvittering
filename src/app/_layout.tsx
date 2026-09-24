@@ -34,7 +34,7 @@ export function ErrorBoundary({ retry, error }: Readonly<ErrorBoundaryProps>) {
             ? error.message
             : "Kontroller nettilkoblingen og prøv igjen."}
         </Notice>
-        <Button title="Prøv igjen" onPress={retry} />
+        <Button title="Prøv igjen" onPress={() => void retry()} />
       </Screen>
     </SafeAreaProvider>
   );
