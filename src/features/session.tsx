@@ -42,6 +42,7 @@ import {
   receiptStorage,
   type CachedHousehold,
 } from "@/lib/receipt-storage";
+import { visibleHousehold } from "@/lib/household";
 import { createQueueRunner, type LocalReceipt } from "@/lib/upload-queue";
 import { Loading, Notice, Screen } from "@/components/ui";
 import { CatalogQueryProvider } from "./catalog-query-provider";
@@ -177,11 +178,7 @@ function HouseholdProvider({
     () => null,
   );
 
-  const household = details
-    ? { id: details.household._id, name: details.household.name }
-    : !online
-      ? cached
-      : null;
+  const household = visibleHousehold(details, cached);
 
   const queue = useSyncExternalStore(
     subscribeStorage,
@@ -210,11 +207,7 @@ function HouseholdProvider({
   useEffect(() => {
     if (details === undefined) return;
 
-    const value = details
-      ? { id: details.household._id, name: details.household.name }
-      : null;
-
-    cacheHousehold(owner, value);
+    cacheHousehold(owner, visibleHousehold(details, null));
   }, [details, owner]);
   const householdId = household?.id;
   useEffect(() => {
