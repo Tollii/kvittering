@@ -1,4 +1,5 @@
 import { beforeEach, expect, it, vi } from "vitest";
+import * as Crypto from "expo-crypto";
 import * as AppleAuthentication from "expo-apple-authentication";
 import { requestAppleIdentity } from "./apple-authentication";
 
@@ -11,8 +12,10 @@ vi.mock("expo-apple-authentication", () => ({
 // oxlint-disable-next-line anti-slop/no-module-mocking -- Replace native randomness and hashing with a known nonce pair.
 vi.mock("expo-crypto", () => ({
   randomUUID: () => "native-request",
-  digestStringAsync: async () =>
-    "3a461e0943140fad72dae7438017ced94863859971a272ea51e87fa0ae2914b8",
+  digestStringAsync: vi.fn<typeof Crypto.digestStringAsync>(
+    async () =>
+      "3a461e0943140fad72dae7438017ced94863859971a272ea51e87fa0ae2914b8",
+  ),
   CryptoDigestAlgorithm: { SHA256: "SHA-256" },
 }));
 
@@ -38,6 +41,10 @@ it("sends a hashed nonce to Apple and retains the raw nonce and first-use name f
 
   const identity = await requestAppleIdentity();
 
+  expect(Crypto.digestStringAsync).toHaveBeenCalledWith(
+    Crypto.CryptoDigestAlgorithm.SHA256,
+    "native-request",
+  );
   expect(AppleAuthentication.signInAsync).toHaveBeenCalledWith({
     nonce: "3a461e0943140fad72dae7438017ced94863859971a272ea51e87fa0ae2914b8",
     requestedScopes: [0, 1],
