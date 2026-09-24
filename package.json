@@ -51,7 +51,7 @@
     "expo-updates": "~57.0.23",
     "expo-web-browser": "~57.0.3",
     "expo-widgets": "~57.0.21",
-    "openai": "^7.18.0",
+    "openai": "^7.20.0",
     "react": "19.2.3",
     "react-native": "0.86.3",
     "react-native-gesture-handler": "~2.32.0",
