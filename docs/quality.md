@@ -234,7 +234,10 @@ references, scheduled functions, workflow callbacks, and installed clients.
 
 Dependabot proposes weekly npm updates and monthly GitHub Actions updates. Expo,
 React, and React Native minor and major versions are excluded; upgrade the SDK
-with `npx expo install --fix` and review it with the release policy.
+with `npx expo install --fix` and review it with the release policy. CI fails
+when installed Expo packages differ from the SDK's expected versions.
+`@sentry/react-native` is excluded in `expo.install.exclude` because the app
+deliberately uses a newer major version than the SDK recommends.
 
 `npm run test:mutation` changes domain rules one at a time and reports which
 changes no test notices. Pass `-- --mutate src/lib/domain/<module>.ts` for one

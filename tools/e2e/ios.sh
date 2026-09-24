@@ -58,12 +58,16 @@ else
   npx expo prebuild --platform ios --clean
   # Installed updates would replace the JavaScript under test.
   plutil -replace EXUpdatesEnabled -bool NO ios/kvitto/Supporting/Expo.plist
-  xcodebuild -workspace ios/kvitto.xcworkspace -scheme kvitto \
+  if ! xcodebuild -workspace ios/kvitto.xcworkspace -scheme kvitto \
     -configuration Release -sdk iphonesimulator \
     -destination "generic/platform=iOS Simulator" \
     -derivedDataPath build/derived \
     CODE_SIGNING_ALLOWED=NO ONLY_ACTIVE_ARCH=YES \
-    -quiet
+    >"$out/xcodebuild.log" 2>&1; then
+    grep -E "error:|BUILD FAILED|Command .* failed" "$out/xcodebuild.log" | head -n 60 >&2
+    echo "error: the simulator build failed; the full log is $out/xcodebuild.log." >&2
+    exit 1
+  fi
   rm -rf "$app"
   cp -R build/derived/Build/Products/Release-iphonesimulator/kvitto.app "$app"
 fi
