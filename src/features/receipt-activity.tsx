@@ -232,7 +232,7 @@ export function ReceiptActivityButton({
             ? "Følg de neste 30 på låseskjermen"
             : "Følg behandling på låseskjermen"
         }
-        secondary
+        variant="secondary"
         busy={busy}
         disabled={!online}
         onPress={() => {
@@ -252,7 +252,7 @@ export function ReceiptActivityButton({
             .finally(() => setBusy(false));
         }}
       />
-      {!!error && <Notice error>{error}</Notice>}
+      {!!error && <Notice tone="error">{error}</Notice>}
     </>
   );
 }

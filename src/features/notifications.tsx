@@ -129,8 +129,7 @@ export function NotificationSettings() {
       {available && (
         <Button
           title={enabled ? "Slå av varsler" : "Slå på varsler"}
-          tint={!enabled}
-          secondary={!!enabled}
+          variant={enabled ? "secondary" : "tint"}
           icon={enabled ? "bell.slash" : "bell"}
           busy={busy}
           onPress={() => void change()}
@@ -138,12 +137,12 @@ export function NotificationSettings() {
       )}
       {!granted && (
         <Button
-          secondary
+          variant="secondary"
           title="Åpne innstillinger"
           onPress={() => void Linking.openSettings()}
         />
       )}
-      {!!error && <Notice error>{error}</Notice>}
+      {!!error && <Notice tone="error">{error}</Notice>}
     </View>
   );
 }
@@ -262,7 +261,7 @@ export function NotificationRouting() {
   }, [client, household.id]);
 
   return error ? (
-    <Notice error>{error}</Notice>
+    <Notice tone="error">{error}</Notice>
   ) : confirmation ? (
     <Notice>{confirmation}</Notice>
   ) : null;

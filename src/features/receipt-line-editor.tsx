@@ -419,7 +419,7 @@ export function ReceiptLineEditor({
                     ? "Produktkobling endret"
                     : "Endre produktkobling"
                 }
-                secondary
+                variant="secondary"
                 compact
                 onPress={() => setProductOpen(!productOpen)}
               />
@@ -504,7 +504,7 @@ export function ReceiptLineEditor({
               </Notice>
               <Button
                 title="Dette stemmer"
-                tint
+                variant="tint"
                 compact
                 icon="checkmark"
                 onPress={() => {
@@ -519,7 +519,12 @@ export function ReceiptLineEditor({
             </>
           )}
           {expanded && (
-            <Button title="Fjern linje" danger compact onPress={onRemove} />
+            <Button
+              title="Fjern linje"
+              variant="danger"
+              compact
+              onPress={onRemove}
+            />
           )}
         </View>
       )}
@@ -529,7 +534,7 @@ export function ReceiptLineEditor({
           <View style={{ flexDirection: "row", gap: 8 }}>
             <Button
               title="Dette stemmer"
-              tint
+              variant="tint"
               compact
               icon="checkmark"
               onPress={() => {
@@ -543,7 +548,7 @@ export function ReceiptLineEditor({
             />
             <Button
               title="Rediger"
-              secondary
+              variant="secondary"
               compact
               onPress={() => setExpanded(true)}
             />
@@ -589,7 +594,7 @@ function ProductSelector({
         <View style={{ flex: 1 }}>
           <Button
             title="Opprett eget produkt"
-            secondary
+            variant="secondary"
             compact
             onPress={() => onChange({ kind: "new_household" })}
           />
@@ -597,7 +602,7 @@ function ProductSelector({
         <View style={{ flex: 1 }}>
           <Button
             title="Hold varen separat"
-            secondary
+            variant="secondary"
             compact
             onPress={() => onChange({ kind: "separate" })}
           />

@@ -52,7 +52,7 @@ export function CatalogStorePicker({
         <Loading title="Henter butikker …" />
       )}
       {(query.isError || query.data?.status === "error") && (
-        <Notice error>
+        <Notice tone="error">
           {query.data?.message ?? "Butikkene kunne ikke hentes nå."}
         </Notice>
       )}

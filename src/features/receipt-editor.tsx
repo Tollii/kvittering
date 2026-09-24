@@ -129,8 +129,8 @@ export function ReceiptEditor({
   );
 
   const [summaryLines, setSummaryLines] = useState(false);
-  const [fields, setFields] = useState(false);
-  const [actions, setActions] = useState(false);
+  // One sheet at a time: the receipt details or, off iOS, the action menu.
+  const [sheet, setSheet] = useState<"fields" | "actions" | null>(null);
   const navigation = useNavigation();
   usePreventRemove(dirty && !busy, ({ data: action }) => {
     Alert.alert("Forkaste endringene?", "Endringene er ikke lagret.", [
@@ -356,7 +356,7 @@ export function ReceiptEditor({
       <IconButton
         name="ellipsis"
         label="Flere handlinger"
-        onPress={() => setActions(true)}
+        onPress={() => setSheet("actions")}
       />
     );
 
@@ -380,7 +380,7 @@ export function ReceiptEditor({
           <Stack.Toolbar.MenuAction
             icon="pencil"
             disabled={!data || busy}
-            onPress={() => setFields(true)}
+            onPress={() => setSheet("fields")}
           >
             Kvitteringsdetaljer
           </Stack.Toolbar.MenuAction>
@@ -451,13 +451,13 @@ export function ReceiptEditor({
                   });
                   setMessage("");
                 }}
-                onEditFields={() => setFields(true)}
+                onEditFields={() => setSheet("fields")}
                 onShowLines={(lines) => setAllLines(lines === "all")}
                 onAddLine={addLine}
                 onChange={change}
               />
             }
-            onEditFields={() => setFields(true)}
+            onEditFields={() => setSheet("fields")}
           />
         }
         insetTop={false}
@@ -492,7 +492,7 @@ export function ReceiptEditor({
             <Notice tone="warning">Endret på en annen enhet</Notice>
             <Button
               title="Hent siste versjon"
-              secondary
+              variant="secondary"
               onPress={() => {
                 if (dirty)
                   Alert.alert(
@@ -510,7 +510,7 @@ export function ReceiptEditor({
         )}
 
         {receipt.provider.includes("mock") && <Notice>Demodata</Notice>}
-        {!!receipt.error && <Notice error>{receipt.error}</Notice>}
+        {!!receipt.error && <Notice tone="error">{receipt.error}</Notice>}
         {receipt.status === "failed" && !processing && (
           <Button
             title="Les bildene på nytt"
@@ -624,7 +624,7 @@ export function ReceiptEditor({
               )}
             />
             {Object.entries(moneyErrors).map(([field, value]) => (
-              <Notice key={field} error>
+              <Notice key={field} tone="error">
                 {value}
               </Notice>
             ))}
@@ -681,7 +681,7 @@ export function ReceiptEditor({
             </Disclosure>
             <ReceiptFields
               key={`fields-${generation}`}
-              visible={fields}
+              visible={sheet === "fields"}
               receiptId={receipt._id}
               onPhysicalStore={(store) => {
                 dispatch({
@@ -697,7 +697,7 @@ export function ReceiptEditor({
               data={data}
               onChange={change}
               onMoneyError={(value) => moneyError("total", value)}
-              onClose={() => setFields(false)}
+              onClose={() => setSheet(null)}
             />
           </View>
         ) : (
@@ -711,24 +711,25 @@ export function ReceiptEditor({
             )}
           </Panel>
         )}
-        {(!data || processing) && !!error && <Notice error>{error}</Notice>}
-        {actions && (
+        {(!data || processing) && !!error && (
+          <Notice tone="error">{error}</Notice>
+        )}
+        {sheet === "actions" && (
           <Sheet
             title="Flere handlinger"
             visible
-            onClose={() => setActions(false)}
+            onClose={() => setSheet(null)}
           >
             <Row
               title="Kvitteringsdetaljer"
               onPress={() => {
-                setActions(false);
-                setFields(true);
+                setSheet("fields");
               }}
             />
             <Row
               title="Legg til linje"
               onPress={() => {
-                setActions(false);
+                setSheet(null);
                 addLine();
               }}
             />
@@ -750,16 +751,16 @@ export function ReceiptEditor({
             />
             <Button
               title="Les bildene på nytt"
-              secondary
+              variant="secondary"
               disabled={processing || !online || busy || dirty}
               onPress={() => {
-                setActions(false);
+                setSheet(null);
                 retry();
               }}
             />
             <Button
               title="Slett kvittering"
-              danger
+              variant="danger"
               disabled={!online || busy || receipt.status === "uploading"}
               onPress={removeReceipt}
             />

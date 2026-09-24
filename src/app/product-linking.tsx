@@ -141,7 +141,7 @@ export default function ProductLinking() {
             <View style={{ flexGrow: 1, flexShrink: 1 }}>
               <Button
                 title="Angre"
-                secondary
+                variant="secondary"
                 compact
                 disabled={!last || busy || !online}
                 onPress={() => void undoLast()}
@@ -152,7 +152,7 @@ export default function ProductLinking() {
                 <View style={{ flexGrow: 1, flexShrink: 1 }}>
                   <Button
                     title="Søk"
-                    secondary
+                    variant="secondary"
                     compact
                     disabled={busy || !online}
                     onPress={() => setSearchKey(itemKey)}
@@ -161,7 +161,7 @@ export default function ProductLinking() {
                 <View style={{ flexGrow: 1, flexShrink: 1 }}>
                   <Button
                     title="Ingen passer"
-                    tint
+                    variant="tint"
                     compact
                     disabled={busy || !online}
                     onPress={() => void select({ kind: "separate" })}
@@ -216,7 +216,7 @@ export default function ProductLinking() {
           Koble til nettet for å lagre produktvalg.
         </Notice>
       )}
-      {!!error && <Notice error>{error}</Notice>}
+      {!!error && <Notice tone="error">{error}</Notice>}
       {busy && <ActivityIndicator accessibilityLabel="Lagrer produktvalg" />}
       {item ? (
         <>

@@ -75,8 +75,6 @@ module.exports = defineConfig([
       "sonarjs/no-unused-vars": "off",
       // Expo and Convex require specific entry filenames.
       "sonarjs/file-name-differ-from-class": "off",
-      // Boolean inputs to pure state decisions do not require separate functions for each case.
-      "sonarjs/no-selector-parameter": "off",
     },
   },
   {

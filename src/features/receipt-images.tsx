@@ -63,12 +63,12 @@ export function ReceiptImages({
       ) : (
         <Button
           title="Vis originalkvittering"
-          secondary
+          variant="secondary"
           busy={busy}
           onPress={() => void load()}
         />
       )}
-      {!!error && !open && <Notice error>{error}</Notice>}
+      {!!error && !open && <Notice tone="error">{error}</Notice>}
       <Sheet
         title="Originalkvittering"
         visible={open}
@@ -76,7 +76,7 @@ export function ReceiptImages({
       >
         {!!error && (
           <>
-            <Notice error>{error}</Notice>
+            <Notice tone="error">{error}</Notice>
             <Button title="Prøv igjen" onPress={() => void load()} />
           </>
         )}

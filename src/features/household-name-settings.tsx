@@ -58,7 +58,7 @@ export function HouseholdNameSettings() {
             setDraft((current) => (current ? { ...current, name } : null))
           }
         />
-        {!!error && <Notice error>{error}</Notice>}
+        {!!error && <Notice tone="error">{error}</Notice>}
         <Button
           title="Lagre"
           busy={busy}

@@ -63,7 +63,7 @@ export function ReleaseSettings() {
       </Copy>
       <Button
         title="Se etter oppdateringer"
-        secondary
+        variant="secondary"
         busy={busy}
         onPress={() => void check()}
       />

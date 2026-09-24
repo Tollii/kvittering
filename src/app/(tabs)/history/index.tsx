@@ -246,7 +246,7 @@ export default function History() {
       {tab === "receipts" && history.status === "CanLoadMore" && !term && (
         <Button
           title="Vis flere kvitteringer"
-          secondary
+          variant="secondary"
           onPress={() => history.loadMore(30)}
         />
       )}

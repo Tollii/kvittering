@@ -138,17 +138,14 @@ export function Disclosure({
 
 export function Notice({
   children,
-  error = false,
-  tone,
+  tone = "info",
   icon,
 }: Readonly<{
   children: ReactNode;
-  error?: boolean;
   tone?: "info" | "warning" | "error" | "success";
   icon?: SymbolViewProps["name"];
 }>) {
   const colors = useTheme();
-  const kind = tone ?? (error ? "error" : "info");
 
   const palette = {
     info: {
@@ -175,7 +172,7 @@ export function Notice({
       accent: colors.success,
       icon: "checkmark.circle" as const,
     },
-  }[kind];
+  }[tone];
 
   return (
     <View
@@ -195,7 +192,7 @@ export function Notice({
       </View>
       <Copy
         size={15}
-        accessibilityRole={kind === "error" ? "alert" : undefined}
+        accessibilityRole={tone === "error" ? "alert" : undefined}
         style={{ color: palette.text, flex: 1 }}
       >
         {children}

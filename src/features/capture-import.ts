@@ -79,12 +79,15 @@ export function createImportQueue() {
   };
 }
 
+/** Whether the capture screen can take shared files now. */
+export type CaptureAvailability = "idle" | "busy" | "hidden";
+
+/** Shared files wait until capture is on screen and idle. */
 export function nextImport(
   batches: readonly ImportBatch[],
-  focused: boolean,
-  busy: boolean,
+  capture: CaptureAvailability,
 ): ImportBatch | undefined {
-  return focused && !busy
+  return capture === "idle"
     ? batches.find((batch) => batch.state === "pending")
     : undefined;
 }

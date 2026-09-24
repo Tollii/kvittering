@@ -48,7 +48,7 @@ export function ReceiptFields({
       onClose={close}
       footer={
         <>
-          {!!totalError && <Notice error>{totalError}</Notice>}
+          {!!totalError && <Notice tone="error">{totalError}</Notice>}
           <Button
             title="Ferdig"
             icon="checkmark"

@@ -400,7 +400,7 @@ export function ReceiptFooter({
           <View style={{ flex: 1 }}>
             <Button
               title="Til innboksen"
-              secondary
+              variant="secondary"
               onPress={() => router.dismissTo("/(tabs)/inbox")}
             />
           </View>

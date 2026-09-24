@@ -57,7 +57,8 @@ type SessionData = {
   details: Household | undefined;
   online: boolean;
   queue: LocalReceipt[];
-  synchronize: (retryFailed?: boolean) => Promise<void>;
+  synchronize: () => Promise<void>;
+  retryFailedUploads: () => Promise<void>;
 };
 
 const emptyQueue: LocalReceipt[] = [];
@@ -216,43 +217,53 @@ function HouseholdProvider({
     );
   }, [householdId, owner]);
 
-  const synchronize = useCallback(
-    async (retryFailed = false) => {
-      if (!householdId) return;
+  const showQueueReadError = useCallback(() => {
+    if (active.current)
+      setQueueError("Kunne ikke lese kvitteringene på denne enheten.");
+  }, []);
 
-      try {
-        if (!canUpload.current) return;
+  const synchronize = useCallback(async () => {
+    if (!householdId) return;
 
-        if (retryFailed) {
-          for (const entry of receiptStorage.list(owner, householdId)) {
-            receiptStorage.update({ ...entry, error: undefined });
-          }
-        }
+    try {
+      if (!canUpload.current) return;
 
-        await drainQueue(
-          owner,
+      await drainQueue(
+        owner,
+        householdId,
+        receiptUploadTransport(
+          convex,
           householdId,
-          receiptUploadTransport(
-            convex,
-            householdId,
-            () => active.current && canUpload.current,
-            `${storageSuffix}:${owner}:${householdId}`,
-          ),
-          () =>
-            active.current &&
-            canUpload.current &&
-            AppState.currentState === "active",
-        );
-        setQueueError("");
-      } catch (error) {
-        reportError(error, "receipt.queue_read");
+          () => active.current && canUpload.current,
+          `${storageSuffix}:${owner}:${householdId}`,
+        ),
+        () =>
+          active.current &&
+          canUpload.current &&
+          AppState.currentState === "active",
+      );
+      setQueueError("");
+    } catch (error) {
+      reportError(error, "receipt.queue_read");
+      showQueueReadError();
+    }
+  }, [convex, householdId, owner, showQueueReadError]);
 
-        if (active.current)
-          setQueueError("Kunne ikke lese kvitteringene på denne enheten.");
-      }
-    },
-    [convex, householdId, owner],
-  );
+  const retryFailedUploads = useCallback(async () => {
+    if (!householdId || !canUpload.current) return;
+
+    try {
+      for (const entry of receiptStorage.list(owner, householdId))
+        receiptStorage.update({ ...entry, error: undefined });
+    } catch (error) {
+      reportError(error, "receipt.queue_read");
+      showQueueReadError();
+
+      return;
+    }
+
+    await synchronize();
+  }, [householdId, owner, synchronize, showQueueReadError]);
 
   useEffect(() => {
     const initialUpload = setTimeout(() => void synchronize(), 0);
@@ -297,6 +308,7 @@ function HouseholdProvider({
         online,
         queue,
         synchronize,
+        retryFailedUploads,
       }}
     >
       {auth.isAuthenticated && (
@@ -312,7 +324,7 @@ function HouseholdProvider({
             "Behandling av kvitteringer er satt på pause. Nye bilder blir lagret på enheten."}
         </Notice>
       )}
-      {queueError ? <Notice error>{queueError}</Notice> : null}
+      {queueError ? <Notice tone="error">{queueError}</Notice> : null}
       <CatalogQueryProvider
         key={`${owner}:${household.id}`}
         scope={`${owner}:${household.id}`}

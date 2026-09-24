@@ -214,7 +214,7 @@ function PolicyProvider({
           </SafeAreaView>
         )}
         {error && requirement !== "required" ? (
-          <Notice error>{error}</Notice>
+          <Notice tone="error">{error}</Notice>
         ) : null}
         {children}
       </View>
@@ -235,11 +235,11 @@ function PolicyProvider({
           <Button title="Oppdater Kvitto" onPress={() => void openUpdate()} />
           <Button
             title="Kontroller igjen"
-            secondary
+            variant="secondary"
             busy={result.isFetching}
             onPress={() => void refresh()}
           />
-          {!!error && <Notice error>{error}</Notice>}
+          {!!error && <Notice tone="error">{error}</Notice>}
           <Copy muted size={13}>
             Versjon {installedRelease.version} ({installedRelease.build})
           </Copy>

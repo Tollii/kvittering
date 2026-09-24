@@ -96,12 +96,12 @@ export function AccountSettings({ disabled }: Readonly<{ disabled: boolean }>) {
       </Copy>
       <Button
         title="Logg ut"
-        secondary
+        variant="secondary"
         disabled={blocked}
         busy={pending === "signOut"}
         onPress={() => void run("signOut")}
       />
-      {!!error && <Notice error>{error}</Notice>}
+      {!!error && <Notice tone="error">{error}</Notice>}
     </View>
   );
 }

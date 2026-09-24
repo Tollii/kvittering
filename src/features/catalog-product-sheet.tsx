@@ -81,7 +81,7 @@ export function CatalogProductPicker({
         <Loading title="Henter produkter …" />
       )}
       {(query.isError || query.data?.status === "error") && (
-        <Notice error>
+        <Notice tone="error">
           {query.data?.message ?? "Kunne ikke hente produkter"}
         </Notice>
       )}
@@ -221,10 +221,14 @@ export function CatalogProductSheet({
           {full.categories.join(" › ")}
         </Copy>
       )}
-      <Button title="Endre produktkobling" secondary onPress={onChange} />
+      <Button
+        title="Endre produktkobling"
+        variant="secondary"
+        onPress={onChange}
+      />
       {query.isFetching && !full && <Loading />}
       {(query.isError || query.data?.status === "error") && (
-        <Notice error>Produktdetaljene kunne ikke hentes nå.</Notice>
+        <Notice tone="error">Produktdetaljene kunne ikke hentes nå.</Notice>
       )}
       {purchases && completeReceipts && (
         <Panel>
@@ -285,7 +289,7 @@ export function CatalogProductSheet({
         (!showPrices ? (
           <Button
             title="Hent butikkpriser"
-            secondary
+            variant="secondary"
             onPress={() => setShowPrices(true)}
           />
         ) : (

@@ -68,7 +68,7 @@ export function BudgetSettings() {
           Budsjettet er endret på en annen enhet. Din verdi vises fortsatt.
         </Notice>
       )}
-      {!!error && <Notice error>{error}</Notice>}
+      {!!error && <Notice tone="error">{error}</Notice>}
       <View style={{ flexDirection: "row", gap: 8 }}>
         <View style={{ flex: 1 }}>
           <Button
@@ -82,7 +82,7 @@ export function BudgetSettings() {
           <View style={{ flex: 1 }}>
             <Button
               title="Fjern budsjett"
-              secondary
+              variant="secondary"
               disabled={!online || busy}
               onPress={() => void save(null)}
             />

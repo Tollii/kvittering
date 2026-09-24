@@ -22,7 +22,7 @@ import { quickApproveData } from "@/lib/domain/receipt-review";
 
 export default function Inbox() {
   const colors = useTheme();
-  const { queue, online, synchronize } = useHousehold();
+  const { queue, online, retryFailedUploads } = useHousehold();
   const { receipts, loadingReceipts } = useCompleteReceipts({ kind: "inbox" });
   const reserved = new Set(queue.map((entry) => entry.receiptId));
 
@@ -175,10 +175,10 @@ export default function Inbox() {
                 {!!entry.error && (
                   <Button
                     title="Prøv igjen"
-                    tint
+                    variant="tint"
                     compact
                     icon="arrow.clockwise"
-                    onPress={() => void synchronize(true)}
+                    onPress={() => void retryFailedUploads()}
                     disabled={!online}
                   />
                 )}

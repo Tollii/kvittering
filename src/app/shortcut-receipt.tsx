@@ -40,7 +40,7 @@ export default function ReceiptShortcut() {
         </Copy>
       )}
       <Button
-        secondary
+        variant="secondary"
         title="Åpne historikken"
         onPress={() => router.replace("/history")}
       />

@@ -111,7 +111,7 @@ export default function Settings() {
                 <View style={{ flex: 1 }}>
                   <Button
                     title="Kopier"
-                    tint
+                    variant="tint"
                     icon="doc.on.doc"
                     disabled={!details || busy}
                     onPress={() =>
@@ -200,7 +200,7 @@ export default function Settings() {
         </FormSection>
         <FormSection title="Konto">
           <AccountSettings disabled={busy} />
-          {!!error && <Notice error>{error}</Notice>}
+          {!!error && <Notice tone="error">{error}</Notice>}
         </FormSection>
       </NativeForm>
     </Screen>
