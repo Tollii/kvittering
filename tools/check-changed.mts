@@ -27,6 +27,12 @@ run("Formatting", "prettier/bin/prettier.cjs", [
 
 run("Types", "typescript/bin/tsc", ["--noEmit"]);
 
+run("Tool types", "typescript/bin/tsc", [
+  "--noEmit",
+  "-p",
+  "tools/tsconfig.json",
+]);
+
 if (code.length > 0) {
   run("Oxlint", "oxlint/bin/oxlint", ["--deny-warnings", ...code]);
   run("Repository policy", "oxlint/bin/oxlint", [

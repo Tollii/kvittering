@@ -1,0 +1,11 @@
+{
+  // Node runs the tools/*.mts scripts directly, so their imports name the file
+  // extension. The root project must not allow that: Orval reads it and would
+  // add extensions to the generated catalog client.
+  "extends": "../tsconfig.json",
+  "compilerOptions": {
+    "allowImportingTsExtensions": true,
+    "types": ["node"]
+  },
+  "include": ["**/*.mts"]
+}
