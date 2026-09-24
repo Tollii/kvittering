@@ -5,7 +5,10 @@ import type { FunctionArgs } from "convex/server";
 import { api } from "../../convex/_generated/api";
 import { useCachedReceipts } from "./receipt-cache-context";
 import { useQueryLifecycle } from "./query-lifecycle-context";
-import { selectReceipts, selectReceiptHistory } from "../lib/receipt-selection";
+import {
+  createReceiptSelector,
+  selectReceiptHistory,
+} from "../lib/receipt-selection";
 
 /** Existing data remains readable until the bounded server backfill is complete. */
 export function useCompleteReceipts(
@@ -35,10 +38,8 @@ export function useCompleteReceipts(
     if (active && !cache.available && status === "CanLoadMore") loadMore(50);
   }, [active, cache.available, status, loadMore]);
 
-  const selected = useMemo(
-    () => selectReceipts(cache.receipts, scope),
-    [cache.receipts, scope],
-  );
+  const [select] = useState(createReceiptSelector);
+  const selected = select(cache.receipts, scope);
 
   return cache.available
     ? {

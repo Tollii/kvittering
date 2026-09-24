@@ -161,9 +161,9 @@ export class ReceiptCache {
   /** Revocation also rejects responses from requests that were already in flight. */
   revoke() {
     this.disposed = true;
-    this.clear();
     this.snapshot = { receipts: [], sequence: 0, complete: false };
 
     for (const listener of this.listeners) listener();
+    this.clear();
   }
 }

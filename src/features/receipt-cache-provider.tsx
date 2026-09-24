@@ -4,6 +4,7 @@ import {
 } from "@/lib/receipt-image-cache";
 import {
   useEffect,
+  useRef,
   useState,
   useSyncExternalStore,
   type ReactNode,
@@ -14,8 +15,18 @@ import type { Id } from "../../convex/_generated/dataModel";
 import { receiptCache, retainReceiptCache } from "@/lib/receipt-cache-storage";
 import { ReceiptCacheContext } from "./receipt-cache-context";
 import { reportError } from "@/lib/observability";
-import { useQueryLifecycle } from "./query-lifecycle";
-import { Notice } from "@/components/ui";
+import { useQueryLifecycle } from "./query-lifecycle-context";
+import { Notice } from "@/components/ui/surfaces";
+
+const emptySnapshot: import("@/lib/receipt-cache").ReceiptCacheSnapshot = {
+  receipts: [],
+  sequence: 0,
+  complete: false,
+};
+
+const readEmpty = () => emptySnapshot;
+
+const subscribeEmpty = () => () => {};
 
 export function ReceiptCacheProvider({
   owner,
@@ -24,14 +35,22 @@ export function ReceiptCacheProvider({
 }: Readonly<{
   owner: string;
   household: Id<"households">;
-  children: ReactNode;
+  children?: ReactNode;
 }>) {
-  const [cache] = useState(() => receiptCache(owner, household));
+  const [cache, setCache] = useState(() => {
+    try {
+      return receiptCache(owner, household);
+    } catch (error) {
+      reportError(error, "receipt.cache_open");
+
+      return null;
+    }
+  });
 
   const snapshot = useSyncExternalStore(
-    cache.subscribe,
-    cache.read,
-    cache.read,
+    cache?.subscribe ?? subscribeEmpty,
+    cache?.read ?? readEmpty,
+    cache?.read ?? readEmpty,
   );
 
   const convex = useConvex();
@@ -45,14 +64,16 @@ export function ReceiptCacheProvider({
 
   const [failure, setFailure] = useState(0);
   const [retry, setRetry] = useState(0);
+  const consecutiveFailures = useRef(0);
   useEffect(() => {
     retainReceiptCache(owner, household);
     retainReceiptImageScope(owner, household);
   }, [owner, household]);
 
   useEffect(() => {
-    if (!head?.ready || !active || !online || !isAuthenticated)
+    if (!cache || !head?.ready || !active || !online || !isAuthenticated)
       return undefined;
+    const currentCache = cache;
     const through = head.sequence;
     const control = { cancelled: false };
     const isCancelled = () => control.cancelled;
@@ -61,7 +82,7 @@ export function ReceiptCacheProvider({
     async function synchronize() {
       try {
         while (!isCancelled()) {
-          const current = cache.read();
+          const current = currentCache.read();
 
           if (current.complete && current.sequence >= through) break;
 
@@ -71,7 +92,15 @@ export function ReceiptCacheProvider({
           });
 
           if (isCancelled()) return;
-          cache.apply(current.sequence, page);
+
+          try {
+            currentCache.apply(current.sequence, page);
+          } catch (error) {
+            reportError(error, "receipt.cache_write");
+            setCache(null);
+
+            return;
+          }
 
           for (const change of page.changes)
             if (!change.receipt) removeCachedReceiptImages(change.id);
@@ -79,14 +108,19 @@ export function ReceiptCacheProvider({
           if (page.done) break;
         }
 
-        if (!isCancelled()) setFailure(0);
+        if (!isCancelled()) {
+          consecutiveFailures.current = 0;
+          setFailure(0);
+        }
       } catch (error) {
         if (isCancelled()) return;
         reportError(error, "receipt.synchronization");
-        setFailure((count) => count + 1);
+        const count = consecutiveFailures.current;
+        consecutiveFailures.current++;
+        setFailure(count + 1);
         timer = setTimeout(
           () => setRetry((value) => value + 1),
-          Math.min(15 * 60_000, 30_000 * 2 ** Math.min(retry, 5)),
+          Math.min(15 * 60_000, 30_000 * 2 ** Math.min(count, 5)),
         );
       }
     }
@@ -105,7 +139,8 @@ export function ReceiptCacheProvider({
       value={{
         ...snapshot,
         available:
-          snapshot.complete || snapshot.sequence > 0 || head?.ready === true,
+          cache !== null &&
+          (snapshot.complete || snapshot.sequence > 0 || head?.ready === true),
         synchronized:
           snapshot.complete &&
           (!online ||

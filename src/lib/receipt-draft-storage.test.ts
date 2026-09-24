@@ -177,3 +177,41 @@ it("retains live edits and reports failed durable writes until storage recovers"
     db.close();
   }
 });
+
+it("recovers edits from a known draft version with an unknown baseline status", () => {
+  const { db, receipt, open } = fixture();
+
+  try {
+    const controller = new ReceiptDraftController(open, receipt);
+    controller.dispatch({ type: "edit", values: { excluded: true } });
+
+    db.prepare(
+      "UPDATE receipt_drafts SET data = json_set(data, '$.baseline', json(?))",
+    ).run(JSON.stringify({ ...receipt, status: "future-processing-state" }));
+
+    const recovered = new ReceiptDraftController(open, {
+      ...receipt,
+      revision: 5,
+    });
+
+    expect(recovered.read()).toMatchObject({
+      kind: "ready",
+      draft: {
+        baseline: { revision: 4 },
+        remote: { revision: 5 },
+        values: { excluded: true },
+      },
+    });
+    recovered.dispatch({
+      type: "money-error",
+      key: "total",
+      error: "Incomplete amount",
+    });
+    expect(open().restore(receipt).moneyErrors).toEqual({
+      total: "Incomplete amount",
+    });
+    expect(open().restore(receipt).values.excluded).toBe(true);
+  } finally {
+    db.close();
+  }
+});

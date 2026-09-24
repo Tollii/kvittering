@@ -68,3 +68,23 @@ export function selectReceiptHistory(receipts: Receipt[], search: string) {
               : 0) || right._creationTime - left._creationTime,
     );
 }
+
+/** Keep a selection stable when callers construct an equivalent scope on each render. */
+export function createReceiptSelector() {
+  let previous:
+    { receipts: Receipt[]; key: string; selected: Receipt[] } | undefined;
+
+  return (
+    receipts: Receipt[],
+    scope: FunctionArgs<typeof api.receipts.readPage>["scope"],
+  ) => {
+    const key = JSON.stringify(scope);
+
+    if (previous?.receipts === receipts && previous.key === key)
+      return previous.selected;
+    const selected = selectReceipts(receipts, scope);
+    previous = { receipts, key, selected };
+
+    return selected;
+  };
+}

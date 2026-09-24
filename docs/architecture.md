@@ -21,7 +21,7 @@ The Expo application starts in `src/app/_layout.tsx`. Session context contains a
 ## Receipt flow
 
 1. Capture claims an import batch. It retains the batch until conversion succeeds or the user dismisses it.
-2. `receipt-storage.ts` copies images into durable storage and commits the queue to SQLite. It publishes immutable snapshots after commit. `receipt-upload-transport.ts` owns authenticated uploads; `upload-queue.ts` retains each completed step. After a failure it retries automatically with backoff (15 seconds, doubling) for at most six attempts per app start. A `REJECTED` user error waits for the person's retry. These limits live in memory, so each app start tries every queued capture again; they never remove queued images.
+2. `receipt-storage.ts` copies images into durable storage and commits the queue to SQLite. It publishes immutable snapshots after commit. `receipt-upload-transport.ts` owns authenticated uploads; `upload-queue.ts` retains each completed step. After a failure it retries automatically with backoff (15 seconds, doubling) for at most six attempts per app start. A `REJECTED` user error waits for the person's retry. These attempt limits live in memory. Quota deadlines are stored separately and survive app restarts and manual retry. Timers use both limits and recheck the queue after each drain; they never remove queued images.
 3. Convex processing extracts and parses receipt evidence, classifies products, checks duplicates, and applies saved household choices. `receiptChanges.ts` owns revision, history, status, and follow-up policy for receipt changes.
 4. Catalog matching and product analysis run on the server. Profile questions use bounded batches. Writes reject stale generation, revision, or evidence. Exhausted analysis can be retried explicitly; `productAnalysis.repair` is an operator recovery operation.
 5. `receipt-draft.ts` owns editor changes and save acknowledgement. The change subscription and bounded synchronization deliver the saved receipt. Report selections keep identity and period, then derive their content from current data.
@@ -107,7 +107,10 @@ household change sequence in the same transaction. New phones synchronize
 bounded changes into a separate SQLite cache. Tabs, receipt details, search,
 and product history read this cache. One small foreground subscription reports
 new changes; inactive tabs do not keep broad receipt subscriptions alive.
-Queued uploads and editor drafts remain separate from disposable caches.
+Queued uploads and editor drafts remain separate from disposable caches. If the
+disposable cache cannot open or accept a page, screens use server reads instead.
+Cleanup failures are reported without blocking the screen or retaining revoked
+data in memory. Synchronization backoff resets after a successful download.
 
 See [Convex operating cost](convex-costs.md) for synchronization, backfill,
 retention, release order, and usage measurements. Existing receipt endpoints
@@ -149,7 +152,9 @@ use persisted daily totals. Synchronization and backfill keep their existing
 The editor writes dirty values synchronously to a separate SQLite draft store.
 The key includes deployment, account, household, and receipt. Drafts survive
 sign-out, policy gates, and process restart; another account cannot load them.
-Each draft keeps its original baseline revision. A newer server revision causes
+Each draft keeps its original baseline identity and revision. Other receipt
+fields come from the current server snapshot, so an unknown historical status
+does not block recovery. A newer server revision causes
 the existing explicit conflict flow, not an automatic overwrite.
 
 A save keeps the durable draft until both acknowledgement and the corresponding

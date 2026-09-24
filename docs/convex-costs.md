@@ -41,8 +41,8 @@ New clients request structured quota errors; older clients retain the Norwegian
 string error. A quota deadline also postpones other unreserved images in that
 household's queue. Manual retry does not bypass an active quota deadline.
 
-Other upload failures start with a 30-second delay, then double up to 30
-minutes. The queue wakes for eligible work, a connection change, or foreground
+Other upload failures start with a 15-second delay, then double for at most
+six attempts per app start. Rejected requests wait for manual retry. The queue wakes for eligible work, a connection change, or foreground
 entry. There is no fixed 15-second upload poll. Reservations and completed
 image uploads remain reusable after failure.
 
@@ -58,13 +58,13 @@ its existing persisted cache and expiry rules.
 | Phone receipt data                               | Separate disposable database, scoped to deployment, account, and household. Clear revoked scopes. Receipt changes and sync progress commit together.                                                  |
 | Queued images and editor drafts                  | Preserve. They are not part of cache cleanup.                                                                                                                                                         |
 | Terminal catalog request results                 | Remove 30 days after expiry, in batches of 50. Keep entries that have workflow waiters. Keep pending and running work.                                                                                |
-| Successful workflow journals                     | New workflows schedule component cleanup 30 days after completion. Existing journals and unsuccessful workflows remain available for diagnosis.                                                       |
+| Terminal workflow journals                       | All terminal outcomes schedule cleanup 30 days after completion. Existing terminal journals get 30 days from first discovery. Active journals are not force-deleted.                                  |
 | Receipt originals, revisions, correction history | Preserve. User-requested receipt deletion uses the existing bounded cleanup.                                                                                                                          |
 | Incomplete uploads                               | Preserve. An offline phone can still hold the matching reservation and unsent images.                                                                                                                 |
 | Receipt deletion markers                         | Preserve so a phone can synchronize after a long offline period.                                                                                                                                      |
 
 Cache cleanup does not remove canonical catalog product identities or store
-records that receipts can reference. Successful workflow cleanup uses the
+records that receipts can reference. Terminal workflow cleanup uses the
 component API; it does not directly delete component tables or active work.
 
 ## Release sequence

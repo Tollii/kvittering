@@ -1,3 +1,4 @@
+import type { createImportQueue } from "./capture-import";
 import { soleElement } from "./domain/collections";
 import { Image } from "react-native";
 import { ImageManipulator, SaveFormat } from "expo-image-manipulator";
@@ -104,4 +105,25 @@ export async function importReceiptFiles(
     uris,
     singleDocument: !!only && isPdf(only) && uris.length > 1,
   };
+}
+
+/** Retain the original files until capture accepts every rendered image. */
+export async function importPendingFiles(
+  queue: ReturnType<typeof createImportQueue>,
+  id: number,
+  room: number,
+  receive: (imported: Awaited<ReturnType<typeof importReceiptFiles>>) => void,
+) {
+  const batch = queue.claim(id);
+
+  if (!batch) return;
+
+  try {
+    const imported = await importReceiptFiles(batch.files, room);
+    receive(imported);
+    queue.finish(id, "completed");
+  } catch (error) {
+    queue.finish(id, "failed");
+    throw error;
+  }
 }

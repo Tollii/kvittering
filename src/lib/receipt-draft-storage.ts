@@ -1,6 +1,5 @@
 import { parse } from "convex-helpers/validators";
 import { v } from "convex/values";
-import schema from "../../convex/schema";
 import type { Id } from "../../convex/_generated/dataModel";
 import type { ReceiptCacheDatabase } from "./receipt-cache";
 import { receiptDataValidator } from "./domain/receipt";
@@ -10,7 +9,11 @@ import type { Receipt } from "./domain/insights";
 
 const savedDraft = v.object({
   schemaVersion: v.literal(1),
-  baseline: schema.doc("receipts"),
+  baseline: v.object({
+    _id: v.id("receipts"),
+    householdId: v.id("households"),
+    revision: v.number(),
+  }),
   values: v.object({
     data: v.union(receiptDataValidator, v.null()),
     duplicateResolved: v.boolean(),
@@ -79,7 +82,7 @@ export class ReceiptDraftStorage implements DraftPersistence {
 
     return {
       ...createReceiptDraft(receipt),
-      baseline: saved.baseline,
+      baseline: { ...receipt, ...saved.baseline },
       values: {
         ...saved.values,
         physicalStoreId: saved.values.physicalStoreId,
@@ -102,7 +105,11 @@ export class ReceiptDraftStorage implements DraftPersistence {
           this.id,
           JSON.stringify({
             schemaVersion: 1,
-            baseline: draft.baseline,
+            baseline: {
+              _id: draft.baseline._id,
+              householdId: draft.baseline.householdId,
+              revision: draft.baseline.revision,
+            },
             values: draft.values,
             moneyErrors: draft.moneyErrors,
             editVersion: draft.editVersion,

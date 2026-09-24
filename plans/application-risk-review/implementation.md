@@ -225,3 +225,26 @@ history (20 s), and saving followed by a clean-device read (52 s). The Expo
 package check, shell syntax checks, formatting, and documentation links also pass.
 No paid provider was contacted. Signed-device upgrades and staged deployment
 remain outside this merge task.
+
+
+## Client review follow-up
+
+The client review identified retry timers that did not follow in-memory
+backoff, captures left behind during a drain, and storage errors that could
+block screens or later queue entries. The queue now owns scheduling and
+preserves quota errors and later deadlines. Disposable cache failures fall
+back to server reads. Cache revocation clears memory even when disk cleanup
+fails, and synchronization backoff resets after success.
+
+Draft storage validates the saved identity and revision independently of the
+current receipt schema. Unknown draft formats remain unchanged. The editor
+reuses its SQLite connection. Receipt selections reuse equivalent scopes. The
+PDF test now calls the same import handler as capture and keeps the rejected
+six-page original available for retry or explicit removal.
+
+Local verification passed 440 application tests and four component tests.
+Eleven deliberate faults made the focused checks fail: queue wakeup, new
+capture pickup, backoff, later quota deadlines, retry storage errors, cache
+open failure, cache backoff reset, memory revocation, baseline recovery, PDF
+retention, and selection reuse. All deliberate faults were restored. Native
+and hosted verification remain required before merging the client PR.

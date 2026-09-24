@@ -131,3 +131,29 @@ it("rejects another household and discards late responses after access is revoke
     db.close();
   }
 });
+
+it("revokes memory and rejects delayed pages even when disk cleanup fails", () => {
+  const { db, adapter } = database();
+
+  try {
+    const receipt = receiptFixture();
+    const cache = new ReceiptCache(adapter, "first", receipt.householdId);
+
+    const page = {
+      through: 1,
+      done: true,
+      changes: [{ id: receipt._id, receipt }],
+    };
+
+    cache.apply(0, page);
+    db.exec(
+      "CREATE TRIGGER reject_delete BEFORE DELETE ON receipts BEGIN SELECT RAISE(ABORT, 'Disk unavailable'); END;",
+    );
+    expect(() => cache.revoke()).toThrow("Disk unavailable");
+    expect(cache.read().receipts).toEqual([]);
+    cache.apply(0, page);
+    expect(cache.read().receipts).toEqual([]);
+  } finally {
+    db.close();
+  }
+});

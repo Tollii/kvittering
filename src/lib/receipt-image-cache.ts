@@ -1,3 +1,4 @@
+import { reportError } from "./observability";
 import { Directory, File, Paths } from "expo-file-system";
 import { convexSiteUrl, fetchAccessToken } from "./auth-client";
 import { storageSuffix } from "./deployment-storage";
@@ -26,12 +27,17 @@ export function retainReceiptImageScope(
 
   if (next !== scope) generation++;
   scope = next;
-  const directory = root();
 
-  if (!directory.exists) return;
+  try {
+    const directory = root();
 
-  for (const item of directory.list()) {
-    if (item.name !== next) item.delete();
+    if (!directory.exists) return;
+
+    for (const item of directory.list()) {
+      if (item.name !== next) item.delete();
+    }
+  } catch (error) {
+    reportError(error, "receipt.image_cache_cleanup");
   }
 }
 
@@ -43,12 +49,17 @@ function scopedDirectory() {
 
 export function removeCachedReceiptImages(id: Id<"receipts">) {
   if (!scope) return;
-  const directory = scopedDirectory();
 
-  if (!directory.exists) return;
+  try {
+    const directory = scopedDirectory();
 
-  for (const file of directory.list())
-    if (file.name.startsWith(`${id}-`)) file.delete();
+    if (!directory.exists) return;
+
+    for (const file of directory.list())
+      if (file.name.startsWith(`${id}-`)) file.delete();
+  } catch (error) {
+    reportError(error, "receipt.image_cache_remove");
+  }
 }
 
 function trimImages(directory: Directory, retained: Set<string>) {

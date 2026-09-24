@@ -2,6 +2,7 @@ import {
   RequestDeferred,
   retryDeadline,
   type RetryStore,
+  type RetryDeadline,
 } from "./request-retry";
 import type { Id } from "../../convex/_generated/dataModel";
 import type { DiagnosticFields } from "./diagnostics";
@@ -62,6 +63,94 @@ export function createQueueRunner(
 ) {
   let running = false;
   const attempts = new Map<string, RetryState>();
+  const restrictions = new Map<string, RetryDeadline>();
+  const listeners = new Set<() => void>();
+
+  function readDeadline(id: string) {
+    const saved = retries.read(id);
+    const memory = restrictions.get(id);
+
+    return memory && memory.retryAt > (saved?.retryAt ?? 0) ? memory : saved;
+  }
+
+  function defer(id: string, cause: RequestDeferred) {
+    const deadline = retryDeadline(1, clock(), cause);
+    // Keep the restriction in memory even if the durable write fails.
+    const memory = restrictions.get(id);
+    restrictions.set(
+      id,
+      memory && memory.retryAt > deadline.retryAt ? memory : deadline,
+    );
+    const previous = readDeadline(id);
+
+    const retained =
+      previous && previous.retryAt > deadline.retryAt ? previous : deadline;
+
+    restrictions.set(id, retained);
+    retries.write(id, retained);
+  }
+
+  function storageFailure(entry: LocalReceipt) {
+    attempts.set(entry.id, { failures: 0, nextAttemptAt: null });
+    entry.error ??=
+      "Kunne ikke lese eller lagre ventetiden. Prøv igjen når lagringen virker.";
+    store.update(entry);
+    record("receipt.retry_storage_failed", { captureId: entry.id });
+  }
+
+  function deadline(entry: LocalReceipt) {
+    const attempt = attempts.get(entry.id);
+
+    if (attempt?.nextAttemptAt === null) return null;
+    const saved = readDeadline(entry.id);
+
+    return Math.max(
+      attempt?.nextAttemptAt ?? 0,
+      saved?.restricted ? saved.retryAt : 0,
+    );
+  }
+
+  /** Re-read the queue after every drain, including captures added during an upload. */
+  function schedule(
+    owner: string,
+    householdId: Id<"households">,
+    synchronize: () => Promise<void>,
+  ) {
+    let timer: ReturnType<typeof setTimeout> | undefined;
+
+    const update = () => {
+      if (timer) clearTimeout(timer);
+
+      if (running) return;
+      let next = Infinity;
+
+      for (const entry of store.list(owner, householdId)) {
+        try {
+          const at = deadline(entry);
+
+          if (at !== null) next = Math.min(next, at);
+        } catch {
+          // The drain records the unreadable deadline without contacting the server.
+          next = Math.min(next, clock());
+        }
+      }
+
+      if (Number.isFinite(next))
+        timer = setTimeout(
+          () => void synchronize(),
+          Math.max(0, next - clock()),
+        );
+    };
+
+    listeners.add(update);
+    update();
+
+    return () => {
+      listeners.delete(update);
+
+      if (timer) clearTimeout(timer);
+    };
+  }
 
   const run = async (
     owner: string,
@@ -85,16 +174,17 @@ export function createQueueRunner(
         };
 
         if (!active()) break;
-        const previous = retries.read(entry.id);
 
-        if (previous?.restricted && previous.retryAt > clock()) continue;
-        const retry = attempts.get(entry.id);
+        try {
+          const at = deadline(entry);
 
-        if (
-          retry &&
-          (retry.nextAttemptAt === null || clock() < retry.nextAttemptAt)
-        )
+          if (at === null || at > clock()) continue;
+        } catch {
+          storageFailure(entry);
           continue;
+        }
+
+        const retry = attempts.get(entry.id);
 
         try {
           entry.error = undefined;
@@ -139,20 +229,16 @@ export function createQueueRunner(
           retries.remove(entry.id);
           store.remove(entry);
           attempts.delete(entry.id);
+          restrictions.delete(entry.id);
           record("receipt.upload_completed", {
             receiptId: entry.receiptId,
             imageCount: entry.images.length,
           });
         } catch (cause) {
-          if (cause instanceof RequestDeferred)
-            retries.write(
-              entry.id,
-              retryDeadline((previous?.attempts ?? 0) + 1, clock(), cause),
-            );
-          else retries.remove(entry.id);
           entry.error =
             cause instanceof Error ? cause.message : "Opplastingen mislyktes.";
           store.update(entry);
+
           const failures = (retry?.failures ?? 0) + 1;
 
           const next = nextAttemptAt(
@@ -169,19 +255,39 @@ export function createQueueRunner(
               attempts: failures,
             });
 
+          try {
+            if (cause instanceof RequestDeferred) defer(entry.id, cause);
+            else retries.remove(entry.id);
+          } catch {
+            storageFailure(entry);
+          }
+
           if (cause instanceof RequestDeferred) {
             for (const pending of store.list(owner, householdId)) {
               if (pending.receiptId || pending.id === entry.id) continue;
-              retries.write(pending.id, retryDeadline(1, clock(), cause));
-              store.update({ ...pending, error: cause.message });
+
+              const deferred = {
+                ...pending,
+                error: pending.error ?? cause.message,
+              };
+
+              store.update(deferred);
+
+              try {
+                defer(pending.id, cause);
+              } catch {
+                storageFailure(deferred);
+              }
             }
           }
         }
       }
     } finally {
       running = false;
+
+      for (const listener of listeners) listener();
     }
   };
 
-  return Object.assign(run, { isRunning: () => running });
+  return Object.assign(run, { isRunning: () => running, schedule });
 }

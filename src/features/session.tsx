@@ -229,16 +229,6 @@ function HouseholdProvider({
       try {
         if (!canUpload.current) return;
 
-        if (retryFailed) {
-          for (const entry of receiptStorage.list(owner, householdId)) {
-            const deadline = uploadRetries.read(entry.id);
-
-            if (deadline?.restricted && deadline.retryAt > Date.now()) continue;
-            uploadRetries.remove(entry.id);
-            receiptStorage.update({ ...entry, error: undefined });
-          }
-        }
-
         await drainQueue(
           owner,
           householdId,
@@ -267,34 +257,19 @@ function HouseholdProvider({
   const retryFailedUploads = useCallback(async () => {
     if (!householdId || !canUpload.current) return;
 
-    try {
-      for (const entry of receiptStorage.list(owner, householdId))
-        receiptStorage.update({ ...entry, error: undefined });
-    } catch (error) {
-      reportError(error, "receipt.queue_read");
-      showQueueReadError();
-
-      return;
-    }
-
     await synchronize({ retryFailed: true });
-  }, [householdId, owner, synchronize, showQueueReadError]);
+  }, [householdId, synchronize]);
 
   useEffect(() => {
     if (!foreground || !canUpload.current || !queue.length) return undefined;
 
-    const next = Math.min(
-      ...queue.map((entry) => uploadRetries.read(entry.id)?.retryAt ?? 0),
-    );
+    if (!householdId) return undefined;
 
-    const timer = setTimeout(
-      () => void synchronize(),
-      Math.max(0, next - Date.now()),
-    );
-
-    return () => clearTimeout(timer);
+    return drainQueue.schedule(owner, householdId, synchronize);
   }, [
     synchronize,
+    owner,
+    householdId,
     online,
     auth.isAuthenticated,
     foreground,

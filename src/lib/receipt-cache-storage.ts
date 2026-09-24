@@ -1,3 +1,4 @@
+import { reportError } from "./observability";
 import { openDatabaseSync } from "expo-sqlite";
 import type { Id } from "../../convex/_generated/dataModel";
 import { storageSuffix } from "./deployment-storage";
@@ -27,21 +28,31 @@ export function retainReceiptCache(
 ) {
   for (const [key, cache] of caches) {
     if (household && key === JSON.stringify([owner, household])) continue;
-    cache.revoke();
+
+    try {
+      cache.revoke();
+    } catch (error) {
+      reportError(error, "receipt.cache_revoke");
+    }
+
     caches.delete(key);
   }
 
-  database ??= openDatabaseSync(`receipt-cache-v1${storageSuffix}.db`);
-  // Initialize the disposable schema even when the app starts at its sign-in screen.
-  initializeReceiptCacheDatabase(database);
+  try {
+    database ??= openDatabaseSync(`receipt-cache-v1${storageSuffix}.db`);
+    // Initialize the disposable schema even when the app starts at its sign-in screen.
+    initializeReceiptCacheDatabase(database);
 
-  for (const table of ["receipts", "cursors"]) {
-    if (owner && household)
-      database.runSync(
-        `DELETE FROM ${table} WHERE owner != ? OR household != ?`,
-        owner,
-        household,
-      );
-    else database.runSync(`DELETE FROM ${table}`);
+    for (const table of ["receipts", "cursors"]) {
+      if (owner && household)
+        database.runSync(
+          `DELETE FROM ${table} WHERE owner != ? OR household != ?`,
+          owner,
+          household,
+        );
+      else database.runSync(`DELETE FROM ${table}`);
+    }
+  } catch (error) {
+    reportError(error, "receipt.cache_cleanup");
   }
 }

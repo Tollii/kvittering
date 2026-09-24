@@ -12,6 +12,14 @@ import { Notice, Screen } from "@/components/ui";
 import { useHousehold } from "./household-context";
 import { ReceiptEditor } from "./receipt-editor";
 
+let draftDatabase: ReturnType<typeof openDatabaseSync> | undefined;
+
+function openDraftDatabase() {
+  draftDatabase ??= openDatabaseSync(`receipt-drafts${storageSuffix}.db`);
+
+  return draftDatabase;
+}
+
 type EditorProps = Omit<
   ComponentProps<typeof ReceiptEditor>,
   "draft" | "dispatch" | "storageError"
@@ -38,7 +46,7 @@ function ScopedReceiptEditor({
       new ReceiptDraftController(
         () =>
           new ReceiptDraftStorage(
-            openDatabaseSync(`receipt-drafts${storageSuffix}.db`),
+            openDraftDatabase(),
             owner,
             props.receipt.householdId,
             props.receipt._id,

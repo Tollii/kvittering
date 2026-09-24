@@ -1,6 +1,10 @@
 import { present } from "./testing/receipts";
 import { expect, it, vi } from "vitest";
-import { importReceiptFiles, maxReceiptImages } from "./receipt-import";
+import {
+  importReceiptFiles,
+  importPendingFiles,
+  maxReceiptImages,
+} from "./receipt-import";
 import { createImportQueue } from "./capture-import";
 
 const native = vi.hoisted(() => ({
@@ -29,7 +33,9 @@ vi.mock("expo-image-manipulator", () => ({
 // oxlint-disable-next-line anti-slop/no-module-mocking -- Replace PDF rendering at the native module boundary.
 vi.mock(
   "../../modules/receipt-intelligence/src/ReceiptIntelligenceModule",
-  () => ({ default: { renderPdf: native.renderPdf } }),
+  () => ({
+    default: { renderPdf: native.renderPdf },
+  }),
 );
 
 it("accepts five selected images and rejects six without losing the selected inputs", async () => {
@@ -66,20 +72,22 @@ it("retains a rejected six-page PDF for explicit retry and never returns a trunc
   const queue = createImportQueue();
   queue.offer([{ uri: "receipt.pdf", mimeType: "application/pdf" }]);
   const batch = present(queue.snapshot()[0]);
-  queue.claim(batch.id);
   native.pages = 6;
-  await expect(importReceiptFiles(batch.files)).rejects.toThrow(
-    "for mange sider",
-  );
-  queue.finish(batch.id, "failed");
-  expect(present(queue.snapshot()[0]).files).toEqual(batch.files);
-  native.pages = 5;
+
+  const received =
+    vi.fn<(value: Awaited<ReturnType<typeof importReceiptFiles>>) => void>();
+
+  await expect(
+    importPendingFiles(queue, batch.id, 5, received),
+  ).rejects.toThrow("for mange sider");
+  expect(queue.snapshot()).toEqual([{ ...batch, state: "failed" }]);
+  expect(received).not.toHaveBeenCalled();
   queue.retry(batch.id);
-  const retry = queue.claim(batch.id)!;
-  expect(await importReceiptFiles(retry.files)).toEqual({
-    uris: Array.from({ length: 5 }, (_, index) => `page-${index}.jpg`),
-    singleDocument: true,
-  });
-  queue.finish(batch.id, "completed");
+  await expect(
+    importPendingFiles(queue, batch.id, 5, received),
+  ).rejects.toThrow("for mange sider");
+  expect(queue.snapshot()).toEqual([{ ...batch, state: "failed" }]);
+  expect(received).not.toHaveBeenCalled();
+  queue.dismiss(batch.id);
   expect(queue.snapshot()).toEqual([]);
 });
