@@ -215,6 +215,7 @@ async function lookupContext(ctx: QueryCtx, lookup: CatalogLookup) {
   };
 }
 
+// Access: lookupContext requires household membership, and receipt access for store lookups.
 export const ensure = mutation({
   service: "productLookup",
   args: { lookup: catalogLookupValidator },
@@ -236,6 +237,7 @@ export const ensure = mutation({
   },
 });
 
+// Access: lookupContext requires household membership, and receipt access for store lookups.
 export const observe = query({
   args: { lookup: catalogLookupValidator, client: clientValidator.optional() },
   returns: catalogResponseValidator,

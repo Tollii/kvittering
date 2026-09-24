@@ -100,6 +100,7 @@ export async function writeFeatureFlags(
   return revision;
 }
 
+// Access: public. Flags gate features before sign-in and hold no household data.
 export const get = query({
   args: { platform: platformValidator },
   returns: snapshotValidator,

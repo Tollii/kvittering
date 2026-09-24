@@ -13,6 +13,27 @@ import { normalizeSearch } from "./policy";
 import { productSearch } from "./search";
 import { organicProduct } from "./equivalence";
 
+/** Container words that differ between listings of the same product. */
+const containerWords = new Set(["flaske", "boks", "pet"]);
+
+/** Package and marketing words that do not distinguish products. */
+const neutralWords = new Set([
+  "x",
+  "pk",
+  "stk",
+  "bx",
+  "sugar",
+  "sukker",
+  "original",
+  "classic",
+  "regular",
+  "sleek",
+  "glass",
+  "kartong",
+  "beger",
+  "pose",
+]);
+
 export { productSearch } from "./search";
 
 export function compatibleCatalogProduct(
@@ -84,7 +105,7 @@ function productWords(name: string) {
     normalizeMeasureText(productSearch(name))
       .replace(/\b(uten sukker|sugar free|sukkerfri)\b/g, "zero")
       .split(/[^\p{L}\p{N}]+/u)
-      .filter((word) => word && !["flaske", "boks", "pet"].includes(word)),
+      .filter((word) => word && !containerWords.has(word)),
   );
 }
 
@@ -115,22 +136,7 @@ export function rankCatalogProducts(name: string, products: CatalogProduct[]) {
 function neutralWord(word: string) {
   return (
     /^\d+(?:[.,]\d+)?(?:g|ml|pk|stk|bx|x)?$/.test(word) ||
-    [
-      "x",
-      "pk",
-      "stk",
-      "bx",
-      "sugar",
-      "sukker",
-      "original",
-      "classic",
-      "regular",
-      "sleek",
-      "glass",
-      "kartong",
-      "beger",
-      "pose",
-    ].includes(word)
+    neutralWords.has(word)
   );
 }
 

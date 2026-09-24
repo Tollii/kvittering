@@ -1,3 +1,4 @@
+import { isReceiptBeingRead } from "../src/lib/domain/receipt-status";
 import { notifyReceiptActivities } from "./liveActivities";
 import { linkCatalogProduct } from "./catalogLinks";
 import { compatibleCatalogProduct } from "../src/lib/catalog/matching";
@@ -225,9 +226,9 @@ export const finish = internalMutation({
         .withIndex("by_householdId_and_purchaseDate", (q) =>
           q
             .eq("householdId", receipt.householdId)
-            .eq("data.purchaseDate", args.data.purchaseDate),
+            .eq("data.purchaseDate", args.data.purchaseDate)
+            .lte("_creationTime", through),
         )
-        .filter((q) => q.lte(q.field("_creationTime"), through))
         .order("desc")
         .paginate({
           cursor: args.duplicateCursor ?? null,
@@ -457,7 +458,7 @@ export const fail = internalMutation({
     if (
       receipt &&
       receipt.generation === args.generation &&
-      ["uploaded", "processing"].includes(receipt.status)
+      isReceiptBeingRead(receipt.status)
     ) {
       // The original failure stays on the receipt; do not duplicate OCR/provider text in logs.
       console.error("receipt.processing_failed", {

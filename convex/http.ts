@@ -11,6 +11,8 @@ const http = httpRouter();
 
 authComponent.registerRoutes(http, createAuth);
 
+const acceptedImageTypes = new Set(["image/jpeg", "image/png", "image/webp"]);
+
 function headers(request: Request) {
   return {
     "Access-Control-Allow-Origin":
@@ -69,7 +71,7 @@ http.route({
         });
       const type = request.headers.get("Content-Type")?.split(";")[0];
 
-      if (!type || !["image/jpeg", "image/png", "image/webp"].includes(type))
+      if (!type || !acceptedImageTypes.has(type))
         return new Response("Bruk JPEG, PNG eller WebP.", {
           status: 415,
           headers: responseHeaders,

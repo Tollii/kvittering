@@ -1,3 +1,7 @@
+import {
+  isMissingLineField,
+  receiptIssueText,
+} from "@/lib/domain/receipt-issues";
 import { useDebouncedSearch } from "./catalog-queries";
 import { productSearch } from "@/lib/catalog/search";
 import {
@@ -23,7 +27,12 @@ import {
 } from "@/components/ui";
 import { MoneyField } from "@/components/money-field";
 import { categoryById } from "@/lib/domain/categories";
-import { lineKinds, formatMoney, type ReceiptLine } from "@/lib/domain/receipt";
+import {
+  lineKinds,
+  formatMoney,
+  isTotalsLine,
+  type ReceiptLine,
+} from "@/lib/domain/receipt";
 import {
   canConfirmSuggestedCategory,
   isCategoryUncertain,
@@ -100,10 +109,12 @@ export function ReceiptLineEditor({
   const { fontScale } = useWindowDimensions();
   const issues = lineReviewIssues(line);
   const categoryUncertain = line.issues.some(isCategoryUncertain);
-  const otherIssues = issues.filter((issue) => !isCategoryUncertain(issue));
 
-  const missingAmount =
-    line.amountOre === null && !["summary", "vat"].includes(line.kind);
+  const otherIssues = issues.filter(
+    (issue) => issue.code !== "category_uncertain",
+  );
+
+  const missingAmount = line.amountOre === null && !isTotalsLine(line.kind);
 
   const missingName = line.kind === "product" && !line.name.trim();
   const [expanded, setExpanded] = useState(false);
@@ -366,16 +377,10 @@ export function ReceiptLineEditor({
         />
       )}
       {otherIssues
-        .filter(
-          (issue) =>
-            !(
-              showEditor &&
-              ["Beløpet mangler.", "Varenavnet mangler."].includes(issue)
-            ),
-        )
+        .filter((issue) => !(showEditor && isMissingLineField(issue)))
         .map((issue) => (
           <View
-            key={issue}
+            key={receiptIssueText(issue)}
             style={{ flexDirection: "row", alignItems: "center", gap: 6 }}
           >
             <Icon
@@ -384,7 +389,7 @@ export function ReceiptLineEditor({
               color={colors.warning}
             />
             <Copy size={13} style={{ color: colors.warning, flex: 1 }}>
-              {issue}
+              {receiptIssueText(issue)}
             </Copy>
           </View>
         ))}

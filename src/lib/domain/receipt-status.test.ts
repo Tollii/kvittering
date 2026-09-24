@@ -1,11 +1,35 @@
 import { expect, it } from "vitest";
-import { isReceiptProcessing } from "./receipt-status";
+import {
+  attentionStatuses,
+  hasReceiptBeenRead,
+  isReceiptBeingRead,
+  isReceiptProcessing,
+  needsAttention,
+  type ReceiptStatus,
+} from "./receipt-status";
+
+const statuses: ReceiptStatus[] = [
+  "uploading",
+  "uploaded",
+  "processing",
+  "needs_review",
+  "reviewed",
+  "failed",
+];
+
+const matching = (predicate: (status: ReceiptStatus) => boolean) =>
+  statuses.filter(predicate);
 
 it("treats a receipt as processing until its images have been read", () => {
-  expect(isReceiptProcessing("uploading")).toBe(true);
-  expect(isReceiptProcessing("uploaded")).toBe(true);
-  expect(isReceiptProcessing("processing")).toBe(true);
-  expect(isReceiptProcessing("needs_review")).toBe(false);
-  expect(isReceiptProcessing("reviewed")).toBe(false);
-  expect(isReceiptProcessing("failed")).toBe(false);
+  expect(matching(isReceiptProcessing)).toEqual([
+    "uploading",
+    "uploaded",
+    "processing",
+  ]);
+  expect(matching(isReceiptBeingRead)).toEqual(["uploaded", "processing"]);
+});
+
+it("separates read receipts from those that need a person", () => {
+  expect(matching(hasReceiptBeenRead)).toEqual(["needs_review", "reviewed"]);
+  expect(matching(needsAttention)).toEqual([...attentionStatuses]);
 });

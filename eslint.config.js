@@ -138,4 +138,31 @@ module.exports = defineConfig([
     // Convex commands deliberately return null after every successful write.
     rules: { "sonarjs/no-invariant-returns": "off" },
   },
+  {
+    files: ["src/**/*.{ts,tsx}", "convex/**/*.ts"],
+    ignores: ["**/*.test.ts"],
+    rules: { "kvitto/no-inline-literal-set": "error" },
+  },
+  {
+    files: ["convex/**/*.ts"],
+    ignores: ["**/*.test.ts"],
+    rules: {
+      "kvitto/no-db-query-filter": "error",
+      "kvitto/no-unbounded-collect": "error",
+      "kvitto/convex-function-access": [
+        "error",
+        {
+          builders: ["query", "mutation", "action"],
+          checks: [
+            "requireMember",
+            "requireReceipt",
+            "requireCorrection",
+            "getUserIdentity",
+            "safeGetAuthUser",
+            "getAuthUser",
+          ],
+        },
+      ],
+    },
+  },
 ]);

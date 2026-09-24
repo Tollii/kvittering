@@ -57,6 +57,11 @@ async function enqueue(
 }
 
 /** One transactional cache entry is shared by all households and simultaneous requests. */
+/** A pending or running request will produce a result; start no other. */
+function isRequestInFlight(state: Doc<"catalogRequests">["state"]): boolean {
+  return state === "pending" || state === "running";
+}
+
 export async function ensureRequest(
   ctx: MutationCtx,
   input: CatalogRequest,
@@ -73,8 +78,7 @@ export async function ensureRequest(
 
   if (
     existing &&
-    (["pending", "running"].includes(existing.state) ||
-      existing.expiresAt > Date.now())
+    (isRequestInFlight(existing.state) || existing.expiresAt > Date.now())
   ) {
     console.info("catalog.request_reused", {
       requestId: existing._id,
@@ -258,7 +262,7 @@ async function failRequest(
 ) {
   const request = await ctx.db.get("catalogRequests", id);
 
-  if (!request || !["running", "pending"].includes(request.state)) return;
+  if (!request || !isRequestInFlight(request.state)) return;
   const now = Date.now();
   const transient = status === 0 || status === 429 || status >= 500;
 

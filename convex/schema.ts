@@ -246,6 +246,11 @@ export default defineSchema({
       "data.purchaseDate",
     ])
     .index("by_householdId_and_status", ["householdId", "status"])
+    .index("by_householdId_and_status_and_excluded", [
+      "householdId",
+      "status",
+      "excluded",
+    ])
     .index("by_duplicateOf", ["duplicateOf"])
     .index("by_householdId", ["householdId"])
     .index("by_householdId_and_clientId", ["householdId", "clientId"]),

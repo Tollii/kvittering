@@ -104,6 +104,7 @@ export async function requireCompatibleClient(
   return policy;
 }
 
+// Access: public. Installed clients read the version policy before sign-in.
 export const get = query({
   args: { platform: platformValidator },
   returns: policyValidator,
@@ -120,6 +121,7 @@ export const check = internalQuery({
     requireCompatibleClient(ctx, client, feature),
 });
 
+// Access: public. Installed clients read the version policy before sign-in.
 /** Version controls no longer carry flags for current clients. */
 export const getVersions = query({
   args: { platform: platformValidator },

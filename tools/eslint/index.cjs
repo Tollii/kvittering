@@ -1,7 +1,181 @@
 /** Repository rules shared by ESLint and Oxlint. */
+const readsDatabase = require("./reads-database.cjs");
+
+const quoted = /^["'`]/;
+
 module.exports = {
   meta: { name: "kvitto" },
   rules: {
+    "no-inline-literal-set": {
+      meta: {
+        type: "suggestion",
+        schema: [],
+        messages: {
+          nameSet:
+            "Name this set of values: a domain predicate such as isReceiptProcessing, or a module-level Set. Inline lists repeat a rule without an owner.",
+        },
+      },
+      create(context) {
+        return {
+          CallExpression(node) {
+            const callee = node.callee;
+
+            if (
+              callee.type !== "MemberExpression" ||
+              callee.property.type !== "Identifier" ||
+              callee.property.name !== "includes"
+            )
+              return;
+            let list = callee.object;
+
+            while (list.type === "TSAsExpression") list = list.expression;
+
+            if (
+              list.type === "ArrayExpression" &&
+              list.elements.length > 1 &&
+              list.elements.every(
+                (element) =>
+                  element?.type === "Literal" && quoted.test(element.raw),
+              )
+            )
+              context.report({ node: list, messageId: "nameSet" });
+          },
+        };
+      },
+    },
+    "no-db-query-filter": {
+      meta: {
+        type: "problem",
+        schema: [],
+        messages: {
+          index:
+            "Select documents with an index range instead of `.filter()`. A filter reads every document in the range and can exceed read limits as data grows.",
+        },
+      },
+      create(context) {
+        return {
+          CallExpression(node) {
+            if (
+              node.callee.type === "MemberExpression" &&
+              node.callee.property.type === "Identifier" &&
+              node.callee.property.name === "filter" &&
+              readsDatabase(node.callee.object)
+            )
+              context.report({
+                node: node.callee.property,
+                messageId: "index",
+              });
+          },
+        };
+      },
+    },
+    "no-unbounded-collect": {
+      meta: {
+        type: "problem",
+        schema: [],
+        messages: {
+          bound:
+            "Bound this read with `.take(n)`, `.first()`, `.unique()`, or pagination. `.collect()` grows with the household's data.",
+        },
+      },
+      create(context) {
+        return {
+          CallExpression(node) {
+            if (
+              node.callee.type === "MemberExpression" &&
+              node.callee.property.type === "Identifier" &&
+              node.callee.property.name === "collect" &&
+              readsDatabase(node.callee.object)
+            )
+              context.report({
+                node: node.callee.property,
+                messageId: "bound",
+              });
+          },
+        };
+      },
+    },
+    "convex-function-access": {
+      meta: {
+        type: "problem",
+        schema: [
+          {
+            type: "object",
+            properties: {
+              builders: { type: "array", items: { type: "string" } },
+              checks: { type: "array", items: { type: "string" } },
+            },
+            additionalProperties: false,
+          },
+        ],
+        messages: {
+          access:
+            "Public Convex function `{{name}}` does not call an access check ({{checks}}). Call one in the handler, or state why the function is public in a preceding `// Access:` comment.",
+        },
+      },
+      create(context) {
+        const options = context.options[0] ?? {};
+
+        const builders = new Set(
+          options.builders ?? ["query", "mutation", "action"],
+        );
+
+        const checks = new Set(options.checks ?? []);
+
+        function calleeName(callee) {
+          if (callee.type === "Identifier") return callee.name;
+
+          return callee.type === "MemberExpression" &&
+            callee.property.type === "Identifier"
+            ? callee.property.name
+            : null;
+        }
+
+        /** Each exported builder call collects the access checks made inside it. */
+        const exports = [];
+
+        function publicFunction(node) {
+          const declarator = node.declaration?.declarations?.[0];
+          const init = declarator?.init;
+
+          return init?.type === "CallExpression" &&
+            init.callee.type === "Identifier" &&
+            builders.has(init.callee.name)
+            ? declarator
+            : null;
+        }
+
+        return {
+          ExportNamedDeclaration(node) {
+            const declarator = publicFunction(node);
+
+            if (declarator) exports.push({ declarator, checked: false });
+          },
+          CallExpression(node) {
+            if (exports.length && checks.has(calleeName(node.callee)))
+              exports.at(-1).checked = true;
+          },
+          "ExportNamedDeclaration:exit"(node) {
+            if (!publicFunction(node)) return;
+            const { declarator, checked } = exports.pop();
+
+            const documented = context.sourceCode
+              .getCommentsBefore(node)
+              .some((comment) => comment.value.trim().startsWith("Access:"));
+
+            if (!checked && !documented)
+              context.report({
+                node: declarator.id,
+                messageId: "access",
+                data: {
+                  name: declarator.id.name,
+                  checks: [...checks].join(", "),
+                },
+              });
+          },
+        };
+      },
+    },
     "no-leaked-render": {
       meta: {
         type: "problem",

@@ -22,6 +22,7 @@ import { randomUUID } from "expo-crypto";
 import { api } from "../../convex/_generated/api";
 import {
   createReceiptDraft,
+  isDraftBusy,
   reduceReceiptDraft,
 } from "@/features/receipt-draft";
 import {
@@ -51,6 +52,7 @@ import {
 import {
   aliasKey,
   emptyLine,
+  isTotalsLine,
   reconcile,
   type ReceiptData,
 } from "@/lib/domain/receipt";
@@ -106,9 +108,7 @@ export function ReceiptEditor({
   const { moneyErrors, dirty, generation } = draft;
   const revision = draft.baseline.revision;
 
-  const busy = ["saving", "awaiting-snapshot", "working", "deleting"].includes(
-    draft.operation.kind,
-  );
+  const busy = isDraftBusy(draft);
 
   const approved = draft.operation.kind === "saved" && draft.operation.approved;
   const error = draft.operation.kind === "failed" ? draft.operation.error : "";
@@ -171,13 +171,13 @@ export function ReceiptEditor({
   const recentCategories = context?.recentCategories ?? [];
 
   const productLines =
-    data?.lines.filter((line) => !["summary", "vat"].includes(line.kind)) ?? [];
+    data?.lines.filter((line) => !isTotalsLine(line.kind)) ?? [];
 
   const visibleLines =
     data?.lines.filter((line) =>
       allLines
         ? summaryLines ||
-          !["summary", "vat"].includes(line.kind) ||
+          !isTotalsLine(line.kind) ||
           lineReviewIssues(line).length
         : reviewLineIds.has(line.id) || lineReviewIssues(line).length,
     ) ?? [];

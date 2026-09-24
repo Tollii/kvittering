@@ -24,6 +24,17 @@ export const lineKinds = [
   "vat",
 ] as const;
 
+export type LineKind = (typeof lineKinds)[number];
+
+/** Summary and VAT lines restate totals printed on the receipt; they are not purchases. */
+export function isTotalsLine(kind: LineKind): boolean {
+  return kind === "summary" || kind === "vat";
+}
+
+export function isDiscountLine(kind: LineKind): boolean {
+  return kind === "item_discount" || kind === "receipt_discount";
+}
+
 export const lineValidator = v.object({
   id: v.string(),
   kind: v.union(...lineKinds.map((kind) => v.literal(kind))),
@@ -247,7 +258,7 @@ export function reconcile(data: ReceiptData) {
     unknown = 0;
 
   for (const line of data.lines) {
-    if (line.kind === "summary" || line.kind === "vat") continue;
+    if (isTotalsLine(line.kind)) continue;
 
     if (line.amountOre === null) {
       unknown++;
@@ -256,7 +267,7 @@ export function reconcile(data: ReceiptData) {
 
     if (line.kind === "product") products += line.amountOre;
 
-    if (line.kind === "item_discount" || line.kind === "receipt_discount") {
+    if (isDiscountLine(line.kind)) {
       const key = JSON.stringify([
         line.kind,
         line.name,

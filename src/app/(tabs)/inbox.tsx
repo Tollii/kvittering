@@ -1,3 +1,4 @@
+import { needsAttention } from "@/lib/domain/receipt-status";
 import { ReceiptActivityButton } from "@/features/receipt-activity";
 import { useCompleteReceipts } from "@/features/receipt-queries";
 import { router } from "expo-router";
@@ -33,13 +34,9 @@ export default function Inbox() {
       !reserved.has(receipt._id),
   );
 
-  const attention = open.filter((receipt) =>
-    ["needs_review", "failed"].includes(receipt.status),
-  );
+  const attention = open.filter((receipt) => needsAttention(receipt.status));
 
-  const working = open.filter(
-    (receipt) => !["needs_review", "failed"].includes(receipt.status),
-  );
+  const working = open.filter((receipt) => !needsAttention(receipt.status));
 
   const empty = !loadingReceipts && open.length === 0 && queue.length === 0;
 

@@ -1,4 +1,5 @@
 import {
+  attentionStatuses,
   isReceiptProcessing,
   receiptStatusValidator,
 } from "../src/lib/domain/receipt-status";
@@ -761,18 +762,21 @@ export const editorContext = query({
       .take(50);
 
     const pending = await Promise.all(
-      (["needs_review", "failed"] as const).map((status) =>
-        ctx.db
+      attentionStatuses.map(async (status) => {
+        // The receipt being edited can be the newest; the next one is then second.
+        const newest = await ctx.db
           .query("receipts")
-          .withIndex("by_householdId_and_status", (q) =>
-            q.eq("householdId", member.householdId).eq("status", status),
-          )
-          .filter((q) =>
-            q.and(q.neq(q.field("_id"), id), q.eq(q.field("excluded"), false)),
+          .withIndex("by_householdId_and_status_and_excluded", (q) =>
+            q
+              .eq("householdId", member.householdId)
+              .eq("status", status)
+              .eq("excluded", false),
           )
           .order("desc")
-          .first(),
-      ),
+          .take(2);
+
+        return newest.find((receipt) => receipt._id !== id) ?? null;
+      }),
     );
 
     return {
@@ -797,13 +801,15 @@ export const attentionCount = query({
     const member = await requireMember(ctx);
 
     const pages = await Promise.all(
-      (["needs_review", "failed"] as const).map((status) =>
+      attentionStatuses.map((status) =>
         ctx.db
           .query("receipts")
-          .withIndex("by_householdId_and_status", (q) =>
-            q.eq("householdId", member.householdId).eq("status", status),
+          .withIndex("by_householdId_and_status_and_excluded", (q) =>
+            q
+              .eq("householdId", member.householdId)
+              .eq("status", status)
+              .eq("excluded", false),
           )
-          .filter((q) => q.eq(q.field("excluded"), false))
           .take(100),
       ),
     );

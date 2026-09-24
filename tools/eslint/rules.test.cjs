@@ -56,6 +56,57 @@ tester.run("no-effect-fetch", plugin.rules["no-effect-fetch"], {
   ].map((code) => ({ code, errors: [{ messageId: "subscription" }] })),
 });
 
+tester.run("no-inline-literal-set", plugin.rules["no-inline-literal-set"], {
+  valid: [
+    "const open = new Set(['pending', 'running']); open.has(state);",
+    "isReceiptProcessing(receipt.status);",
+    "[first, second].includes(value);",
+    "['only'].includes(value);",
+  ],
+  invalid: [
+    "['needs_review', 'failed'].includes(receipt.status);",
+    "(['summary', 'vat'] as const).includes(line.kind);",
+  ].map((code) => ({ code, errors: [{ messageId: "nameSet" }] })),
+});
+
+tester.run("no-db-query-filter", plugin.rules["no-db-query-filter"], {
+  valid: [
+    "ctx.db.query('receipts').withIndex('by_status', (q) => q.eq('status', s)).take(10);",
+    "receipts.filter((receipt) => receipt.excluded);",
+    "(await ctx.db.query('receipts').take(10)).filter(Boolean);",
+  ],
+  invalid: [
+    "ctx.db.query('receipts').withIndex('by_status', (q) => q).filter((q) => q.eq(q.field('excluded'), false)).take(1);",
+    "ctx.db.system.query('_scheduled_functions').filter((q) => q).first();",
+  ].map((code) => ({ code, errors: [{ messageId: "index" }] })),
+});
+
+tester.run("no-unbounded-collect", plugin.rules["no-unbounded-collect"], {
+  valid: ["ctx.db.query('receipts').take(100);", "stream.collect();"],
+  invalid: [
+    "ctx.db.query('receipts').withIndex('by_householdId', (q) => q).collect();",
+  ].map((code) => ({ code, errors: [{ messageId: "bound" }] })),
+});
+
+const access = [{ builders: ["query"], checks: ["requireMember"] }];
+
+tester.run("convex-function-access", plugin.rules["convex-function-access"], {
+  valid: [
+    "export const list = query({ handler: async (ctx) => { await requireMember(ctx); } });",
+    "export const nested = query({ handler: async (ctx) => { const run = () => requireMember(ctx); await run(); } });",
+    "// Access: public. Clients read this before sign-in.\nexport const get = query({ handler: async () => null });",
+    "export const worker = internalQuery({ handler: async () => null });",
+  ].map((code) => ({ code, options: access })),
+  invalid: [
+    "export const list = query({ handler: async (ctx) => ctx.db.query('receipts').take(10) });",
+    "// Reads receipts.\nexport const list = query({ handler: async () => null });",
+  ].map((code) => ({
+    code,
+    options: access,
+    errors: [{ messageId: "access" }],
+  })),
+});
+
 const typedTester = new RuleTester({
   languageOptions: {
     parser,

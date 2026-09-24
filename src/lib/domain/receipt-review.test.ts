@@ -53,7 +53,7 @@ it("requires review for amounts, identity, overlap and missing receipt informati
 it("keeps a missing amount visible after a general warning is acknowledged", () => {
   const line = batteryFixture().lines[0];
   line.amountOre = null;
-  expect(lineReviewIssues(line)).toEqual(["Beløpet mangler."]);
+  expect(lineReviewIssues(line)).toEqual([{ code: "amount_missing" }]);
 });
 
 it("resolves category uncertainty without dismissing other review requirements", () => {
@@ -64,8 +64,8 @@ it("resolves category uncertainty without dismissing other review requirements",
   expect(corrected.categoryId).toBe("drinks.soft-drinks");
   expect(corrected.manual).toBe(true);
   expect(lineReviewIssues(corrected)).toEqual([
-    "Mulig overlapp.",
-    "Beløpet mangler.",
+    { code: "reader_issue", message: "Mulig overlapp." },
+    { code: "amount_missing" },
   ]);
   expect(line.issues).toContain("Kategorien er usikker.");
   expect(confirmLineCategory(line, "fallback.unclear").issues).toContain(

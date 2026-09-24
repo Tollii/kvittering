@@ -40,7 +40,7 @@ import {
   receiptCoverage,
   type SpendingGroup,
 } from "@/lib/domain/insights";
-import { formatMoney, osloDate } from "@/lib/domain/receipt";
+import { formatMoney, isDiscountLine, osloDate } from "@/lib/domain/receipt";
 import { categoryById } from "@/lib/domain/categories";
 import { receiptNeeds } from "@/components/receipt-card";
 import { useTheme } from "@/constants/theme";
@@ -220,7 +220,7 @@ function Spending({ initialMonth }: Readonly<{ initialMonth: string }>) {
         name: "Rabatter",
         amountOre: totals.discounts,
         contributions: accounting.filter((item) =>
-          ["item_discount", "receipt_discount"].includes(item.line.kind),
+          isDiscountLine(item.line.kind),
         ),
       },
       {
