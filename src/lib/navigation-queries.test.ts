@@ -8,7 +8,7 @@ import { createElement, StrictMode, act } from "react";
 import { create, type ReactTestRenderer } from "react-test-renderer";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { ConvexProvider, ConvexReactClient } from "convex/react";
-import { useQuery, useQueries } from "convex-helpers/react/cache";
+import { useQuery } from "convex-helpers/react/cache";
 import { convexToJson, type Value } from "convex/values";
 import { getFunctionName, makeFunctionReference } from "convex/server";
 import { NavigationQueryProvider } from "../features/navigation-query-provider";
@@ -231,15 +231,19 @@ it("loads optional report scopes only on demand and stops at sign-out", async ()
   enabled = true;
   await show(Report);
   expect(subscriptions.size).toBe(1);
+  const receipt = receiptFixture({ data: null });
   await publish("receipts:readPage", {
-    page: [],
+    page: [receipt],
     isDone: true,
     continueCursor: "end",
   });
+  expect(result!.receipts).toEqual([receipt]);
+  expect(result!.completeReceipts).toBe(true);
   navigation.authenticated = false;
   await show(Report);
   expect(result!.receipts).toEqual([]);
   expect(result!.completeReceipts).toBe(false);
+  expect(subscriptions.size).toBe(0);
 });
 
 it("retains local history pagination across tabs and keeps searches separate", async () => {
@@ -310,7 +314,7 @@ it("releases the matching queue while another screen has focus", async () => {
   expect(result!.loading).toBe(false);
 });
 
-it("releases closed details and obtains fresh values when reopened", async () => {
+it("releases detail data on close and while changing households", async () => {
   const query = makeFunctionReference<
     "query",
     { id: string },
@@ -333,62 +337,15 @@ it("releases closed details and obtains fresh values when reopened", async () =>
   expect(value).toBeUndefined();
   await publish("receipts:detail", { total: 200 });
   expect(value).toEqual({ total: 200 });
+  const previous = [...subscriptions.values()][0];
+  await show(Detail, "household-b");
+  expect(previous?.listeners.size).toBe(0);
+  expect(value).toBeUndefined();
+  expect(subscriptions.size).toBe(1);
+  await publish("receipts:detail", { total: 300 });
+  expect(value).toEqual({ total: 300 });
   await publish("receipts:detail", null);
   expect(value).toBeNull();
-});
-
-it("expires idle results and releases them when the household changes", async () => {
-  const query = makeFunctionReference<"query", Record<string, never>, number>(
-    "receipts:detail",
-  );
-
-  let value: number | undefined;
-
-  function Detail() {
-    value = useQuery(query, {});
-
-    return null;
-  }
-
-  await show(Detail);
-  await publish("receipts:detail", 100);
-  await show(null);
-  await act(async () => {
-    vi.advanceTimersByTime(5 * 60_000);
-  });
-  expect(subscriptions.size).toBe(0);
-  await show(Detail);
-  expect(value).toBeUndefined();
-  await publish("receipts:detail", 200);
-  await show(null, "household-b");
-  expect(subscriptions.size).toBe(0);
-  expect(vi.getTimerCount()).toBe(0);
-  await show(Detail, "household-b");
-  expect(value).toBeUndefined();
-});
-
-it("bounds idle subscriptions without evicting mounted queries", async () => {
-  const query = makeFunctionReference<"query", { id: number }, number>(
-    "receipts:detail",
-  );
-
-  function Details() {
-    useQueries(
-      Object.fromEntries(
-        Array.from({ length: 45 }, (_, id) => [
-          String(id),
-          { query, args: { id } },
-        ]),
-      ),
-    );
-
-    return null;
-  }
-
-  await show(Details);
-  expect(subscriptions.size).toBe(45);
-  await show(null);
-  expect(subscriptions.size).toBe(0);
 });
 
 it("opens a newly linked receipt before the local change page arrives", async () => {

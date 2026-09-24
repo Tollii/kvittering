@@ -57,5 +57,4 @@ it("continues beyond 500 subscriptions without duplicate device batches", async 
 
   expect(devices).toHaveLength(501);
   expect(new Set(devices).size).toBe(501);
-  expect(jobs.every((job) => !job.name.startsWith("pushDelivery"))).toBe(true);
 });

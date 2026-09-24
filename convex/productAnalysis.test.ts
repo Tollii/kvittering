@@ -291,14 +291,50 @@ it("commits duplicate profile decisions once and rejects a stale batch", async (
 it("batches independent profiles and uses only quantity questions for cached profiles", async () => {
   const { t, id, data, args } = await setup();
   vi.stubEnv("TYPESAFE_API_KEY", "test-key");
-  const product = present(data.lines[0]);
+
+  const product = {
+    ...present(data.lines[0]),
+    id: "cola",
+    name: "Cola 10x330ml",
+    originalText: "Cola 10x330ml",
+    quantity: 2,
+  };
+
   data.lines = [
     product,
-    { ...product, id: "same-product" },
-    { ...product, id: "different-product", name: "Milk", originalText: "Milk" },
+    { ...product, id: "same-product", quantity: 1 },
+    {
+      ...product,
+      id: "milk",
+      name: "Milk 500ml",
+      originalText: "Milk 500ml",
+      quantity: 3,
+    },
   ];
   await t.run((ctx) => ctx.db.patch("receipts", id, { data }));
   const requests: ModelRequest[] = [];
+
+  const profileAnswers = {
+    profile_0_family: "new",
+    profile_0_count: "count_1",
+    profile_0_measure: "each_0",
+    profile_0_attribute_type: "unknown",
+    profile_0_attribute_sugar: "unknown",
+    profile_0_attribute_preparation: "unknown",
+    profile_1_family: "new",
+    profile_1_count: "count_0",
+    profile_1_measure: "total_0",
+    profile_1_attribute_type: "unknown",
+    profile_1_attribute_sugar: "unknown",
+    profile_1_attribute_preparation: "unknown",
+  };
+
+  const quantityAnswers = {
+    quantity_0: "candidate_1",
+    quantity_1: "candidate_1",
+    quantity_2: "candidate_1",
+  };
+
   vi.stubGlobal(
     "fetch",
     vi.fn(async (_url: string, init?: RequestInit) => {
@@ -310,13 +346,17 @@ it("batches independent profiles and uses only quantity questions for cached pro
           model: "jev-latest",
           usage: { input_tokens: 1, output_tokens: 1 },
           answers: Object.fromEntries(
-            Object.keys(request.questions).map((key) => [
+            Object.entries(
+              "profile_0_family" in request.questions
+                ? profileAnswers
+                : quantityAnswers,
+            ).map(([key, selected]) => [
               key,
               {
                 type: "choice",
-                choice: key.endsWith("_family") ? "new" : "unknown",
+                choice: selected,
                 confidence: 0.9,
-                probabilities: { unknown: 0.9 },
+                probabilities: { [selected]: 0.9 },
               },
             ]),
           ),
@@ -334,16 +374,35 @@ it("batches independent profiles and uses only quantity questions for cached pro
       version: args.version,
     };
 
-    expect(
-      await t.action(internal.productAnalysisWorker.analyze, snapshot),
-    ).toHaveLength(3);
+    const result = await t.action(
+      internal.productAnalysisWorker.analyze,
+      snapshot,
+    );
+
+    expect(result).toMatchObject([
+      {
+        lineId: "cola",
+        family: { name: "Cola" },
+        quantity: { packages: 2, units: 20, grams: null, millilitres: 6600 },
+      },
+      {
+        lineId: "same-product",
+        family: { name: "Cola" },
+        quantity: { packages: 1, units: 10, grams: null, millilitres: 3300 },
+      },
+      {
+        lineId: "milk",
+        family: { name: "Milk" },
+        quantity: { packages: 3, units: 3, grams: null, millilitres: 1500 },
+      },
+    ]);
+    expect(result[0]?.family?.id).toBe(result[1]?.family?.id);
+    expect(result[0]?.family?.id).not.toBe(result[2]?.family?.id);
     expect(requests).toHaveLength(2);
-    expect(Object.keys(present(requests[0]).questions)).toHaveLength(12);
-    expect(Object.keys(present(requests[1]).questions)).toHaveLength(3);
     requests.length = 0;
     expect(
       await t.action(internal.productAnalysisWorker.analyze, snapshot),
-    ).toHaveLength(3);
+    ).toEqual(result);
     expect(requests).toHaveLength(1);
     expect(
       Object.keys(present(requests[0]).questions).every((key) =>
