@@ -211,13 +211,9 @@ export const finish = internalMutation({
 
     if (existing) return null;
     let duplicateOf = receipt.duplicateOf;
+    const { store, purchaseDate } = args.data;
 
-    if (
-      !duplicateOf &&
-      args.data.store &&
-      args.data.purchaseDate &&
-      args.data.totalOre !== null
-    ) {
+    if (!duplicateOf && store && purchaseDate && args.data.totalOre !== null) {
       const through = args.duplicateThrough ?? Date.now();
 
       const page = await ctx.db
@@ -225,7 +221,7 @@ export const finish = internalMutation({
         .withIndex("by_householdId_and_purchaseDate", (q) =>
           q
             .eq("householdId", receipt.householdId)
-            .eq("data.purchaseDate", args.data.purchaseDate!),
+            .eq("data.purchaseDate", purchaseDate),
         )
         .filter((q) => q.lte(q.field("_creationTime"), through))
         .order("desc")
@@ -241,8 +237,7 @@ export const finish = internalMutation({
         (other) =>
           other._id !== receipt._id &&
           other.data?.store &&
-          normalizeAlias(other.data.store) ===
-            normalizeAlias(args.data.store!) &&
+          normalizeAlias(other.data.store) === normalizeAlias(store) &&
           other.data.purchaseDate === args.data.purchaseDate &&
           other.data.totalOre === args.data.totalOre &&
           ((args.data.receiptNumber &&

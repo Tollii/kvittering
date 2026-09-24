@@ -62,6 +62,7 @@ import {
 } from "@/lib/domain/receipt-review";
 import { useCompleteReceipts } from "./receipt-queries";
 import type { Receipt } from "@/lib/domain/insights";
+import { isReceiptProcessing } from "@/lib/domain/receipt-state";
 import { receiptStatusLabel } from "@/components/receipt-card";
 import { formatDate } from "@/lib/format-date";
 import { useTheme } from "@/constants/theme";
@@ -143,9 +144,7 @@ export function ReceiptEditor({
     ]);
   });
 
-  const processing = ["processing", "uploaded", "uploading"].includes(
-    receipt.status,
-  );
+  const processing = isReceiptProcessing(receipt.status);
 
   const totals = data ? reconcile(data) : null;
   const unresolvedDuplicate = !!receipt.duplicateOf && !duplicateResolved;

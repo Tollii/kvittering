@@ -2,7 +2,7 @@ import {
   preparePurchases,
   comparisonPurchasePolicy,
 } from "./purchase-projection";
-import type { Contribution, Receipt } from "./insights";
+import type { Contribution, PurchaseContribution, Receipt } from "./insights";
 import { formatMoney } from "./receipt";
 import {
   productProfileKey,
@@ -96,9 +96,29 @@ export type SpendingEffect = {
   contributions: Contribution[];
 };
 
-type MeasuredLine = Contribution & {
+type MeasuredLine = PurchaseContribution & {
   quantity: ProductAnalysisResult["quantity"] | null;
 };
+
+const measures = ["millilitres", "grams", "units"] as const;
+
+/** One measure summed across lines, or null when any line lacks a positive amount. */
+function measuredTotal(
+  items: MeasuredLine[],
+  measure: (typeof measures)[number],
+): number | null {
+  let total = 0;
+
+  for (const item of items) {
+    const amount = item.quantity?.[measure];
+
+    // Missing, zero, negative, and NaN amounts cannot be compared.
+    if (!amount || amount < 0) return null;
+    total += amount;
+  }
+
+  return total;
+}
 
 type Group = {
   name: string;
@@ -222,30 +242,28 @@ export function spendingAnalysis(
     if (!group.current.length || !group.previous.length) continue;
 
     // Physical measures allow comparison across package sizes. Package counts do not.
-    const measure = (["millilitres", "grams", "units"] as const).find((key) =>
-      all.every(
-        (line) =>
-          line.quantity?.[key] !== null && (line.quantity?.[key] ?? 0) > 0,
-      ),
-    );
+    const measured = measures
+      .flatMap((measure) => {
+        const cq = measuredTotal(group.current, measure);
+        const pq = measuredTotal(group.previous, measure);
+
+        return cq !== null && pq !== null ? [{ measure, cq, pq }] : [];
+      })
+      .at(0);
 
     if (
-      !measure ||
-      (measure === "units" &&
-        new Set(all.map((item) => productProfileKey(item.line!))).size !== 1)
+      !measured ||
+      (measured.measure === "units" &&
+        new Set(all.map((item) => productProfileKey(item.line))).size !== 1)
     )
       continue;
+    const { measure, cq, pq } = measured;
 
     const sum = (items: MeasuredLine[]) =>
       items.reduce((total, item) => total + item.amountOre, 0);
 
-    const quantity = (items: MeasuredLine[]) =>
-      items.reduce((total, item) => total + item.quantity![measure]!, 0);
-
     const c = sum(group.current),
-      p = sum(group.previous),
-      cq = quantity(group.current),
-      pq = quantity(group.previous);
+      p = sum(group.previous);
 
     // Symmetric decomposition: price and quantity effects add exactly to the change.
     const price = Math.round(((c / cq - p / pq) * (cq + pq)) / 2);

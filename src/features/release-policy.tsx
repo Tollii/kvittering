@@ -60,12 +60,15 @@ const queryKey = [
 
 export function ReleasePolicyProvider({
   children,
-}: Readonly<{ children: ReactNode }>) {
+  convexUrl,
+}: Readonly<{ children: ReactNode; convexUrl: string }>) {
   const [client] = useState(() => new QueryClient());
 
   return (
     <QueryClientProvider client={client}>
-      <PolicyProvider client={client}>{children}</PolicyProvider>
+      <PolicyProvider client={client} convexUrl={convexUrl}>
+        {children}
+      </PolicyProvider>
     </QueryClientProvider>
   );
 }
@@ -73,9 +76,11 @@ export function ReleasePolicyProvider({
 function PolicyProvider({
   children,
   client,
+  convexUrl,
 }: Readonly<{
   children: ReactNode;
   client: QueryClient;
+  convexUrl: string;
 }>) {
   const [cached] = useState(readCachedPolicy);
   const featureFlags = useFeatureFlags();
@@ -83,11 +88,11 @@ function PolicyProvider({
 
   const http = useMemo(
     () =>
-      new ConvexHttpClient(process.env.EXPO_PUBLIC_CONVEX_URL!, {
+      new ConvexHttpClient(convexUrl, {
         fetch: (input, init) =>
           fetch(input, { ...init, signal: AbortSignal.timeout(8000) }),
       }),
-    [],
+    [convexUrl],
   );
 
   const result = useQuery({

@@ -284,9 +284,7 @@ export default function History() {
             <SpendingBars
               rows={prices.observations.map((observation, index) => ({
                 id: String(index),
-                name: formatDate(
-                  observation.contribution.receipt.data!.purchaseDate,
-                ),
+                name: formatDate(observation.date),
                 amountOre: observation.ore,
                 contributions: [observation.contribution],
               }))}

@@ -20,6 +20,10 @@ import {
   confirmLineCategory,
 } from "../src/lib/domain/receipt-review";
 import { correctionTarget } from "../src/lib/domain/corrections";
+import {
+  extractedReceipt,
+  type ExtractedReceipt,
+} from "../src/lib/domain/receipt-state";
 
 /** Only human saves create evaluation examples; automatic propagation does not. */
 export async function recordCorrections(
@@ -104,7 +108,16 @@ export const list = query({
   },
 });
 
-async function requireCorrection(ctx: QueryCtx, id: Id<"corrections">) {
+/** A category correction that can be applied to other receipts. */
+type CategoryCorrection = Doc<"corrections"> & {
+  field: "category";
+  expected: string;
+};
+
+async function requireCorrection(
+  ctx: QueryCtx,
+  id: Id<"corrections">,
+): Promise<CategoryCorrection> {
   const member = await requireMember(ctx);
   const correction = await ctx.db.get("corrections", id);
 
@@ -119,19 +132,22 @@ async function requireCorrection(ctx: QueryCtx, id: Id<"corrections">) {
   )
     throw new Error("Denne rettelsen kan ikke brukes på flere varer.");
 
-  return correction;
+  return {
+    ...correction,
+    field: correction.field,
+    expected: correction.expected,
+  };
 }
 
 function matches(
-  receipt: Doc<"receipts">,
-  correction: Doc<"corrections">,
+  receipt: ExtractedReceipt,
+  correction: CategoryCorrection,
   line: ReceiptData["lines"][number],
 ) {
   const key = categoryMemoryKey(correction.store, correction.name);
 
   return (
     receipt._id !== correction.receiptId &&
-    !!receipt.data &&
     !receipt.excluded &&
     ["reviewed", "needs_review"].includes(receipt.status) &&
     !!key &&
@@ -140,6 +156,27 @@ function matches(
     line.categoryId !== correction.expected &&
     categoryMemoryKey(receipt.data.store, line.name) === key
   );
+}
+
+/** The receipt's lines that a correction would change, as preview targets. */
+function correctionTargets(
+  row: Doc<"receipts">,
+  correction: CategoryCorrection,
+) {
+  const receipt = extractedReceipt(row);
+
+  return receipt
+    ? receipt.data.lines
+        .filter((line) => matches(receipt, correction, line))
+        .map((line) => ({
+          receiptId: receipt._id,
+          revision: receipt.revision,
+          lineId: line.id,
+          name: line.name,
+          categoryId: line.categoryId,
+          date: receipt.data.purchaseDate,
+        }))
+    : [];
 }
 
 export const preview = query({
@@ -165,18 +202,9 @@ export const preview = query({
       .order("desc")
       .take(201);
 
-    const targets = receipts.slice(0, 200).flatMap((receipt) =>
-      (receipt.data?.lines ?? [])
-        .filter((line) => matches(receipt, correction, line))
-        .map((line) => ({
-          receiptId: receipt._id,
-          revision: receipt.revision,
-          lineId: line.id,
-          name: line.name,
-          categoryId: line.categoryId,
-          date: receipt.data!.purchaseDate,
-        })),
-    );
+    const targets = receipts
+      .slice(0, 200)
+      .flatMap((receipt) => correctionTargets(receipt, correction));
 
     return {
       targets: targets.slice(0, 20),
@@ -203,14 +231,15 @@ export const apply = mutation({
     for (const receiptId of new Set(
       targets.map((target) => target.receiptId),
     )) {
-      const receipt = await ctx.db.get("receipts", receiptId);
+      const row = await ctx.db.get("receipts", receiptId);
+      const receipt = row && extractedReceipt(row);
 
       const selected = targets.filter(
         (target) => target.receiptId === receiptId,
       );
 
       if (
-        !receipt?.data ||
+        !receipt ||
         receipt.householdId !== correction.householdId ||
         selected.some((target) => target.revision !== receipt.revision)
       )
@@ -219,7 +248,7 @@ export const apply = mutation({
         );
 
       const before = selected.map((target) => {
-        const line = receipt.data!.lines.find(
+        const line = receipt.data.lines.find(
           (line) => line.id === target.lineId,
         );
 
@@ -239,7 +268,7 @@ export const apply = mutation({
           ...receipt.data,
           lines: receipt.data.lines.map((line) =>
             ids.has(line.id)
-              ? confirmLineCategory(line, correction.expected!)
+              ? confirmLineCategory(line, correction.expected)
               : line,
           ),
         },
@@ -360,16 +389,7 @@ export const previewPage = query({
       ...page,
       page: page.page.map((receipt) => ({
         receiptId: receipt._id,
-        targets: (receipt.data?.lines ?? [])
-          .filter((line) => matches(receipt, correction, line))
-          .map((line) => ({
-            receiptId: receipt._id,
-            revision: receipt.revision,
-            lineId: line.id,
-            name: line.name,
-            categoryId: line.categoryId,
-            date: receipt.data!.purchaseDate,
-          })),
+        targets: correctionTargets(receipt, correction),
       })),
     };
   },

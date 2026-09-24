@@ -59,6 +59,12 @@ Runtime `typeof` checks are prohibited. Parse external data at its boundary and
 pass the resulting types to application code. Do not add runtime checks for
 facts that the declared type already establishes.
 
+Non-null assertions (`value!`) are prohibited outside tests. Parse a value once
+where its presence is established and pass the narrower type on. For example,
+`extractedReceipt` returns a receipt whose `data` is present, and `getOrInsert`
+returns a memoized value without a second lookup. Tests may assert values that
+the test itself has just established.
+
 Exceptions must be local and explain the contract:
 
 - Error deduplication checks the original object identity before parsing. This

@@ -21,8 +21,11 @@ export const evaluate = internalAction({
     }),
   ),
   handler: async () => {
+    if (!env.TYPESAFE_API_KEY)
+      throw new Error("Produktanalysetesten er ikke tilgjengelig.");
+
     const client = new TypeSafeClient({
-      apiKey: env.TYPESAFE_API_KEY!,
+      apiKey: env.TYPESAFE_API_KEY,
       timeout: 20000,
       retry: { maxRetries: 0 },
     });
