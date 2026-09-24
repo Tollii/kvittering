@@ -1,6 +1,8 @@
 /// <reference types="vite/client" />
 import { convexTest } from "convex-test";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
+import { register as registerBetterAuth } from "@convex-dev/better-auth/test";
+import { internal } from "./_generated/api";
 import { createAuth } from "./auth";
 import schema from "./schema";
 
@@ -50,3 +52,52 @@ it.each([undefined, "false", "true"])(
     });
   },
 );
+
+it("toggles email registration while existing email accounts can still sign in", async () => {
+  const t = convexTest(schema, modules);
+  registerBetterAuth(t);
+
+  const body = {
+    name: "Test member",
+    email: "member@example.com",
+    password: "test-password-123456",
+  };
+
+  const signup = () =>
+    t.fetch("/api/auth/sign-up/email", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Origin: "kvitto://" },
+      body: JSON.stringify(body),
+    });
+
+  expect((await signup()).status).toBe(403);
+
+  for (const platform of ["ios", "android"] as const)
+    await t.mutation(internal.featureFlags.set, {
+      platform,
+      name: "emailSignUp",
+      enabled: true,
+      expectedRevision: 0,
+      operator: "test",
+      reason: "Enable registration",
+    });
+
+  expect((await signup()).status).toBe(200);
+  await t.mutation(internal.featureFlags.set, {
+    platform: "ios",
+    name: "emailSignUp",
+    enabled: false,
+    expectedRevision: 1,
+    operator: "test",
+    reason: "Disable registration",
+  });
+  expect((await signup()).status).toBe(403);
+
+  const signin = await t.fetch("/api/auth/sign-in/email", {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Origin: "kvitto://" },
+    body: JSON.stringify({ email: body.email, password: body.password }),
+  });
+
+  expect(signin.status).toBe(200);
+});

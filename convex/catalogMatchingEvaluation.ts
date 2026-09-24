@@ -1,5 +1,7 @@
 "use node";
 
+import { providerFetch } from "./providerTransport";
+
 import { v } from "convex/values";
 import { TypeSafeClient } from "@typesafe-ai/sdk";
 import { internalAction, env } from "./_generated/server";
@@ -20,7 +22,7 @@ export const evaluate = internalAction({
       probabilities: v.array(v.union(v.number(), v.null())),
     }),
   ),
-  handler: async () => {
+  handler: async (ctx) => {
     if (!env.TYPESAFE_API_KEY)
       throw new Error("Product matching is unavailable.");
 
@@ -87,6 +89,7 @@ export const evaluate = internalAction({
         }),
       })),
       new TypeSafeClient({
+        fetch: providerFetch(ctx, "typesafe"),
         apiKey: env.TYPESAFE_API_KEY,
         timeout: 30000,
         retry: { maxRetries: 0 },

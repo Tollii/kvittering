@@ -59,6 +59,14 @@ if ! grep -qx BETTER_AUTH_SECRET <<<"$environment_names"; then
   npx convex env set BETTER_AUTH_SECRET "$(openssl rand -hex 32)" >/dev/null
 fi
 npx convex env set RECEIPT_PROVIDER mock >/dev/null
+npx convex env set RELEASE_CHANNEL development >/dev/null
+# Email registration is disabled by default. Enable it only on this local backend.
+for platform in ios android; do
+  flags="$(npx convex run featureFlags:get "{\"platform\":\"$platform\"}")"
+  revision="$(jq -r .revision <<<"$flags")"
+  npx convex run featureFlags:set \
+    "{\"platform\":\"$platform\",\"name\":\"emailSignUp\",\"enabled\":true,\"expectedRevision\":$revision,\"operator\":\"Local end-to-end tests\",\"reason\":\"Create isolated test accounts\"}" >/dev/null
+done
 grep "^EXPO_PUBLIC_CONVEX" .env.local
 
 if [[ -n "${E2E_APP_CACHE:-}" && -d "$E2E_APP_CACHE" ]]; then

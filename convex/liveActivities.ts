@@ -4,10 +4,10 @@ import { clientMutation as mutation } from "./clientFunctions";
 import {
   query,
   internalQuery,
-  internalMutation,
   type MutationCtx,
   type QueryCtx,
 } from "./_generated/server";
+import { internalMutation } from "./serverFunctions";
 import { internal } from "./_generated/api";
 import { requireMember, requireReceipt } from "./access";
 import type { Doc, Id } from "./_generated/dataModel";

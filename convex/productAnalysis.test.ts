@@ -3,11 +3,13 @@ import {
   readModelRequest,
   type ModelRequest,
 } from "../src/lib/testing/model-requests";
+import { HOUR, RateLimiter } from "@convex-dev/rate-limiter";
 /// <reference types="vite/client" />
+import { register as registerRateLimiter } from "@convex-dev/rate-limiter/test";
 import { convexTest } from "convex-test";
 import { expect, it, vi, afterEach } from "vitest";
 import schema from "./schema";
-import { api, internal } from "./_generated/api";
+import { api, components, internal } from "./_generated/api";
 import { batteryFixture } from "../src/lib/domain/receipt";
 import { readAttributes } from "../src/lib/domain/product-attributes";
 import {
@@ -25,6 +27,7 @@ afterEach(() => {
 async function setup() {
   vi.stubEnv("TYPESAFE_API_KEY", "");
   const t = convexTest(schema, modules);
+  registerRateLimiter(t);
 
   const first = t.withIdentity({
     subject: "first",
@@ -350,4 +353,43 @@ it("batches independent profiles and uses only quantity questions for cached pro
   } finally {
     vi.unstubAllGlobals();
   }
+});
+
+it("denies new manual processing at its shared allowance but permits an already completed analysis", async () => {
+  const { t, first, id, args } = await setup();
+  vi.stubEnv("TYPESAFE_API_KEY", "test-key");
+  vi.stubEnv("KASSALAPP_API_KEY", "test-key");
+  const receipt = (await first.query(api.receipts.detail, { id }))!.receipt;
+  const limiter = new RateLimiter(components.rateLimiter);
+  await t.run((ctx) =>
+    limiter.limit(ctx, `work:analysis:${HOUR}`, {
+      key: `user:${receipt.uploadedBy}`,
+      count: 20,
+      config: { kind: "fixed window", rate: 20, period: HOUR, start: 0 },
+    }),
+  );
+  await expect(
+    first.mutation(api.productAnalysis.ensure, { ids: [id] }),
+  ).rejects.toThrow("Bruksgrensen");
+  await expect(
+    first.mutation(api.catalogMatching.enrich, { id }),
+  ).rejects.toThrow("Bruksgrensen");
+  await t.run((ctx) =>
+    ctx.db.patch("receipts", id, {
+      productAnalysis: {
+        version: args.version,
+        generation: args.generation,
+        revision: args.revision,
+        state: "complete",
+        updatedAt: Date.now(),
+        results: [],
+      },
+    }),
+  );
+  await expect(
+    first.mutation(api.productAnalysis.ensure, { ids: [id, id] }),
+  ).resolves.toBeNull();
+  await expect(
+    first.mutation(api.catalogMatching.enrich, { id, onlyIfMissing: true }),
+  ).resolves.toBeNull();
 });

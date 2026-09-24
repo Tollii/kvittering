@@ -1,5 +1,7 @@
 "use node";
 
+import { providerFetch } from "./providerTransport";
+
 import { v } from "convex/values";
 import { attributeQuestions } from "../src/lib/domain/product-attribute-classification";
 import {
@@ -20,11 +22,12 @@ export const evaluate = internalAction({
       confidence: v.number(),
     }),
   ),
-  handler: async () => {
+  handler: async (ctx) => {
     if (!env.TYPESAFE_API_KEY)
       throw new Error("Produktanalysetesten er ikke tilgjengelig.");
 
     const client = new TypeSafeClient({
+      fetch: providerFetch(ctx, "typesafe"),
       apiKey: env.TYPESAFE_API_KEY,
       timeout: 20000,
       retry: { maxRetries: 0 },
@@ -85,7 +88,7 @@ export const evaluateAttributes = internalAction({
       attributes: productAttributesValidator,
     }),
   ),
-  handler: async () => {
+  handler: async (ctx) => {
     if (!env.TYPESAFE_API_KEY)
       throw new Error("Product analysis is unavailable.");
 
@@ -127,6 +130,7 @@ export const evaluateAttributes = internalAction({
     });
 
     const client = new TypeSafeClient({
+      fetch: providerFetch(ctx, "typesafe"),
       apiKey: env.TYPESAFE_API_KEY,
       timeout: 30000,
       retry: { maxRetries: 0 },

@@ -20,11 +20,14 @@ import {
   requestAppleIdentity,
 } from "@/lib/apple-authentication";
 
+import { useFeatureFlag } from "./featureFlags";
+
 export function SignIn() {
+  const emailSignUp = useFeatureFlag("emailSignUp");
   const appleAvailable = useAppleAuthentication();
   const colors = useTheme();
   const [emailMode, setEmailMode] = useState<"login" | "register" | null>(null);
-  const register = emailMode === "register";
+  const register = emailSignUp && emailMode === "register";
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -158,19 +161,21 @@ export function SignIn() {
                 }}
               />
             </View>
-            <Button
-              variant="secondary"
-              title="Opprett konto med e-post"
-              disabled={busy}
-              style={{
-                minHeight: 56,
-                borderRadius: 28,
-                backgroundColor: "transparent",
-                borderWidth: 1,
-                borderColor: colors.line,
-              }}
-              onPress={() => setEmailMode("register")}
-            />
+            {emailSignUp && (
+              <Button
+                variant="secondary"
+                title="Opprett konto med e-post"
+                disabled={busy}
+                style={{
+                  minHeight: 56,
+                  borderRadius: 28,
+                  backgroundColor: "transparent",
+                  borderWidth: 1,
+                  borderColor: colors.line,
+                }}
+                onPress={() => setEmailMode("register")}
+              />
+            )}
             <View style={{ paddingTop: 12, gap: 2 }}>
               <Copy muted size={14} style={{ textAlign: "center" }}>
                 Har du allerede en konto?
@@ -235,16 +240,18 @@ export function SignIn() {
               disabled={busy || !canSubmit}
               onPress={() => void submit()}
             />
-            <AuthenticationLink
-              title={
-                register ? "Har du konto? Logg inn" : "Ny her? Opprett konto"
-              }
-              disabled={busy}
-              onPress={() => {
-                setEmailMode(register ? "login" : "register");
-                setError("");
-              }}
-            />
+            {emailSignUp && (
+              <AuthenticationLink
+                title={
+                  register ? "Har du konto? Logg inn" : "Ny her? Opprett konto"
+                }
+                disabled={busy}
+                onPress={() => {
+                  setEmailMode(register ? "login" : "register");
+                  setError("");
+                }}
+              />
+            )}
           </>
         )}
       </View>

@@ -11,4 +11,26 @@ crons.weekly(
   {},
 );
 
+crons.interval(
+  "remove expired catalog results",
+  { hours: 24 },
+  internal.retention.catalog,
+  { state: "ready" },
+);
+
+crons.interval(
+  "remove expired catalog errors",
+  { hours: 24 },
+  internal.retention.catalog,
+  { state: "error" },
+);
+
+for (const component of ["processing", "analysis"] as const)
+  crons.interval(
+    `remove expired ${component} workflows`,
+    { hours: 24 },
+    internal.retention.inventoryWorkflows,
+    { component },
+  );
+
 export default crons;

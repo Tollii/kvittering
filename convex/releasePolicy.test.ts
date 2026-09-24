@@ -1,5 +1,6 @@
 import { Ore } from "../src/lib/domain/ore";
 /// <reference types="vite/client" />
+import { register as registerRateLimiter } from "@convex-dev/rate-limiter/test";
 import { convexTest } from "convex-test";
 import { beforeEach, afterEach, expect, it, vi } from "vitest";
 import { api, internal } from "./_generated/api";
@@ -24,6 +25,7 @@ afterEach(() => vi.unstubAllEnvs());
 
 async function setup() {
   const t = convexTest(schema, modules);
+  registerRateLimiter(t);
 
   const user = t.withIdentity({
     subject: "first",

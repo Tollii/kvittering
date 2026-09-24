@@ -1,5 +1,6 @@
 import { oreValidator } from "../src/lib/domain/ore";
 import { receiptStatusValidator } from "../src/lib/domain/receipt-state";
+import { spendingTotalsValidator } from "../src/lib/domain/receipt-summary";
 import { productReferenceValidator } from "../src/lib/domain/product-reference";
 import { productLinkUndoValidator } from "../src/lib/domain/product-linking";
 import {
@@ -55,6 +56,47 @@ export const receiptFields = {
 };
 
 export default defineSchema({
+  workflowJournals: defineTable({
+    workflowId: vWorkflowId,
+    component: v.union(v.literal("processing"), v.literal("analysis")),
+    receiptId: v.id("receipts").optional(),
+    expiresAt: v.number().optional(),
+  })
+    .index("by_component_and_workflowId", ["component", "workflowId"])
+    .index("by_receiptId", ["receiptId"]),
+  receiptReadModel: defineTable({
+    name: v.literal("receipts-v1"),
+    cursor: v.union(v.string(), v.null()),
+    ready: v.boolean(),
+  }).index("by_name", ["name"]),
+  receiptSyncHeads: defineTable({
+    householdId: v.id("households"),
+    sequence: v.number(),
+  }).index("by_householdId", ["householdId"]),
+  receiptSummaries: defineTable({
+    householdId: v.id("households"),
+    receiptId: v.id("receipts"),
+    sequence: v.number(),
+    deleted: v.boolean(),
+    createdAt: v.number(),
+    status: receiptStatusValidator,
+    store: v.union(v.string(), v.null()),
+    purchaseDate: v.union(v.string(), v.null()),
+    totalOre: v.union(v.number(), v.null()),
+    spendingOre: v.number(),
+    excluded: v.boolean(),
+    totals: spendingTotalsValidator,
+    categories: v.record(v.string(), v.number()),
+  })
+    .index("by_receiptId", ["receiptId"])
+    .index("by_householdId_and_sequence", ["householdId", "sequence"])
+    .index("by_householdId_and_purchaseDate", ["householdId", "purchaseDate"]),
+  receiptDailyTotals: defineTable({
+    householdId: v.id("households"),
+    date: v.string(),
+    totals: spendingTotalsValidator,
+    categories: v.record(v.string(), v.number()),
+  }).index("by_householdId_and_date", ["householdId", "date"]),
   receiptActivities: defineTable({
     identity: v.string(),
     householdId: v.id("households"),
@@ -153,6 +195,9 @@ export default defineSchema({
     ),
   }).index("by_householdId_and_key", ["householdId", "key"]),
   catalogRequests: defineTable({
+    payer: v
+      .object({ identity: v.string(), householdId: v.id("households") })
+      .optional(),
     key: v.string(),
     request: catalogRequestValidator,
     state: v.union(
@@ -167,7 +212,9 @@ export default defineSchema({
     attempts: v.number(),
     scheduledAt: v.number(),
     error: v.string().optional(),
-  }).index("by_key", ["key"]),
+  })
+    .index("by_key", ["key"])
+    .index("by_state_and_expiresAt", ["state", "expiresAt"]),
   catalogProducts: defineTable({
     key: v.string(),
     product: catalogProductValidator,

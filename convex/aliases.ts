@@ -1,10 +1,8 @@
+import { isReceiptProcessing } from "../src/lib/domain/receipt-state";
 import { commitReceiptChange } from "./receiptChanges";
 import { v } from "convex/values";
-import {
-  internalMutation,
-  type MutationCtx,
-  type QueryCtx,
-} from "./_generated/server";
+import { type MutationCtx, type QueryCtx } from "./_generated/server";
+import { internalMutation } from "./serverFunctions";
 import { internal } from "./_generated/api";
 import type { Id } from "./_generated/dataModel";
 import { aliasKey, type ReceiptData } from "../src/lib/domain/receipt";
@@ -140,10 +138,7 @@ export async function learnCategories(
   }
 }
 
-/**
- * Apply a confirmed exact match in bounded batches. Item-only corrections keep
- * their category. A receipt waiting only on that item is approved on the spot.
- */
+/** Existing scheduled calls retain their original argument contract. */
 export const applyToMatching = internalMutation({
   args: {
     householdId: v.id("households"),
@@ -151,50 +146,103 @@ export const applyToMatching = internalMutation({
     cursor: v.union(v.string(), v.null()),
   },
   returns: v.null(),
-  handler: async (ctx, args) => {
+  handler: (ctx, args) =>
+    applyChangesPage(ctx, {
+      householdId: args.householdId,
+      keys: [args.key],
+      cursor: args.cursor,
+      through: Date.now(),
+    }),
+});
+
+/** One bounded household traversal applies every changed decision from a save. */
+export const applyChanges = internalMutation({
+  args: {
+    householdId: v.id("households"),
+    keys: v.array(v.string()),
+    cursor: v.union(v.string(), v.null()),
+    through: v.number(),
+  },
+  returns: v.null(),
+  handler: applyChangesPage,
+});
+
+async function applyChangesPage(
+  ctx: MutationCtx,
+  args: {
+    householdId: Id<"households">;
+    keys: string[];
+    cursor: string | null;
+    through: number;
+  },
+): Promise<null> {
+  if (!args.keys.length || args.keys.length > 300)
+    throw new Error("Invalid alias batch.");
+
+  const aliases = new Map<
+    string,
+    { categoryId: string; confirmedBy: string }
+  >();
+
+  for (const key of new Set(args.keys)) {
     const alias = await ctx.db
       .query("aliases")
       .withIndex("by_householdId_and_key", (q) =>
-        q.eq("householdId", args.householdId).eq("key", args.key),
+        q.eq("householdId", args.householdId).eq("key", key),
       )
       .unique();
 
-    if (!alias || !isCategoryId(alias.categoryId)) return null;
-    const categoryId = alias.categoryId;
+    if (alias && isCategoryId(alias.categoryId)) aliases.set(key, alias);
+  }
 
-    const page = await ctx.db
-      .query("receipts")
-      .withIndex("by_householdId", (q) => q.eq("householdId", args.householdId))
-      .paginate({ cursor: args.cursor, numItems: 10 });
+  if (!aliases.size) return null;
 
-    for (const receipt of page.page) {
-      if (!receipt.data) continue;
-      let changed = false;
-      const data = structuredClone(receipt.data);
+  const page = await ctx.db
+    .query("receipts")
+    .withIndex("by_householdId", (q) =>
+      q.eq("householdId", args.householdId).lte("_creationTime", args.through),
+    )
+    .paginate({
+      cursor: args.cursor,
+      numItems: 10,
+      maximumRowsRead: 10,
+      maximumBytesRead: 500_000,
+    });
 
-      for (const line of data.lines) {
-        if (line.kind !== "product" || aliasKey(data, line) !== args.key)
-          continue;
+  for (const receipt of page.page) {
+    // Completion applies current aliases after extraction owns the state transition.
+    if (!receipt.data || isReceiptProcessing(receipt.status)) continue;
+    const data = structuredClone(receipt.data);
+    let editor: string | null = null;
 
-        if (settleLineWithAlias(line, args.key, categoryId)) changed = true;
-      }
+    for (const line of data.lines) {
+      if (line.kind !== "product") continue;
+      const key = aliasKey(data, line);
+      const alias = key ? aliases.get(key) : null;
 
-      if (changed) {
-        await commitReceiptChange(ctx, {
-          receiptId: receipt._id,
-          expected: receipt,
-          data,
-          origin: { kind: "alias", editor: alias.confirmedBy },
-        });
-      }
+      if (
+        key &&
+        alias &&
+        isCategoryId(alias.categoryId) &&
+        settleLineWithAlias(line, key, alias.categoryId)
+      )
+        editor = alias.confirmedBy;
     }
 
-    if (!page.isDone)
-      await ctx.scheduler.runAfter(0, internal.aliases.applyToMatching, {
-        ...args,
-        cursor: page.continueCursor,
+    if (editor !== null)
+      await commitReceiptChange(ctx, {
+        receiptId: receipt._id,
+        expected: receipt,
+        data,
+        origin: { kind: "alias", editor },
       });
+  }
 
-    return null;
-  },
-});
+  if (!page.isDone)
+    await ctx.scheduler.runAfter(0, internal.aliases.applyChanges, {
+      ...args,
+      cursor: page.continueCursor,
+    });
+
+  return null;
+}

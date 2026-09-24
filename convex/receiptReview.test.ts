@@ -1,12 +1,13 @@
 import type { CalendarDate } from "../src/lib/domain/calendar";
 import { present } from "../src/lib/testing/receipts";
 import { Ore } from "../src/lib/domain/ore";
+/// <reference types="vite/client" />
+import { register as registerRateLimiter } from "@convex-dev/rate-limiter/test";
 import {
   decideReceiptChange,
   commitReceiptChange,
   type ReceiptChangeOrigin,
 } from "./receiptChanges";
-/// <reference types="vite/client" />
 import { convexTest } from "convex-test";
 import { expect, it } from "vitest";
 import { api, internal } from "./_generated/api";
@@ -19,6 +20,7 @@ const modules = import.meta.glob("./**/*.ts");
 
 it("keeps unresolved extraction issues, mismatches, duplicates and mock results in review", async () => {
   const t = convexTest(schema, modules);
+  registerRateLimiter(t);
 
   const user = t.withIdentity({
     subject: "reviewer",
@@ -143,6 +145,7 @@ it.each([
 
 it("rejects stale commits without data or history changes and returns a small save acknowledgement", async () => {
   const t = convexTest(schema, modules);
+  registerRateLimiter(t);
 
   const user = t.withIdentity({
     subject: "person",
@@ -196,6 +199,7 @@ it("rejects stale commits without data or history changes and returns a small sa
 
 it("returns a readable rejection for an impossible date without saving", async () => {
   const t = convexTest(schema, modules);
+  registerRateLimiter(t);
 
   const user = t.withIdentity({
     subject: "person",
@@ -239,6 +243,7 @@ it("returns a readable rejection for an impossible date without saving", async (
 
 it("persists category uncertainty in the representation understood by installed editors", async () => {
   const t = convexTest(schema, modules);
+  registerRateLimiter(t);
   const user = t.withIdentity({ subject: "legacy-reviewer", issuer: "test" });
 
   const householdId = await user.mutation(api.households.create, {

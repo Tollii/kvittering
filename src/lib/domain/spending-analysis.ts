@@ -284,7 +284,7 @@ export function spendingAnalysis(
     measuredLines,
     productLines,
     effects,
-    currentOnly: currentOnly.toSorted(
+    currentOnly: [...currentOnly].sort(
       (a, b) =>
         Ore.compare(b.amountOre, a.amountOre) || a.id.localeCompare(b.id),
     ),
@@ -300,7 +300,10 @@ export function spendingAnalysis(
 }
 
 export function analysisSummary(
-  report: ReturnType<typeof spendingAnalysis>,
+  report: Pick<
+    ReturnType<typeof spendingAnalysis>,
+    "currentReceipts" | "previousReceipts" | "differenceOre"
+  > & { categories: { name: string; differenceOre: Ore }[] },
 ): string {
   if (!report.currentReceipts) return "Ingen registrerte kjøp i perioden.";
 

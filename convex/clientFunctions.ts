@@ -1,5 +1,5 @@
 import { customMutation } from "convex-helpers/server/customFunctions";
-import { mutation } from "./_generated/server";
+import { mutation } from "./serverFunctions";
 import { clientValidator, type Feature } from "../src/lib/releases/policy";
 import { requireCompatibleClient } from "./releasePolicy";
 

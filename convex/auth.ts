@@ -5,6 +5,7 @@ import {
 } from "@convex-dev/better-auth";
 import { convex } from "@convex-dev/better-auth/plugins";
 import { expo } from "@better-auth/expo";
+import { APIError, createAuthMiddleware } from "better-auth/api";
 import { betterAuth } from "better-auth/minimal";
 import { v } from "convex/values";
 import { z } from "zod";
@@ -96,6 +97,21 @@ export const createAuth = (ctx: GenericCtx<DataModel>) =>
         // Explicit linking proves both identities, including private relay email.
         allowDifferentEmails: true,
       },
+    },
+    hooks: {
+      before: createAuthMiddleware(async (request) => {
+        if (request.path !== "/sign-up/email") return;
+
+        const enabled = await ctx.runQuery(internal.featureFlags.enabled, {
+          name: "emailSignUp",
+        });
+
+        if (!enabled)
+          throw new APIError("FORBIDDEN", {
+            message:
+              "Registrering med e-post er ikke tilgjengelig. Bruk Apple for å opprette en konto.",
+          });
+      }),
     },
     emailAndPassword: {
       enabled: true,

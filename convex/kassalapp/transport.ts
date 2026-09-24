@@ -12,7 +12,7 @@ export class CatalogRequestError extends Error {
 /** Called by the catalog worker; credentials remain on the server. */
 export async function kassalappFetch<T>(
   path: string,
-  options?: RequestInit,
+  options?: RequestInit & { fetch?: typeof fetch },
 ): Promise<T> {
   const key = env.KASSALAPP_API_KEY;
 
@@ -25,8 +25,13 @@ export async function kassalappFetch<T>(
       url.searchParams.set(name, value === "true" ? "1" : "0");
   }
 
-  const response = await fetch(url, {
-    ...options,
+  const { fetch: request, ...requestOptions } = options ?? {};
+
+  if (!request)
+    throw new Error("Catalog requests require a quota-controlled transport.");
+
+  const response = await request(url, {
+    ...requestOptions,
     signal: AbortSignal.timeout(15000),
     headers: {
       ...options?.headers,

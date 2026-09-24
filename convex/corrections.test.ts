@@ -1,22 +1,28 @@
+import { z } from "zod";
 import { present } from "../src/lib/testing/receipts";
 import {
   readModelRequest,
   type ModelRequest,
 } from "../src/lib/testing/model-requests";
 /// <reference types="vite/client" />
+import { register as registerRateLimiter } from "@convex-dev/rate-limiter/test";
 import { convexTest } from "convex-test";
 import { afterEach, expect, it, vi } from "vitest";
-import { api } from "./_generated/api";
+import { api, internal } from "./_generated/api";
 import schema from "./schema";
 import { batteryFixture } from "../src/lib/domain/receipt";
 
 const modules = import.meta.glob("./**/*.ts");
 
-afterEach(() => vi.unstubAllEnvs());
+afterEach(() => {
+  vi.unstubAllEnvs();
+  vi.unstubAllGlobals();
+});
 
 async function setup() {
   vi.stubEnv("TYPESAFE_API_KEY", "");
   const t = convexTest(schema, modules);
+  registerRateLimiter(t);
   const first = t.withIdentity({ subject: "first", issuer: "test" });
   const other = t.withIdentity({ subject: "other", issuer: "test" });
 
@@ -259,4 +265,227 @@ it("keeps every matching line when a preview receipt exceeds the selection limit
         })),
     }),
   ).rejects.toThrow("20");
+});
+
+it("blocks category evaluation during a pause for legacy and other-platform callers", async () => {
+  const { t, first } = await setup();
+  vi.stubEnv("TYPESAFE_API_KEY", "test-placeholder");
+
+  const transport = vi.fn<typeof fetch>(async () =>
+    Response.json({
+      answers: {
+        category_0: {
+          type: "choice",
+          choice: "drinks.soft-drinks",
+          confidence: 1,
+        },
+      },
+    }),
+  );
+
+  vi.stubGlobal("fetch", transport);
+  await t.mutation(internal.featureFlags.set, {
+    platform: "ios",
+    name: "receiptProcessing",
+    enabled: false,
+    expectedRevision: 0,
+    operator: "test",
+    reason: "Pause classification",
+  });
+
+  for (const client of [
+    undefined,
+    {
+      version: "1.0.0",
+      build: "15",
+      platform: "android" as const,
+      channel: "development" as const,
+      apiVersion: 1,
+      updateId: null,
+      runtimeVersion: null,
+    },
+  ]) {
+    await expect(
+      first.action(api.correctionEvaluation.evaluate, { client }),
+    ).rejects.toThrow("SERVICE_PAUSED");
+  }
+
+  expect(transport).not.toHaveBeenCalled();
+  await t.mutation(internal.featureFlags.set, {
+    platform: "ios",
+    name: "receiptProcessing",
+    enabled: true,
+    expectedRevision: 1,
+    operator: "test",
+    reason: "Resume classification",
+  });
+  const result = await first.action(api.correctionEvaluation.evaluate, {});
+  expect(result).toMatchObject({ checked: 1, matched: 1 });
+  expect(transport).toHaveBeenCalledTimes(1);
+});
+
+it("removes deleted receipt payloads from mixed batches and preserves surviving undo", async () => {
+  const { t, first, other, ids, correction } = await setup();
+  await t.run(async (ctx) => {
+    const receipt = await ctx.db.get("receipts", present(ids[2]));
+    const data = receipt!.data!;
+    present(data.lines[0]).manual = false;
+    await ctx.db.patch("receipts", present(ids[2]), { data });
+  });
+
+  const preview = await first.query(api.corrections.preview, {
+    id: correction._id,
+  });
+
+  const batchId = await first.mutation(api.corrections.apply, {
+    id: correction._id,
+    targets: preview.targets.map(({ receiptId, revision, lineId }) => ({
+      receiptId,
+      revision,
+      lineId,
+    })),
+  });
+
+  expect(preview.targets).toHaveLength(2);
+  await first.mutation(api.receipts.remove, {
+    id: present(ids[1]),
+    revision: 1,
+  });
+
+  const scheduled = await t.run((ctx) =>
+    ctx.db.system.query("_scheduled_functions").collect(),
+  );
+
+  expect(
+    scheduled.some(
+      (job) =>
+        job.name === "retention:deletedReceiptBatches" &&
+        z.object({ receiptId: z.string() }).parse(job.args[0]).receiptId ===
+          present(ids[1]),
+    ),
+  ).toBe(true);
+  await t.mutation(internal.retention.deletedReceiptBatches, {
+    householdId: correction.householdId,
+    receiptId: present(ids[1]),
+  });
+  await t.mutation(internal.retention.deletedReceiptBatches, {
+    householdId: correction.householdId,
+    receiptId: present(ids[1]),
+  });
+  const batches = await first.query(api.corrections.batches, {});
+  expect(present(batches[0]).changes.map((change) => change.receiptId)).toEqual(
+    [present(ids[2])],
+  );
+  expect(
+    (await t.run((ctx) => ctx.db.get("correctionBatches", batchId)))?.changes,
+  ).toEqual(present(batches[0]).changes);
+  expect(await other.query(api.corrections.batches, {})).toEqual([]);
+  await first.mutation(api.corrections.undo, { id: batchId });
+  expect(
+    (await first.query(api.receipts.detail, { id: present(ids[2]) }))?.receipt
+      .data?.lines[0]?.categoryId,
+  ).toBe("other-purchases.batteries");
+  expect(
+    await first.query(api.receipts.detail, { id: present(ids[1]) }),
+  ).toBeNull();
+});
+
+it("repairs historical orphan batches without changing live receipt history", async () => {
+  const { t, first, ids, correction } = await setup();
+
+  const batchId = await first.mutation(api.corrections.apply, {
+    id: correction._id,
+    targets: [
+      {
+        receiptId: present(ids[1]),
+        revision: 0,
+        lineId: present(batteryFixture().lines[0]).id,
+      },
+    ],
+  });
+
+  await t.mutation(internal.retention.orphanedCorrection, {
+    batchId,
+    receiptId: present(ids[1]),
+  });
+  expect(
+    await t.run((ctx) => ctx.db.get("correctionBatches", batchId)),
+  ).not.toBeNull();
+  await t.run((ctx) => ctx.db.delete("receipts", present(ids[1])));
+  await t.mutation(internal.retention.orphanedCorrectionBatches, {});
+
+  const jobs = await t.run((ctx) =>
+    ctx.db.system.query("_scheduled_functions").collect(),
+  );
+
+  expect(
+    jobs.some(
+      (job) =>
+        job.name === "retention:orphanedCorrection" &&
+        z.object({ batchId: z.string() }).parse(job.args[0]).batchId ===
+          batchId,
+    ),
+  ).toBe(true);
+  await t.mutation(internal.retention.orphanedCorrection, {
+    batchId,
+    receiptId: present(ids[1]),
+  });
+  await t.mutation(internal.retention.orphanedCorrection, {
+    batchId,
+    receiptId: present(ids[1]),
+  });
+  expect(await first.query(api.corrections.batches, {})).toEqual([]);
+  expect(
+    await t.run((ctx) => ctx.db.get("correctionBatches", batchId)),
+  ).toBeNull();
+});
+
+it("admits six evaluations per hour and denies extra provider calls until recovery", async () => {
+  vi.useFakeTimers();
+
+  try {
+    const { t, first } = await setup();
+    const second = t.withIdentity({ subject: "second", issuer: "test" });
+    await second.mutation(api.households.join, {
+      invitation: "11111111111111111111111111111111",
+    });
+    vi.stubEnv("TYPESAFE_API_KEY", "test-placeholder");
+
+    const transport = vi.fn<typeof fetch>(async () =>
+      Response.json({
+        answers: {
+          category_0: {
+            type: "choice",
+            choice: "drinks.soft-drinks",
+            confidence: 1,
+          },
+        },
+      }),
+    );
+
+    vi.stubGlobal("fetch", transport);
+
+    for (let index = 0; index < 5; index++)
+      await first.action(api.correctionEvaluation.evaluate, {});
+
+    const attempts = await Promise.allSettled(
+      Array.from({ length: 4 }, () =>
+        first.action(api.correctionEvaluation.evaluate, {}),
+      ),
+    );
+
+    expect(
+      attempts.filter((attempt) => attempt.status === "fulfilled"),
+    ).toHaveLength(1);
+    expect(transport).toHaveBeenCalledTimes(6);
+    await expect(
+      second.action(api.correctionEvaluation.evaluate, {}),
+    ).rejects.toThrow("Bruksgrensen");
+    expect(transport).toHaveBeenCalledTimes(6);
+    vi.setSystemTime(Date.now() + 60 * 60_000);
+    await first.action(api.correctionEvaluation.evaluate, {});
+    expect(transport).toHaveBeenCalledTimes(7);
+  } finally {
+    vi.useRealTimers();
+  }
 });

@@ -3,6 +3,7 @@ import { v, type VBoolean } from "convex/values";
 
 /** Existing services default on. New experimental entries must default off. */
 export const featureFlagDefinitions = {
+  emailSignUp: { default: false, legacy: false },
   receiptProcessing: { default: true, legacy: true },
   productLookup: { default: true, legacy: true },
   automaticProductMatching: { default: true, legacy: true },

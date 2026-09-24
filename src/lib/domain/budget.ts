@@ -100,9 +100,36 @@ export function weeklyDigest(
   const currentMonth = CalendarDate.month(today);
   const month = monthlyInsights(receipts, currentMonth);
 
+  return formatWeeklyDigest(
+    {
+      weekStart,
+      weekSpentOre,
+      weekReceipts,
+      monthSpentOre: month.products,
+      comparison: analysis.previousReceipts ? analysisSummary(analysis) : null,
+    },
+    budgetOre,
+    today,
+  );
+}
+
+export function formatWeeklyDigest(
+  values: {
+    weekStart: CalendarDate;
+    weekSpentOre: Ore;
+    weekReceipts: number;
+    monthSpentOre: Ore;
+    comparison: string | null;
+  },
+  budgetOre: Ore | null,
+  today: CalendarDate,
+) {
+  const { weekStart, weekSpentOre, weekReceipts, monthSpentOre, comparison } =
+    values;
+
   const pace =
     budgetOre && budgetOre > 0
-      ? budgetPace(budgetOre, month.products, currentMonth, today)
+      ? budgetPace(budgetOre, monthSpentOre, CalendarDate.month(today), today)
       : null;
 
   const parts = [
@@ -110,7 +137,7 @@ export function weeklyDigest(
     `${weekReceipts} ${weekReceipts === 1 ? "kvittering" : "kvitteringer"}`,
   ];
 
-  if (analysis.previousReceipts) parts.push(analysisSummary(analysis));
+  if (comparison) parts.push(comparison);
 
   if (pace)
     parts.push(
@@ -121,7 +148,7 @@ export function weeklyDigest(
     weekStart,
     weekSpentOre,
     weekReceipts,
-    monthSpentOre: month.products,
+    monthSpentOre,
     pace,
     title: weekReceipts ? "Ukens handel" : "Ingen kvitteringer denne uken",
     body: parts.join(" · "),

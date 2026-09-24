@@ -1,6 +1,7 @@
 "use node";
 
 import { userError } from "./userErrors";
+import { providerFetch } from "./providerTransport";
 
 import { clientValidator } from "../src/lib/releases/policy";
 import { v } from "convex/values";
@@ -47,7 +48,10 @@ export const evaluate = action({
     ),
   }),
   handler: async (ctx, { client: release }): Promise<EvaluationResult> => {
-    await ctx.runQuery(internal.releasePolicy.check, { client: release });
+    await ctx.runQuery(internal.releasePolicy.check, {
+      client: release,
+      feature: "receiptProcessing",
+    });
 
     const history: { entries: Doc<"corrections">[]; truncated: boolean } =
       await ctx.runQuery(api.corrections.list, {});
@@ -73,7 +77,12 @@ export const evaluate = action({
 
     if (!examples.length) return { model, checked: 0, matched: 0, results: [] };
 
+    await ctx.runMutation(internal.rateLimits.admitEvaluation, {
+      client: release,
+    });
+
     const client = new TypeSafeClient({
+      fetch: providerFetch(ctx, "typesafe", { kind: "member" }),
       apiKey: env.TYPESAFE_API_KEY,
       timeout: 30000,
       retry: { maxRetries: 0 },
