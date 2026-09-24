@@ -10,6 +10,7 @@ module.exports = {
   moduleNameMapper: { "^@/(.*)$": "<rootDir>/src/$1" },
   // Vitest writes the application coverage report to coverage/.
   coverageDirectory: "coverage/components",
+  coveragePathIgnorePatterns: ["/node_modules/", "\\.test\\.tsx?$"],
   coverageReporters: ["text-summary", "lcov", "json-summary"],
   // Metro applies babel-preset-expo without a project Babel file; Jest needs it named.
   transform: {

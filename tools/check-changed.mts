@@ -3,15 +3,12 @@
  * uncommitted and untracked files. Agents run this after each change;
  * `npm run check` remains the complete check before committing.
  */
-import { execFileSync, spawnSync } from "node:child_process";
-import { existsSync } from "node:fs";
+import { spawnSync } from "node:child_process";
+import { changedFiles, mergeBase } from "./changes.mts";
 
 const base = mergeBase();
 
-const changed = [
-  ...git(["diff", "--name-only", "--diff-filter=ACMR", base]),
-  ...git(["ls-files", "--others", "--exclude-standard"]),
-].filter((path, index, all) => all.indexOf(path) === index && existsSync(path));
+const changed = changedFiles(base);
 
 if (changed.length === 0) {
   console.log(`No files changed since ${base}.`);
@@ -94,25 +91,4 @@ function run(name: string, script: string | null, args: string[]) {
   );
 
   if (result.status !== 0) failures.push(name);
-}
-
-function git(args: string[]): string[] {
-  // eslint-disable-next-line sonarjs/no-os-command-from-path -- Git is the contributor's own installation; the repository cannot pin its path.
-  return execFileSync("git", args, { encoding: "utf8" })
-    .split("\n")
-    .filter(Boolean);
-}
-
-/** The commit this branch started from, or HEAD when no main branch is known. */
-function mergeBase(): string {
-  for (const branch of ["origin/main", "main"]) {
-    // eslint-disable-next-line sonarjs/no-os-command-from-path -- Git is the contributor's own installation; the repository cannot pin its path.
-    const result = spawnSync("git", ["merge-base", "HEAD", branch], {
-      encoding: "utf8",
-    });
-
-    if (result.status === 0) return result.stdout.trim();
-  }
-
-  return "HEAD";
 }
