@@ -391,6 +391,11 @@ it("charges background provider attempts to their source and leaves allowance fo
 
 it("sends five images and counts the OpenAI SDK retry before network I/O", async () => {
   const { t, first, householdId } = await setup();
+  // Fix the quota clock while the SDK uses its real, short retry timeout.
+  const now = Date.now();
+  vi.useRealTimers();
+  vi.useFakeTimers({ toFake: ["Date"] });
+  vi.setSystemTime(now);
   vi.stubEnv("OPENAI_API_KEY", "test-key");
   vi.stubEnv("RECEIPT_PROVIDER", "openai");
 
@@ -444,19 +449,17 @@ it("sends five images and counts the OpenAI SDK retry before network I/O", async
       .flatMap((item) => item.content)
       .filter((item: { type: string }) => item.type === "input_image").length;
 
-    return new Response(null, { status: 503 });
+    return new Response(null, {
+      status: 503,
+      headers: { "retry-after-ms": "1" },
+    });
   });
 
   vi.stubGlobal("fetch", transport);
 
-  await Promise.all([
-    (async () => {
-      await expect(
-        t.action(internal.providers.extract, { receiptId, storageIds }),
-      ).rejects.toThrow(/Connection|Bruksgrensen/);
-    })(),
-    vi.advanceTimersByTimeAsync(5000),
-  ]);
+  await expect(
+    t.action(internal.providers.extract, { receiptId, storageIds }),
+  ).rejects.toThrow(/Connection|Bruksgrensen/);
   expect(images).toBe(5);
   expect(transport).toHaveBeenCalledTimes(1);
   expect(

@@ -256,6 +256,7 @@ it("continues after concurrent changes move records beyond a bounded synchroniza
   ).toEqual([]);
 });
 
+// Allow hosted runners to serialize the multi-megabyte fixture across all read paths.
 it("keeps large receipt pages bounded without dropping totals or synchronization entries", async () => {
   const { t, user, householdId } = await setup();
   const data = weeklyShopFixture();
@@ -368,4 +369,4 @@ it("keeps large receipt pages bounded without dropping totals or synchronization
       today: "2026-09-18",
     }),
   ).toEqual({ title: expected.title, body: expected.body });
-});
+}, 15_000);
