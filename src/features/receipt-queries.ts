@@ -139,7 +139,7 @@ export function useReceiptEditorContext(
   );
 
   const local = useMemo(() => {
-    const recent = cache.receipts.toSorted(
+    const recent = [...cache.receipts].sort(
       (left, right) => right._creationTime - left._creationTime,
     );
 

@@ -55,7 +55,7 @@ function trimImages(directory: Directory, retained: Set<string>) {
   const files = directory.list().filter((item) => item instanceof File);
   let bytes = files.reduce((sum, file) => sum + file.size, 0);
 
-  for (const file of files.toSorted(
+  for (const file of [...files].sort(
     (left, right) => (left.lastModified ?? 0) - (right.lastModified ?? 0),
   )) {
     if (retained.has(file.name)) continue;

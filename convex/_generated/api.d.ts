@@ -96,13 +96,16 @@ import type * as providers from "../providers.js";
 import type * as pushDelivery from "../pushDelivery.js";
 import type * as rateLimits from "../rateLimits.js";
 import type * as receiptChanges from "../receiptChanges.js";
+import type * as receiptPeriod from "../receiptPeriod.js";
 import type * as receiptReadModel from "../receiptReadModel.js";
 import type * as receiptSync from "../receiptSync.js";
+import type * as receiptUploadCompletion from "../receiptUploadCompletion.js";
 import type * as receipts from "../receipts.js";
 import type * as releasePolicy from "../releasePolicy.js";
 import type * as retention from "../retention.js";
 import type * as serverFunctions from "../serverFunctions.js";
 import type * as spotlight from "../spotlight.js";
+import type * as userErrors from "../userErrors.js";
 
 import type {
   ApiFromModules,
@@ -199,13 +202,16 @@ declare const fullApi: ApiFromModules<{
   pushDelivery: typeof pushDelivery;
   rateLimits: typeof rateLimits;
   receiptChanges: typeof receiptChanges;
+  receiptPeriod: typeof receiptPeriod;
   receiptReadModel: typeof receiptReadModel;
   receiptSync: typeof receiptSync;
+  receiptUploadCompletion: typeof receiptUploadCompletion;
   receipts: typeof receipts;
   releasePolicy: typeof releasePolicy;
   retention: typeof retention;
   serverFunctions: typeof serverFunctions;
   spotlight: typeof spotlight;
+  userErrors: typeof userErrors;
 }>;
 
 /**

@@ -58,6 +58,23 @@ function importTable(
 
 importTable("households", [], "--replace-all");
 
+// Local test accounts use email. Disable paid integrations in every fixture.
+importTable(
+  "featureFlags",
+  ["ios", "android"].map((platform) => ({
+    platform,
+    channel: "development",
+    revision: 1,
+    values: {
+      emailSignUp: true,
+      receiptProcessing: true,
+      productLookup: false,
+      automaticProductMatching: false,
+      spendingAnalysis: false,
+    },
+  })),
+);
+
 if (fixture) {
   if (!fixture.account)
     throw new Error("A seeded flow needs one fixture account.");
@@ -106,3 +123,19 @@ if (fixture) {
     JSON.stringify(fixture.account),
   );
 }
+
+// Direct fixture imports bypass the receipt write triggers. Advance the resumable
+// backfill until its read model is ready, with a bound on fixture work.
+function prepareReceiptReadModel() {
+  for (let page = 0; page < 100; page += 1) {
+    const state = z
+      .object({ ready: z.boolean() })
+      .parse(JSON.parse(convex(["run", "receiptSync:backfill", "{}"])));
+
+    if (state.ready) return;
+  }
+
+  throw new Error("The fixture read model did not finish within 100 pages.");
+}
+
+prepareReceiptReadModel();

@@ -170,7 +170,7 @@ Hosted contention, load, workflow replay, and signed-device upgrade checks were
 not run. The client recovery flow must ship before stricter image-count
 enforcement. Existing eight-image reservations retain their original capacity.
 The historical correction cleanup remains an operator step after deployment.
-No code was pushed or deployed, and no release minimum was changed.
+At that stage, no code was pushed or deployed, and no release minimum was changed.
 
 
 ## Integration with current main
@@ -186,3 +186,42 @@ The integrated branch passes `npm run check:ci`: 406 tests in 71 files, type
 checks, lint, unused-code checks, rule tests, and coverage collection. Native
 seeded-data tests and hosted PR checks follow the verification-tooling merge.
 This integration does not deploy a backend or publish a client update.
+
+
+## Integration with verification tooling and seeded tests
+
+PR #26 merged as `b783c24` after all selected CI jobs passed and its six review
+threads were resolved. The audit branch is rebased on that revision and includes
+the related task's local fixture implementation.
+
+The combined branch passes `check:ci` with 428 tests in 75 files and four
+component tests. `check:changed` and the backend compatibility comparison pass.
+The contract comparison includes stored internal workflow results; no breaking
+contract exception is needed.
+
+A Release iOS 27 test found a startup failure in the receipt search index:
+`Array.toSorted` was absent from the device's JavaScript engine. All five client
+uses now copy the array before sorting. The client lint rule rejects the original
+code. Sign-up and household creation then passed with the real local backend.
+
+Seeded tests use anonymous local data, enable test email registration, disable
+paid integrations, and build the receipt read model before launch. Shared login
+steps clear app data and the test Keychain. Tests within a flow retain state when
+checking restarts; the save test clears local state before checking the server
+value. Fixtures cover history, deletion, unsaved-draft recovery, explicit discard,
+and saving an edit. Native results and failure proofs are recorded before the
+follow-up pull request is merged.
+
+The native draft test failed after restart when local draft writes were disabled.
+The deletion test failed when the server returned success without deleting the
+receipt. Both faults were restored before the final suite. The release guide now
+states the required two backend stages: additive read functions with eight-image
+admission, then the recovery client, then five-image enforcement. This removes
+an ambiguous ordering between read-model deployment and queue recovery.
+
+The final iOS 27 Release suite passed all five flows against the real anonymous
+backend: sign-up (45 s), deletion (37 s), draft recovery and discard (48 s),
+history (20 s), and saving followed by a clean-device read (52 s). The Expo
+package check, shell syntax checks, formatting, and documentation links also pass.
+No paid provider was contacted. Signed-device upgrades and staged deployment
+remain outside this merge task.

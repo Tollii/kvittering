@@ -2,28 +2,7 @@
 appId: no.tolnes.kvitto
 name: Open a reviewed receipt from history
 ---
-- launchApp:
-    clearState: true
-    permissions:
-      all: allow
-- extendedWaitUntil:
-    visible: "Logg inn med e-post|Ny her\\? Opprett konto"
-    timeout: 60000
-- runFlow:
-    when:
-      visible: "Logg inn med e-post"
-    commands:
-      - tapOn: "Logg inn med e-post"
-- tapOn:
-    id: "sign-in-email"
-- inputText: ${E2E_EMAIL}
-- tapOn:
-    id: "sign-in-password"
-- inputText: ${E2E_PASSWORD}
-- pressKey: Enter
-- extendedWaitUntil:
-    visible: "Historikk"
-    timeout: 30000
+- runFlow: ../shared/sign-in.yml
 - tapOn: "Historikk"
 - extendedWaitUntil:
     visible: "REMA 1000.*"
@@ -31,4 +10,4 @@ name: Open a reviewed receipt from history
 - tapOn: "REMA 1000.*"
 - assertVisible: "REMA 1000"
 - assertVisible: ".*63,80.*"
-- assertVisible: "TINE LETTMELK 1L"
+- assertVisible: "Rediger TINE LETTMELK 1L,.*"

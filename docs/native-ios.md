@@ -6,6 +6,14 @@ At larger accessibility text sizes, segmented controls use wrapping labels and
 sheets open at full height. Editing a receipt still requires the existing save
 operation; dismissing its details sheet does not discard the receipt draft.
 
+## JavaScript runtime
+
+Keep shared and device code compatible with the Hermes engine in supported
+installed clients. Node-based tests do not prove that a built-in method exists
+on the device. `Array.toSorted` caused a Release simulator failure after household
+creation; use a copied array with `sort` instead. The client lint rule rejects
+`toSorted`, and the native sign-up flow covers this startup path.
+
 ## Apple authentication
 
 On supported iOS devices, **Continue with Apple** is the first authentication

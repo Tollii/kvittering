@@ -1,0 +1,25 @@
+appId: no.tolnes.kvitto
+---
+- launchApp:
+    clearState: true
+    clearKeychain: true
+    permissions:
+      all: allow
+- extendedWaitUntil:
+    visible: "Logg inn med e-post|Ny her\\? Opprett konto"
+    timeout: 60000
+- runFlow:
+    when:
+      visible: "Logg inn med e-post"
+    commands:
+      - tapOn: "Logg inn med e-post"
+- tapOn:
+    id: "sign-in-email"
+- inputText: ${E2E_EMAIL}
+- tapOn:
+    id: "sign-in-password"
+- inputText: ${E2E_PASSWORD}
+- pressKey: Enter
+- extendedWaitUntil:
+    visible: "Historikk"
+    timeout: 30000

@@ -86,9 +86,11 @@ Native code, native packages, permissions, plugins or entitlements require a new
 
 Run the applicable [project checks](quality.md). Focused tests cover numeric version ordering, anonymous policy reads, legacy request compatibility and retirement, stale-policy writes, service pauses, policy history, and actual SQLite migration rollback. Before a public release, additionally test update links, offline startup, returning from the store, an OTA download/restart, and native upgrade with unsent images on a device.
 
-Receipt cache releases use an additive server read model. Deploy the backend,
-run its bounded backfill, then release the app as described in
-[Convex operating cost](convex-costs.md). Upload queue payloads remain version
+Receipt cache releases use an additive server read model. The combined cache
+and image-limit change needs staged deployment: deploy the read model while
+retaining eight-image admission, run its bounded backfill, release the recovery
+client, then enforce five images. Follow the full sequence in
+[Convex operating cost](convex-costs.md#release-sequence). Upload queue payloads remain version
 1; retry deadlines and disposable receipt caches use separate tables or files.
 Cached image Quick Look is an optional native method. Older binaries use the
 image sheet. Existing HTTPS preview calls and workflow step arguments remain

@@ -60,8 +60,8 @@ export function ReceiptSearchIndex() {
 
   const local = useMemo(
     () =>
-      cache.receipts
-        .toSorted((left, right) => right._creationTime - left._creationTime)
+      [...cache.receipts]
+        .sort((left, right) => right._creationTime - left._creationTime)
         .slice(0, 100)
         .flatMap((receipt) =>
           receipt.data && !receipt.excluded

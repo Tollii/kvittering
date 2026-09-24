@@ -71,8 +71,10 @@ component API; it does not directly delete component tables or active work.
 
 1. Rehearse the additive schema and backfill against representative existing
    data in an isolated deployment. Follow [backend operations](backend-operations.md).
-2. Deploy the backend before the app. Existing receipt functions, response
-   shapes, queue records, and workflow step arguments remain supported.
+2. Deploy an additive backend stage with the new receipt read functions and
+   the existing eight-image admission limit. Do not deploy the combined head
+   with five-image enforcement yet. Existing receipt functions, response shapes,
+   queue records, and workflow step arguments remain supported.
 3. Start the bounded backfill on the explicitly selected deployment:
    `npx convex run --deployment <deployment-name> receiptSync:backfill '{}'`.
    Continuations run automatically. Repeating this command resumes safely.
@@ -81,7 +83,15 @@ component API; it does not directly delete component tables or active work.
    Check receipt edits and deletion from a second household device.
 5. Release the app. Before backfill completion it uses the existing bounded
    reads. Local image Quick Look needs a new native build; older binaries use
-   the image sheet. No minimum app version needs to change.
+   the image sheet. Include the recovery action for older six-to-eight-image
+   queue entries and verify it with pending uploads on a device.
+6. Deploy the five-image admission rule only after the recovery client is
+   available. Existing server reservations keep their original capacity.
+   No minimum app version needs to change.
+
+The combined branch therefore needs staged backend deployment. The regular
+TestFlight command deploys its selected backend revision before building the app;
+do not use that command on the combined head for the initial rollout.
 
 Local Convex tests cover backfill retries, legacy records, concurrent changes,
 aggregate edits and deletions, authorization, and the old digest calculation.

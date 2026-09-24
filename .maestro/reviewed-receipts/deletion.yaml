@@ -1,0 +1,26 @@
+appId: no.tolnes.kvitto
+name: Delete one receipt and retain the other household receipts
+---
+- runFlow: history.yaml
+- tapOn: "Flere handlinger"
+- tapOn: "Slett kvittering"
+- assertVisible: "Slett kvitteringen[?]"
+- tapOn: "Slett"
+- extendedWaitUntil:
+    visible: "Historikk"
+    timeout: 30000
+- assertVisible: "KIWI.*"
+- assertVisible: "Coop Extra.*"
+- assertNotVisible: "REMA 1000.*"
+- stopApp
+- launchApp
+- extendedWaitUntil:
+    visible: "Historikk"
+    timeout: 30000
+- tapOn: "Historikk"
+- assertVisible: "KIWI.*"
+- assertVisible: "Coop Extra.*"
+- assertNotVisible: "REMA 1000.*"
+- tapOn: "KIWI.*"
+- assertVisible: "Rediger EVERGOOD KAFFE,.*"
+- assertVisible: ".*69,90.*"

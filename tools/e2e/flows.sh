@@ -9,6 +9,17 @@ if [[ ${#flows[@]} -eq 0 ]]; then
   echo "error: no Maestro flows found." >&2
   exit 1
 fi
+if [[ -n "${E2E_FLOW:-}" ]]; then
+  selected=()
+  for flow in "${flows[@]}"; do
+    if [[ "$flow" == "$E2E_FLOW" ]]; then selected+=("$flow"); fi
+  done
+  if [[ ${#selected[@]} -ne 1 ]]; then
+    echo "error: E2E_FLOW must name one discovered .maestro flow." >&2
+    exit 1
+  fi
+  flows=("${selected[@]}")
+fi
 for flow in "${flows[@]}"; do
   name="${flow#.maestro/}"
   name="${name%.yaml}"
@@ -29,6 +40,11 @@ for flow in "${flows[@]}"; do
     account=(--env "E2E_EMAIL=$(jq -r .email "$result/seed/account.json")"
       --env "E2E_PASSWORD=$(jq -r .password "$result/seed/account.json")")
   fi
-  maestro --device "$device" test "$flow" "${account[@]}" \
-    --format junit --output "$result/maestro.xml" --debug-output "$result/maestro"
+  if ! maestro --device "$device" test "$flow" "${account[@]}" \
+    --format junit --output "$result/maestro.xml" \
+    --debug-output "$result/maestro" --flatten-debug-output; then
+    echo "Failed step ($flow):" >&2
+    grep -oE '<failure[^>]*>[^<]*' "$result/maestro.xml" >&2 || true
+    exit 1
+  fi
 done

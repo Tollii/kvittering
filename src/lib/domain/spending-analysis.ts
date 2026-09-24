@@ -284,7 +284,7 @@ export function spendingAnalysis(
     measuredLines,
     productLines,
     effects,
-    currentOnly: currentOnly.toSorted(
+    currentOnly: [...currentOnly].sort(
       (a, b) =>
         Ore.compare(b.amountOre, a.amountOre) || a.id.localeCompare(b.id),
     ),

@@ -59,6 +59,7 @@ if ! grep -qx BETTER_AUTH_SECRET <<<"$environment_names"; then
   npx convex env set BETTER_AUTH_SECRET "$(openssl rand -hex 32)" >/dev/null
 fi
 npx convex env set RECEIPT_PROVIDER mock >/dev/null
+npx convex env set RELEASE_CHANNEL development >/dev/null
 grep "^EXPO_PUBLIC_CONVEX" .env.local
 
 if [[ -n "${E2E_APP_CACHE:-}" && -d "$E2E_APP_CACHE" ]]; then
