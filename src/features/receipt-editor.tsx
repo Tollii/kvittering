@@ -1,14 +1,8 @@
 import { isDecidedCategory } from "@/lib/domain/categories";
 import { isReceiptProcessing } from "@/lib/domain/receipt-state";
 import { releaseMutation } from "@/lib/releases/requests";
-import { usePreventRemove } from "expo-router/react-navigation";
-import {
-  useReducer,
-  useRef,
-  useState,
-  type ReactNode,
-  type ComponentProps,
-} from "react";
+import { useDraftNavigation } from "./receipt-draft-navigation";
+import { useRef, useState, type ReactNode, type ComponentProps } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -16,15 +10,15 @@ import {
   Pressable,
   View,
 } from "react-native";
-import { Stack, useNavigation } from "expo-router";
+import { Stack } from "expo-router";
 import { useConvex } from "convex/react";
 
 import { randomUUID } from "expo-crypto";
 import { api } from "../../convex/_generated/api";
 import {
-  createReceiptDraft,
   isDraftBusy,
-  reduceReceiptDraft,
+  type ReceiptDraft,
+  type ReceiptDraftAction,
 } from "@/features/receipt-draft";
 import {
   Button,
@@ -79,8 +73,14 @@ export function ReceiptEditor({
   receipt,
   online,
   onDeletionChange,
+  draft,
+  dispatch,
+  storageError,
 }: Readonly<{
   receipt: Receipt;
+  draft: ReceiptDraft;
+  dispatch: (action: ReceiptDraftAction) => void;
+  storageError: string;
   online: boolean;
   onDeletionChange: (state: "idle" | "deleting" | "deleted") => void;
 }>) {
@@ -93,12 +93,6 @@ export function ReceiptEditor({
   });
 
   const context = useReceiptEditorContext(receipt._id);
-
-  const [draft, dispatch] = useReducer(
-    reduceReceiptDraft,
-    receipt,
-    createReceiptDraft,
-  );
 
   const {
     data,
@@ -119,7 +113,6 @@ export function ReceiptEditor({
   const [message, setMessage] = useState("");
   const operationActive = useRef(false);
 
-  if (draft.remote !== receipt) dispatch({ type: "remote", receipt });
   const [allLinesSelected, setAllLines] = useState(false);
   const allLines = receipt.status === "reviewed" || allLinesSelected;
 
@@ -133,19 +126,8 @@ export function ReceiptEditor({
   );
 
   const [summaryLines, setSummaryLines] = useState(false);
-  // One sheet at a time: the receipt details or, off iOS, the action menu.
   const [sheet, setSheet] = useState<"fields" | "actions" | null>(null);
-  const navigation = useNavigation();
-  usePreventRemove(dirty && !busy, ({ data: action }) => {
-    Alert.alert("Forkaste endringene?", "Endringene er ikke lagret.", [
-      { text: "Fortsett å redigere", style: "cancel" },
-      {
-        text: "Forkast",
-        style: "destructive",
-        onPress: () => navigation.dispatch(action.action),
-      },
-    ]);
-  });
+  useDraftNavigation(draft, () => dispatch({ type: "discard" }));
 
   const processing = isReceiptProcessing(receipt.status);
 
@@ -490,6 +472,7 @@ export function ReceiptEditor({
         }
       >
         {!online && <Notice icon="wifi.slash">Uten nett</Notice>}
+        {!!storageError && <Notice error>{storageError}</Notice>}
         {receipt.revision !== revision && (
           <Panel>
             <Notice tone="warning">Endret på en annen enhet</Notice>

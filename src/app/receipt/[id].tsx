@@ -4,7 +4,7 @@ import { router, Stack, useLocalSearchParams } from "expo-router";
 import { useReceiptDetail } from "@/features/receipt-queries";
 import { Button, Copy, Icon, Loading, Screen } from "@/components/ui";
 import { useHousehold } from "@/features/household-context";
-import { ReceiptEditor } from "@/features/receipt-editor";
+import { ReceiptEditorSession } from "@/features/receipt-editor-session";
 
 export default function ReceiptPage() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -70,7 +70,7 @@ function ReceiptDetail({ id }: Readonly<{ id: string }>) {
     );
 
   return (
-    <ReceiptEditor
+    <ReceiptEditorSession
       key={id}
       receipt={detail}
       online={online}

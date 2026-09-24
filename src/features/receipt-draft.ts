@@ -1,6 +1,6 @@
 import type { Receipt } from "@/lib/domain/insights";
 import type { ReceiptData } from "@/lib/domain/receipt";
-import type { ProductChoice } from "./receipt-line-editor";
+import type { ProductChoice } from "@/lib/domain/product-reference";
 
 export type ReceiptDraftValues = {
   data: ReceiptData | null;

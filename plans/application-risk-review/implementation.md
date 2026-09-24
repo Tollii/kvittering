@@ -108,3 +108,20 @@ PDF code already rejects oversized documents before rendering; it does not
 truncate them. Signed-device camera, background upload, and installed-client
 upgrade flows remain release checks. Client recovery must precede backend
 count enforcement. No backend or native release was published here.
+
+## 003 — Durable editor drafts
+
+A scoped SQLite record preserves dirty values, validation errors, product
+choices, and the original revision. Draft storage is independent of the upload
+queue and disposable cache. The editor blocks unknown persisted formats without
+changing them. Newer remote revisions retain the draft and use the existing
+explicit conflict flow. Pending saves keep navigation protection active.
+
+SQLite tests cover restart, account isolation, future formats, write failure,
+and cleanup only after acknowledgement plus snapshot, discard, or deletion.
+A React DOM component harness exercises the actual navigation hook with a
+pending save, Back, rejection, visible edited text and error, successful save,
+and explicit discard. Restoring the old guard makes that check fail. The harness
+uses supported React DOM and Happy DOM instead of the deprecated test renderer.
+No native module changed. A signed-device update-gate/restart and gesture flow
+remains required before distribution; it was not simulated as a real device run.

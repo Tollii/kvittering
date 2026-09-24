@@ -143,3 +143,18 @@ The pre-backfill digest fallback reduces each bounded receipt page into daily
 totals. It retains at most the days in the report period. Normal digests still
 use persisted daily totals. Synchronization and backfill keep their existing
 4 MiB budgets; synchronization also bounds its returned full-record payload.
+
+## Unsaved editor drafts
+
+The editor writes dirty values synchronously to a separate SQLite draft store.
+The key includes deployment, account, household, and receipt. Drafts survive
+sign-out, policy gates, and process restart; another account cannot load them.
+Each draft keeps its original baseline revision. A newer server revision causes
+the existing explicit conflict flow, not an automatic overwrite.
+
+A save keeps the durable draft until both acknowledgement and the corresponding
+server snapshot arrive. Explicit discard or completed deletion removes it.
+Pending saves keep navigation protection active. Disk-write failures retain the
+live edits and show an error. Unknown future database or payload versions block
+editing and remain unchanged on disk. Disposable cache removal never clears this
+store. The draft database and upload queue have independent version contracts.

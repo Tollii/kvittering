@@ -3,12 +3,10 @@ import {
   isMissingLineField,
   receiptIssueText,
 } from "@/lib/domain/receipt-issues";
+import type { ProductChoice } from "@/lib/domain/product-reference";
 import { useDebouncedSearch } from "./catalog-queries";
 import { productSearch } from "@/lib/catalog/search";
-import {
-  productReference,
-  type ProductSelection,
-} from "@/lib/domain/product-reference";
+import { productReference } from "@/lib/domain/product-reference";
 import { useState } from "react";
 import { Pressable, View, useWindowDimensions } from "react-native";
 import { useQuery } from "convex-helpers/react/cache";
@@ -48,7 +46,6 @@ import {
   CatalogProductPicker,
   CatalogProductSheet,
 } from "./catalog-product-sheet";
-import type { CatalogProduct } from "@/lib/catalog/model";
 import { useTheme } from "@/constants/theme";
 import { priceSignalLabel, type PriceSignal } from "@/lib/domain/price-signals";
 import { tapFeedback } from "@/lib/haptics";
@@ -64,15 +61,7 @@ export const lineLabels: Record<ReceiptLine["kind"], string> = {
   vat: "MVA (telles ikke)",
 };
 
-type SelectionChoice<T> = T extends { lineId: string }
-  ? Omit<T, "lineId">
-  : never;
-
-export type ProductChoice =
-  | Exclude<SelectionChoice<ProductSelection>, { kind: "catalog" }>
-  | (SelectionChoice<Extract<ProductSelection, { kind: "catalog" }>> & {
-      product: CatalogProduct;
-    });
+export type { ProductChoice } from "@/lib/domain/product-reference";
 
 type Props = {
   line: ReceiptLine;
