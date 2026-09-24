@@ -1,4 +1,3 @@
-import { CalendarDate, calendarDateValidator } from "./calendar";
 import { Ore, oreValidator } from "./ore";
 import type { ClassificationEvidence } from "./classification";
 import { productReferenceValidator } from "./product-reference";
@@ -8,9 +7,10 @@ import { v, type Infer } from "convex/values";
 import {
   isCategoryId,
   parseCategoryId,
-  type CategoryId,
   unclearCategoryId,
+  type CategoryId,
 } from "./categories";
+import { CalendarDate, calendarDateValidator } from "./calendar";
 import {
   catalogIdentityValidator,
   physicalStoreValidator,
@@ -143,32 +143,46 @@ export type ReceiptParseOutcome =
 
 // oxlint-disable-next-line anti-slop/no-unknown-parameters -- This boundary parser validates external input before returning a domain value.
 export function parseReceipt(input: unknown): ReceiptParseOutcome {
+  let data: ReceiptData;
+
   try {
-    const data = structuredClone(parseValue(receiptDataValidator, input));
-
-    // Older receipts may store category ids that have since been merged.
-    for (const line of data.lines)
-      line.categoryId = parseCategoryId(line.categoryId) ?? line.categoryId;
-
-    return { kind: "parsed", receipt: validateReceipt(data) };
+    data = structuredClone(parseValue(receiptDataValidator, input));
   } catch (cause) {
-    return {
-      kind: "rejected",
-      issue: {
-        code: "invalid_receipt",
-        message: cause instanceof Error ? cause.message : "Ugyldig kvittering.",
-      },
-    };
+    return rejectedReceipt(
+      cause instanceof Error ? cause.message : "Ugyldig kvittering.",
+    );
   }
+
+  // Older receipts may store category ids that have since been merged.
+  for (const line of data.lines)
+    line.categoryId = parseCategoryId(line.categoryId) ?? line.categoryId;
+
+  const checked = checkReceipt(data);
+
+  return checked.kind === "valid"
+    ? { kind: "parsed", receipt: checked.receipt }
+    : rejectedReceipt(checked.message);
 }
 
-export function validateReceipt(data: ReceiptData): ParsedReceipt {
+const rejectedReceipt = (message: string): ReceiptParseOutcome => ({
+  kind: "rejected",
+  issue: { code: "invalid_receipt", message },
+});
+
+export type ReceiptCheck =
+  | { kind: "valid"; receipt: ParsedReceipt }
+  | { kind: "invalid"; message: string };
+
+/** Check the domain invariants of well-formed receipt data. */
+export function checkReceipt(data: ReceiptData): ReceiptCheck {
+  const invalid = (message: string) => ({ kind: "invalid", message }) as const;
+
   if (data.lines.length > 300 || data.originalText.length > 60000)
-    throw new Error("Kvitteringen er for stor. Del den opp.");
+    return invalid("Kvitteringen er for stor. Del den opp.");
   const ids = new Set<string>();
 
   for (const line of data.lines) {
-    if (ids.has(line.id)) throw new Error("Varelinjene må ha ulike ID-er.");
+    if (ids.has(line.id)) return invalid("Varelinjene må ha ulike ID-er.");
     ids.add(line.id);
 
     for (const value of [line.amountOre, line.unitPriceOre])
@@ -176,21 +190,21 @@ export function validateReceipt(data: ReceiptData): ParsedReceipt {
         value !== null &&
         (!Number.isSafeInteger(value) || Math.abs(value) > 100_000_000)
       )
-        throw new Error("Beløp må være hele øre.");
+        return invalid("Beløp må være hele øre.");
 
     for (const value of [line.quantity, line.packageSize])
       if (value !== null && (!Number.isFinite(value) || value <= 0))
-        throw new Error("Mengde må være større enn null.");
+        return invalid("Mengde må være større enn null.");
 
     if (line.categoryId && !isCategoryId(line.categoryId))
-      throw new Error("Ukjent kategori.");
+      return invalid("Ukjent kategori.");
 
     if (
       line.name.length > 500 ||
       line.originalText.length > 1500 ||
       line.tags.length > 10
     )
-      throw new Error("Varelinjen er for lang.");
+      return invalid("Varelinjen er for lang.");
   }
 
   if (
@@ -198,13 +212,22 @@ export function validateReceipt(data: ReceiptData): ParsedReceipt {
     (!Number.isSafeInteger(data.totalOre) ||
       Math.abs(data.totalOre) > 100_000_000)
   )
-    throw new Error("Totalen må være hele øre.");
+    return invalid("Totalen må være hele øre.");
 
   if (data.purchaseDate && !CalendarDate.parse(data.purchaseDate))
-    throw new Error("Ugyldig dato.");
+    return invalid("Ugyldig dato.");
 
   // SAFETY: The checks above establish all ParsedReceipt domain invariants.
-  return data as ParsedReceipt;
+  return { kind: "valid", receipt: data as ParsedReceipt };
+}
+
+/** For background steps where invalid data is a failure of that step. */
+export function validateReceipt(data: ReceiptData): ParsedReceipt {
+  const checked = checkReceipt(data);
+
+  if (checked.kind === "invalid") throw new Error(checked.message);
+
+  return checked.receipt;
 }
 
 export function reconcile(data: ReceiptData) {

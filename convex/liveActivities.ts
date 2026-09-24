@@ -1,3 +1,4 @@
+import { userError } from "./userErrors";
 import { v } from "convex/values";
 import { clientMutation as mutation } from "./clientFunctions";
 import {
@@ -50,7 +51,7 @@ export const register = mutation({
       new Set(args.receiptIds).size !== args.receiptIds.length ||
       (args.token && !/^[a-f0-9]{32,512}$/.test(args.token))
     )
-      throw new Error("Ugyldig aktivitetsforespørsel.");
+      throw userError("Ugyldig aktivitetsforespørsel.");
 
     for (const id of args.receiptIds) await requireReceipt(ctx, id);
 
@@ -64,7 +65,7 @@ export const register = mutation({
       (existing.identity !== member.identity ||
         existing.householdId !== member.householdId)
     )
-      throw new Error("Aktiviteten er ikke tilgjengelig.");
+      throw userError("Aktiviteten er ikke tilgjengelig.");
 
     const values = {
       ...args,
@@ -89,7 +90,7 @@ export const register = mutation({
         .take(3);
 
       if (current.length >= 3)
-        throw new Error("Tre aktiviteter er allerede i gang.");
+        throw userError("Tre aktiviteter er allerede i gang.");
       id = await ctx.db.insert("receiptActivities", values);
       await ctx.scheduler.runAfter(3600000, internal.liveActivities.expire, {
         id,
@@ -239,7 +240,7 @@ export const setToken = mutation({
     const member = await requireMember(ctx);
 
     if (!/^[a-f0-9]{32,512}$/.test(token))
-      throw new Error("Ugyldig aktivitetsadresse.");
+      throw userError("Ugyldig aktivitetsadresse.");
 
     const activity = await ctx.db
       .query("receiptActivities")

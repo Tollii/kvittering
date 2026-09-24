@@ -3,12 +3,18 @@ import { Ore } from "./ore";
 
 describe("Ore", () => {
   it("parses Norwegian amounts exactly and rejects extra decimals", () => {
-    expect(Ore.parse("−2,59")).toBe(-259);
-    expect(Ore.parse("1 250,10")).toBe(125010);
-    expect(Ore.parse("12")).toBe(1200);
-    expect(Ore.parse("")).toBeNull();
-    expect(() => Ore.parse("1,234")).toThrow("høyst to desimaler");
-    expect(() => Ore.parse("2000000")).toThrow("for stort");
+    expect(Ore.parse("−2,59")).toEqual({ kind: "amount", ore: -259 });
+    expect(Ore.parse("1 250,10")).toEqual({ kind: "amount", ore: 125010 });
+    expect(Ore.parse("12")).toEqual({ kind: "amount", ore: 1200 });
+    expect(Ore.parse("")).toEqual({ kind: "amount", ore: null });
+    expect(Ore.parse("1,234")).toEqual({
+      kind: "invalid",
+      message: "Bruk et beløp med høyst to desimaler.",
+    });
+    expect(Ore.parse("2000000")).toEqual({
+      kind: "invalid",
+      message: "Beløpet er for stort.",
+    });
   });
 
   it("accepts only whole øre", () => {

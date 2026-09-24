@@ -4,6 +4,7 @@ import * as Updates from "expo-updates";
 import * as Sentry from "@sentry/react-native";
 import { Platform } from "react-native";
 import { recordEvent, reportError } from "../observability";
+import { parseUserError } from "../user-errors";
 import type { DiagnosticFields } from "../diagnostics";
 import {
   apiVersion,
@@ -50,7 +51,7 @@ const releaseFailureSchema = z.object({
   }),
 });
 
-/** Convert backend policy errors into UI policy updates and plain user messages. */
+/** Convert backend policy and user errors into UI policy updates and plain user messages. */
 export function releaseError(
   cause: unknown,
   operation = "backend.request",
@@ -91,7 +92,10 @@ export function releaseError(
 
   reportError(cause, operation, fields);
 
-  return cause instanceof Error ? cause : new Error("Handlingen mislyktes.");
+  return (
+    parseUserError(cause) ??
+    (cause instanceof Error ? cause : new Error("Handlingen mislyktes."))
+  );
 }
 
 export function setReleaseDiagnostics(policyRevision: number) {

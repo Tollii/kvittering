@@ -26,7 +26,9 @@ describe("operational diagnostics", () => {
     reportError(new TypeError("Network request failed"), "test.network");
     reportError({ data: { code: "SERVICE_PAUSED" } }, "test.pause");
     reportError(new Error("rate limit"), "test.rate_limit", { status: 429 });
-    expect(Sentry.logger.warn).toHaveBeenCalledTimes(3);
+    reportError({ data: { code: "RECEIPT_CHANGED" } }, "test.conflict");
+    reportError({ data: { code: "REJECTED" } }, "test.rejected");
+    expect(Sentry.logger.warn).toHaveBeenCalledTimes(5);
     expect(Sentry.captureException).not.toHaveBeenCalled();
   });
 
