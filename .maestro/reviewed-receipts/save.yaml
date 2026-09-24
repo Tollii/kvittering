@@ -7,7 +7,11 @@ name: Save a receipt edit and read it after clearing local app data
 - tapOn: "Oslo"
 - eraseText
 - inputText: "Saved branch"
+# Finish text entry before selecting controls in the native sheet.
+- pressKey: Enter
+- waitForAnimationToEnd
 - tapOn: "Lukk"
+- assertNotVisible: "Kvitteringsdetaljer"
 - tapOn: "Lagre og godkjenn"
 - extendedWaitUntil:
     visible: "Til innboksen"
