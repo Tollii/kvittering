@@ -28,7 +28,7 @@ it("applies initial foreground state and removes its only subscription", () => {
 
   expect(changed).toHaveBeenCalledExactlyOnceWith(false);
   notify(true);
-  expect(changed).toHaveBeenCalledTimes(2);
+  expect(changed).toHaveBeenLastCalledWith(true);
   stop();
   expect(unsubscribe).toHaveBeenCalledOnce();
 });
