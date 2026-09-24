@@ -1,3 +1,4 @@
+import { CalendarMonth } from "@/lib/domain/calendar";
 import { Ore } from "@/lib/domain/ore";
 import { shortcutMonth } from "@/lib/shortcut-selection";
 import { z } from "zod";
@@ -14,11 +15,7 @@ import {
   type SpendingSelection,
   type SpendingDimension,
 } from "@/lib/spending-selection";
-import {
-  spendingCalendar,
-  monthBefore,
-  shiftMonth,
-} from "@/lib/domain/insights";
+import { spendingCalendar } from "@/lib/domain/insights";
 import { useCompleteReceipts } from "@/features/receipt-queries";
 import { useState } from "react";
 import { Pressable, View } from "react-native";
@@ -45,7 +42,7 @@ import {
   receiptCoverage,
   type SpendingGroup,
 } from "@/lib/domain/insights";
-import { isDiscountLine, osloDate } from "@/lib/domain/receipt";
+import { isDiscountLine } from "@/lib/domain/receipt";
 import { categoryById } from "@/lib/domain/categories";
 import { receiptNeeds } from "@/components/receipt-card";
 import { useTheme } from "@/constants/theme";
@@ -71,22 +68,22 @@ export default function SpendingRoute() {
 
   return (
     <Spending
-      key={`${month ?? "current"}:${request}`}
-      initialMonth={month ?? osloDate().slice(0, 7)}
+      key={[month ?? "current", request].join(":")}
+      initialMonth={month ?? CalendarMonth.current()}
     />
   );
 }
 
-function Spending({ initialMonth }: Readonly<{ initialMonth: string }>) {
+function Spending({ initialMonth }: Readonly<{ initialMonth: CalendarMonth }>) {
   const { online, details } = useHousehold();
   const colors = useTheme();
-  const currentMonth = osloDate().slice(0, 7);
+  const currentMonth = CalendarMonth.current();
   const [month, setMonth] = useState(initialMonth);
 
   const { receipts, loadingReceipts, completeReceipts } = useCompleteReceipts({
     kind: "period",
-    start: `${monthBefore(month)}-01`,
-    end: `${month}-31`,
+    start: CalendarMonth.first(CalendarMonth.before(month)),
+    end: CalendarMonth.last(month),
   });
 
   const [storesOpen, setStoresOpen] = useState(false);
@@ -116,10 +113,7 @@ function Spending({ initialMonth }: Readonly<{ initialMonth: string }>) {
     provisional: totals.provisional,
   });
 
-  const monthLabel = new Intl.DateTimeFormat("nb-NO", {
-    month: "long",
-    year: "numeric",
-  }).format(new Date(`${month}-01T12:00:00Z`));
+  const monthLabel = CalendarMonth.format(month);
 
   const coverage = receiptCoverage([...receipts, ...undated.receipts]);
   const [firstPending] = coverage.pending;
@@ -176,7 +170,7 @@ function Spending({ initialMonth }: Readonly<{ initialMonth: string }>) {
     }));
 
   function moveMonth(offset: number) {
-    setMonth(shiftMonth(month, offset));
+    setMonth(CalendarMonth.shift(month, offset));
     setGroup(null);
   }
 
@@ -204,7 +198,7 @@ function Spending({ initialMonth }: Readonly<{ initialMonth: string }>) {
     catalogProduct: catalog.products,
     catalogBrand: catalog.brands,
     catalogStore: catalog.stores,
-    calendar: spendingCalendar(receipts, Number(month.slice(0, 4))).map(
+    calendar: spendingCalendar(receipts, CalendarMonth.year(month)).map(
       (day) => ({
         id: day.date,
         name: day.date,
@@ -300,7 +294,7 @@ function Spending({ initialMonth }: Readonly<{ initialMonth: string }>) {
                 label="Neste måned"
                 size={16}
                 color={colors.onHero}
-                disabled={month >= currentMonth}
+                disabled={CalendarMonth.compare(month, currentMonth) >= 0}
                 onPress={() => moveMonth(1)}
               />
             </View>
@@ -539,7 +533,7 @@ function Spending({ initialMonth }: Readonly<{ initialMonth: string }>) {
         monthLabel={monthLabel}
         onPreviousMonth={() => moveMonth(-1)}
         onNextMonth={() => moveMonth(1)}
-        nextDisabled={month >= currentMonth}
+        nextDisabled={CalendarMonth.compare(month, currentMonth) >= 0}
         loading={loadingReceipts}
       />
       <WidgetTip />

@@ -1,9 +1,9 @@
+import { CalendarDate } from "./calendar";
 import { Ore } from "./ore";
 import { z } from "zod";
 import {
   emptyLine,
   lineKinds,
-  osloDate,
   validateReceipt,
   type ReceiptData,
   type ParsedReceipt,
@@ -77,26 +77,23 @@ export function prepareExtraction(
   imageCount: number,
   referenceTime = Date.now(),
 ): ParsedReceipt {
-  let purchaseDate = extraction.purchaseDate;
   const issues = blockingIssues(extraction.issues);
+  const raw = extraction.purchaseDate;
 
-  if (purchaseDate && /^--\d{2}-\d{2}$/.test(purchaseDate)) {
-    const candidate =
-      osloDate(referenceTime).slice(0, 4) + purchaseDate.slice(1);
+  // A date without a year ("--09-17") belongs to the current year.
+  const partial = !!raw && /^--\d{2}-\d{2}$/.test(raw);
 
-    const parsed = new Date(candidate);
+  const text = partial
+    ? `${CalendarDate.year(CalendarDate.today(referenceTime))}${raw.slice(1)}`
+    : raw;
 
-    if (
-      Number.isFinite(parsed.getTime()) &&
-      parsed.toISOString().slice(0, 10) === candidate
-    ) {
-      purchaseDate = candidate;
-    } else {
-      purchaseDate = null;
-      issues.push(
-        "Datoen er ikke gyldig i inneværende år. Kontroller kjøpsdatoen.",
-      );
-    }
+  const purchaseDate = text ? CalendarDate.parse(text) : null;
+
+  if (text && !purchaseDate) {
+    if (!partial) throw new Error("Ugyldig dato.");
+    issues.push(
+      "Datoen er ikke gyldig i inneværende år. Kontroller kjøpsdatoen.",
+    );
   }
 
   const data: ReceiptData = {

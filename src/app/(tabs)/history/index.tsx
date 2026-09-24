@@ -1,3 +1,4 @@
+import { CalendarDate, CalendarMonth } from "@/lib/domain/calendar";
 import { Ore } from "@/lib/domain/ore";
 import {
   contributionKey,
@@ -30,7 +31,6 @@ import {
 import { IllustratedEmpty } from "@/components/monument-artwork";
 import { openReceipt } from "@/components/receipt-card";
 import { SpendingBars } from "@/components/spending-details";
-import { formatDate } from "@/lib/format-date";
 import { useTheme } from "@/constants/theme";
 
 export default function History() {
@@ -65,24 +65,24 @@ export default function History() {
 
   const sorted = [...filtered].sort(
     (a, b) =>
-      (b.purchaseDate ?? "").localeCompare(a.purchaseDate ?? "") ||
+      CalendarDate.compare(b.purchaseDate, a.purchaseDate) ||
       b._creationTime - a._creationTime,
   );
 
-  const months = new Map<string, typeof sorted>();
+  const months = new Map<CalendarMonth | "unknown", typeof sorted>();
 
   for (const receipt of sorted) {
-    const key = receipt.purchaseDate?.slice(0, 7) ?? "unknown";
+    const key = receipt.purchaseDate
+      ? CalendarDate.month(receipt.purchaseDate)
+      : "unknown";
+
     months.set(key, [...(months.get(key) ?? []), receipt]);
   }
 
-  const monthTitle = (key: string) => {
+  const monthTitle = (key: CalendarMonth | "unknown") => {
     if (key === "unknown") return "Uten dato";
 
-    const label = new Intl.DateTimeFormat("nb-NO", {
-      month: "long",
-      year: "numeric",
-    }).format(new Date(`${key}-01T12:00:00Z`));
+    const label = CalendarMonth.format(key);
 
     return label.charAt(0).toLocaleUpperCase("nb-NO") + label.slice(1);
   };
@@ -184,7 +184,7 @@ export default function History() {
                       receiptId={receipt._id}
                       store={receipt.store || "Ny kvittering"}
                       amount={Ore.format(receipt.totalOre)}
-                      date={formatDate(receipt.purchaseDate)}
+                      date={CalendarDate.format(receipt.purchaseDate)}
                     >
                       <View
                         style={{
@@ -195,7 +195,7 @@ export default function History() {
                       >
                         <Row
                           title={receipt.store || "Ny kvittering"}
-                          detail={formatDate(receipt.purchaseDate)}
+                          detail={CalendarDate.format(receipt.purchaseDate)}
                           value={Ore.format(receipt.totalOre)}
                           onPress={() =>
                             router.push({
@@ -284,7 +284,7 @@ export default function History() {
             <SpendingBars
               rows={prices.observations.map((observation, index) => ({
                 id: String(index),
-                name: formatDate(observation.date),
+                name: CalendarDate.format(observation.date),
                 amountOre: observation.ore,
                 contributions: [observation.contribution],
               }))}
@@ -311,7 +311,9 @@ export default function History() {
                   }}
                 >
                   <Row
-                    title={formatDate(contribution.receipt.data?.purchaseDate)}
+                    title={CalendarDate.format(
+                      contribution.receipt.data?.purchaseDate,
+                    )}
                     detail={`${contribution.receipt.data?.store} · ${contribution.line ? matchLabel(contribution.line) : ""}`}
                     value={Ore.format(contribution.amountOre)}
                     onPress={() => {

@@ -94,6 +94,8 @@ module.exports = defineConfig([
       "kvitto/no-leaked-render": "error",
       // Amounts change only through the Ore operations.
       "kvitto/no-ore-arithmetic": "error",
+      // Dates change only through the CalendarDate and CalendarMonth operations.
+      "kvitto/no-calendar-string-ops": "error",
       "react/no-array-index-key": "error",
       "react/jsx-no-useless-fragment": ["error", { allowExpressions: true }],
       // Navigation options such as `headerRight` take render functions.
@@ -139,6 +141,10 @@ module.exports = defineConfig([
   {
     files: ["src/lib/domain/ore.ts"],
     rules: { "kvitto/no-ore-arithmetic": "off" },
+  },
+  {
+    files: ["src/lib/domain/calendar.ts"],
+    rules: { "kvitto/no-calendar-string-ops": "off" },
   },
   {
     files: ["**/*.{ts,tsx,mts}"],

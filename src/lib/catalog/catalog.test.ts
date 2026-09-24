@@ -1,3 +1,4 @@
+import { date } from "../testing/calendar";
 import { present } from "../testing/receipts";
 import { expect, it } from "vitest";
 import { parse } from "convex-helpers/validators";
@@ -359,7 +360,7 @@ it("requires a unique branch match and keeps price data separate from product id
         { store: { name: "KIWI" }, current_price: 29.9 },
         {
           store: { name: "MENY" },
-          current_price: { price: 32.5, date: "2026-09-18" },
+          current_price: { price: 32.5, date: date("2026-09-18") },
         },
       ],
     },

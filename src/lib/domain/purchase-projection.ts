@@ -1,3 +1,4 @@
+import { CalendarDate } from "./calendar";
 import { Ore } from "./ore";
 import type { Receipt } from "./insights";
 import { extractedReceipt, type ExtractedReceipt } from "./receipt-state";
@@ -12,7 +13,7 @@ export type PurchasePolicy = {
   currency: "NOK" | "all";
   provisional: "include" | "exclude";
   duplicates: "include" | "exclude";
-  period?: { start: string; end: string };
+  period?: { start: CalendarDate; end: CalendarDate };
   undated: "include" | "exclude";
 };
 

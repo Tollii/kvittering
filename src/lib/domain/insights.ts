@@ -1,3 +1,4 @@
+import { CalendarMonth, CalendarDate } from "./calendar";
 import { Ore } from "./ore";
 import { productIdentityKey, productReference } from "./product-reference";
 import {
@@ -36,32 +37,25 @@ export type SpendingGroup = {
   contributions: Contribution[];
 };
 
-/** The "YYYY-MM" month `offset` months after `month`. */
-export function shiftMonth(month: string, offset: number) {
-  const year = Number(month.slice(0, 4));
-  const number = Number(month.slice(5, 7));
-
-  return new Date(Date.UTC(year, number - 1 + offset, 1))
-    .toISOString()
-    .slice(0, 7);
-}
-
-export const monthBefore = (month: string) => shiftMonth(month, -1);
-
 export function receiptMonth(receipt: Receipt) {
-  return receipt.data?.purchaseDate?.slice(0, 7) ?? null;
+  const date = receipt.data?.purchaseDate;
+
+  return date ? CalendarDate.month(date) : null;
 }
 
 export function monthlyInsights(
   receipts: Receipt[],
-  month: string,
+  month: CalendarMonth,
   reviewedOnly = false,
 ) {
   const projected = preparePurchases(receipts, {
     ...overviewPurchasePolicy,
     currency: "all",
     provisional: reviewedOnly ? "exclude" : "include",
-    period: { start: `${month}-01`, end: `${month}-31` },
+    period: {
+      start: CalendarMonth.first(month),
+      end: CalendarMonth.last(month),
+    },
   });
 
   const unconverted = projected
@@ -264,23 +258,21 @@ export function productHistory(receipts: Receipt[]) {
 /** Current months compare equal calendar ranges; completed months compare in full. */
 export function comparisonInsights(
   receipts: Receipt[],
-  month: string,
+  month: CalendarMonth,
   reviewedOnly = false,
-  today = new Date().toLocaleDateString("sv-SE", { timeZone: "Europe/Oslo" }),
+  today = CalendarDate.today(),
 ) {
-  const priorMonth = monthBefore(month);
+  const priorMonth = CalendarMonth.before(month);
 
-  const lastDay = (value: string) =>
-    new Date(
-      Date.UTC(Number(value.slice(0, 4)), Number(value.slice(5, 7)), 0),
-    ).getUTCDate();
+  // An unfinished month compares with the same days of the month before.
+  const partial = month === CalendarDate.month(today);
+  const currentEnd = partial ? today : CalendarMonth.last(month);
 
-  const partial = month === today.slice(0, 7);
-  const day = partial ? Number(today.slice(8, 10)) : lastDay(month);
-  const currentEnd = `${month}-${String(day).padStart(2, "0")}`;
-  const previousEnd = `${priorMonth}-${String(partial ? Math.min(day, lastDay(priorMonth)) : lastDay(priorMonth)).padStart(2, "0")}`;
+  const previousEnd = partial
+    ? CalendarMonth.day(priorMonth, CalendarDate.day(today))
+    : CalendarMonth.last(priorMonth);
 
-  const through = (end: string) =>
+  const through = (end: CalendarDate) =>
     receipts.filter((r) => !r.data?.purchaseDate || r.data.purchaseDate <= end);
 
   const current = monthlyInsights(through(currentEnd), month, reviewedOnly);
@@ -363,7 +355,7 @@ export function productPrices(contributions: Contribution[]) {
     })
     .sort(
       (a, b) =>
-        a.date.localeCompare(b.date) ||
+        CalendarDate.compare(a.date, b.date) ||
         a.contribution.receipt._creationTime -
           b.contribution.receipt._creationTime,
     );
@@ -389,7 +381,7 @@ export function spendingCalendar(
   const days = new Map<
     string,
     {
-      date: string;
+      date: CalendarDate;
       amountOre: Ore;
       contributions: Contribution[];
       provisional: number;
@@ -397,14 +389,13 @@ export function spendingCalendar(
     }
   >();
 
-  for (
-    let date = new Date(Date.UTC(year, 0, 1));
-    date.getUTCFullYear() === year;
-    date.setUTCDate(date.getUTCDate() + 1)
-  ) {
-    const key = date.toISOString().slice(0, 10);
-    days.set(key, {
-      date: key,
+  const dates = Array.from({ length: 12 }, (_, index) =>
+    CalendarMonth.dates(CalendarMonth.of(year, index + 1)),
+  ).flat();
+
+  for (const date of dates) {
+    days.set(date, {
+      date,
       amountOre: Ore.zero,
       contributions: [],
       provisional: 0,

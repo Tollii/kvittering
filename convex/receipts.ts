@@ -1,3 +1,7 @@
+import {
+  CalendarDate,
+  calendarDateValidator,
+} from "../src/lib/domain/calendar";
 import { Ore, oreValidator } from "../src/lib/domain/ore";
 import {
   attentionStatuses,
@@ -604,7 +608,7 @@ export const history = query({
       _creationTime: v.number(),
       status: receiptStatusValidator,
       store: v.union(v.string(), v.null()),
-      purchaseDate: v.union(v.string(), v.null()),
+      purchaseDate: v.union(calendarDateValidator, v.null()),
       totalOre: v.union(oreValidator, v.null()),
       spendingOre: oreValidator,
       excluded: v.boolean(),
@@ -686,20 +690,13 @@ export const readPage = query({
         .paginate(options);
 
     if (scope.kind === "period") {
-      if (
-        !/^\d{4}-\d{2}-\d{2}$/.test(scope.start) ||
-        !/^\d{4}-\d{2}-\d{2}$/.test(scope.end) ||
-        scope.start > scope.end
-      )
+      const start = CalendarDate.parseBound(scope.start);
+      const end = CalendarDate.parseBound(scope.end);
+
+      if (!start || !end || CalendarDate.compare(start, end) > 0)
         throw new Error("Invalid report period.");
 
-      return receiptPeriodPage(
-        ctx,
-        member.householdId,
-        scope.start,
-        scope.end,
-        options,
-      );
+      return receiptPeriodPage(ctx, member.householdId, start, end, options);
     }
 
     const keys = new Set<string>();
@@ -827,8 +824,8 @@ export const attentionCount = query({
 export function receiptPeriodPage(
   ctx: QueryCtx,
   householdId: Id<"households">,
-  start: string,
-  end: string,
+  start: CalendarDate,
+  end: CalendarDate,
   paginationOpts: PaginationOptions,
 ) {
   return ctx.db

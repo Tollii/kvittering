@@ -1,3 +1,4 @@
+import { CalendarDate, CalendarMonth } from "./calendar";
 import { Ore } from "./ore";
 import {
   preparePurchases,
@@ -11,71 +12,46 @@ import {
 import { categoryById } from "./categories";
 
 export type AnalysisPeriod = {
-  start: string;
-  end: string;
-  previousStart: string;
-  previousEnd: string;
+  start: CalendarDate;
+  end: CalendarDate;
+  previousStart: CalendarDate;
+  previousEnd: CalendarDate;
 };
 
 export type AnalysisFrequency = "week" | "month";
 
-const dateString = (date: Date) => date.toISOString().slice(0, 10);
-
-export function shiftDate(date: string, days: number) {
-  const value = new Date(`${date}T12:00:00Z`);
-  value.setUTCDate(value.getUTCDate() + days);
-
-  return dateString(value);
-}
-
 /** Compare an unfinished week/month with the same elapsed part of its predecessor. */
-/** ISO dates order lexically. */
-export const earlierDate = (left: string, right: string) =>
-  left < right ? left : right;
-
 export function analysisPeriod(
-  anchor: string,
+  anchor: CalendarDate,
   frequency: AnalysisFrequency,
-  today: string,
+  today: CalendarDate,
 ): AnalysisPeriod {
-  const date = new Date(`${anchor}T12:00:00Z`);
-
   if (frequency === "week") {
-    const start = shiftDate(anchor, -((date.getUTCDay() + 6) % 7));
+    const start = CalendarDate.shift(anchor, -CalendarDate.weekday(anchor));
 
-    const end = earlierDate(shiftDate(start, 6), today);
+    const end = CalendarDate.earlier(CalendarDate.shift(start, 6), today);
 
     return {
       start,
       end,
-      previousStart: shiftDate(start, -7),
-      previousEnd: shiftDate(end, -7),
+      previousStart: CalendarDate.shift(start, -7),
+      previousEnd: CalendarDate.shift(end, -7),
     };
   }
 
-  const start = `${anchor.slice(0, 7)}-01`;
+  const month = CalendarDate.month(anchor);
+  const previousMonth = CalendarMonth.before(month);
+  const start = CalendarMonth.first(month);
+  const monthEnd = CalendarMonth.last(month);
+  const end = CalendarDate.earlier(monthEnd, today);
+  const previousStart = CalendarMonth.first(previousMonth);
 
-  const monthEnd = dateString(
-    new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth() + 1, 0, 12)),
-  );
-
-  const end = earlierDate(monthEnd, today);
-
-  const previousStart = dateString(
-    new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth() - 1, 1, 12)),
-  );
-
-  const previousLast = new Date(
-    Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), 0, 12),
-  );
-
+  // A finished month compares with the whole month before; an unfinished one
+  // with the same days, clamped to the shorter month.
   const previousEnd =
     end === monthEnd
-      ? dateString(previousLast)
-      : shiftDate(
-          previousStart,
-          Math.min(Number(end.slice(8)), previousLast.getUTCDate()) - 1,
-        );
+      ? CalendarMonth.last(previousMonth)
+      : CalendarMonth.day(previousMonth, CalendarDate.day(end));
 
   return { start, end, previousStart, previousEnd };
 }
@@ -134,7 +110,7 @@ export function spendingAnalysis(
     provisional: reviewedOnly ? "exclude" : "include",
   });
 
-  const within = (start: string, end: string) =>
+  const within = (start: CalendarDate, end: CalendarDate) =>
     prepared.filter(
       ({ data }) =>
         !!data.purchaseDate &&

@@ -1,10 +1,10 @@
+import { CalendarDate } from "@/lib/domain/calendar";
 import { Ore } from "@/lib/domain/ore";
 import { Pressable, View, useWindowDimensions } from "react-native";
 import { useTheme } from "@/constants/theme";
 import { Copy, Panel, Row, Sheet } from "./ui";
 import { openReceipt, receiptStatusLabel } from "./receipt-card";
 import { contributionKey, type SpendingGroup } from "@/lib/domain/insights";
-import { formatDate } from "@/lib/format-date";
 
 export function SpendingBars({
   rows,
@@ -132,7 +132,7 @@ export function SpendingDetails({
                     contribution.receipt.data?.store ||
                     "Kvittering"
                   }
-                  detail={`${formatDate(contribution.receipt.data?.purchaseDate)} · ${contribution.line ? (contribution.receipt.data?.store ?? "") : receiptStatusLabel(contribution.receipt)}`}
+                  detail={`${CalendarDate.format(contribution.receipt.data?.purchaseDate)} · ${contribution.line ? (contribution.receipt.data?.store ?? "") : receiptStatusLabel(contribution.receipt)}`}
                   value={Ore.format(contribution.amountOre)}
                   onPress={() => {
                     onClose();

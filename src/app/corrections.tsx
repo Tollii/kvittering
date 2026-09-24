@@ -1,3 +1,4 @@
+import { CalendarDate } from "@/lib/domain/calendar";
 import { useReleaseMutation } from "@/lib/releases/requests";
 import { useState } from "react";
 import { Stack } from "expo-router";
@@ -16,7 +17,6 @@ import {
   Sheet,
 } from "@/components/ui";
 import { categoryById } from "@/lib/domain/categories";
-import { formatDate } from "@/lib/format-date";
 
 const categoryName = (id: string | null) =>
   id ? (categoryById.get(id)?.name ?? id) : "Ingen";
@@ -193,7 +193,7 @@ export default function Corrections() {
                         : previous,
                   );
                 }}
-                detail={`${formatDate(target.date)} · ${categoryName(target.categoryId)}`}
+                detail={`${CalendarDate.format(target.date)} · ${categoryName(target.categoryId)}`}
               />
             ))}
             {!preview.targets.length && (

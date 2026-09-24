@@ -1,3 +1,4 @@
+import { CalendarMonth } from "./calendar";
 import { Ore } from "./ore";
 import { median } from "./statistics";
 import { productIdentityKey, productReference } from "./product-reference";
@@ -160,7 +161,7 @@ export function priceSignals(
 }
 
 /** Build history once, then compare eligible purchases in the selected month. */
-export function monthPriceSignals(receipts: Receipt[], month: string) {
+export function monthPriceSignals(receipts: Receipt[], month: CalendarMonth) {
   const prepared = preparePurchases(receipts, comparisonPurchasePolicy);
   const history = priceHistory(prepared.flatMap((item) => item.purchases));
 

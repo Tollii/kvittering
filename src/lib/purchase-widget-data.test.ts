@@ -1,9 +1,10 @@
+import { month } from "./testing/calendar";
 import { Ore } from "./domain/ore";
 import { describe, expect, it } from "vitest";
 import { purchaseWidgetData } from "./purchase-widget-data";
 
 const purchase = {
-  month: "2026-09",
+  month: month("2026-09"),
   amountOre: Ore.of(125000),
   budgetOre: Ore.of(200000),
   provisional: 0,

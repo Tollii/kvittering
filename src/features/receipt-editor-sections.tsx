@@ -1,3 +1,4 @@
+import { CalendarDate } from "@/lib/domain/calendar";
 import { Ore } from "@/lib/domain/ore";
 import type { ReactNode } from "react";
 import { Alert, View, useWindowDimensions } from "react-native";
@@ -20,7 +21,6 @@ import {
 } from "@/lib/domain/receipt-review";
 import type { Receipt } from "@/lib/domain/insights";
 import { receiptStatusLabel } from "@/components/receipt-card";
-import { formatDate } from "@/lib/format-date";
 import { useTheme } from "@/constants/theme";
 
 type Totals = ReturnType<typeof reconcile>;
@@ -198,7 +198,7 @@ export function ReceiptSummary({
             }}
           >
             <Copy size={13} weight="600" style={{ color: colors.onHeroMuted }}>
-              {formatDate(data?.purchaseDate)}
+              {CalendarDate.format(data?.purchaseDate)}
               {data?.purchaseDate && data.purchaseTime
                 ? ` kl. ${data.purchaseTime}`
                 : ""}

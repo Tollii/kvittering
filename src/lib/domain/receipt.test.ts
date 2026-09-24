@@ -1,3 +1,4 @@
+import { month } from "../testing/calendar";
 import { present, receiptFixture } from "../testing/receipts";
 import { Ore } from "./ore";
 import { describe, it, expect } from "vitest";
@@ -135,7 +136,7 @@ describe("receipt accounting", () => {
       excluded: true,
     });
 
-    const totals = monthlyInsights([base, undated, excluded], "2026-09");
+    const totals = monthlyInsights([base, undated, excluded], month("2026-09"));
     expect(totals.products).toBe(2331);
     expect(totals.undated).toHaveLength(1);
     expect(totals.provisional).toBe(1);
@@ -169,7 +170,7 @@ it("keeps unknown and foreign currencies out of NOK totals", () => {
     excluded: false,
   });
 
-  const totals = monthlyInsights([receipt], "2026-09");
+  const totals = monthlyInsights([receipt], month("2026-09"));
   expect(totals.paid).toBe(0);
   expect(totals.products).toBe(0);
   expect(totals.unconverted).toEqual([receipt]);

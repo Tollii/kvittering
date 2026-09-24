@@ -1,3 +1,4 @@
+import { CalendarDate, CalendarMonth } from "@/lib/domain/calendar";
 import { Ore } from "@/lib/domain/ore";
 import { type ComponentProps, type ReactNode } from "react";
 import { View } from "react-native";
@@ -8,7 +9,6 @@ import { SpendingCalendar } from "@/components/spending-calendar";
 import { openReceipt } from "@/components/receipt-card";
 import { useTheme } from "@/constants/theme";
 import { isCategoryUncertain } from "@/lib/domain/receipt-issues";
-import { formatDate } from "@/lib/format-date";
 import {
   priceSignalLabel,
   priceSignalMinimumObservations,
@@ -39,7 +39,7 @@ type ReportProps = {
   coverage: ReturnType<typeof receiptCoverage>;
   catalog: ReturnType<typeof catalogInsights>;
   receipts: Receipt[];
-  month: string;
+  month: CalendarMonth;
   historyComplete: boolean;
   coverageComplete: boolean;
   surprises: ReturnType<typeof monthPriceSignals>;
@@ -155,7 +155,7 @@ export function useSpendingReports({
                 >
                   <Row
                     title={signal.name}
-                    detail={`${formatDate(signal.receipt.data?.purchaseDate)} · vanlig ${Ore.format(Ore.round(signal.typicalUnitPrice))}`}
+                    detail={`${CalendarDate.format(signal.receipt.data?.purchaseDate)} · vanlig ${Ore.format(Ore.round(signal.typicalUnitPrice))}`}
                     value={priceSignalLabel(signal)}
                     onPress={() => {
                       onClose();

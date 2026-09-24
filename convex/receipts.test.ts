@@ -1,3 +1,4 @@
+import { date } from "../src/lib/testing/calendar";
 import { present } from "../src/lib/testing/receipts";
 import { Ore } from "../src/lib/domain/ore";
 /// <reference types="vite/client" />
@@ -648,7 +649,8 @@ it("pages narrow history summaries and includes imported older purchases in comp
 
     for (let index = 0; index < 65; index++) {
       const data = batteryFixture();
-      data.purchaseDate = index === 64 ? "2020-01-02" : "2026-09-01";
+      data.purchaseDate =
+        index === 64 ? date("2020-01-02") : date("2026-09-01");
 
       if (index === 64) present(data.lines[0]).tags = ["older import"];
       await ctx.db.insert("receipts", {
@@ -713,7 +715,7 @@ it("finds a dated duplicate beyond the former insertion-order limit", async () =
   });
 
   const data = batteryFixture();
-  data.purchaseDate = "2020-01-01";
+  data.purchaseDate = date("2020-01-01");
   data.receiptNumber = "fixed-receipt";
   await t.run(async (ctx) => {
     await ctx.db.patch("receipts", originalId, { data, status: "reviewed" });
@@ -727,7 +729,7 @@ it("finds a dated duplicate beyond the former insertion-order limit", async () =
       await ctx.db.insert("receipts", {
         ...template,
         clientId: `later-${index}`,
-        data: { ...data, purchaseDate: "2026-09-19" },
+        data: { ...data, purchaseDate: date("2026-09-19") },
       });
   });
 

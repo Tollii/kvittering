@@ -1,3 +1,4 @@
+import { date, month } from "../testing/calendar";
 import { present, receiptFixture } from "../testing/receipts";
 import { Ore } from "./ore";
 import {
@@ -14,7 +15,7 @@ import { weeklyShopFixture } from "./receipt";
 
 const receipt = (id: string, purchaseDate: string, colaOre: number) => {
   const data = weeklyShopFixture();
-  data.purchaseDate = purchaseDate;
+  data.purchaseDate = date(purchaseDate);
   const cola = data.lines.find((line) => line.id === "cola")!;
   cola.amountOre = Ore.of(colaOre);
   cola.catalogProduct = {
@@ -122,9 +123,17 @@ it("lists a month's surprises, largest overspend first", () => {
 
   const cheap = receipt("cheap", "2026-09-02", 6990);
   const dear = receipt("dear", "2026-09-20", 12900);
-  const month = monthPriceSignals([...history, cheap, dear], "2026-09");
-  expect(month.map((signal) => signal.receipt._id)).toEqual(["dear", "cheap"]);
-  expect(priceSignalLabel(present(month[1]))).toMatch(/^−2\d % vs vanlig$/);
+
+  const signals = monthPriceSignals(
+    [...history, cheap, dear],
+    month("2026-09"),
+  );
+
+  expect(signals.map((signal) => signal.receipt._id)).toEqual([
+    "dear",
+    "cheap",
+  ]);
+  expect(priceSignalLabel(present(signals[1]))).toMatch(/^−2\d % vs vanlig$/);
 });
 
 it("omits excluded warning targets", () => {
@@ -135,7 +144,7 @@ it("omits excluded warning targets", () => {
   ];
 
   const target = { ...receipt("d", "2026-09-01", 20000), excluded: true };
-  expect(monthPriceSignals([...history, target], "2026-09")).toEqual([]);
+  expect(monthPriceSignals([...history, target], month("2026-09"))).toEqual([]);
 });
 
 it("uses interpreted packages for equivalent raw unit quantities", () => {

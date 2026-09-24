@@ -1,6 +1,8 @@
+import { CalendarMonth } from "./domain/calendar";
 import { Ore } from "./domain/ore";
 
 export type PurchaseWidgetData = {
+  /** The month's label, such as "september 2026". */
   month: string;
   amount: string;
   budget: string;
@@ -22,7 +24,7 @@ export function purchaseWidgetData({
   provisional,
   now,
 }: Readonly<{
-  month: string;
+  month: CalendarMonth;
   amountOre: Ore;
   budgetOre: Ore | null;
   provisional: number;
@@ -32,11 +34,7 @@ export function purchaseWidgetData({
     budgetOre === null ? null : Ore.subtract(budgetOre, amountOre);
 
   return {
-    month: new Intl.DateTimeFormat("nb-NO", {
-      month: "long",
-      year: "numeric",
-      timeZone: "Europe/Oslo",
-    }).format(new Date(`${month}-01T12:00:00Z`)),
+    month: CalendarMonth.format(month),
     amount: Ore.format(amountOre),
     budget:
       remaining === null

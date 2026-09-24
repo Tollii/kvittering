@@ -1,3 +1,4 @@
+import { CalendarDate, calendarDateValidator } from "./calendar";
 import { Ore, oreValidator } from "./ore";
 import type { ClassificationEvidence } from "./classification";
 import { productReferenceValidator } from "./product-reference";
@@ -73,7 +74,7 @@ export const receiptDataValidator = v.object({
   physicalStoreManual: v.boolean().optional(),
   store: nullableString,
   branch: nullableString,
-  purchaseDate: nullableString,
+  purchaseDate: v.union(calendarDateValidator, v.null()),
   purchaseTime: nullableString,
   receiptNumber: nullableString,
   currency: nullableString,
@@ -110,14 +111,6 @@ export function emptyLine(id: string = crypto.randomUUID()): ReceiptLine {
     productKey: null,
   };
 }
-
-export const osloDate = (time = Date.now()) =>
-  new Intl.DateTimeFormat("sv-SE", {
-    timeZone: "Europe/Oslo",
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-  }).format(time);
 
 export const normalizeAlias = (text: string) =>
   text.normalize("NFKC").trim().replace(/\s+/g, " ").toLocaleUpperCase("nb-NO");
@@ -203,12 +196,7 @@ export function validateReceipt(data: ReceiptData): ParsedReceipt {
   )
     throw new Error("Totalen må være hele øre.");
 
-  if (
-    data.purchaseDate &&
-    (!/^\d{4}-\d{2}-\d{2}$/.test(data.purchaseDate) ||
-      new Date(data.purchaseDate).toISOString().slice(0, 10) !==
-        data.purchaseDate)
-  )
+  if (data.purchaseDate && !CalendarDate.parse(data.purchaseDate))
     throw new Error("Ugyldig dato.");
 
   // SAFETY: The checks above establish all ParsedReceipt domain invariants.
@@ -369,7 +357,7 @@ export function batteryFixture(): ReceiptData {
   return {
     store: "Eksempelbutikk",
     branch: null,
-    purchaseDate: "2026-09-17",
+    purchaseDate: CalendarDate.of(2026, 9, 17),
     purchaseTime: null,
     receiptNumber: null,
     currency: "NOK",
@@ -427,7 +415,7 @@ export function weeklyShopFixture(): ReceiptData {
   return {
     store: "REMA 1000",
     branch: "Kanalveien",
-    purchaseDate: "2026-09-12",
+    purchaseDate: CalendarDate.of(2026, 9, 12),
     purchaseTime: "17:42",
     receiptNumber: "4711",
     currency: "NOK",
