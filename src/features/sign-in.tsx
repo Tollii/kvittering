@@ -229,6 +229,7 @@ export function SignIn() {
             </View>
             <Button
               title={register ? "Opprett konto" : "Logg inn"}
+              testID="sign-in-submit"
               busy={pending === "email"}
               style={{ minHeight: 56, borderRadius: 28 }}
               disabled={busy || !canSubmit}

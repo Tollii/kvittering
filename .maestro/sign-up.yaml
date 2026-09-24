@@ -35,8 +35,13 @@ name: Sign up and start a household
 - tapOn:
     id: "sign-in-password"
 - inputText: "correct horse battery staple"
-# Submitting from the keyboard avoids matching the "Opprett konto" heading.
-- pressKey: Enter
+- hideKeyboard
+# The button is enabled only when name, email, and password are valid.
+- assertVisible:
+    id: "sign-in-submit"
+    enabled: true
+- tapOn:
+    id: "sign-in-submit"
 - extendedWaitUntil:
     visible: "Start med mine kvitteringer"
     timeout: 30000
