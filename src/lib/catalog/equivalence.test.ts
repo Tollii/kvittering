@@ -1,3 +1,4 @@
+import { present } from "../testing/receipts";
 import { expect, it } from "vitest";
 import { normalizeProducts } from "../../../convex/kassalapp/normalize";
 import { emptyLine } from "../domain/receipt";
@@ -42,7 +43,7 @@ it("links interchangeable Crispi records as one group without importing package 
   const identity = catalogIdentity(equivalentCatalogProduct(match));
   expect(identity).toMatchObject({
     name: "Crispi Salat",
-    image: candidates[1].image,
+    image: present(candidates[1]).image,
   });
   expect(identity.ean).toBeUndefined();
   expect(identity.weight).toBeUndefined();
@@ -100,12 +101,12 @@ it("keeps recipes, organic labels and explicit pack counts separate", () => {
 
   expect(groupCatalogProducts(candidates)).toHaveLength(candidates.length);
   const salad = products(["Crispi Salat 150g", "Crispi Salat 150g"]);
-  salad[1].labels = ["Økologisk"];
+  present(salad[1]).labels = ["Økologisk"];
   expect(groupCatalogProducts(salad)).toHaveLength(2);
   expect(
     compatibleCatalogProduct(
       { ...emptyLine("s"), name: "Crispi Salat" },
-      salad[1],
+      present(salad[1]),
     ),
   ).toBe(false);
 });
@@ -122,9 +123,9 @@ it("accepts a supported group but preserves competing sizes and missing model an
   const line = { ...emptyLine("pizza"), name: "BigOne BBQ Chicken" };
   expect(selectCatalogMatch(line, groups, [0.9, 0.91]).productKey).toBeNull();
   expect(selectCatalogMatch(line, groups, [0.92, 0.2])).toMatchObject({
-    productKey: groups[0].key,
+    productKey: present(groups[0]).key,
     reason: "equivalent_match",
-    equivalentKeys: groups[0].equivalence?.candidateKeys,
+    equivalentKeys: present(groups[0]).equivalence?.candidateKeys,
   });
   expect(selectCatalogMatch(line, groups, [null, null]).productKey).toBeNull();
   expect(
@@ -139,7 +140,7 @@ it("accepts a supported group but preserves competing sizes and missing model an
 it("does not group generic names or conflicting catalog measurements", () => {
   expect(groupCatalogProducts(products(["Agurk", "Agurk"]))).toHaveLength(2);
   const candidates = products(["Crispi Salat 150g", "Crispi Salat 150g"]);
-  candidates[1].weight = 200;
-  candidates[1].weightUnit = "g";
+  present(candidates[1]).weight = 200;
+  present(candidates[1]).weightUnit = "g";
   expect(groupCatalogProducts(candidates)).toHaveLength(2);
 });

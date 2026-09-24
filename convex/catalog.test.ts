@@ -1,3 +1,4 @@
+import { present } from "../src/lib/testing/receipts";
 /// <reference types="vite/client" />
 import { convexTest } from "convex-test";
 import { register as registerWorkpool } from "@convex-dev/workpool/test";
@@ -27,7 +28,7 @@ it("persists equivalent matches safely across catalog reads, old editors and man
   });
 
   const data = batteryFixture();
-  const line = data.lines[0];
+  const line = present(data.lines[0]);
   Object.assign(line, {
     name: "SALAT CRISPI",
     receiptName: "SALAT CRISPI",
@@ -48,7 +49,7 @@ it("persists equivalent matches safely across catalog reads, old editors and man
     ],
   });
 
-  const group = groupCatalogProducts(products)[0];
+  const group = present(groupCatalogProducts(products)[0]);
   await t.run(async (ctx) => {
     await ctx.db.patch("receipts", id, {
       data,
@@ -77,7 +78,7 @@ it("persists equivalent matches safely across catalog reads, old editors and man
   const apply = { id, generation: 0, store: data.store, decisions: [decision] };
   await t.mutation(internal.catalogMatching.apply, apply);
   let receipt = (await first.query(api.receipts.detail, { id }))!.receipt;
-  const linked = receipt.data!.lines[0];
+  const linked = present(receipt.data!.lines[0]);
   expect(linked.catalogProduct).toMatchObject({
     key: group.key,
     name: "Crispi Salat",
@@ -98,9 +99,9 @@ it("persists equivalent matches safely across catalog reads, old editors and man
   });
 
   expect(details.status).toBe("ready");
-  expect(details.products[0].ids).toEqual([]);
-  expect(details.products[0].weight).toBeUndefined();
-  expect(details.products[0].ingredients).toBeUndefined();
+  expect(present(details.products[0]).ids).toEqual([]);
+  expect(present(details.products[0]).weight).toBeUndefined();
+  expect(present(details.products[0]).ingredients).toBeUndefined();
   expect(
     (await first.mutation(api.catalog.product, { key: group.key })).products,
   ).toEqual(details.products);
@@ -117,8 +118,8 @@ it("persists equivalent matches safely across catalog reads, old editors and man
   ).rejects.toThrow("Logg inn");
 
   const oldData = structuredClone(receipt.data!);
-  delete oldData.lines[0].productReference;
-  delete oldData.lines[0].catalogProduct!.equivalence;
+  delete present(oldData.lines[0]).productReference;
+  delete present(oldData.lines[0]).catalogProduct!.equivalence;
 
   const save = {
     id,
@@ -132,19 +133,23 @@ it("persists equivalent matches safely across catalog reads, old editors and man
 
   await first.mutation(api.receipts.save, save);
   receipt = (await first.query(api.receipts.detail, { id }))!.receipt;
-  expect(receipt.data!.lines[0].catalogProduct?.equivalence).toEqual(
+  expect(present(receipt.data!.lines[0]).catalogProduct?.equivalence).toEqual(
     group.equivalence,
   );
   await first.mutation(api.receipts.save, {
     ...save,
     revision: receipt.revision,
     data: receipt.data!,
-    catalogChanges: [{ lineId: line.id, key: products[1].key }],
+    catalogChanges: [{ lineId: line.id, key: present(products[1]).key }],
   });
   await t.mutation(internal.catalogMatching.apply, apply);
   receipt = (await first.query(api.receipts.detail, { id }))!.receipt;
-  expect(receipt.data!.lines[0].catalogProduct?.key).toBe(products[1].key);
-  expect(receipt.data!.lines[0].catalogProduct?.equivalence).toBeUndefined();
+  expect(present(receipt.data!.lines[0]).catalogProduct?.key).toBe(
+    present(products[1]).key,
+  );
+  expect(
+    present(receipt.data!.lines[0]).catalogProduct?.equivalence,
+  ).toBeUndefined();
 });
 
 afterEach(() => {
@@ -194,7 +199,7 @@ it("shares normalized pending and completed lookups across households and reject
   );
 
   expect(requests).toHaveLength(1);
-  const id = requests[0]._id;
+  const id = present(requests[0])._id;
   await t.mutation(internal.catalogQueue.claim, { id });
 
   const products = normalizeProducts({
@@ -315,7 +320,7 @@ it("includes the receipt retailer in matching inputs without changing line evide
 
   expect(inputs.length).toBeGreaterThan(0);
   expect(inputs.every((input) => input.store === "KIWI")).toBe(true);
-  expect(inputs[0].line).toEqual(
+  expect(present(inputs[0]).line).toEqual(
     data.lines.find((line) => line.kind === "product"),
   );
 });
@@ -396,7 +401,7 @@ it.each([
         urls.push(new URL(url));
 
         return new Response(
-          JSON.stringify({ data: responses[urls.length - 1] }),
+          JSON.stringify({ data: present(responses[urls.length - 1]) }),
           {
             status,
             headers: {
@@ -416,7 +421,7 @@ it.each([
 
     await t.action(internal.catalogWorker.execute, { id: request._id });
     expect(urls.map((url) => url.searchParams.get("search"))).toEqual(searches);
-    expect(urls[0].searchParams.get("store")).toBe(
+    expect(present(urls[0]).searchParams.get("store")).toBe(
       store === "REMA 1000" ? "REMA_1000" : (store ?? null),
     );
     expect(urls.slice(1).every((url) => !url.searchParams.has("store"))).toBe(
@@ -510,15 +515,15 @@ it("uses category-only evidence but preserves manual edits, stale lines and a ch
   });
 
   const data = batteryFixture();
-  data.lines[0].categoryId = "fallback.unclear";
-  data.lines[0].issues = ["Kategorien er usikker."];
+  present(data.lines[0]).categoryId = "fallback.unclear";
+  present(data.lines[0]).issues = ["Kategorien er usikker."];
   await t.run((ctx) =>
     ctx.db.patch("receipts", id, { data, status: "needs_review" }),
   );
 
   const decision = {
-    lineId: data.lines[0].id,
-    evidenceKey: lineEvidenceKey(data.lines[0]),
+    lineId: present(data.lines[0]).id,
+    evidenceKey: lineEvidenceKey(present(data.lines[0])),
     productKey: null,
     categoryId: "drinks.soft-drinks",
     categoryConfidence: 0.95,
@@ -540,16 +545,16 @@ it("uses category-only evidence but preserves manual edits, stale lines and a ch
   ).toBe(0);
   await t.mutation(internal.catalogMatching.apply, args);
   let saved = (await first.query(api.receipts.detail, { id }))!.receipt;
-  expect(saved.data?.lines[0].categoryId).toBe("drinks.soft-drinks");
-  expect(saved.data?.lines[0].catalogProduct).toBeUndefined();
+  expect(present(saved.data?.lines[0]).categoryId).toBe("drinks.soft-drinks");
+  expect(present(saved.data?.lines[0]).catalogProduct).toBeUndefined();
   expect(saved.catalogDecisions).toEqual([decision]);
   const manual = saved.data!;
-  manual.lines[0].manual = true;
-  manual.lines[0].categoryId = "drinks.sports-drinks";
+  present(manual.lines[0]).manual = true;
+  present(manual.lines[0]).categoryId = "drinks.sports-drinks";
   await t.run((ctx) => ctx.db.patch("receipts", id, { data: manual }));
   await t.mutation(internal.catalogMatching.apply, args);
   saved = (await first.query(api.receipts.detail, { id }))!.receipt;
-  expect(saved.data?.lines[0].categoryId).toBe("drinks.sports-drinks");
+  expect(present(saved.data?.lines[0]).categoryId).toBe("drinks.sports-drinks");
 });
 
 it("refreshes expired searches while retaining the last usable result", async () => {
@@ -615,22 +620,26 @@ it("saves a selected catalog product and prevents background matching from repla
     data,
     reviewed: false,
     rememberLineIds: [],
-    catalogChanges: [{ lineId: data.lines[0].id, key: products[0].key }],
+    catalogChanges: [
+      { lineId: present(data.lines[0]).id, key: present(products[0]).key },
+    ],
     duplicateResolved: false,
     excluded: false,
   });
   const saved = (await first.query(api.receipts.detail, { id }))!.receipt.data!;
-  expect(saved.lines[0].catalogProduct?.key).toBe(products[0].key);
-  expect(saved.lines[0].productMatchManual).toBe(true);
+  expect(present(saved.lines[0]).catalogProduct?.key).toBe(
+    present(products[0]).key,
+  );
+  expect(present(saved.lines[0]).productMatchManual).toBe(true);
   await t.mutation(internal.catalogMatching.apply, {
     id,
     generation: 0,
     store: data.store,
     decisions: [
       {
-        lineId: saved.lines[0].id,
-        evidenceKey: lineEvidenceKey(saved.lines[0]),
-        productKey: products[1].key,
+        lineId: present(saved.lines[0]).id,
+        evidenceKey: lineEvidenceKey(present(saved.lines[0])),
+        productKey: present(products[1]).key,
         categoryId: "drinks.soft-drinks",
         categoryConfidence: 0.99,
       },
@@ -640,16 +649,22 @@ it("saves a selected catalog product and prevents background matching from repla
   const current = (await first.query(api.receipts.detail, { id }))!.receipt
     .data!;
 
-  expect(current.lines[0].catalogProduct?.key).toBe(products[0].key);
-  expect(current.lines[0].categoryId).toBe(saved.lines[0].categoryId);
+  expect(present(current.lines[0]).catalogProduct?.key).toBe(
+    present(products[0]).key,
+  );
+  expect(present(current.lines[0]).categoryId).toBe(
+    present(saved.lines[0]).categoryId,
+  );
 });
 
 it("fetches details after a summary and retains detail freshness across later summaries", async () => {
   const { t, first } = await setup();
 
-  const product = normalizeProducts({
-    data: [{ id: 31, name: "Cola 500ml" }],
-  })[0];
+  const product = present(
+    normalizeProducts({
+      data: [{ id: 31, name: "Cola 500ml" }],
+    })[0],
+  );
 
   await t.run((ctx) =>
     ctx.db.insert("catalogProducts", {
@@ -668,9 +683,11 @@ it("fetches details after a summary and retains detail freshness across later su
   );
 
   expect(requests).toHaveLength(1);
-  await t.mutation(internal.catalogQueue.claim, { id: requests[0]._id });
+  await t.mutation(internal.catalogQueue.claim, {
+    id: present(requests[0])._id,
+  });
   await t.mutation(internal.catalogQueue.succeed, {
-    id: requests[0]._id,
+    id: present(requests[0])._id,
     result: { ...emptyCatalogResult(), products: [product] },
   });
   expect(
@@ -697,15 +714,17 @@ it("fetches details after a summary and retains detail freshness across later su
 it("merges summary fields without erasing rich detail data or mutating inputs", async () => {
   const { mergeCatalogProduct } = await import("./catalogQueue");
 
-  const product = normalizeProducts({
-    data: [
-      {
-        id: 31,
-        name: "Cola",
-        nutrition: [{ display_name: "Energy", amount: 10, unit: "kcal" }],
-      },
-    ],
-  })[0];
+  const product = present(
+    normalizeProducts({
+      data: [
+        {
+          id: 31,
+          name: "Cola",
+          nutrition: [{ display_name: "Energy", amount: 10, unit: "kcal" }],
+        },
+      ],
+    })[0],
+  );
 
   const previous = {
     key: product.key,
@@ -747,7 +766,7 @@ it("observes delayed catalog completion without queuing more work", async () => 
     await t.run((ctx) => ctx.db.query("catalogRequests").collect()),
   ).toEqual(initial);
   await t.run((ctx) =>
-    ctx.db.patch("catalogRequests", initial[0]._id, {
+    ctx.db.patch("catalogRequests", present(initial[0])._id, {
       state: "ready",
       fetchedAt: Date.now(),
       expiresAt: Date.now() + 10000,

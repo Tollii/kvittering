@@ -1,3 +1,4 @@
+import { soleElement, type NonEmpty } from "../domain/collections";
 import {
   parseProductEvidence,
   removePackageText,
@@ -81,7 +82,7 @@ export function groupCatalogProducts(
     product.equivalence ? [] : [descriptor(product)],
   );
 
-  const groups = new Map<string, CatalogProduct[]>();
+  const groups = new Map<string, NonEmpty<CatalogProduct>>();
 
   for (const item of descriptors) {
     const possible = descriptors.filter((other) =>
@@ -107,7 +108,8 @@ export function groupCatalogProducts(
     const [key = JSON.stringify([item.family, item.brand, item.size])] =
       signatures.size === 1 ? signatures : [];
 
-    groups.set(key, [...(groups.get(key) ?? []), item.product]);
+    const existing = groups.get(key);
+    groups.set(key, existing ? [...existing, item.product] : [item.product]);
   }
 
   const completeness = (product: CatalogProduct) =>
@@ -118,12 +120,21 @@ export function groupCatalogProducts(
   return [
     ...unique.filter((product) => product.equivalence),
     ...[...groups].map(([key, members]) => {
-      if (members.length === 1) return members[0];
+      const only = soleElement(members);
 
-      const representative = [...members].sort(
-        (a, b) =>
-          completeness(b) - completeness(a) || a.key.localeCompare(b.key),
-      )[0];
+      if (only) return only;
+
+      // The most complete member represents the group; ties go to the lowest key.
+      const [first, ...rest] = members;
+
+      const representative = rest.reduce(
+        (best, member) =>
+          (completeness(member) - completeness(best) ||
+            best.key.localeCompare(member.key)) > 0
+            ? member
+            : best,
+        first,
+      );
 
       const size = members.flatMap(
         (member) =>

@@ -149,7 +149,7 @@ export function Screen({
         ) : (
           content
         )}
-        {footer && (
+        {!!footer && (
           <View
             style={{
               paddingHorizontal: 16,
@@ -221,7 +221,7 @@ export function Sheet({
             onPress={onClose}
           />
         </View>
-        {header && (
+        {!!header && (
           <View style={{ paddingHorizontal: 16, paddingBottom: 10, gap: 10 }}>
             {header}
           </View>
@@ -246,7 +246,7 @@ export function Sheet({
           ) : (
             children
           )}
-          {footer && (
+          {!!footer && (
             <View
               style={{
                 paddingHorizontal: 16,

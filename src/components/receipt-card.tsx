@@ -1,3 +1,5 @@
+import { Ore } from "@/lib/domain/ore";
+import { isReceiptProcessing } from "@/lib/domain/receipt-state";
 import { router } from "expo-router";
 import {
   ActivityIndicator,
@@ -10,8 +12,6 @@ import { radius, useTheme } from "@/constants/theme";
 import { formatDate } from "@/lib/format-date";
 import { reviewSummary } from "@/lib/domain/receipt-review";
 import type { Receipt } from "@/lib/domain/insights";
-import { formatMoney } from "@/lib/domain/receipt";
-import { isReceiptProcessing } from "@/lib/domain/receipt-state";
 
 export const statusLabels: Record<Receipt["status"], string> = {
   uploading: "Laster opp",
@@ -60,7 +60,7 @@ export function ReceiptCard({
   return (
     <Pressable
       accessibilityRole="button"
-      accessibilityLabel={`${receipt.data?.store || "Ny kvittering"}, ${formatMoney(receipt.data?.totalOre ?? null)}, ${receiptStatusLabel(receipt)}${reviewLabel}`}
+      accessibilityLabel={`${receipt.data?.store || "Ny kvittering"}, ${Ore.format(receipt.data?.totalOre ?? null)}, ${receiptStatusLabel(receipt)}${reviewLabel}`}
       onPress={() => openReceipt(receipt)}
       style={(state) => [
         {
@@ -92,7 +92,7 @@ export function ReceiptCard({
             </Copy>
             {stacked && !busy && receipt.data && (
               <Copy weight="700" size={17}>
-                {formatMoney(receipt.data.totalOre)}
+                {Ore.format(receipt.data.totalOre)}
               </Copy>
             )}
           </View>
@@ -106,13 +106,13 @@ export function ReceiptCard({
                 size={17}
                 style={{ flexShrink: 1, textAlign: "right" }}
               >
-                {formatMoney(receipt.data.totalOre)}
+                {Ore.format(receipt.data.totalOre)}
               </Copy>
             )
           )}
           <Icon name="chevron.right" size={12} color={colors.secondary} />
         </View>
-        {(!compact || needs.length > 0 || receipt.error) && (
+        {!!(!compact || needs.length > 0 || receipt.error) && (
           <Copy size={13} weight="500" muted>
             <Copy
               size={13}

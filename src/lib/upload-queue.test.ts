@@ -1,4 +1,4 @@
-import { testId } from "./testing/receipts";
+import { present, testId } from "./testing/receipts";
 import { describe, expect, it } from "vitest";
 import {
   createQueueRunner,
@@ -68,8 +68,8 @@ describe("durable receipt upload", () => {
     };
 
     await run("user", household, transport, () => true);
-    expect(rows()[0].uploaded).toEqual([true, false]);
-    expect(rows()[0].error).toBe("Connection lost");
+    expect(present(rows()[0]).uploaded).toEqual([true, false]);
+    expect(present(rows()[0]).error).toBe("Connection lost");
     fail = false;
     await run("user", household, transport, () => true);
     expect(uploaded).toEqual([0, 1]);
@@ -125,7 +125,7 @@ describe("durable receipt upload", () => {
     expect(calls).toBe(0);
     await run("user", household, transport, () => active);
     expect(calls).toBe(1);
-    expect(rows()[0].uploaded).toEqual([false, false]);
+    expect(present(rows()[0]).uploaded).toEqual([false, false]);
   });
 });
 
@@ -154,6 +154,6 @@ it("schedules every background image before waiting and retains each successful 
   second.resolve();
   first.reject(new Error("Offline"));
   await running;
-  expect(rows()[0].uploaded).toEqual([false, true]);
+  expect(present(rows()[0]).uploaded).toEqual([false, true]);
   expect(committed).toBe(false);
 });

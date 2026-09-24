@@ -1,3 +1,4 @@
+import { needsAttention } from "@/lib/domain/receipt-state";
 import { ReceiptActivityButton } from "@/features/receipt-activity";
 import { useCompleteReceipts } from "@/features/receipt-queries";
 import { router } from "expo-router";
@@ -16,13 +17,13 @@ import {
 import { IllustratedEmpty } from "@/components/monument-artwork";
 import { ReceiptCard, openReceipt } from "@/components/receipt-card";
 import { SwipeToApprove } from "@/features/swipe-approve";
-import { useHousehold } from "@/features/session";
+import { useHousehold } from "@/features/household-context";
 import { useTheme } from "@/constants/theme";
 import { quickApproveData } from "@/lib/domain/receipt-review";
 
 export default function Inbox() {
   const colors = useTheme();
-  const { queue, online, synchronize } = useHousehold();
+  const { queue, online, retryFailedUploads } = useHousehold();
   const { receipts, loadingReceipts } = useCompleteReceipts({ kind: "inbox" });
   const reserved = new Set(queue.map((entry) => entry.receiptId));
 
@@ -33,13 +34,9 @@ export default function Inbox() {
       !reserved.has(receipt._id),
   );
 
-  const attention = open.filter((receipt) =>
-    ["needs_review", "failed"].includes(receipt.status),
-  );
+  const attention = open.filter((receipt) => needsAttention(receipt.status));
 
-  const working = open.filter(
-    (receipt) => !["needs_review", "failed"].includes(receipt.status),
-  );
+  const working = open.filter((receipt) => !needsAttention(receipt.status));
 
   const empty = !loadingReceipts && open.length === 0 && queue.length === 0;
 
@@ -70,7 +67,11 @@ export default function Inbox() {
           <SectionTitle
             title="Til kontroll"
             action={attention.length > 1 ? "Start" : undefined}
-            onAction={() => openReceipt(attention[0])}
+            onAction={() => {
+              const [next] = attention;
+
+              if (next) openReceipt(next);
+            }}
           />
           {attention.map((receipt) => (
             <SwipeToApprove
@@ -175,10 +176,10 @@ export default function Inbox() {
                 {!!entry.error && (
                   <Button
                     title="Prøv igjen"
-                    tint
+                    variant="tint"
                     compact
                     icon="arrow.clockwise"
-                    onPress={() => void synchronize(true)}
+                    onPress={() => void retryFailedUploads()}
                     disabled={!online}
                   />
                 )}

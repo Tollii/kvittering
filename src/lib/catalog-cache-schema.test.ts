@@ -1,3 +1,4 @@
+import { present } from "./testing/receipts";
 import { expect, it } from "vitest";
 import { dehydrate, QueryClient } from "@tanstack/react-query";
 import {
@@ -26,9 +27,9 @@ it("restores complete catalogue data and rejects damaged response fields", () =>
 
   const restored = catalogCacheSchema.parse(JSON.parse(JSON.stringify(stored)));
   expect(restored.clientState.queries).toHaveLength(1);
-  expect(restored.clientState.queries[0].state.data).toEqual(response);
-  expect(restored.clientState.queries[0].state.dataUpdatedAt).toBe(
-    stored.clientState.queries[0].state.dataUpdatedAt,
+  expect(present(restored.clientState.queries[0]).state.data).toEqual(response);
+  expect(present(restored.clientState.queries[0]).state.dataUpdatedAt).toBe(
+    present(stored.clientState.queries[0]).state.dataUpdatedAt,
   );
   expect(() =>
     catalogCacheSchema.parse({
@@ -37,9 +38,9 @@ it("restores complete catalogue data and rejects damaged response fields", () =>
         ...stored.clientState,
         queries: [
           {
-            ...stored.clientState.queries[0],
+            ...present(stored.clientState.queries[0]),
             state: {
-              ...stored.clientState.queries[0].state,
+              ...present(stored.clientState.queries[0]).state,
               data: { ...response, products: [{ name: 42 }] },
             },
           },

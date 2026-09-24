@@ -1,3 +1,4 @@
+import { Ore } from "./ore";
 import type { Receipt } from "./insights";
 import { extractedReceipt, type ExtractedReceipt } from "./receipt-state";
 import { reconcile, spendingLines, type ReceiptLine } from "./receipt";
@@ -30,8 +31,8 @@ export const comparisonPurchasePolicy: PurchasePolicy = {
 
 export type PreparedPurchase = {
   receipt: ExtractedReceipt;
-  line: ReceiptLine & { netOre: number };
-  amountOre: number;
+  line: ReceiptLine & { netOre: Ore };
+  amountOre: Ore;
   analysis: ProductAnalysisResult | undefined;
 };
 
@@ -43,21 +44,6 @@ export function currentAnalysis(receipt: Receipt) {
     analysis.revision === receipt.revision
     ? analysis
     : undefined;
-}
-
-export function currentLineAnalysis(
-  receipt: Receipt,
-  line: ReceiptLine,
-): ProductAnalysisResult | undefined {
-  const analysis = currentAnalysis(receipt);
-
-  if (analysis?.state !== "complete") return;
-
-  return analysis.results.find(
-    (result) =>
-      result.lineId === line.id &&
-      result.evidenceKey === purchaseEvidenceKey(line),
-  );
 }
 
 /** One preparation pass owns inclusion, accounting, and current analysis evidence. */

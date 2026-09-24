@@ -1,3 +1,4 @@
+import { Ore } from "@/lib/domain/ore";
 import { completeReceiptTip } from "@/components/receipt-tip";
 import { useTheme } from "@/constants/theme";
 import { useRef, useState } from "react";
@@ -16,10 +17,9 @@ import {
 import { useProductLinkingQueue } from "@/features/product-linking-queue";
 import { ProductLinkingOptions } from "@/features/product-linking-options";
 import { CatalogProductPicker } from "@/features/catalog-product-sheet";
-import { useHousehold } from "@/features/session";
+import { useHousehold } from "@/features/household-context";
 import { useReleaseMutation } from "@/lib/releases/requests";
 import { formatDate } from "@/lib/format-date";
-import { formatMoney } from "@/lib/domain/receipt";
 import { errorFeedback, successFeedback } from "@/lib/haptics";
 import type { ReceiptCommitAcknowledgement } from "../../convex/receiptChanges";
 
@@ -112,7 +112,7 @@ export default function ProductLinking() {
             <Copy size={24} weight="600" style={{ color: colors.onHero }}>
               {item.line.name}
             </Copy>
-            {item.line.receiptName &&
+            {!!item.line.receiptName &&
               item.line.receiptName !== item.line.name && (
                 <Copy size={13} style={{ color: colors.onHeroMuted }}>
                   På kvitteringen: {item.line.receiptName}
@@ -124,7 +124,7 @@ export default function ProductLinking() {
                 item.line.packageSize && item.line.packageUnit
                   ? `${item.line.packageSize} ${item.line.packageUnit}`
                   : null,
-                formatMoney(item.line.amountOre),
+                Ore.format(item.line.amountOre),
               ]
                 .filter(Boolean)
                 .join(" · ")}
@@ -141,7 +141,7 @@ export default function ProductLinking() {
             <View style={{ flexGrow: 1, flexShrink: 1 }}>
               <Button
                 title="Angre"
-                secondary
+                variant="secondary"
                 compact
                 disabled={!last || busy || !online}
                 onPress={() => void undoLast()}
@@ -152,7 +152,7 @@ export default function ProductLinking() {
                 <View style={{ flexGrow: 1, flexShrink: 1 }}>
                   <Button
                     title="Søk"
-                    secondary
+                    variant="secondary"
                     compact
                     disabled={busy || !online}
                     onPress={() => setSearchKey(itemKey)}
@@ -161,7 +161,7 @@ export default function ProductLinking() {
                 <View style={{ flexGrow: 1, flexShrink: 1 }}>
                   <Button
                     title="Ingen passer"
-                    tint
+                    variant="tint"
                     compact
                     disabled={busy || !online}
                     onPress={() => void select({ kind: "separate" })}
@@ -216,7 +216,7 @@ export default function ProductLinking() {
           Koble til nettet for å lagre produktvalg.
         </Notice>
       )}
-      {!!error && <Notice error>{error}</Notice>}
+      {!!error && <Notice tone="error">{error}</Notice>}
       {busy && <ActivityIndicator accessibilityLabel="Lagrer produktvalg" />}
       {item ? (
         <>

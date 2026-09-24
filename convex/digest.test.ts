@@ -1,3 +1,5 @@
+import { parse } from "convex-helpers/validators";
+import { deliverBatchArgs, sendAllArgs } from "./digest";
 /// <reference types="vite/client" />
 import { convexTest } from "convex-test";
 import { afterEach, expect, it, vi } from "vitest";
@@ -38,7 +40,7 @@ it("continues beyond 500 subscriptions without duplicate device batches", async 
 
     if (!next) break;
     processed.add(next._id);
-    await t.mutation(internal.digest.sendAll, next.args[0]);
+    await t.mutation(internal.digest.sendAll, parse(sendAllArgs, next.args[0]));
   }
 
   const jobs = await t.run((ctx) =>
@@ -48,8 +50,8 @@ it("continues beyond 500 subscriptions without duplicate device batches", async 
   const devices = jobs
     .filter((job) => job.name === "digest:deliverBatch")
     .flatMap((job) =>
-      job.args[0].devices.map(
-        (device: { subscriptionId: string }) => device.subscriptionId,
+      parse(deliverBatchArgs, job.args[0]).devices.map(
+        (device) => device.subscriptionId,
       ),
     );
 

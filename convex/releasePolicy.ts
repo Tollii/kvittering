@@ -1,4 +1,5 @@
 import { readFeatureFlags, writeFeatureFlags } from "./featureFlags";
+import { deploymentChannel } from "./deployment";
 import { featureNameValidator, legacyFeatures } from "../src/lib/featureFlags";
 import { ConvexError, v } from "convex/values";
 import {
@@ -20,22 +21,8 @@ import {
   type ClientRelease,
   type Feature,
   type Platform,
-  type Channel,
   type ReleasePolicy,
 } from "../src/lib/releases/policy";
-
-export function deploymentChannel(): Channel {
-  const value = process.env.RELEASE_CHANNEL ?? "development";
-
-  if (
-    value !== "development" &&
-    value !== "testflight" &&
-    value !== "production"
-  )
-    throw new Error("Invalid RELEASE_CHANNEL.");
-
-  return value;
-}
 
 export async function readPolicy(
   ctx: Pick<QueryCtx, "db">,
@@ -104,6 +91,7 @@ export async function requireCompatibleClient(
   return policy;
 }
 
+// Access: public. Installed clients read the version policy before sign-in.
 export const get = query({
   args: { platform: platformValidator },
   returns: policyValidator,
@@ -120,6 +108,7 @@ export const check = internalQuery({
     requireCompatibleClient(ctx, client, feature),
 });
 
+// Access: public. Installed clients read the version policy before sign-in.
 /** Version controls no longer carry flags for current clients. */
 export const getVersions = query({
   args: { platform: platformValidator },

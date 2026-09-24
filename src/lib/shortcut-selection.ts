@@ -1,3 +1,4 @@
+import { hasReceiptBeenRead } from "./domain/receipt-state";
 import { z } from "zod";
 import type { FunctionReturnType } from "convex/server";
 import type { api } from "../../convex/_generated/api";
@@ -39,7 +40,7 @@ export function latestStoreReceipt(
     if (
       receipt.excluded ||
       !date ||
-      !["reviewed", "needs_review"].includes(receipt.status) ||
+      !hasReceiptBeenRead(receipt.status) ||
       !receipt.store?.toLocaleLowerCase("nb-NO").includes(term)
     )
       continue;

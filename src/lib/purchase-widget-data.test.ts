@@ -1,10 +1,11 @@
+import { Ore } from "./domain/ore";
 import { describe, expect, it } from "vitest";
 import { purchaseWidgetData } from "./purchase-widget-data";
 
 const purchase = {
   month: "2026-09",
-  amountOre: 125000,
-  budgetOre: 200000,
+  amountOre: Ore.of(125000),
+  budgetOre: Ore.of(200000),
   provisional: 0,
   now: new Date("2026-09-21T09:30:00Z"),
 };
@@ -22,10 +23,10 @@ describe("purchase widget summary", () => {
       "Uten månedsbudsjett",
     );
     expect(
-      purchaseWidgetData({ ...purchase, budgetOre: 100000 }).budget.replaceAll(
-        "\u00a0",
-        " ",
-      ),
+      purchaseWidgetData({
+        ...purchase,
+        budgetOre: Ore.of(100000),
+      }).budget.replaceAll("\u00a0", " "),
     ).toBe("250,00 kr over budsjett");
   });
 

@@ -1,3 +1,9 @@
+import { Ore, oreValidator } from "../src/lib/domain/ore";
+import {
+  attentionStatuses,
+  isReceiptProcessing,
+  receiptStatusValidator,
+} from "../src/lib/domain/receipt-state";
 import { notifyReceiptActivities } from "./liveActivities";
 import type { Id } from "./_generated/dataModel";
 import {
@@ -29,7 +35,7 @@ import {
   type MutationCtx,
 } from "./_generated/server";
 import { internal } from "./_generated/api";
-import schema, { statusValidator } from "./schema";
+import schema from "./schema";
 import { requireMember, requireReceipt } from "./access";
 import {
   reconcile,
@@ -38,7 +44,6 @@ import {
   aliasKey,
 } from "../src/lib/domain/receipt";
 import { canAcceptReceipt } from "../src/lib/domain/receipt-review";
-import { isReceiptProcessing } from "../src/lib/domain/receipt-state";
 import { learnCategories } from "./aliases";
 import { start } from "@convex-dev/workflow";
 
@@ -228,11 +233,7 @@ export const save = mutation({
     if (receipt.revision !== args.revision)
       throw new Error("Kvitteringen ble endret av en annen. Åpne den på nytt.");
 
-    if (
-      receipt.status === "processing" ||
-      receipt.status === "uploaded" ||
-      receipt.status === "uploading"
-    )
+    if (isReceiptProcessing(receipt.status))
       throw new Error("Vent til behandlingen er ferdig.");
     args = { ...args, data: structuredClone(args.data) };
     validateReceipt(args.data);
@@ -275,15 +276,16 @@ export const save = mutation({
       );
     }
 
+    // Matching the saved store narrows the saved data to present.
     args.data.physicalStore =
       args.data.store === receipt.data?.store &&
-      args.data.branch === receipt.data?.branch
-        ? (receipt.data?.physicalStore ?? null)
+      args.data.branch === receipt.data.branch
+        ? (receipt.data.physicalStore ?? null)
         : null;
     args.data.physicalStoreManual =
       args.data.store === receipt.data?.store &&
-      args.data.branch === receipt.data?.branch
-        ? (receipt.data?.physicalStoreManual ?? false)
+      args.data.branch === receipt.data.branch
+        ? (receipt.data.physicalStoreManual ?? false)
         : false;
     // Translate installed-client commands once; the resolver consumes one selection union.
     const selections = new Map<string, ProductSelection>();
@@ -600,11 +602,11 @@ export const history = query({
     v.object({
       _id: v.id("receipts"),
       _creationTime: v.number(),
-      status: statusValidator,
+      status: receiptStatusValidator,
       store: v.union(v.string(), v.null()),
       purchaseDate: v.union(v.string(), v.null()),
-      totalOre: v.union(v.number(), v.null()),
-      spendingOre: v.number(),
+      totalOre: v.union(oreValidator, v.null()),
+      spendingOre: oreValidator,
       excluded: v.boolean(),
     }),
   ),
@@ -649,7 +651,7 @@ export const history = query({
           spendingOre:
             receipt.data && !receipt.excluded
               ? reconcile(receipt.data).productSpending
-              : 0,
+              : Ore.zero,
           excluded: receipt.excluded,
         })),
     };
@@ -762,18 +764,21 @@ export const editorContext = query({
       .take(50);
 
     const pending = await Promise.all(
-      (["needs_review", "failed"] as const).map((status) =>
-        ctx.db
+      attentionStatuses.map(async (status) => {
+        // The receipt being edited can be the newest; the next one is then second.
+        const newest = await ctx.db
           .query("receipts")
-          .withIndex("by_householdId_and_status", (q) =>
-            q.eq("householdId", member.householdId).eq("status", status),
-          )
-          .filter((q) =>
-            q.and(q.neq(q.field("_id"), id), q.eq(q.field("excluded"), false)),
+          .withIndex("by_householdId_and_status_and_excluded", (q) =>
+            q
+              .eq("householdId", member.householdId)
+              .eq("status", status)
+              .eq("excluded", false),
           )
           .order("desc")
-          .first(),
-      ),
+          .take(2);
+
+        return newest.find((receipt) => receipt._id !== id) ?? null;
+      }),
     );
 
     return {
@@ -798,13 +803,15 @@ export const attentionCount = query({
     const member = await requireMember(ctx);
 
     const pages = await Promise.all(
-      (["needs_review", "failed"] as const).map((status) =>
+      attentionStatuses.map((status) =>
         ctx.db
           .query("receipts")
-          .withIndex("by_householdId_and_status", (q) =>
-            q.eq("householdId", member.householdId).eq("status", status),
+          .withIndex("by_householdId_and_status_and_excluded", (q) =>
+            q
+              .eq("householdId", member.householdId)
+              .eq("status", status)
+              .eq("excluded", false),
           )
-          .filter((q) => q.eq(q.field("excluded"), false))
           .take(100),
       ),
     );

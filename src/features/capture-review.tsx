@@ -57,7 +57,7 @@ export function CaptureReview({
       }}
       footer={
         <>
-          {!!error && <Notice error>{error}</Notice>}
+          {!!error && <Notice tone="error">{error}</Notice>}
           {importRecovery}
           <Button
             title={
@@ -155,7 +155,7 @@ export function CaptureReview({
         <View style={{ flex: 1 }}>
           <Button
             title="Ta flere"
-            secondary
+            variant="secondary"
             icon="camera"
             disabled={busy || photos.length >= maxReceiptImages}
             onPress={onClose}
@@ -164,7 +164,7 @@ export function CaptureReview({
         <View style={{ flex: 1 }}>
           <Button
             title="Velg flere"
-            secondary
+            variant="secondary"
             icon="photo.on.rectangle"
             disabled={busy || photos.length >= maxReceiptImages}
             onPress={onChoosePhotos}

@@ -1,3 +1,4 @@
+import { Ore } from "../src/lib/domain/ore";
 /// <reference types="vite/client" />
 import { convexTest } from "convex-test";
 import { beforeEach, afterEach, expect, it, vi } from "vitest";
@@ -168,7 +169,7 @@ it("enforces native build restrictions and service flags on the server despite s
     user.mutation(api.catalog.searchProducts, { search: "Cola", client }),
   ).rejects.toThrow("SERVICE_PAUSED");
   await user.mutation(api.households.setBudget, {
-    monthlyBudgetOre: 10000,
+    monthlyBudgetOre: Ore.of(10000),
     client,
   });
 });

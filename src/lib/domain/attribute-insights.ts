@@ -1,3 +1,4 @@
+import { Ore } from "./ore";
 import type { Receipt, SpendingGroup } from "./insights";
 import {
   preparePurchases,
@@ -54,12 +55,12 @@ export function attributeInsights(
       const group = groups.get(id) ?? {
         id,
         name: labels[id] ?? "Ukjent",
-        amountOre: 0,
+        amountOre: Ore.zero,
         contributions: [],
         quantity: emptyPurchaseQuantity(),
       };
 
-      group.amountOre += line.netOre;
+      group.amountOre = Ore.add(group.amountOre, line.netOre);
 
       if (analysis && line.amountOre !== null && line.netOre >= 0) {
         for (const key of purchaseQuantityKeys) {
@@ -78,6 +79,8 @@ export function attributeInsights(
   return {
     total,
     known,
-    groups: [...groups.values()].sort((a, b) => b.amountOre - a.amountOre),
+    groups: [...groups.values()].sort((a, b) =>
+      Ore.compare(b.amountOre, a.amountOre),
+    ),
   };
 }

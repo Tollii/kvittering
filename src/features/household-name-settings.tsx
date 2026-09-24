@@ -2,7 +2,7 @@ import { useState } from "react";
 import { api } from "../../convex/_generated/api";
 import { Button, Field, Notice, Row, Sheet } from "@/components/ui";
 import { useReleaseMutation } from "@/lib/releases/requests";
-import { useHousehold } from "./session";
+import { useHousehold } from "./household-context";
 
 export function HouseholdNameSettings() {
   const { household, online } = useHousehold();
@@ -58,7 +58,7 @@ export function HouseholdNameSettings() {
             setDraft((current) => (current ? { ...current, name } : null))
           }
         />
-        {!!error && <Notice error>{error}</Notice>}
+        {!!error && <Notice tone="error">{error}</Notice>}
         <Button
           title="Lagre"
           busy={busy}

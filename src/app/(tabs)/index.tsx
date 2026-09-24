@@ -31,7 +31,7 @@ import {
   Panel,
   pressed,
 } from "@/components/ui";
-import { useHousehold } from "@/features/session";
+import { useHousehold } from "@/features/household-context";
 import { saveLocalReceipts } from "@/lib/receipt-storage";
 import {
   importReceiptFiles,
@@ -47,7 +47,7 @@ import {
   offerImportedFiles,
   usePendingImports,
 } from "@/lib/pending-import";
-import { nextImport, type ImportOutcome } from "@/features/capture-import";
+import { nextImport, type ImportOutcome } from "@/lib/capture-import";
 import { useTheme } from "@/constants/theme";
 
 const cameraBackground = "#101C51";
@@ -152,7 +152,6 @@ export default function Capture() {
       recordEvent("receipt.capture", { operation: "camera" });
       const result = await camera.current.takePictureAsync({ quality: 0.9 });
 
-      if (!result) throw new Error("Kameraet kunne ikke ta et bilde.");
       const uri = await prepareImage(result.uri, result.width, result.height);
       setPhotos((current) => [...current, uri]);
       setReview(true);
@@ -203,7 +202,10 @@ export default function Capture() {
   // Files shared from other apps wait until this screen is on show.
   const pendingImports = usePendingImports();
   useEffect(() => {
-    const next = nextImport(pendingImports, focused, busy);
+    const next = nextImport(
+      pendingImports,
+      !focused ? "hidden" : busy ? "busy" : "idle",
+    );
 
     if (!next || busyRef.current) return;
     const batch = claimImportedFiles(next.id);
@@ -220,7 +222,7 @@ export default function Capture() {
 
   const importRecovery = failedImports.map((batch) => (
     <Panel key={batch.id}>
-      <Notice error>
+      <Notice tone="error">
         Importen er ikke fullført. Filene venter på nytt forsøk.
       </Notice>
       <Button
@@ -230,7 +232,7 @@ export default function Capture() {
       />
       <Button
         title="Forkast importen"
-        secondary
+        variant="secondary"
         disabled={busy}
         onPress={() => dismissImportedFiles(batch.id)}
       />
@@ -394,7 +396,7 @@ export default function Capture() {
             </View>
           </Panel>
         )}
-        {!!error && !review && <Notice error>{error}</Notice>}
+        {!!error && !review && <Notice tone="error">{error}</Notice>}
         {!review && importRecovery}
         <View style={{ flex: 1, justifyContent: "center" }}>
           {live ? (

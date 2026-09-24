@@ -1,3 +1,4 @@
+import { hasReceiptBeenRead } from "../src/lib/domain/receipt-state";
 import {
   paginationOptsValidator,
   paginationResultValidator,
@@ -149,7 +150,7 @@ function matches(
   return (
     receipt._id !== correction.receiptId &&
     !receipt.excluded &&
-    ["reviewed", "needs_review"].includes(receipt.status) &&
+    hasReceiptBeenRead(receipt.status) &&
     !!key &&
     line.kind === "product" &&
     !line.manual &&

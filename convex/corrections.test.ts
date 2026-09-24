@@ -1,3 +1,8 @@
+import { present } from "../src/lib/testing/receipts";
+import {
+  readModelRequest,
+  type ModelRequest,
+} from "../src/lib/testing/model-requests";
 /// <reference types="vite/client" />
 import { convexTest } from "convex-test";
 import { afterEach, expect, it, vi } from "vitest";
@@ -34,8 +39,8 @@ async function setup() {
     });
 
     const data = batteryFixture();
-    data.lines[0].categoryId = "other-purchases.batteries";
-    data.lines[0].manual = index === 2;
+    present(data.lines[0]).categoryId = "other-purchases.batteries";
+    present(data.lines[0]).manual = index === 2;
     await t.run((ctx) =>
       ctx.db.patch("receipts", id, { data, status: "reviewed" }),
     );
@@ -43,7 +48,7 @@ async function setup() {
   }
 
   await first.mutation(api.receipts.save, {
-    id: ids[0],
+    id: present(ids[0]),
     revision: 0,
     data: batteryFixture(),
     reviewed: true,
@@ -53,7 +58,7 @@ async function setup() {
   });
   const history = await first.query(api.corrections.list, {});
 
-  return { t, first, other, ids, correction: history.entries[0] };
+  return { t, first, other, ids, correction: present(history.entries[0]) };
 }
 
 it("records a human correction and keeps examples private to the household", async () => {
@@ -98,12 +103,14 @@ it("applies only previewed unedited items and can undo without teaching from the
   });
 
   expect(
-    (await first.query(api.receipts.detail, { id: ids[1] }))?.receipt.data
-      ?.lines[0],
+    (await first.query(api.receipts.detail, { id: present(ids[1]) }))?.receipt
+      .data?.lines[0],
   ).toMatchObject({ categoryId: "drinks.soft-drinks", manual: true });
   expect(
-    (await first.query(api.receipts.detail, { id: ids[2] }))?.receipt.data
-      ?.lines[0].categoryId,
+    present(
+      (await first.query(api.receipts.detail, { id: present(ids[2]) }))?.receipt
+        .data?.lines[0],
+    ).categoryId,
   ).toBe("other-purchases.batteries");
   expect((await first.query(api.corrections.list, {})).entries).toHaveLength(1);
   await expect(
@@ -112,8 +119,8 @@ it("applies only previewed unedited items and can undo without teaching from the
   await first.mutation(api.corrections.undo, { id: batch });
   await first.mutation(api.corrections.undo, { id: batch });
   expect(
-    (await first.query(api.receipts.detail, { id: ids[1] }))?.receipt.data
-      ?.lines[0],
+    (await first.query(api.receipts.detail, { id: present(ids[1]) }))?.receipt
+      .data?.lines[0],
   ).toMatchObject({ categoryId: "other-purchases.batteries", manual: false });
 });
 
@@ -130,7 +137,9 @@ it("rejects stale previews and never undoes a later edit", async () => {
     lineId,
   }));
 
-  await t.run((ctx) => ctx.db.patch("receipts", ids[1], { revision: 1 }));
+  await t.run((ctx) =>
+    ctx.db.patch("receipts", present(ids[1]), { revision: 1 }),
+  );
   await expect(
     first.mutation(api.corrections.apply, { id: correction._id, targets }),
   ).rejects.toThrow("endret");
@@ -140,7 +149,9 @@ it("rejects stale previews and never undoes a later edit", async () => {
     targets: targets.map((target) => ({ ...target, revision: 1 })),
   });
 
-  await t.run((ctx) => ctx.db.patch("receipts", ids[1], { revision: 3 }));
+  await t.run((ctx) =>
+    ctx.db.patch("receipts", present(ids[1]), { revision: 3 }),
+  );
   await expect(
     first.mutation(api.corrections.undo, { id: batch }),
   ).rejects.toThrow("endret");
@@ -165,15 +176,12 @@ it("evaluates only the caller's latest category decisions in one request", async
   });
   vi.stubEnv("TYPESAFE_API_KEY", "test-key");
 
-  const requests: {
-    state: { products: unknown[] };
-    questions: Record<string, { type: string }>;
-  }[] = [];
+  const requests: ModelRequest[] = [];
 
   vi.stubGlobal(
     "fetch",
-    vi.fn(async (_url, init) => {
-      const request = JSON.parse(init.body);
+    vi.fn(async (_url: string, init?: RequestInit) => {
+      const request = readModelRequest(init);
       requests.push(request);
 
       return new Response(
@@ -207,7 +215,7 @@ it("evaluates only the caller's latest category decisions in one request", async
     const result = await first.action(api.correctionEvaluation.evaluate, {});
     expect(result).toMatchObject({ checked: 1, matched: 1 });
     expect(requests).toHaveLength(1);
-    expect(requests[0].state.products).toHaveLength(1);
+    expect(present(requests[0]).state?.products).toHaveLength(1);
   } finally {
     vi.unstubAllGlobals();
   }
@@ -216,12 +224,12 @@ it("evaluates only the caller's latest category decisions in one request", async
 it("keeps every matching line when a preview receipt exceeds the selection limit", async () => {
   const { t, first, ids, correction } = await setup();
   await t.run(async (ctx) => {
-    const receipt = (await ctx.db.get("receipts", ids[1]))!;
-    await ctx.db.patch("receipts", ids[1], {
+    const receipt = (await ctx.db.get("receipts", present(ids[1])))!;
+    await ctx.db.patch("receipts", present(ids[1]), {
       data: {
         ...receipt.data!,
         lines: Array.from({ length: 25 }, (_, index) => ({
-          ...receipt.data!.lines[0],
+          ...present(receipt.data!.lines[0]),
           id: `line-${index}`,
         })),
       },

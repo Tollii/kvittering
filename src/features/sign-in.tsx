@@ -127,7 +127,7 @@ export function SignIn() {
       }
     >
       <View style={{ gap: 20 }}>
-        {!!error && <Notice error>{error}</Notice>}
+        {!!error && <Notice tone="error">{error}</Notice>}
         {!showEmail && (
           <>
             {appleAvailable && (
@@ -159,7 +159,7 @@ export function SignIn() {
               />
             </View>
             <Button
-              secondary
+              variant="secondary"
               title="Opprett konto med e-post"
               disabled={busy}
               style={{
@@ -296,7 +296,7 @@ export function HouseholdSetup() {
             editable={!busy}
           />
         )}
-        {!!error && <Notice error>{error}</Notice>}
+        {!!error && <Notice tone="error">{error}</Notice>}
         <Button
           title={join ? "Bli med" : "Start med mine kvitteringer"}
           busy={busy}
@@ -304,7 +304,7 @@ export function HouseholdSetup() {
           onPress={() => void submit()}
         />
         <Button
-          secondary
+          variant="secondary"
           disabled={busy}
           title={join ? "Tilbake" : "Jeg har en invitasjonskode"}
           onPress={() => {
@@ -314,7 +314,7 @@ export function HouseholdSetup() {
         />
       </Panel>
       <Button
-        secondary
+        variant="secondary"
         title="Logg ut"
         disabled={busy}
         onPress={() => {

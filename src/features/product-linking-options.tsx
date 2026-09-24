@@ -181,7 +181,7 @@ export function ProductLinkingOptions({
         (pending ? (
           <Loading title="Finner forslag …" />
         ) : (
-          <Notice error={failed}>
+          <Notice tone={failed ? "error" : "info"}>
             {failed
               ? "Kunne ikke hente forslag. Du kan prøve et nytt søk."
               : "Ingen forslag funnet. Søk etter et annet navn, eller velg Ingen passer."}

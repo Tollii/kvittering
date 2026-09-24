@@ -1,3 +1,4 @@
+import { Ore } from "@/lib/domain/ore";
 import { shortcutMonth } from "@/lib/shortcut-selection";
 import { z } from "zod";
 import { WidgetTip } from "@/features/widget-tip";
@@ -13,7 +14,11 @@ import {
   type SpendingSelection,
   type SpendingDimension,
 } from "@/lib/spending-selection";
-import { spendingCalendar, monthBefore } from "@/lib/domain/insights";
+import {
+  spendingCalendar,
+  monthBefore,
+  shiftMonth,
+} from "@/lib/domain/insights";
 import { useCompleteReceipts } from "@/features/receipt-queries";
 import { useState } from "react";
 import { Pressable, View } from "react-native";
@@ -34,13 +39,13 @@ import {
 } from "@/components/ui";
 import { MonumentArtwork } from "@/components/monument-artwork";
 import { SpendingBars, SpendingDetails } from "@/components/spending-details";
-import { useHousehold } from "@/features/session";
+import { useHousehold } from "@/features/household-context";
 import {
   comparisonInsights,
   receiptCoverage,
   type SpendingGroup,
 } from "@/lib/domain/insights";
-import { formatMoney, osloDate } from "@/lib/domain/receipt";
+import { isDiscountLine, osloDate } from "@/lib/domain/receipt";
 import { categoryById } from "@/lib/domain/categories";
 import { receiptNeeds } from "@/components/receipt-card";
 import { useTheme } from "@/constants/theme";
@@ -117,13 +122,15 @@ function Spending({ initialMonth }: Readonly<{ initialMonth: string }>) {
   }).format(new Date(`${month}-01T12:00:00Z`));
 
   const coverage = receiptCoverage([...receipts, ...undated.receipts]);
+  const [firstPending] = coverage.pending;
   const catalog = catalogInsights(totals.selected);
 
   const change = comparison.previous.products
     ? Math.round(
-        ((totals.products - comparison.previous.products) /
-          Math.abs(comparison.previous.products)) *
-          100,
+        Ore.ratio(
+          Ore.subtract(totals.products, comparison.previous.products),
+          Ore.abs(comparison.previous.products),
+        ) * 100,
       )
     : null;
 
@@ -157,7 +164,7 @@ function Spending({ initialMonth }: Readonly<{ initialMonth: string }>) {
     receipt.data.lines.map((line) => ({
       receipt,
       line,
-      amountOre: line.amountOre ?? 0,
+      amountOre: line.amountOre ?? Ore.zero,
     })),
   );
 
@@ -165,14 +172,11 @@ function Spending({ initialMonth }: Readonly<{ initialMonth: string }>) {
     items.map((receipt) => ({
       receipt,
       line: null,
-      amountOre: receipt.data?.totalOre ?? 0,
+      amountOre: receipt.data?.totalOre ?? Ore.zero,
     }));
 
   function moveMonth(offset: number) {
-    const [year, value] = month.split("-").map(Number);
-    setMonth(
-      new Date(Date.UTC(year, value - 1 + offset, 1)).toISOString().slice(0, 7),
-    );
+    setMonth(shiftMonth(month, offset));
     setGroup(null);
   }
 
@@ -220,7 +224,7 @@ function Spending({ initialMonth }: Readonly<{ initialMonth: string }>) {
         name: "Rabatter",
         amountOre: totals.discounts,
         contributions: accounting.filter((item) =>
-          ["item_discount", "receipt_discount"].includes(item.line.kind),
+          isDiscountLine(item.line.kind),
         ),
       },
       {
@@ -242,7 +246,7 @@ function Spending({ initialMonth }: Readonly<{ initialMonth: string }>) {
       {
         id: "unlinked",
         name: "Uten produktkobling",
-        amountOre: 0,
+        amountOre: Ore.zero,
         contributions: receiptContributions(coverage.unlinked),
       },
     ],
@@ -317,7 +321,7 @@ function Spending({ initialMonth }: Readonly<{ initialMonth: string }>) {
                   selectable
                   style={{ color: colors.onHero }}
                 >
-                  {formatMoney(totals.products)}
+                  {Ore.format(totals.products)}
                 </Copy>
                 <Copy size={13} style={{ color: colors.onHeroMuted }}>
                   {totals.selected.length}{" "}
@@ -411,8 +415,9 @@ function Spending({ initialMonth }: Readonly<{ initialMonth: string }>) {
                     : `${coverage.pending.length} kvitteringer venter på kontroll`}
                 </Copy>
                 <Copy size={12} muted numberOfLines={1}>
-                  {receiptNeeds(coverage.pending[0]).slice(0, 2).join(" · ") ||
-                    "Summene er foreløpige."}
+                  {(firstPending ? receiptNeeds(firstPending) : [])
+                    .slice(0, 2)
+                    .join(" · ") || "Summene er foreløpige."}
                 </Copy>
               </View>
               <Icon name="chevron.right" size={12} color={colors.secondary} />
@@ -433,7 +438,7 @@ function Spending({ initialMonth }: Readonly<{ initialMonth: string }>) {
                 { value: "type", label: "Varetype" },
               ]}
             />
-            {group && (
+            {!!group && (
               <Pressable
                 accessibilityRole="button"
                 onPress={() => setGroup(null)}
@@ -452,7 +457,7 @@ function Spending({ initialMonth }: Readonly<{ initialMonth: string }>) {
                   Alle kategorier
                 </Copy>
                 <Copy size={14} muted>
-                  · {categoryById.get(rows[0]?.id)?.groupName}
+                  · {categoryById.get(rows[0]?.id ?? "")?.groupName}
                 </Copy>
               </Pressable>
             )}

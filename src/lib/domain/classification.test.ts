@@ -1,3 +1,4 @@
+import { present } from "../testing/receipts";
 import { expect, it } from "vitest";
 import {
   parseLegacyClassification,
@@ -6,7 +7,7 @@ import {
 import { classificationInputs, batteryFixture } from "./receipt";
 
 it("reads legacy evidence into the same checked object used by current classification", () => {
-  const product = classificationInputs(batteryFixture())[0];
+  const product = present(classificationInputs(batteryFixture())[0]);
   const before = structuredClone(product);
   expect(classificationEvidence(product)).toEqual(product.evidence);
   expect(

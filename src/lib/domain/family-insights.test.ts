@@ -1,4 +1,5 @@
-import { receiptFixture, testId } from "../testing/receipts";
+import { present, receiptFixture, testId } from "../testing/receipts";
+import { Ore } from "./ore";
 import { expect, it } from "vitest";
 import { batteryFixture, emptyLine } from "./receipt";
 import type { Receipt } from "./insights";
@@ -16,10 +17,22 @@ import {
 function receipt(): Receipt {
   const data = batteryFixture();
   data.lines = [
-    { ...emptyLine("pack"), name: "Coca-Cola 10pk", amountOre: 10000 },
-    { ...emptyLine("bottle"), name: "Coca-Cola 500ml", amountOre: 2500 },
-    { ...emptyLine("zero"), name: "Coca-Cola Zero 500ml", amountOre: 2500 },
-    { ...emptyLine("deposit"), kind: "deposit" as const, amountOre: 2400 },
+    { ...emptyLine("pack"), name: "Coca-Cola 10pk", amountOre: Ore.of(10000) },
+    {
+      ...emptyLine("bottle"),
+      name: "Coca-Cola 500ml",
+      amountOre: Ore.of(2500),
+    },
+    {
+      ...emptyLine("zero"),
+      name: "Coca-Cola Zero 500ml",
+      amountOre: Ore.of(2500),
+    },
+    {
+      ...emptyLine("deposit"),
+      kind: "deposit" as const,
+      amountOre: Ore.of(2400),
+    },
   ];
 
   return receiptFixture({
@@ -56,20 +69,22 @@ it("combines package sizes, keeps variants separate, and excludes deposits", () 
   const report = familyInsights([receipt()]);
   expect(report.total).toBe(3);
   expect(report.families).toHaveLength(2);
-  expect(report.families[0].quantity).toMatchObject({
+  expect(present(report.families[0]).quantity).toMatchObject({
     units: 21,
     millilitres: 7100,
   });
-  expect(report.families[0].amountOre).toBe(12500);
-  expect(formatPurchaseQuantity(report.families[0].quantity)).toBe(
+  expect(present(report.families[0]).amountOre).toBe(12500);
+  expect(formatPurchaseQuantity(present(report.families[0]).quantity)).toBe(
     "21 stk · 7,1 l",
   );
 });
 
 it("marks partial quantities and ignores stale or excluded receipt analysis", () => {
   const value = receipt();
-  value.productAnalysis!.results[1].quantity = emptyPurchaseQuantity();
-  expect(partialQuantity(familyInsights([value]).families[0])).toBe(true);
+  present(value.productAnalysis!.results[1]).quantity = emptyPurchaseQuantity();
+  expect(partialQuantity(present(familyInsights([value]).families[0]))).toBe(
+    true,
+  );
   expect(familyInsights([{ ...value, revision: 3 }]).linked).toBe(0);
   expect(familyInsights([{ ...value, excluded: true }]).total).toBe(0);
 });

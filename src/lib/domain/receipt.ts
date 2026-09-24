@@ -1,3 +1,4 @@
+import { Ore, oreValidator } from "./ore";
 import type { ClassificationEvidence } from "./classification";
 import { productReferenceValidator } from "./product-reference";
 import { parse as parseValue } from "convex-helpers/validators";
@@ -13,6 +14,8 @@ const nullableString = v.union(v.string(), v.null());
 
 const nullableNumber = v.union(v.number(), v.null());
 
+const nullableOre = v.union(oreValidator, v.null());
+
 export const lineKinds = [
   "product",
   "item_discount",
@@ -24,16 +27,27 @@ export const lineKinds = [
   "vat",
 ] as const;
 
+export type LineKind = (typeof lineKinds)[number];
+
+/** Summary and VAT lines restate totals printed on the receipt; they are not purchases. */
+export function isTotalsLine(kind: LineKind): boolean {
+  return kind === "summary" || kind === "vat";
+}
+
+export function isDiscountLine(kind: LineKind): boolean {
+  return kind === "item_discount" || kind === "receipt_discount";
+}
+
 export const lineValidator = v.object({
   id: v.string(),
   kind: v.union(...lineKinds.map((kind) => v.literal(kind))),
   originalText: v.string(),
   sourceImages: v.array(v.number()).optional(),
   name: v.string(),
-  amountOre: nullableNumber,
+  amountOre: nullableOre,
   quantity: nullableNumber,
   unit: nullableString,
-  unitPriceOre: nullableNumber,
+  unitPriceOre: nullableOre,
   packageSize: nullableNumber,
   packageUnit: nullableString,
   brand: nullableString,
@@ -63,7 +77,7 @@ export const receiptDataValidator = v.object({
   purchaseTime: nullableString,
   receiptNumber: nullableString,
   currency: nullableString,
-  totalOre: nullableNumber,
+  totalOre: nullableOre,
   originalText: v.string(),
   lines: v.array(lineValidator),
   issues: v.array(v.string()),
@@ -96,40 +110,6 @@ export function emptyLine(id: string = crypto.randomUUID()): ReceiptLine {
     productKey: null,
   };
 }
-
-export function parseOre(text: string): number | null {
-  const value = text
-    .trim()
-    .replaceAll(/\s/g, "")
-    .replace("−", "-")
-    .replace(",", ".");
-
-  if (!value) return null;
-
-  if (!/^-?\d+(\.\d{1,2})?$/.test(value))
-    throw new Error("Bruk et beløp med høyst to desimaler.");
-  const [whole, fraction = ""] = value.replace("-", "").split(".");
-
-  const result =
-    (Number(whole) * 100 + Number(fraction.padEnd(2, "0"))) *
-    (value.startsWith("-") ? -1 : 1);
-
-  if (!Number.isSafeInteger(result) || Math.abs(result) > 100_000_000)
-    throw new Error("Beløpet er for stort.");
-
-  return result;
-}
-
-export const formatMoney = (ore: number | null) =>
-  ore === null
-    ? "Ukjent"
-    : new Intl.NumberFormat("nb-NO", {
-        style: "currency",
-        currency: "NOK",
-      }).format(ore / 100);
-
-export const moneyInput = (ore: number | null) =>
-  ore === null ? "" : (ore / 100).toFixed(2).replace(".", ",");
 
 export const osloDate = (time = Date.now()) =>
   new Intl.DateTimeFormat("sv-SE", {
@@ -239,24 +219,24 @@ export function reconcile(data: ReceiptData) {
   const reviewIssues: ReceiptIssue[] = [];
   const discountsSeen = new Set<string>();
 
-  let products = 0,
-    discounts = 0,
-    deposits = 0,
-    returns = 0,
-    adjustments = 0,
+  let products = Ore.zero,
+    discounts = Ore.zero,
+    deposits = Ore.zero,
+    returns = Ore.zero,
+    adjustments = Ore.zero,
     unknown = 0;
 
   for (const line of data.lines) {
-    if (line.kind === "summary" || line.kind === "vat") continue;
+    if (isTotalsLine(line.kind)) continue;
 
     if (line.amountOre === null) {
       unknown++;
       continue;
     }
 
-    if (line.kind === "product") products += line.amountOre;
+    if (line.kind === "product") products = Ore.add(products, line.amountOre);
 
-    if (line.kind === "item_discount" || line.kind === "receipt_discount") {
+    if (isDiscountLine(line.kind)) {
       const key = JSON.stringify([
         line.kind,
         line.name,
@@ -267,24 +247,31 @@ export function reconcile(data: ReceiptData) {
       if (discountsSeen.has(key))
         reviewIssues.push({ code: "duplicate_discount" });
       discountsSeen.add(key);
-      discounts += line.amountOre;
+      discounts = Ore.add(discounts, line.amountOre);
 
       if (line.amountOre > 0) reviewIssues.push({ code: "positive_discount" });
     }
 
-    if (line.kind === "deposit") deposits += line.amountOre;
+    if (line.kind === "deposit") deposits = Ore.add(deposits, line.amountOre);
 
     if (line.kind === "deposit_return") {
-      returns += line.amountOre;
+      returns = Ore.add(returns, line.amountOre);
 
       if (line.amountOre > 0)
         reviewIssues.push({ code: "positive_deposit_return" });
     }
 
-    if (line.kind === "adjustment") adjustments += line.amountOre;
+    if (line.kind === "adjustment")
+      adjustments = Ore.add(adjustments, line.amountOre);
   }
 
-  const calculated = products + discounts + deposits + returns + adjustments;
+  const calculated = Ore.sum([
+    products,
+    discounts,
+    deposits,
+    returns,
+    adjustments,
+  ]);
 
   if (unknown) reviewIssues.push({ code: "amounts_missing", count: unknown });
 
@@ -293,7 +280,9 @@ export function reconcile(data: ReceiptData) {
   if (data.currency !== "NOK") reviewIssues.push({ code: "currency" });
 
   if (!data.purchaseDate) reviewIssues.push({ code: "date_missing" });
-  const difference = data.totalOre === null ? null : calculated - data.totalOre;
+
+  const difference =
+    data.totalOre === null ? null : Ore.subtract(calculated, data.totalOre);
 
   if (difference !== null && difference !== 0)
     reviewIssues.push({ code: "difference", amountOre: difference });
@@ -304,7 +293,7 @@ export function reconcile(data: ReceiptData) {
     deposits,
     returns,
     adjustments,
-    productSpending: products + discounts + adjustments,
+    productSpending: Ore.sum([products, discounts, adjustments]),
     calculated,
     difference,
     unknown,
@@ -317,45 +306,52 @@ export function reconcile(data: ReceiptData) {
 export function spendingLines(data: ReceiptData) {
   const products = data.lines
     .filter((line) => line.kind === "product")
-    .map((line) => ({ ...line, netOre: line.amountOre ?? 0 }));
+    .map((line) => ({ ...line, netOre: line.amountOre ?? Ore.zero }));
 
-  let unallocated = 0;
+  let unallocated = Ore.zero;
 
   for (const line of data.lines) {
+    const amount = line.amountOre ?? Ore.zero;
+
     if (line.kind === "item_discount") {
       const product = products.find(
         (product) => product.id === line.relatedLineId,
       );
 
-      if (product) product.netOre += line.amountOre ?? 0;
-      else unallocated += line.amountOre ?? 0;
+      if (product) product.netOre = Ore.add(product.netOre, amount);
+      else unallocated = Ore.add(unallocated, amount);
     }
 
-    if (line.kind === "adjustment") unallocated += line.amountOre ?? 0;
+    if (line.kind === "adjustment") unallocated = Ore.add(unallocated, amount);
   }
 
-  const discount = data.lines
-    .filter((line) => line.kind === "receipt_discount")
-    .reduce((sum, line) => sum + (line.amountOre ?? 0), 0);
-
-  const basis = products.reduce(
-    (sum, line) => sum + Math.max(0, line.netOre),
-    0,
+  const discount = Ore.sum(
+    data.lines
+      .filter((line) => line.kind === "receipt_discount")
+      .map((line) => line.amountOre ?? Ore.zero),
   );
 
-  let assigned = 0;
+  const basis = Ore.sum(
+    products.map((line) => Ore.of(Math.max(0, line.netOre))),
+  );
+
+  let assigned = Ore.zero;
   products.forEach((line, index) => {
     const share =
       basis > 0
         ? index === products.length - 1
-          ? discount - assigned
-          : Math.trunc((discount * Math.max(0, line.netOre)) / basis)
-        : 0;
+          ? Ore.subtract(discount, assigned)
+          : Ore.of(
+              Math.trunc(
+                Ore.ratio(Ore.scale(discount, Math.max(0, line.netOre)), basis),
+              ),
+            )
+        : Ore.zero;
 
-    assigned += share;
-    line.netOre += share;
+    assigned = Ore.add(assigned, share);
+    line.netOre = Ore.add(line.netOre, share);
   });
-  unallocated += discount - assigned;
+  unallocated = Ore.add(unallocated, Ore.subtract(discount, assigned));
 
   return { products, unallocated };
 }
@@ -365,7 +361,7 @@ export function batteryFixture(): ReceiptData {
     ...emptyLine("battery"),
     name: "BATTERY REMIX",
     originalText: "BATTERY REMIX 25,90",
-    amountOre: 2590,
+    amountOre: Ore.of(2590),
     categoryId: "drinks.soft-drinks",
     manual: false,
   };
@@ -377,7 +373,7 @@ export function batteryFixture(): ReceiptData {
     purchaseTime: null,
     receiptNumber: null,
     currency: "NOK",
-    totalOre: 2531,
+    totalOre: Ore.of(2531),
     originalText: "BATTERY REMIX 25,90\nRABATT -2,59\nPANT 2,00\nBETALT 25,31",
     issues: [],
     lines: [
@@ -387,7 +383,7 @@ export function batteryFixture(): ReceiptData {
         kind: "item_discount",
         name: "Produktrabatt",
         originalText: "RABATT -2,59",
-        amountOre: -259,
+        amountOre: Ore.of(-259),
         relatedLineId: "battery",
         categoryId: null,
         manual: false,
@@ -397,7 +393,7 @@ export function batteryFixture(): ReceiptData {
         kind: "deposit",
         name: "Pant",
         originalText: "PANT 2,00",
-        amountOre: 200,
+        amountOre: Ore.of(200),
         categoryId: null,
         manual: false,
       },
@@ -414,14 +410,13 @@ export function weeklyShopFixture(): ReceiptData {
   const product = (
     id: string,
     name: string,
-    amountOre: number | null,
+    amountOre: Ore | null,
     categoryId: string,
     extra: Partial<ReceiptLine> = {},
   ): ReceiptLine => ({
     ...emptyLine(id),
     name,
-    originalText:
-      `${name} ${amountOre === null ? "" : (amountOre / 100).toFixed(2).replace(".", ",")}`.trim(),
+    originalText: `${name} ${Ore.formatInput(amountOre)}`.trim(),
     amountOre,
     categoryId,
     confidence: 0.9,
@@ -436,32 +431,38 @@ export function weeklyShopFixture(): ReceiptData {
     purchaseTime: "17:42",
     receiptNumber: "4711",
     currency: "NOK",
-    totalOre: 41980,
+    totalOre: Ore.of(41980),
     originalText: "",
     issues: [],
     lines: [
-      product("milk", "TINE LETTMELK 1L", 2390, "dairy.milk"),
-      product("bread", "KNEIPP", 3990, "bakery.bread"),
-      product("chicken", "KYLLINGFILET 900G", 14990, "meat-fish.poultry", {
-        packageSize: 900,
-        packageUnit: "g",
-      }),
-      product("cheez", "CHEEZ DOODLES XL", 4290, "snacks.crisps", {
+      product("milk", "TINE LETTMELK 1L", Ore.of(2390), "dairy.milk"),
+      product("bread", "KNEIPP", Ore.of(3990), "bakery.bread"),
+      product(
+        "chicken",
+        "KYLLINGFILET 900G",
+        Ore.of(14990),
+        "meat-fish.poultry",
+        {
+          packageSize: 900,
+          packageUnit: "g",
+        },
+      ),
+      product("cheez", "CHEEZ DOODLES XL", Ore.of(4290), "snacks.crisps", {
         confidence: 0.4,
         issues: ["Kategorien er usikker."],
       }),
-      product("cola", "COCA-COLA10PK BX", 9490, "drinks.soft-drinks", {
+      product("cola", "COCA-COLA10PK BX", Ore.of(9490), "drinks.soft-drinks", {
         packageSize: 10,
         packageUnit: "pk",
       }),
-      product("bag", "BÆREPOSE", 350, "other-purchases.bags"),
+      product("bag", "BÆREPOSE", Ore.of(350), "other-purchases.bags"),
       product("unknown", "KAFFE EVERGOOD", null, "drinks.coffee"),
       {
         ...emptyLine("chicken-discount"),
         kind: "item_discount",
         name: "Rabatt kyllingfilet",
         originalText: "RABATT -30,00",
-        amountOre: -3000,
+        amountOre: Ore.of(-3000),
         relatedLineId: "chicken",
         categoryId: null,
         manual: false,
@@ -471,7 +472,7 @@ export function weeklyShopFixture(): ReceiptData {
         kind: "receipt_discount",
         name: "Æ-rabatt",
         originalText: "Æ RABATT -12,20",
-        amountOre: -1220,
+        amountOre: Ore.of(-1220),
         categoryId: null,
         manual: false,
       },
@@ -480,7 +481,7 @@ export function weeklyShopFixture(): ReceiptData {
         kind: "deposit",
         name: "Pant",
         originalText: "PANT 20,00",
-        amountOre: 2000,
+        amountOre: Ore.of(2000),
         categoryId: null,
         manual: false,
       },
@@ -489,7 +490,7 @@ export function weeklyShopFixture(): ReceiptData {
         kind: "deposit_return",
         name: "Pantretur",
         originalText: "PANTRETUR -43,00",
-        amountOre: -4300,
+        amountOre: Ore.of(-4300),
         categoryId: null,
         manual: false,
       },
@@ -498,7 +499,7 @@ export function weeklyShopFixture(): ReceiptData {
         kind: "vat",
         name: "MVA 15 %",
         originalText: "MVA 15% 40,12",
-        amountOre: 4012,
+        amountOre: Ore.of(4012),
         categoryId: null,
         manual: false,
       },

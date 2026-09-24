@@ -1,5 +1,6 @@
+import { present, testId } from "../testing/receipts";
+import { Ore } from "./ore";
 import { spendingExplanations } from "./spending-explanations";
-import { testId } from "../testing/receipts";
 import { expect, it } from "vitest";
 import { batteryFixture, emptyLine } from "./receipt";
 import type { Receipt } from "./insights";
@@ -19,10 +20,10 @@ function receipt(date: string, ore: number, ml: number | null): Receipt {
       ...emptyLine("cola"),
       name: "Cola",
       categoryId: "drinks.soft-drinks",
-      amountOre: ore,
+      amountOre: Ore.of(ore),
     },
   ];
-  data.totalOre = ore;
+  data.totalOre = Ore.of(ore);
 
   const attributes = readAttributes(
     {
@@ -56,7 +57,7 @@ function receipt(date: string, ore: number, ml: number | null): Receipt {
       results: [
         {
           lineId: "cola",
-          evidenceKey: purchaseEvidenceKey(data.lines[0]),
+          evidenceKey: purchaseEvidenceKey(present(data.lines[0])),
           family: { id: testId<"productFamilies">("cola"), name: "Cola" },
           quantity: { packages: 1, units: null, grams: null, millilitres: ml },
           attributes,
@@ -75,14 +76,14 @@ it("separates quantity and unit-price effects and conserves every øre", () => {
   );
 
   expect(report).toMatchObject({
-    currentOre: 3000,
-    previousOre: 1000,
-    priceOre: 750,
-    quantityOre: 1250,
-    unexplainedOre: 0,
+    currentOre: Ore.of(3000),
+    previousOre: Ore.of(1000),
+    priceOre: Ore.of(750),
+    quantityOre: Ore.of(1250),
+    unexplainedOre: Ore.of(0),
   });
   const changed = receipt("2026-09-12", 333, null);
-  changed.productAnalysis!.results[0].family = null;
+  present(changed.productAnalysis!.results[0]).family = null;
 
   const expanded = spendingAnalysis(
     [
@@ -95,7 +96,7 @@ it("separates quantity and unit-price effects and conserves every øre", () => {
 
   expect(expanded.unexplainedOre).toBe(333);
   expect(
-    expanded.priceOre + expanded.quantityOre + expanded.unexplainedOre,
+    Ore.sum([expanded.priceOre, expanded.quantityOre, expanded.unexplainedOre]),
   ).toBe(expanded.differenceOre);
 });
 
@@ -107,29 +108,29 @@ it("keeps deposits out, includes allocated discounts and adjustments, and exclud
     {
       ...emptyLine("discount"),
       kind: "receipt_discount",
-      amountOre: -500,
+      amountOre: Ore.of(-500),
       categoryId: null,
     },
     {
       ...emptyLine("deposit"),
       kind: "deposit",
-      amountOre: 200,
+      amountOre: Ore.of(200),
       categoryId: null,
     },
     {
       ...emptyLine("adjust"),
       kind: "adjustment",
-      amountOre: 7,
+      amountOre: Ore.of(7),
       categoryId: null,
     },
   );
   const duplicate = { ...after, duplicateOf: before._id };
   const report = spendingAnalysis([before, after, duplicate], period);
   expect(report).toMatchObject({
-    differenceOre: 7,
-    priceOre: 0,
-    quantityOre: 0,
-    unexplainedOre: 7,
+    differenceOre: Ore.of(7),
+    priceOre: Ore.of(0),
+    quantityOre: Ore.of(0),
+    unexplainedOre: Ore.of(7),
     currentReceipts: 1,
   });
 });
@@ -173,12 +174,12 @@ it("compares counts only when the package identity is the same", () => {
   const after = receipt("2026-09-10", 1500, null);
 
   for (const item of [before, after])
-    item.productAnalysis!.results[0].quantity.units = 1;
+    present(item.productAnalysis!.results[0]).quantity.units = 1;
   expect(spendingAnalysis([before, after], period).priceOre).toBe(500);
-  after.data!.lines[0].packageSize = 500;
-  after.data!.lines[0].packageUnit = "ml";
-  after.productAnalysis!.results[0].evidenceKey = purchaseEvidenceKey(
-    after.data!.lines[0],
+  present(after.data!.lines[0]).packageSize = 500;
+  present(after.data!.lines[0]).packageUnit = "ml";
+  present(after.productAnalysis!.results[0]).evidenceKey = purchaseEvidenceKey(
+    present(after.data!.lines[0]),
   );
   const report = spendingAnalysis([before, after], period);
   expect(report.effects).toEqual([]);
@@ -189,18 +190,18 @@ it("groups product attributes across families and keeps weak or stale evidence u
   const a = receipt("2026-09-01", 1000, 1000),
     b = receipt("2026-09-02", 2000, 2000);
 
-  b.productAnalysis!.results[0].family!.id =
+  present(b.productAnalysis!.results[0]).family!.id =
     testId<"productFamilies">("other-brand");
   const report = attributeInsights([a, b], "type");
   expect(report).toMatchObject({ known: 2, total: 2 });
   expect(report.groups[0]).toMatchObject({
     id: "cola",
-    amountOre: 3000,
+    amountOre: Ore.of(3000),
     quantity: { millilitres: 3000 },
   });
-  expect(attributeInsights([{ ...a, revision: 1 }], "type").groups[0].id).toBe(
-    "unknown",
-  );
+  expect(
+    present(attributeInsights([{ ...a, revision: 1 }], "type").groups[0]).id,
+  ).toBe("unknown");
   expect(
     readAttributes(
       {
@@ -219,21 +220,21 @@ it("explains offsetting price and quantity changes even when total spending is u
   const explanations = spendingExplanations(report);
   expect(report.differenceOre).toBe(0);
   expect(explanations).toHaveLength(2);
-  expect(explanations[0].detail).toContain("lavere");
-  expect(explanations[1].detail).toContain("større");
-  expect(explanations[0].contributions.map((item) => item.receipt._id)).toEqual(
-    [after._id, before._id],
-  );
+  expect(present(explanations[0]).detail).toContain("lavere");
+  expect(present(explanations[1]).detail).toContain("større");
+  expect(
+    present(explanations[0]).contributions.map((item) => item.receipt._id),
+  ).toEqual([after._id, before._id]);
   expect(explanations[0]).toMatchObject({
     name: "Cola · begge perioder",
-    amountOre: 4000,
+    amountOre: Ore.of(4000),
   });
 });
 
 it("identifies current-only families without calling unlinked purchases new", () => {
   const before = receipt("2026-08-10", 1000, 1000);
   const after = receipt("2026-09-10", 2500, null);
-  after.productAnalysis!.results[0].family = {
+  present(after.productAnalysis!.results[0]).family = {
     id: testId<"productFamilies">("coffee"),
     name: "Kaffe",
   };
@@ -242,7 +243,10 @@ it("identifies current-only families without calling unlinked purchases new", ()
   expect(report.currentOnly.map((item) => item.name)).toEqual(["Kaffe"]);
   const explanations = spendingExplanations(report);
   expect(explanations).toHaveLength(1);
-  expect(explanations[0]).toMatchObject({ name: "Kaffe", amountOre: 2500 });
+  expect(explanations[0]).toMatchObject({
+    name: "Kaffe",
+    amountOre: Ore.of(2500),
+  });
   expect(report.unexplainedOre).toBe(2300);
   expect(spendingExplanations(spendingAnalysis([after], period))).toEqual([]);
   expect(spendingExplanations(spendingAnalysis([before], period))).toEqual([]);

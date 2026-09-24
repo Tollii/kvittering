@@ -101,7 +101,7 @@ export default function Corrections() {
             kategori- og produktrettelser fra nå av. Automatisk godkjenning
             teller ikke som en rettelse.
           </Copy>
-          {!!error && <Notice error>{error}</Notice>}
+          {!!error && <Notice tone="error">{error}</Notice>}
           <SectionTitle title="Siste beslutninger" />
           {!history.entries.length && (
             <Empty
@@ -136,7 +136,7 @@ export default function Corrections() {
           {historyPage.status === "CanLoadMore" && (
             <Button
               title="Vis eldre beslutninger"
-              secondary
+              variant="secondary"
               onPress={() => historyPage.loadMore(50)}
             />
           )}
@@ -207,11 +207,11 @@ export default function Corrections() {
             {previewPage.status === "CanLoadMore" && (
               <Button
                 title="Undersøk flere kvitteringer"
-                secondary
+                variant="secondary"
                 onPress={() => previewPage.loadMore(20)}
               />
             )}
-            {!!error && <Notice error>{error}</Notice>}
+            {!!error && <Notice tone="error">{error}</Notice>}
             <Button
               title={`Rett ${targets.length} varer`}
               disabled={!targets.length || busy}

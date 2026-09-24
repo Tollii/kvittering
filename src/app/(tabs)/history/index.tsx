@@ -1,3 +1,10 @@
+import { Ore } from "@/lib/domain/ore";
+import {
+  contributionKey,
+  matchLabel,
+  productHistory,
+  productPrices,
+} from "@/lib/domain/insights";
 import { ReceiptContextMenu } from "@/components/receipt-context-menu";
 import { router, Stack } from "expo-router";
 import {
@@ -23,12 +30,6 @@ import {
 import { IllustratedEmpty } from "@/components/monument-artwork";
 import { openReceipt } from "@/components/receipt-card";
 import { SpendingBars } from "@/components/spending-details";
-import {
-  matchLabel,
-  productHistory,
-  productPrices,
-} from "@/lib/domain/insights";
-import { formatMoney } from "@/lib/domain/receipt";
 import { formatDate } from "@/lib/format-date";
 import { useTheme } from "@/constants/theme";
 
@@ -145,9 +146,8 @@ export default function History() {
         <>
           {tab === "receipts" &&
             [...months.entries()].map(([key, items]) => {
-              const total = items.reduce(
-                (sum, receipt) => sum + receipt.spendingOre,
-                0,
+              const total = Ore.sum(
+                items.map((receipt) => receipt.spendingOre),
               );
 
               return (
@@ -175,7 +175,7 @@ export default function History() {
                     <Copy size={13} weight="600" muted>
                       {items.length}{" "}
                       {items.length === 1 ? "kvittering" : "kvitteringer"} ·{" "}
-                      {formatMoney(total)}
+                      {Ore.format(total)}
                     </Copy>
                   </View>
                   {items.map((receipt) => (
@@ -183,7 +183,7 @@ export default function History() {
                       key={receipt._id}
                       receiptId={receipt._id}
                       store={receipt.store || "Ny kvittering"}
-                      amount={formatMoney(receipt.totalOre)}
+                      amount={Ore.format(receipt.totalOre)}
                       date={formatDate(receipt.purchaseDate)}
                     >
                       <View
@@ -196,7 +196,7 @@ export default function History() {
                         <Row
                           title={receipt.store || "Ny kvittering"}
                           detail={formatDate(receipt.purchaseDate)}
-                          value={formatMoney(receipt.totalOre)}
+                          value={Ore.format(receipt.totalOre)}
                           onPress={() =>
                             router.push({
                               pathname: "/receipt/[id]",
@@ -223,7 +223,7 @@ export default function History() {
                   <Row
                     title={product.name || "Ukjent vare"}
                     detail={`${product.purchases.size} kjøp · ${product.linked ? "Koblet produkt" : "Enkeltvare"}`}
-                    value={formatMoney(product.amountOre)}
+                    value={Ore.format(product.amountOre)}
                     onPress={() => setSelectedKey(product.key)}
                   />
                 </View>
@@ -245,7 +245,7 @@ export default function History() {
       {tab === "receipts" && history.status === "CanLoadMore" && !term && (
         <Button
           title="Vis flere kvitteringer"
-          secondary
+          variant="secondary"
           onPress={() => history.loadMore(30)}
         />
       )}
@@ -257,7 +257,7 @@ export default function History() {
         {selected && prices && (
           <>
             <Copy size={30} weight="800">
-              {formatMoney(selected.amountOre)}
+              {Ore.format(selected.amountOre)}
             </Copy>
             <Copy muted>{selected.purchases.size} kjøp</Copy>
             <Panel
@@ -276,7 +276,7 @@ export default function History() {
                     {metric.label}
                   </Copy>
                   <Copy weight="700" size={17}>
-                    {formatMoney(metric.amount)}
+                    {Ore.format(metric.amount)}
                   </Copy>
                 </View>
               ))}
@@ -289,8 +289,10 @@ export default function History() {
                 contributions: [observation.contribution],
               }))}
               onSelect={(row) => {
+                const [contribution] = row.contributions;
                 setSelectedKey(null);
-                openReceipt(row.contributions[0].receipt);
+
+                if (contribution) openReceipt(contribution.receipt);
               }}
             />
             {prices.omitted > 0 && (
@@ -302,7 +304,7 @@ export default function History() {
             <Panel style={{ gap: 0, paddingVertical: 4 }}>
               {selected.contributions.map((contribution, index) => (
                 <View
-                  key={index}
+                  key={contributionKey(contribution)}
                   style={{
                     borderTopWidth: index ? 1 : 0,
                     borderTopColor: colors.line,
@@ -311,7 +313,7 @@ export default function History() {
                   <Row
                     title={formatDate(contribution.receipt.data?.purchaseDate)}
                     detail={`${contribution.receipt.data?.store} · ${contribution.line ? matchLabel(contribution.line) : ""}`}
-                    value={formatMoney(contribution.amountOre)}
+                    value={Ore.format(contribution.amountOre)}
                     onPress={() => {
                       setSelectedKey(null);
                       openReceipt(contribution.receipt);

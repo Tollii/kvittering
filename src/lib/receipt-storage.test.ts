@@ -1,4 +1,4 @@
-import { testId } from "./testing/receipts";
+import { present, testId } from "./testing/receipts";
 import { expect, it, vi } from "vitest";
 import {
   receiptStorage,
@@ -7,7 +7,7 @@ import {
   parseCachedHousehold,
 } from "./receipt-storage";
 
-const control = vi.hoisted(() => ({ fail: false }));
+const control = vi.hoisted(() => ({ fail: false, copyFails: false }));
 
 // oxlint-disable-next-line anti-slop/no-module-mocking -- Replace the native SDK or environment boundary; application behavior remains under test.
 vi.mock("./deployment-storage", () => ({ storageSuffix: "-test" }));
@@ -23,7 +23,9 @@ vi.mock("expo-file-system", () => ({
   },
   File: class {
     exists = false;
-    copy() {}
+    copySync() {
+      if (control.copyFails) throw new Error("Copy failed");
+    }
     delete() {}
   },
 }));
@@ -82,9 +84,19 @@ it("publishes immutable scoped snapshots only after committed writes", () => {
   expect(snapshot).toHaveLength(1);
   expect(notified).toHaveReturnedWith(snapshot);
   expect(receiptStorage.list("owner", household)).toBe(snapshot);
-  expect(Object.isFrozen(snapshot[0].uploaded)).toBe(true);
+  expect(Object.isFrozen(present(snapshot[0]).uploaded)).toBe(true);
   expect(receiptStorage.list("another", household)).toEqual([]);
   unsubscribe();
+});
+
+it("queues no receipt when an image cannot be copied", () => {
+  const household = testId<"households">("copy-household");
+  control.copyFails = true;
+  expect(() => saveLocalReceipts("owner", household, ["image"], false)).toThrow(
+    "Copy failed",
+  );
+  control.copyFails = false;
+  expect(receiptStorage.list("owner", household)).toEqual([]);
 });
 
 it("rejects malformed disposable household cache data", () => {

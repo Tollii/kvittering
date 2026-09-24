@@ -1,3 +1,4 @@
+import { Ore } from "@/lib/domain/ore";
 import { useState } from "react";
 import { Pressable, View } from "react-native";
 import { Copy, Icon, Panel, Row, pressed } from "./ui";
@@ -8,7 +9,6 @@ import {
   partialQuantity,
 } from "@/lib/domain/family-insights";
 import type { Receipt } from "@/lib/domain/insights";
-import { formatMoney } from "@/lib/domain/receipt";
 import { formatDate } from "@/lib/format-date";
 import { openReceipt } from "./receipt-card";
 
@@ -52,7 +52,7 @@ export function FamilyPurchases({
           {formatPurchaseQuantity(selected.quantity)}
         </Copy>
         <Copy muted>
-          {selected.name} · {formatMoney(selected.amountOre)}
+          {selected.name} · {Ore.format(selected.amountOre)}
         </Copy>
         {partialQuantity(selected) && (
           <Copy muted size={13}>
@@ -71,7 +71,7 @@ export function FamilyPurchases({
               <Row
                 title={item.line.catalogProduct?.name ?? item.line.name}
                 detail={`${formatDate(item.receipt.data.purchaseDate)} · ${formatPurchaseQuantity(item.quantity)}`}
-                value={formatMoney(item.amountOre)}
+                value={Ore.format(item.amountOre)}
                 onPress={() => {
                   onClose();
                   openReceipt(item.receipt);
@@ -97,7 +97,7 @@ export function FamilyPurchases({
             <Row
               title={family.name}
               detail={`${formatPurchaseQuantity(family.quantity)}${partialQuantity(family) ? " · delvis kjent" : ""}`}
-              value={formatMoney(family.amountOre)}
+              value={Ore.format(family.amountOre)}
               onPress={() => setSelection(family.id)}
             />
           </View>

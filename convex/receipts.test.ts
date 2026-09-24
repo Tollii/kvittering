@@ -1,3 +1,5 @@
+import { present } from "../src/lib/testing/receipts";
+import { Ore } from "../src/lib/domain/ore";
 /// <reference types="vite/client" />
 import { convexTest } from "convex-test";
 import { expect, it } from "vitest";
@@ -182,9 +184,9 @@ it("duplicate processing commits once and preserves all manual edits during repr
         .collect(),
     ),
   ).toHaveLength(1);
-  data.lines[0].name = "Corrected product";
+  present(data.lines[0]).name = "Corrected product";
   data.lines = data.lines.filter((line) => line.id !== "deposit");
-  data.totalOre = 2331;
+  data.totalOre = Ore.of(2331);
   await first.mutation(api.receipts.save, {
     id,
     revision: 0,
@@ -204,7 +206,7 @@ it("duplicate processing commits once and preserves all manual edits during repr
     original: batteryFixture(),
   });
   const detail = (await first.query(api.receipts.detail, { id }))!;
-  expect(detail.receipt.data?.lines[0].name).toBe("Corrected product");
+  expect(present(detail.receipt.data?.lines[0]).name).toBe("Corrected product");
   expect(detail.receipt.data?.lines).toHaveLength(2);
   expect(
     await t.run((ctx) =>
@@ -283,11 +285,11 @@ it("applies confirmed matches while keeping item-only category corrections", asy
 
     ids.push(id);
     const data = batteryFixture();
-    data.lines[0].categoryId = "fallback.unclear";
+    present(data.lines[0]).categoryId = "fallback.unclear";
 
     if (index === 2) {
-      data.lines[0].manual = true;
-      data.lines[0].categoryId = "drinks.sports-drinks";
+      present(data.lines[0]).manual = true;
+      present(data.lines[0]).categoryId = "drinks.sports-drinks";
     }
 
     await t.run(async (ctx) => {
@@ -297,7 +299,7 @@ it("applies confirmed matches while keeping item-only category corrections", asy
 
   const data = batteryFixture();
   await first.mutation(api.receipts.save, {
-    id: ids[0],
+    id: present(ids[0]),
     revision: 0,
     data,
     reviewed: true,
@@ -317,14 +319,27 @@ it("applies confirmed matches while keeping item-only category corrections", asy
 
   await t.mutation(internal.aliases.applyToMatching, {
     householdId,
-    key: aliases[0].key,
+    key: present(aliases[0]).key,
     cursor: null,
   });
-  const matched = (await first.query(api.receipts.detail, { id: ids[1] }))!;
-  const manual = (await first.query(api.receipts.detail, { id: ids[2] }))!;
-  expect(matched.receipt.data?.lines[0].categoryId).toBe("drinks.soft-drinks");
-  expect(matched.receipt.data?.lines[0].productKey).toBe(aliases[0].key);
-  expect(manual.receipt.data?.lines[0].categoryId).toBe("drinks.sports-drinks");
+
+  const matched = (await first.query(api.receipts.detail, {
+    id: present(ids[1]),
+  }))!;
+
+  const manual = (await first.query(api.receipts.detail, {
+    id: present(ids[2]),
+  }))!;
+
+  expect(present(matched.receipt.data?.lines[0]).categoryId).toBe(
+    "drinks.soft-drinks",
+  );
+  expect(present(matched.receipt.data?.lines[0]).productKey).toBe(
+    present(aliases[0]).key,
+  );
+  expect(present(manual.receipt.data?.lines[0]).categoryId).toBe(
+    "drinks.sports-drinks",
+  );
   // The remembered item was the only open question, so the receipt is approved.
   expect(matched.receipt.status).toBe("reviewed");
   expect(matched.receipt.autoAccepted).toBe(true);
@@ -366,9 +381,9 @@ it("settles remembered categories for a newly read receipt from any engine", asy
   });
   // A reading may arrive with an uncertain category the household has already settled.
   const data = batteryFixture();
-  data.lines[0].categoryId = "fallback.unclear";
-  data.lines[0].confidence = 0;
-  data.lines[0].issues = ["Kategorien er usikker."];
+  present(data.lines[0]).categoryId = "fallback.unclear";
+  present(data.lines[0]).confidence = 0;
+  present(data.lines[0]).issues = ["Kategorien er usikker."];
   await t.mutation(internal.processing.finish, {
     id,
     generation: 1,
@@ -377,8 +392,10 @@ it("settles remembered categories for a newly read receipt from any engine", asy
     provider: "test reader",
   });
   const detail = (await first.query(api.receipts.detail, { id }))!;
-  expect(detail.receipt.data?.lines[0].categoryId).toBe("drinks.soft-drinks");
-  expect(detail.receipt.data?.lines[0].issues).toEqual([]);
+  expect(present(detail.receipt.data?.lines[0]).categoryId).toBe(
+    "drinks.soft-drinks",
+  );
+  expect(present(detail.receipt.data?.lines[0]).issues).toEqual([]);
   expect(detail.receipt.status).toBe("reviewed");
   expect(detail.receipt.autoAccepted).toBe(true);
 });
@@ -409,8 +426,8 @@ it("ignores an alias whose category is no longer available", async () => {
     });
   });
   const result = await t.query(internal.processing.applyAliases, { id, data });
-  expect(result.lines[0].categoryId).toBe("drinks.soft-drinks");
-  expect(result.lines[0].productKey).toBeNull();
+  expect(present(result.lines[0]).categoryId).toBe("drinks.soft-drinks");
+  expect(present(result.lines[0]).productKey).toBeNull();
 });
 
 it("deletes a household receipt, its images and history without allowing a late processing result", async () => {
@@ -530,7 +547,7 @@ it("trusts a category after two approvals and settles the next reading without a
   const approved = () => {
     const data = weeklyShopFixture();
     data.lines = data.lines.filter((line) => line.id !== "unknown");
-    data.totalOre = 28980;
+    data.totalOre = Ore.of(28980);
     const cheez = data.lines.find((line) => line.id === "cheez")!;
     cheez.issues = [];
     cheez.confidence = 1;
@@ -633,7 +650,7 @@ it("pages narrow history summaries and includes imported older purchases in comp
       const data = batteryFixture();
       data.purchaseDate = index === 64 ? "2020-01-02" : "2026-09-01";
 
-      if (index === 64) data.lines[0].tags = ["older import"];
+      if (index === 64) present(data.lines[0]).tags = ["older import"];
       await ctx.db.insert("receipts", {
         ...template,
         clientId: `page-${index}`,
@@ -659,7 +676,7 @@ it("pages narrow history summaries and includes imported older purchases in comp
 
   expect(older.isDone).toBe(true);
   expect(older.page).toHaveLength(1);
-  expect(older.page[0].data?.purchaseDate).toBe("2020-01-02");
+  expect(present(older.page[0]).data?.purchaseDate).toBe("2020-01-02");
 
   const undated = await first.query(api.receipts.readPage, {
     scope: { kind: "undated" },

@@ -1,3 +1,4 @@
+import { present } from "../testing/receipts";
 import { expect, it } from "vitest";
 import { weeklyShopFixture } from "./receipt";
 import {
@@ -70,7 +71,7 @@ it("settles an uncertain line once memory is trusted, never a manual one", () =>
 });
 
 it("ignores memories and approvals for categories outside the current taxonomy", () => {
-  const line = weeklyShopFixture().lines[0];
+  const line = present(weeklyShopFixture().lines[0]);
   const before = structuredClone(line);
   expect(
     applyCategoryMemory(line, {

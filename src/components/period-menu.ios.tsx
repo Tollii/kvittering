@@ -25,9 +25,12 @@ export function PeriodMenu({
     );
 
   const months = [latest];
+  let previous = latest;
 
-  for (let index = 1; index < 12; index++)
-    months.push(monthBefore(months[index - 1]));
+  for (let index = 1; index < 12; index++) {
+    previous = monthBefore(previous);
+    months.push(previous);
+  }
 
   if (!months.includes(value)) months.push(value);
 

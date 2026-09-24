@@ -1,3 +1,4 @@
+import { isReceiptProcessing } from "@/lib/domain/receipt-state";
 import { releaseMutation } from "@/lib/releases/requests";
 import { usePreventRemove } from "expo-router/react-navigation";
 import {
@@ -13,20 +14,19 @@ import {
   Platform,
   Pressable,
   View,
-  useWindowDimensions,
 } from "react-native";
-import { router, Stack, useNavigation } from "expo-router";
+import { Stack, useNavigation } from "expo-router";
 import { useConvex } from "convex/react";
 import { useQuery } from "convex-helpers/react/cache";
 import { randomUUID } from "expo-crypto";
 import { api } from "../../convex/_generated/api";
 import {
   createReceiptDraft,
+  isDraftBusy,
   reduceReceiptDraft,
 } from "@/features/receipt-draft";
 import {
   Button,
-  Chip,
   Copy,
   Disclosure,
   Icon,
@@ -42,29 +42,31 @@ import {
 } from "@/components/ui";
 import { ReceiptLineEditor } from "@/features/receipt-line-editor";
 import { ReceiptFields } from "@/features/receipt-fields";
-import { ReceiptImages } from "@/features/receipt-images";
+import {
+  PurchaseTotals,
+  ReceiptFooter,
+  ReceiptLineList,
+  ReceiptSummary,
+  ReviewTaskChips,
+} from "@/features/receipt-editor-sections";
 import {
   aliasKey,
-  formatMoney,
   emptyLine,
+  isTotalsLine,
   reconcile,
   type ReceiptData,
 } from "@/lib/domain/receipt";
 import {
-  balanceWithAdjustment,
   canAcceptReceipt,
   canConfirmSuggestedCategory,
   isCategoryUncertain,
   confirmSuggestedCategories,
   lineReviewIssues,
   reviewTasks,
-  type ReviewTask,
 } from "@/lib/domain/receipt-review";
 import { useCompleteReceipts } from "./receipt-queries";
 import type { Receipt } from "@/lib/domain/insights";
-import { isReceiptProcessing } from "@/lib/domain/receipt-state";
 import { receiptStatusLabel } from "@/components/receipt-card";
-import { formatDate } from "@/lib/format-date";
 import { useTheme } from "@/constants/theme";
 import { priceSignals } from "@/lib/domain/price-signals";
 import { errorFeedback, successFeedback, tapFeedback } from "@/lib/haptics";
@@ -80,7 +82,6 @@ export function ReceiptEditor({
 }>) {
   const client = useConvex();
   const colors = useTheme();
-  const { fontScale } = useWindowDimensions();
 
   const history = useCompleteReceipts({
     kind: "priceHistory",
@@ -107,9 +108,7 @@ export function ReceiptEditor({
   const { moneyErrors, dirty, generation } = draft;
   const revision = draft.baseline.revision;
 
-  const busy = ["saving", "awaiting-snapshot", "working", "deleting"].includes(
-    draft.operation.kind,
-  );
+  const busy = isDraftBusy(draft);
 
   const approved = draft.operation.kind === "saved" && draft.operation.approved;
   const error = draft.operation.kind === "failed" ? draft.operation.error : "";
@@ -130,8 +129,8 @@ export function ReceiptEditor({
   );
 
   const [summaryLines, setSummaryLines] = useState(false);
-  const [fields, setFields] = useState(false);
-  const [actions, setActions] = useState(false);
+  // One sheet at a time: the receipt details or, off iOS, the action menu.
+  const [sheet, setSheet] = useState<"fields" | "actions" | null>(null);
   const navigation = useNavigation();
   usePreventRemove(dirty && !busy, ({ data: action }) => {
     Alert.alert("Forkaste endringene?", "Endringene er ikke lagret.", [
@@ -172,13 +171,13 @@ export function ReceiptEditor({
   const recentCategories = context?.recentCategories ?? [];
 
   const productLines =
-    data?.lines.filter((line) => !["summary", "vat"].includes(line.kind)) ?? [];
+    data?.lines.filter((line) => !isTotalsLine(line.kind)) ?? [];
 
   const visibleLines =
     data?.lines.filter((line) =>
       allLines
         ? summaryLines ||
-          !["summary", "vat"].includes(line.kind) ||
+          !isTotalsLine(line.kind) ||
           lineReviewIssues(line).length
         : reviewLineIds.has(line.id) || lineReviewIssues(line).length,
     ) ?? [];
@@ -331,115 +330,6 @@ export function ReceiptEditor({
     rememberLines(ids);
   }
 
-  /** One compact chip per open question. Tapping it jumps straight to the fix. */
-  function taskChip(task: ReviewTask) {
-    const chip = (
-      label: string,
-      icon: Parameters<typeof Chip>[0]["icon"],
-      onPress: () => void,
-    ) => (
-      <Chip
-        key={task.kind}
-        label={label}
-        icon={icon}
-        tone="warning"
-        trailing="none"
-        onPress={onPress}
-      />
-    );
-
-    const toLines = () => setAllLines(false);
-
-    switch (task.kind) {
-      case "duplicate":
-        return chip("Mulig duplikat", "doc.on.doc", () =>
-          Alert.alert(
-            "Mulig duplikat",
-            "Samme bilde eller kjøp finnes fra før.",
-            [
-              { text: "Avbryt", style: "cancel" },
-              {
-                text: "Dette er et eget kjøp",
-                onPress: () => {
-                  dispatch({
-                    type: "edit",
-                    values: { duplicateResolved: true },
-                  });
-                  setMessage("");
-                },
-              },
-            ],
-          ),
-        );
-      case "store":
-        return chip("Butikk mangler", "storefront", () => setFields(true));
-      case "total":
-        return chip("Betalt beløp mangler", "banknote", () => setFields(true));
-      case "date":
-        return chip("Dato mangler", "calendar", () => setFields(true));
-      case "currency":
-        return chip(
-          `Valuta: ${data?.currency ?? "ukjent"}`,
-          "coloncurrencysign.circle",
-          () => setFields(true),
-        );
-      case "no-lines":
-        return chip("Ingen varer lest", "plus", addLine);
-      case "difference":
-        return chip(
-          `Avvik ${formatMoney(task.amountOre)}`,
-          "equal.circle",
-          () =>
-            Alert.alert(
-              `Avvik ${formatMoney(task.amountOre)}`,
-              `Linjene gir ${formatMoney(totals?.calculated ?? null)}. Kvitteringen sier ${formatMoney(data?.totalOre ?? null)}.`,
-              [
-                { text: "Avbryt", style: "cancel" },
-                { text: "Se alle linjer", onPress: () => setAllLines(true) },
-                {
-                  text: "Legg inn justering",
-                  onPress: () => {
-                    if (data) change(balanceWithAdjustment(data, randomUUID()));
-                    setAllLines(true);
-                  },
-                },
-              ],
-            ),
-        );
-      case "receipt-issues":
-        return chip(
-          task.issues.length === 1
-            ? "1 merknad"
-            : `${task.issues.length} merknader`,
-          "exclamationmark.bubble",
-          () =>
-            Alert.alert(
-              "Merknader fra lesingen",
-              task.issues.join("\n"),
-              data?.issues.length
-                ? [
-                    { text: "Avbryt", style: "cancel" },
-                    {
-                      text: "Dette stemmer",
-                      onPress: () => data && change({ ...data, issues: [] }),
-                    },
-                  ]
-                : [{ text: "OK" }],
-            ),
-        );
-      case "amounts":
-        return chip(`${task.count} beløp mangler`, "numbers", toLines);
-      case "names":
-        return chip(`${task.count} navn mangler`, "textformat", toLines);
-      case "line-issues":
-        return chip(
-          `${task.count} ${task.count === 1 ? "vare" : "varer"} å sjekke`,
-          "exclamationmark.circle",
-          toLines,
-        );
-    }
-  }
-
   const footerLabel = processing
     ? receiptStatusLabel(receipt)
     : approved
@@ -466,7 +356,7 @@ export function ReceiptEditor({
       <IconButton
         name="ellipsis"
         label="Flere handlinger"
-        onPress={() => setActions(true)}
+        onPress={() => setSheet("actions")}
       />
     );
 
@@ -490,7 +380,7 @@ export function ReceiptEditor({
           <Stack.Toolbar.MenuAction
             icon="pencil"
             disabled={!data || busy}
-            onPress={() => setFields(true)}
+            onPress={() => setSheet("fields")}
           >
             Kvitteringsdetaljer
           </Stack.Toolbar.MenuAction>
@@ -541,108 +431,34 @@ export function ReceiptEditor({
       </ReceiptToolbar>
       <Screen
         summary={
-          <Panel
-            tone="primary"
-            style={{
-              padding: 0,
-              gap: 0,
-              borderRadius: 0,
-            }}
-          >
-            <View style={{ padding: 20, gap: 12 }}>
-              <View
-                style={{
-                  flexDirection: "row",
-                  alignItems: "flex-start",
-                  flexWrap: "wrap",
-                  gap: 8,
+          <ReceiptSummary
+            receipt={receipt}
+            data={data}
+            dirty={dirty}
+            excluded={excluded}
+            approved={approved}
+            processing={processing}
+            busy={busy}
+            chips={
+              <ReviewTaskChips
+                tasks={tasks}
+                data={data}
+                totals={totals}
+                onResolveDuplicate={() => {
+                  dispatch({
+                    type: "edit",
+                    values: { duplicateResolved: true },
+                  });
+                  setMessage("");
                 }}
-              >
-                <View
-                  style={{
-                    flex: 1,
-                    minWidth: fontScale > 1.3 ? "100%" : undefined,
-                    gap: 4,
-                  }}
-                >
-                  <Copy
-                    size={13}
-                    weight="600"
-                    style={{ color: colors.onHeroMuted }}
-                  >
-                    {formatDate(data?.purchaseDate)}
-                    {data?.purchaseDate && data.purchaseTime
-                      ? ` kl. ${data.purchaseTime}`
-                      : ""}
-                    {data?.branch ? ` · ${data.branch}` : ""}
-                  </Copy>
-                  <Copy
-                    size={36}
-                    weight="600"
-                    selectable
-                    style={{ color: colors.onHero }}
-                  >
-                    {formatMoney(data?.totalOre ?? null)}
-                  </Copy>
-                </View>
-                <View style={{ flexDirection: "row", gap: 6 }}>
-                  <ReceiptImages
-                    receipt={receipt}
-                    compact
-                    color={colors.onHero}
-                    background="#FFFFFF22"
-                  />
-                  <IconButton
-                    name="pencil"
-                    label="Rediger kvitteringsdetaljer"
-                    filled="#FFFFFF22"
-                    size={17}
-                    color={colors.onHero}
-                    disabled={!data || busy}
-                    onPress={() => setFields(true)}
-                  />
-                </View>
-              </View>
-              <View
-                style={{
-                  flexDirection: "row",
-                  gap: 6,
-                  flexWrap: "wrap",
-                  alignItems: "center",
-                }}
-              >
-                <Chip
-                  label={
-                    dirty ? "Ulagrede endringer" : receiptStatusLabel(receipt)
-                  }
-                  tone={
-                    dirty
-                      ? "warning"
-                      : receipt.status === "reviewed"
-                        ? "success"
-                        : "muted"
-                  }
-                  icon={
-                    receipt.status === "reviewed"
-                      ? "checkmark.seal"
-                      : processing
-                        ? "hourglass"
-                        : receipt.status === "failed"
-                          ? "exclamationmark.triangle"
-                          : "doc.text.magnifyingglass"
-                  }
-                />
-                {excluded && <Chip label="Utelatt" icon="eye.slash" />}
-                {!approved && tasks.map(taskChip)}
-              </View>
-              {receipt.status === "reviewed" && !dirty && !excluded && (
-                <Copy size={14} style={{ color: colors.onHeroMuted }}>
-                  Kvitteringen er med i forbruket. Du trenger ikke kontrollere
-                  hver vare. Produktkobling er valgfritt.
-                </Copy>
-              )}
-            </View>
-          </Panel>
+                onEditFields={() => setSheet("fields")}
+                onShowLines={(lines) => setAllLines(lines === "all")}
+                onAddLine={addLine}
+                onChange={change}
+              />
+            }
+            onEditFields={() => setSheet("fields")}
+          />
         }
         insetTop={false}
         statusBarStyle="light"
@@ -676,7 +492,7 @@ export function ReceiptEditor({
             <Notice tone="warning">Endret på en annen enhet</Notice>
             <Button
               title="Hent siste versjon"
-              secondary
+              variant="secondary"
               onPress={() => {
                 if (dirty)
                   Alert.alert(
@@ -694,7 +510,7 @@ export function ReceiptEditor({
         )}
 
         {receipt.provider.includes("mock") && <Notice>Demodata</Notice>}
-        {!!receipt.error && <Notice error>{receipt.error}</Notice>}
+        {!!receipt.error && <Notice tone="error">{receipt.error}</Notice>}
         {receipt.status === "failed" && !processing && (
           <Button
             title="Les bildene på nytt"
@@ -708,68 +524,7 @@ export function ReceiptEditor({
             pointerEvents={busy || processing ? "none" : "auto"}
             style={{ gap: 12 }}
           >
-            <Panel>
-              <View
-                style={{
-                  flexDirection: "row",
-                  alignItems: "baseline",
-                  gap: 12,
-                }}
-              >
-                <Copy
-                  weight="600"
-                  accessibilityRole="header"
-                  style={{ flex: 1 }}
-                >
-                  Kjøpsoversikt
-                </Copy>
-                <Copy size={13} muted>
-                  {data.lines.filter((line) => line.kind === "product").length}{" "}
-                  varer
-                </Copy>
-              </View>
-              {totals.difference !== 0 && (
-                <Notice tone="warning">
-                  {totals.difference === null
-                    ? "Betalt beløp mangler"
-                    : `Avvik mellom varelinjer og betalt beløp: ${formatMoney(totals.difference)}`}
-                </Notice>
-              )}
-              {[
-                { label: "Varer før rabatt", amount: totals.products },
-                { label: "Rabatter", amount: totals.discounts },
-                {
-                  label: "Pant og pantretur",
-                  amount: totals.deposits + totals.returns,
-                },
-                { label: "Andre justeringer", amount: totals.adjustments },
-                { label: "Sum av linjene", amount: totals.calculated },
-                { label: "Betalt", amount: data.totalOre },
-              ].map((row) =>
-                row.amount !== 0 ||
-                ["Sum av linjene", "Betalt"].includes(row.label) ? (
-                  <View
-                    key={row.label}
-                    style={{
-                      flexDirection: fontScale > 1.3 ? "column" : "row",
-                      justifyContent: "space-between",
-                      gap: fontScale > 1.3 ? 4 : 16,
-                      paddingVertical: 6,
-                    }}
-                  >
-                    <Copy size={14} muted style={{ flexShrink: 1 }}>
-                      {row.label}
-                    </Copy>
-                    <Copy
-                      size={14}
-                      weight={row.label === "Betalt" ? "700" : "500"}
-                    >
-                      {formatMoney(row.amount)}
-                    </Copy>
-                  </View>
-                ) : null,
-              )}
-            </Panel>
+            <PurchaseTotals data={data} totals={totals} />
             {receipt.status !== "reviewed" && productLines.length > 0 && (
               <Segments
                 value={allLines ? "all" : "review"}
@@ -868,8 +623,8 @@ export function ReceiptEditor({
                 />
               )}
             />
-            {Object.values(moneyErrors).map((value, index) => (
-              <Notice key={index} error>
+            {Object.entries(moneyErrors).map(([field, value]) => (
+              <Notice key={field} tone="error">
                 {value}
               </Notice>
             ))}
@@ -926,7 +681,7 @@ export function ReceiptEditor({
             </Disclosure>
             <ReceiptFields
               key={`fields-${generation}`}
-              visible={fields}
+              visible={sheet === "fields"}
               receiptId={receipt._id}
               onPhysicalStore={(store) => {
                 dispatch({
@@ -942,7 +697,7 @@ export function ReceiptEditor({
               data={data}
               onChange={change}
               onMoneyError={(value) => moneyError("total", value)}
-              onClose={() => setFields(false)}
+              onClose={() => setSheet(null)}
             />
           </View>
         ) : (
@@ -956,24 +711,25 @@ export function ReceiptEditor({
             )}
           </Panel>
         )}
-        {(!data || processing) && !!error && <Notice error>{error}</Notice>}
-        {actions && (
+        {(!data || processing) && !!error && (
+          <Notice tone="error">{error}</Notice>
+        )}
+        {sheet === "actions" && (
           <Sheet
             title="Flere handlinger"
             visible
-            onClose={() => setActions(false)}
+            onClose={() => setSheet(null)}
           >
             <Row
               title="Kvitteringsdetaljer"
               onPress={() => {
-                setActions(false);
-                setFields(true);
+                setSheet("fields");
               }}
             />
             <Row
               title="Legg til linje"
               onPress={() => {
-                setActions(false);
+                setSheet(null);
                 addLine();
               }}
             />
@@ -995,16 +751,16 @@ export function ReceiptEditor({
             />
             <Button
               title="Les bildene på nytt"
-              secondary
+              variant="secondary"
               disabled={processing || !online || busy || dirty}
               onPress={() => {
-                setActions(false);
+                setSheet(null);
                 retry();
               }}
             />
             <Button
               title="Slett kvittering"
-              danger
+              variant="danger"
               disabled={!online || busy || receipt.status === "uploading"}
               onPress={removeReceipt}
             />
@@ -1015,128 +771,8 @@ export function ReceiptEditor({
   );
 }
 
-function ReceiptFooter({
-  error,
-  ready,
-  approved,
-  label,
-  nextPending,
-  dirty,
-  receipt,
-  busy,
-  saveDisabled,
-  onSave,
-}: Readonly<{
-  error: string;
-  ready: boolean;
-  approved: boolean;
-  label: string;
-  nextPending: Pick<Receipt, "_id"> | undefined;
-  dirty: boolean;
-  receipt: Receipt;
-  busy: boolean;
-  saveDisabled: boolean;
-  onSave: () => void;
-}>) {
-  const colors = useTheme();
-
-  return (
-    <>
-      {!!error && (
-        <Copy
-          size={13}
-          style={{ color: colors.danger }}
-          accessibilityRole="alert"
-        >
-          {error}
-        </Copy>
-      )}
-      <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
-        <Icon
-          name={ready || approved ? "checkmark.circle.fill" : "circle.dotted"}
-          size={17}
-          color={ready || approved ? colors.success : colors.primary}
-        />
-        <Copy
-          size={13}
-          weight="500"
-          muted
-          style={{ flex: 1 }}
-          accessibilityLiveRegion="polite"
-        >
-          {label}
-        </Copy>
-      </View>
-      {approved ? (
-        <View style={{ flexDirection: "row", gap: 8 }}>
-          <View style={{ flex: 1 }}>
-            <Button
-              title="Til innboksen"
-              secondary
-              onPress={() => router.dismissTo("/(tabs)/inbox")}
-            />
-          </View>
-          {nextPending && (
-            <View style={{ flex: 1.4 }}>
-              <Button
-                title="Neste til kontroll"
-                icon="arrow.right"
-                onPress={() =>
-                  router.replace({
-                    pathname: "/receipt/[id]",
-                    params: { id: nextPending._id },
-                  })
-                }
-              />
-            </View>
-          )}
-        </View>
-      ) : (
-        (dirty || receipt.status !== "reviewed") && (
-          <Button
-            title={
-              !ready && dirty
-                ? "Lagre for senere"
-                : dirty
-                  ? "Lagre og godkjenn"
-                  : "Godkjenn kvittering"
-            }
-            icon={ready ? "checkmark" : undefined}
-            busy={busy}
-            disabled={saveDisabled || (!dirty && !ready)}
-            onPress={onSave}
-          />
-        )
-      )}
-    </>
-  );
-}
-
 function ReceiptToolbar({ children }: { children: ReactNode }) {
   return Platform.OS === "ios" ? (
     <Stack.Toolbar placement="right">{children}</Stack.Toolbar>
-  ) : null;
-}
-
-function ReceiptLineList({
-  lines,
-  renderLine,
-}: {
-  lines: ReceiptData["lines"];
-  renderLine: (line: ReceiptData["lines"][number]) => ReactNode;
-}) {
-  const colors = useTheme();
-
-  return lines.length ? (
-    <Panel style={{ gap: 0, paddingVertical: 2 }}>
-      {lines.map((line, index) => (
-        <View
-          key={line.id}
-          style={{ borderTopWidth: index ? 1 : 0, borderTopColor: colors.line }}
-        >
-          {renderLine(line)}
-        </View>
-      ))}
-    </Panel>
   ) : null;
 }

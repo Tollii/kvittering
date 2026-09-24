@@ -1,4 +1,5 @@
-import { receiptFixture } from "../testing/receipts";
+import { present, receiptFixture } from "../testing/receipts";
+import { Ore } from "./ore";
 import {
   productAnalysisVersion,
   purchaseEvidenceKey,
@@ -15,7 +16,7 @@ const receipt = (id: string, purchaseDate: string, colaOre: number) => {
   const data = weeklyShopFixture();
   data.purchaseDate = purchaseDate;
   const cola = data.lines.find((line) => line.id === "cola")!;
-  cola.amountOre = colaOre;
+  cola.amountOre = Ore.of(colaOre);
   cola.catalogProduct = {
     key: "ean:5000112637380",
     name: "Coca-Cola 330ml Sleek X 10pk bx",
@@ -62,15 +63,17 @@ it("flags a linked product priced well above what the household usually pays", (
   const cola = signals.get("cola")!;
   expect(cola).toBeDefined();
   // Net of the allocated receipt discount, so a little under the printed 94,90.
-  expect(cola.typicalOre).toBeGreaterThan(9000);
-  expect(cola.typicalOre).toBeLessThan(9490);
+  expect(cola.typicalUnitPrice).toBeGreaterThan(9000);
+  expect(cola.typicalUnitPrice).toBeLessThan(9490);
   expect(cola.observations).toBe(3);
   expect(priceSignalLabel(cola)).toMatch(/^\+3\d % vs vanlig$/);
   // Unlinked lines and lines within the band are silent.
   expect(signals.has("milk")).toBe(false);
   expect(
-    priceSignals([...history, receipt("e", "2026-09-13", 9790)], history[0])
-      .size,
+    priceSignals(
+      [...history, receipt("e", "2026-09-13", 9790)],
+      present(history[0]),
+    ).size,
   ).toBe(0);
 });
 
@@ -103,7 +106,7 @@ it("does not report exact-product price changes for equivalent catalog matches",
         candidateKeys: ["ean:111", "ean:222"],
       },
     };
-    purchase.productAnalysis!.results[0].evidenceKey =
+    present(purchase.productAnalysis!.results[0]).evidenceKey =
       purchaseEvidenceKey(line);
   }
 
@@ -121,7 +124,7 @@ it("lists a month's surprises, largest overspend first", () => {
   const dear = receipt("dear", "2026-09-20", 12900);
   const month = monthPriceSignals([...history, cheap, dear], "2026-09");
   expect(month.map((signal) => signal.receipt._id)).toEqual(["dear", "cheap"]);
-  expect(priceSignalLabel(month[1])).toMatch(/^−2\d % vs vanlig$/);
+  expect(priceSignalLabel(present(month[1]))).toMatch(/^−2\d % vs vanlig$/);
 });
 
 it("omits excluded warning targets", () => {
@@ -144,7 +147,7 @@ it("uses interpreted packages for equivalent raw unit quantities", () => {
 
   const target = receipt("d", "2026-09-01", 9490);
   target.data!.lines.find((line) => line.id === "cola")!.quantity = 10;
-  target.productAnalysis!.results[0].evidenceKey = purchaseEvidenceKey(
+  present(target.productAnalysis!.results[0]).evidenceKey = purchaseEvidenceKey(
     target.data!.lines.find((line) => line.id === "cola")!,
   );
   expect(priceSignals([...history, target], target).size).toBe(0);

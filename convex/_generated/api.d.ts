@@ -23,6 +23,7 @@ import type * as clientReleases from "../clientReleases.js";
 import type * as correctionEvaluation from "../correctionEvaluation.js";
 import type * as corrections from "../corrections.js";
 import type * as crons from "../crons.js";
+import type * as deployment from "../deployment.js";
 import type * as digest from "../digest.js";
 import type * as featureFlags from "../featureFlags.js";
 import type * as households from "../households.js";
@@ -119,6 +120,7 @@ declare const fullApi: ApiFromModules<{
   correctionEvaluation: typeof correctionEvaluation;
   corrections: typeof corrections;
   crons: typeof crons;
+  deployment: typeof deployment;
   digest: typeof digest;
   featureFlags: typeof featureFlags;
   households: typeof households;

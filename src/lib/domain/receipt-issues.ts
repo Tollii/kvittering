@@ -1,3 +1,5 @@
+import { Ore } from "./ore";
+
 export type ReceiptIssue =
   | {
       code:
@@ -14,7 +16,7 @@ export type ReceiptIssue =
         | "date_missing";
     }
   | { code: "amounts_missing"; count: number }
-  | { code: "difference"; amountOre: number }
+  | { code: "difference"; amountOre: Ore }
   | { code: "reader_issue"; message: string };
 
 export const categoryUncertainIssue = "category_uncertain";
@@ -28,6 +30,32 @@ export function parseReceiptIssue(value: string): ReceiptIssue {
 
 export const isCategoryUncertain = (value: string) =>
   parseReceiptIssue(value).code === "category_uncertain";
+
+/** Issues about a line field that the line editor shows as an input to fill. */
+export function isMissingLineField(issue: ReceiptIssue): boolean {
+  return issue.code === "amount_missing" || issue.code === "name_missing";
+}
+
+/** Issues printed on the receipt as a whole rather than on one line. */
+export function isReceiptLevelIssue(issue: ReceiptIssue): boolean {
+  switch (issue.code) {
+    case "duplicate_discount":
+    case "positive_discount":
+    case "positive_deposit_return":
+      return true;
+    default:
+      return false;
+  }
+}
+
+/** Issues that read the same are one issue, whether stored as text or found by a check. */
+export function uniqueIssues(issues: ReceiptIssue[]): ReceiptIssue[] {
+  return [
+    ...new Map(
+      issues.map((issue) => [receiptIssueText(issue), issue]),
+    ).values(),
+  ];
+}
 
 export function receiptIssueText(issue: ReceiptIssue): string {
   switch (issue.code) {
@@ -56,7 +84,7 @@ export function receiptIssueText(issue: ReceiptIssue): string {
     case "amounts_missing":
       return `${issue.count} linje(r) mangler beløp.`;
     case "difference":
-      return `Avvik mot betalt: ${new Intl.NumberFormat("nb-NO", { style: "currency", currency: "NOK" }).format(issue.amountOre / 100)}.`;
+      return `Avvik mot betalt: ${Ore.format(issue.amountOre)}.`;
     case "reader_issue":
       return issue.message;
   }

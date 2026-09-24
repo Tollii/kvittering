@@ -47,14 +47,15 @@ export function diagnosticText(value: string) {
   return filtered.slice(0, 2000);
 }
 
+const networkCategories = new Set(["http", "fetch", "xhr"]);
+
 /** HTTP breadcrumbs retain method, endpoint and status, never bodies or query parameters. */
 export function diagnosticBreadcrumb(
   breadcrumb: Breadcrumb,
 ): Breadcrumb | null {
   if (breadcrumb.category === "kvitto") return breadcrumb;
 
-  if (!["http", "fetch", "xhr"].includes(breadcrumb.category ?? ""))
-    return null;
+  if (!networkCategories.has(breadcrumb.category ?? "")) return null;
   const data = breadcrumb.data ?? {};
   const safeData = httpBreadcrumbSchema.parse(data);
 

@@ -94,6 +94,10 @@ export const evaluate = internalAction({
     );
 
     return results.map((result, index) => {
+      const testCase = cases[index];
+
+      if (!testCase) throw new Error("Each evaluation case needs a result.");
+
       const actual = result.productKey
         ? result.equivalentKeys
           ? "equivalent"
@@ -101,10 +105,10 @@ export const evaluate = internalAction({
         : "unresolved";
 
       return {
-        name: cases[index].name,
-        expected: cases[index].expected,
+        name: testCase.name,
+        expected: testCase.expected,
         actual,
-        passed: actual === cases[index].expected,
+        passed: actual === testCase.expected,
         reason: result.reason ?? "unspecified",
         probabilities:
           result.candidates?.map((candidate) => candidate.probability) ?? [],

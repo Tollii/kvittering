@@ -1,3 +1,4 @@
+import { soleElement } from "../domain/collections";
 import { v, type Infer } from "convex/values";
 import type { ReceiptLine } from "../domain/receipt";
 import type { CatalogProduct } from "./model";
@@ -67,10 +68,11 @@ export function selectCatalogMatch(
     ).values(),
   ];
 
-  const selected =
-    eligible.length === 1
-      ? products.find((product) => product.key === eligible[0].key)
-      : undefined;
+  const only = soleElement(eligible);
+
+  const selected = only
+    ? products.find((product) => product.key === only.key)
+    : undefined;
 
   return {
     candidates,

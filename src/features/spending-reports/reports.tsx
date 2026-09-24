@@ -1,3 +1,4 @@
+import { Ore } from "@/lib/domain/ore";
 import { type ComponentProps, type ReactNode } from "react";
 import { View } from "react-native";
 import { Copy, Empty, Icon, Notice, Panel, Row } from "@/components/ui";
@@ -8,7 +9,6 @@ import { openReceipt } from "@/components/receipt-card";
 import { useTheme } from "@/constants/theme";
 import { isCategoryUncertain } from "@/lib/domain/receipt-issues";
 import { formatDate } from "@/lib/format-date";
-import { formatMoney } from "@/lib/domain/receipt";
 import {
   priceSignalLabel,
   priceSignalMinimumObservations,
@@ -67,12 +67,12 @@ export function useSpendingReports({
   const uncertainCategories = totals.selected.reduce(
     (count, receipt) =>
       count +
-      (receipt.data?.lines.filter(
+      receipt.data.lines.filter(
         (line) =>
           line.kind === "product" &&
           (line.categoryId === "fallback.unclear" ||
             line.issues.some(isCategoryUncertain)),
-      ).length ?? 0),
+      ).length,
     0,
   );
 
@@ -155,7 +155,7 @@ export function useSpendingReports({
                 >
                   <Row
                     title={signal.name}
-                    detail={`${formatDate(signal.receipt.data?.purchaseDate)} · vanlig ${formatMoney(signal.typicalOre)}`}
+                    detail={`${formatDate(signal.receipt.data?.purchaseDate)} · vanlig ${Ore.format(Ore.round(signal.typicalUnitPrice))}`}
                     value={priceSignalLabel(signal)}
                     onPress={() => {
                       onClose();
@@ -213,7 +213,7 @@ export function useSpendingReports({
           </Copy>
           <Row
             title="Betalt"
-            value={formatMoney(totals.paid)}
+            value={Ore.format(totals.paid)}
             onPress={() => onAccounting("paid")}
           />
           {[
@@ -224,7 +224,7 @@ export function useSpendingReports({
             <Row
               key={item.name}
               title={item.name}
-              value={formatMoney(item.amount)}
+              value={Ore.format(item.amount)}
               onPress={() => onAccounting(item.name)}
             />
           ))}

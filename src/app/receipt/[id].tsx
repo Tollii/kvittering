@@ -4,7 +4,7 @@ import { router, Stack, useLocalSearchParams } from "expo-router";
 import { useQuery } from "convex-helpers/react/cache";
 import { api } from "../../../convex/_generated/api";
 import { Button, Copy, Icon, Loading, Screen } from "@/components/ui";
-import { useHousehold } from "@/features/session";
+import { useHousehold } from "@/features/household-context";
 import { ReceiptEditor } from "@/features/receipt-editor";
 
 export default function ReceiptPage() {
@@ -15,7 +15,7 @@ export default function ReceiptPage() {
 
 function ReceiptDetail({ id }: Readonly<{ id: string }>) {
   const { online } = useHousehold();
-  const detail = useQuery(api.receipts.detail, { id: id ?? "" });
+  const detail = useQuery(api.receipts.detail, { id });
 
   const [deletion, setDeletion] = useState<"idle" | "deleting" | "deleted">(
     "idle",

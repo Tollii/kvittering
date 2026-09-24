@@ -1,10 +1,15 @@
+import { Ore } from "./ore";
 import {
   isCategoryUncertain,
+  isReceiptLevelIssue,
   parseReceiptIssue,
   receiptIssueText,
+  uniqueIssues,
+  type ReceiptIssue,
 } from "./receipt-issues";
 import {
   emptyLine,
+  isTotalsLine,
   reconcile,
   parseReceipt,
   type ParsedReceipt,
@@ -13,7 +18,7 @@ import {
 } from "./receipt";
 import { categoryById } from "./categories";
 
-export { categoryUncertainIssue, isCategoryUncertain } from "./receipt-issues";
+export { isCategoryUncertain } from "./receipt-issues";
 
 export const categoryReviewThreshold = 0.5;
 
@@ -62,31 +67,16 @@ export function confirmSuggestedCategories(data: ReceiptData): ReceiptData {
   };
 }
 
-export function lineReviewIssues(line: ReceiptLine): string[] {
-  const issues = line.issues.map((issue) =>
-    receiptIssueText(parseReceiptIssue(issue)),
-  );
+export function lineReviewIssues(line: ReceiptLine): ReceiptIssue[] {
+  const issues = line.issues.map(parseReceiptIssue);
 
-  if (!["summary", "vat"].includes(line.kind) && line.amountOre === null)
-    issues.push("Beløpet mangler.");
+  if (!isTotalsLine(line.kind) && line.amountOre === null)
+    issues.push({ code: "amount_missing" });
 
   if (line.kind === "product" && !line.name.trim())
-    issues.push("Varenavnet mangler.");
+    issues.push({ code: "name_missing" });
 
-  return [...new Set(issues)];
-}
-
-export function receiptReviewIssues(data: ReceiptData): string[] {
-  return [
-    ...new Set([
-      ...data.issues.map((issue) => receiptIssueText(parseReceiptIssue(issue))),
-      ...reconcile(data).issues,
-      ...(!data.store?.trim() ? ["Butikken mangler."] : []),
-      ...(!data.lines.some((line) => line.kind === "product")
-        ? ["Ingen varer er lest."]
-        : []),
-    ]),
-  ];
+  return uniqueIssues(issues);
 }
 
 /**
@@ -122,7 +112,7 @@ export function balanceWithAdjustment(
         ...emptyLine(id),
         kind: "adjustment",
         name: "Justering mot betalt beløp",
-        amountOre: -difference,
+        amountOre: Ore.negate(difference),
         categoryId: null,
       },
     ],
@@ -148,7 +138,7 @@ export type ReviewTask =
   | { kind: "total" }
   | { kind: "date" }
   | { kind: "currency" }
-  | { kind: "difference"; amountOre: number }
+  | { kind: "difference"; amountOre: Ore }
   | { kind: "no-lines" }
   | { kind: "amounts"; count: number }
   | { kind: "names"; count: number }
@@ -189,15 +179,7 @@ export function assessReceipt(
   const receiptIssues = [
     ...new Set([
       ...data.issues,
-      ...totals.reviewIssues
-        .filter((issue) =>
-          [
-            "duplicate_discount",
-            "positive_discount",
-            "positive_deposit_return",
-          ].includes(issue.code),
-        )
-        .map(receiptIssueText),
+      ...totals.reviewIssues.filter(isReceiptLevelIssue).map(receiptIssueText),
     ]),
   ];
 
@@ -208,8 +190,7 @@ export function assessReceipt(
     data.lines.filter(predicate).length;
 
   const amounts = counted(
-    (line) =>
-      !["summary", "vat"].includes(line.kind) && line.amountOre === null,
+    (line) => !isTotalsLine(line.kind) && line.amountOre === null,
   );
 
   if (amounts) tasks.push({ kind: "amounts", count: amounts });

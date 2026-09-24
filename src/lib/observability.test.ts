@@ -1,3 +1,4 @@
+import { present } from "./testing/receipts";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import * as Sentry from "@sentry/react-native";
 import { reportError } from "./observability";
@@ -62,12 +63,10 @@ describe("operational diagnostics", () => {
 
     reportError(error, "release.policy_refresh");
 
-    expect(Sentry.captureException).toHaveBeenCalledWith(
+    expect(vi.mocked(Sentry.captureException).mock.lastCall).toMatchObject([
       error,
-      expect.objectContaining({
-        tags: expect.objectContaining({ operation: "release.policy_refresh" }),
-      }),
-    );
+      { tags: { operation: "release.policy_refresh" } },
+    ]);
   });
 
   it("keeps correlation and stack frames without sending receipt or provider payloads", () => {
@@ -86,8 +85,9 @@ describe("operational diagnostics", () => {
       position: 1,
     });
 
-    const [captured, context] = vi.mocked(Sentry.captureException).mock
-      .calls[0];
+    const [captured, context] = present(
+      vi.mocked(Sentry.captureException).mock.calls[0],
+    );
 
     expect(captured).toBe(error);
 
@@ -102,9 +102,10 @@ describe("operational diagnostics", () => {
       },
     });
 
-    expect(event.exception?.values?.[0].stacktrace?.frames?.[0].function).toBe(
-      "upload",
-    );
+    expect(
+      present(present(event.exception?.values?.[0]).stacktrace?.frames?.[0])
+        .function,
+    ).toBe("upload");
     expect(JSON.stringify(event)).not.toContain("PRIVATE");
     expect(JSON.stringify(context)).not.toContain("PRIVATE");
     expect(context).toMatchObject({
@@ -145,8 +146,9 @@ describe("operational diagnostics", () => {
       "test.update",
     );
 
-    const [captured, context] = vi.mocked(Sentry.captureException).mock
-      .calls[0];
+    const [captured, context] = present(
+      vi.mocked(Sentry.captureException).mock.calls[0],
+    );
 
     if (!(captured instanceof Error))
       throw new Error("Expected an Error event");

@@ -1,4 +1,5 @@
-import { receiptFixture, testId } from "../testing/receipts";
+import { present, receiptFixture, testId } from "../testing/receipts";
+import { Ore } from "./ore";
 import { expect, it } from "vitest";
 import { batteryFixture, emptyLine } from "./receipt";
 import {
@@ -14,8 +15,8 @@ import {
 function receipt(date: string, ore = 1000): Receipt {
   const data = batteryFixture();
   data.purchaseDate = date;
-  data.lines = [{ ...emptyLine("item"), amountOre: ore }];
-  data.totalOre = ore;
+  data.lines = [{ ...emptyLine("item"), amountOre: Ore.of(ore) }];
+  data.totalOre = Ore.of(ore);
 
   return receiptFixture({
     _id: date,
@@ -40,7 +41,7 @@ it("compares the same part of the current month and excludes later purchases", (
 
   expect(result.current.products).toBe(1000);
   expect(result.previous.products).toBe(500);
-  expect(result.changes[0].difference).toBe(500);
+  expect(present(result.changes[0]).difference).toBe(500);
 });
 
 it("handles year boundaries, leap days and completed months", () => {
@@ -75,7 +76,7 @@ function contribution(
       packageSize: size,
       packageUnit: size ? "g" : null,
     },
-    amountOre: ore,
+    amountOre: Ore.of(ore),
   };
 }
 
@@ -165,11 +166,11 @@ it("keeps leap days, empty dates and negative totals without colouring refunds a
 
   expect(calendar).toHaveLength(366);
   expect(calendar.find((d) => d.date === "2024-02-29")).toMatchObject({
-    amountOre: -1000,
+    amountOre: Ore.of(-1000),
     level: 0,
   });
   expect(calendar[0]).toMatchObject({
-    amountOre: 0,
+    amountOre: Ore.of(0),
     level: 0,
     contributions: [],
   });

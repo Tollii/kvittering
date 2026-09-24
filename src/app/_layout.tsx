@@ -29,12 +29,12 @@ export function ErrorBoundary({ retry, error }: Readonly<ErrorBoundaryProps>) {
   return (
     <SafeAreaProvider>
       <Screen title="Kunne ikke åpne siden">
-        <Notice error>
+        <Notice tone="error">
           {error instanceof ReceiptMigrationError
             ? error.message
             : "Kontroller nettilkoblingen og prøv igjen."}
         </Notice>
-        <Button title="Prøv igjen" onPress={retry} />
+        <Button title="Prøv igjen" onPress={() => void retry()} />
       </Screen>
     </SafeAreaProvider>
   );

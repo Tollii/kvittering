@@ -1,3 +1,4 @@
+import { isReceiptProcessing } from "../src/lib/domain/receipt-state";
 import { commitReceiptChange } from "./receiptChanges";
 import { isCategoryUncertain } from "../src/lib/domain/receipt-issues";
 import { featureEnabled } from "./featureFlags";
@@ -29,7 +30,6 @@ import { normalizeSearch } from "../src/lib/catalog/policy";
 import { matchingKey } from "../src/lib/domain/product-matching";
 import { categoryById } from "../src/lib/domain/categories";
 import { lineValidator } from "../src/lib/domain/receipt";
-import { isReceiptProcessing } from "../src/lib/domain/receipt-state";
 import type { Id } from "./_generated/dataModel";
 
 import { catalogDecision } from "../src/lib/catalog/decisions";
