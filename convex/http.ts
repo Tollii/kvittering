@@ -1,3 +1,4 @@
+import { isUserError } from "./userErrors";
 import { ConvexError, v } from "convex/values";
 import { parse } from "convex-helpers/validators";
 import { clientValidator } from "../src/lib/releases/policy";
@@ -108,7 +109,8 @@ http.route({
         durationMs: Date.now() - started,
       });
 
-      if (error instanceof ConvexError)
+      // Installed upload clients read only release-policy errors from JSON bodies.
+      if (error instanceof ConvexError && !isUserError(error))
         return Response.json(error.data, {
           status: 409,
           headers: responseHeaders,

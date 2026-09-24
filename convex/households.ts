@@ -1,3 +1,4 @@
+import { userError } from "./userErrors";
 import { clientMutation as mutation } from "./clientFunctions";
 import { query } from "./_generated/server";
 import { v } from "convex/values";
@@ -50,7 +51,7 @@ export const create = mutation({
   handler: async (ctx, args) => {
     const identity = await ctx.auth.getUserIdentity();
 
-    if (!identity) throw new Error("Logg inn først.");
+    if (!identity) throw userError("Logg inn først.");
 
     const existing = await ctx.db
       .query("members")
@@ -66,7 +67,7 @@ export const create = mutation({
       args.name.length > 80 ||
       !/^[a-f0-9]{32}$/.test(args.invitation)
     )
-      throw new Error("Ugyldig navn eller invitasjon.");
+      throw userError("Ugyldig navn eller invitasjon.");
 
     const householdId = await ctx.db.insert("households", {
       name: args.name.trim(),
@@ -89,7 +90,7 @@ export const join = mutation({
   handler: async (ctx, args) => {
     const identity = await ctx.auth.getUserIdentity();
 
-    if (!identity) throw new Error("Logg inn først.");
+    if (!identity) throw userError("Logg inn først.");
 
     const existing = await ctx.db
       .query("members")
@@ -107,7 +108,7 @@ export const join = mutation({
       )
       .unique();
 
-    if (!household) throw new Error("Invitasjonen er ugyldig.");
+    if (!household) throw userError("Invitasjonen er ugyldig.");
 
     const members = await ctx.db
       .query("members")
@@ -115,7 +116,7 @@ export const join = mutation({
       .take(2);
 
     if (members.length >= 2)
-      throw new Error("Husstanden har allerede to medlemmer.");
+      throw userError("Husstanden har allerede to medlemmer.");
     await ctx.db.insert("members", {
       householdId: household._id,
       identity: identity.tokenIdentifier,
@@ -138,7 +139,7 @@ export const setBudget = mutation({
         args.monthlyBudgetOre <= 0 ||
         args.monthlyBudgetOre > 100_000_000)
     )
-      throw new Error("Ugyldig budsjett.");
+      throw userError("Ugyldig budsjett.");
     await ctx.db.patch("households", member.householdId, {
       monthlyBudgetOre: args.monthlyBudgetOre ?? undefined,
     });
@@ -155,10 +156,10 @@ export const rename = mutation({
     const household = await ctx.db.get("households", member.householdId);
     const name = args.name.trim();
 
-    if (!name || name.length > 80) throw new Error("Bruk 1–80 tegn i navnet.");
+    if (!name || name.length > 80) throw userError("Bruk 1–80 tegn i navnet.");
 
     if (!household || household.name !== args.previousName)
-      throw new Error("Navnet er endret. Lukk og åpne navnefeltet på nytt.");
+      throw userError("Navnet er endret. Lukk og åpne navnefeltet på nytt.");
     await ctx.db.patch("households", household._id, { name });
 
     return null;
@@ -172,7 +173,7 @@ export const rotateInvitation = mutation({
     const member = await requireMember(ctx);
 
     if (!/^[a-f0-9]{32}$/.test(args.invitation))
-      throw new Error("Ugyldig invitasjon.");
+      throw userError("Ugyldig invitasjon.");
     await ctx.db.patch("households", member.householdId, {
       invitation: args.invitation,
     });

@@ -1,3 +1,4 @@
+import { userError } from "./userErrors";
 import { notifyReceiptActivities } from "./liveActivities";
 import {
   parseReceiptIssue,
@@ -61,7 +62,7 @@ export function decideReceiptChange({
   const acceptable = assessReceipt(data, unresolvedDuplicate).acceptable;
 
   if (origin.kind === "human" && origin.reviewed && !acceptable)
-    throw new Error("Kontroller avvik og uklare felt før godkjenning.");
+    throw userError("Kontroller avvik og uklare felt før godkjenning.");
 
   const provider =
     origin.kind === "extraction" ? origin.provider : previous.provider;
@@ -108,10 +109,13 @@ export async function commitReceiptChange(
     previous.revision !== input.expected.revision ||
     previous.generation !== input.expected.generation
   )
-    throw new Error("Kvitteringen er endret. Hent siste versjon.");
+    throw userError(
+      "Kvitteringen er endret. Hent siste versjon.",
+      "RECEIPT_CHANGED",
+    );
   const parsed = parseReceipt(input.data);
 
-  if (parsed.kind === "rejected") throw new Error(parsed.issue.message);
+  if (parsed.kind === "rejected") throw userError(parsed.issue.message);
 
   const duplicateOf = input.duplicate
     ? input.duplicate.duplicateOf

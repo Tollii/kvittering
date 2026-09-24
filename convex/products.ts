@@ -1,3 +1,4 @@
+import { userError } from "./userErrors";
 import {
   withProductReference,
   type ProductReference,
@@ -188,7 +189,7 @@ export async function createProduct(
   line: ReceiptLine,
 ) {
   if (!line.name.trim() || line.name.length > 300)
-    throw new Error("Varen må ha et navn på 1–300 tegn.");
+    throw userError("Varen må ha et navn på 1–300 tegn.");
 
   return ctx.db.insert("products", {
     householdId,
@@ -214,7 +215,7 @@ export async function linkProduct(
       product.householdId !== householdId ||
       product.retailer !== retailer)
   )
-    throw new Error("Varen er ikke tilgjengelig i denne butikken.");
+    throw userError("Varen er ikke tilgjengelig i denne butikken.");
 
   return withProductReference(
     line,

@@ -133,7 +133,12 @@ it("rejects stale previews and never undoes a later edit", async () => {
   await t.run((ctx) => ctx.db.patch("receipts", ids[1], { revision: 1 }));
   await expect(
     first.mutation(api.corrections.apply, { id: correction._id, targets }),
-  ).rejects.toThrow("endret");
+  ).rejects.toMatchObject({
+    data: {
+      code: "RECEIPT_CHANGED",
+      message: "Kvitteringene er endret. Åpne forhåndsvisningen på nytt.",
+    },
+  });
 
   const batch = await first.mutation(api.corrections.apply, {
     id: correction._id,

@@ -1,3 +1,4 @@
+import { userError } from "./userErrors";
 import {
   paginationOptsValidator,
   paginationResultValidator,
@@ -122,7 +123,7 @@ async function requireCorrection(
   const correction = await ctx.db.get("corrections", id);
 
   if (!correction || correction.householdId !== member.householdId)
-    throw new Error("Rettelsen er ikke tilgjengelig.");
+    throw userError("Rettelsen er ikke tilgjengelig.");
 
   if (
     correction.field !== "category" ||
@@ -130,7 +131,7 @@ async function requireCorrection(
     !categoryById.has(correction.expected) ||
     correction.expected === "fallback.unclear"
   )
-    throw new Error("Denne rettelsen kan ikke brukes på flere varer.");
+    throw userError("Denne rettelsen kan ikke brukes på flere varer.");
 
   return {
     ...correction,
@@ -225,7 +226,7 @@ export const apply = mutation({
       new Set(targets.map((t) => `${t.receiptId}:${t.lineId}`)).size !==
         targets.length
     )
-      throw new Error("Velg mellom 1 og 20 ulike varer.");
+      throw userError("Velg mellom 1 og 20 ulike varer.");
     const changes: Doc<"correctionBatches">["changes"] = [];
 
     for (const receiptId of new Set(
@@ -243,8 +244,9 @@ export const apply = mutation({
         receipt.householdId !== correction.householdId ||
         selected.some((target) => target.revision !== receipt.revision)
       )
-        throw new Error(
+        throw userError(
           "Kvitteringene er endret. Åpne forhåndsvisningen på nytt.",
+          "RECEIPT_CHANGED",
         );
 
       const before = selected.map((target) => {
@@ -253,7 +255,10 @@ export const apply = mutation({
         );
 
         if (!line || !matches(receipt, correction, line))
-          throw new Error("Varen er endret. Åpne forhåndsvisningen på nytt.");
+          throw userError(
+            "Varen er endret. Åpne forhåndsvisningen på nytt.",
+            "RECEIPT_CHANGED",
+          );
 
         return line;
       });
@@ -294,7 +299,7 @@ export const undo = mutation({
     const batch = await ctx.db.get("correctionBatches", id);
 
     if (!batch || batch.householdId !== member.householdId)
-      throw new Error("Rettelsen er ikke tilgjengelig.");
+      throw userError("Rettelsen er ikke tilgjengelig.");
 
     if (batch.undone) return null;
 
@@ -306,8 +311,9 @@ export const undo = mutation({
         receipt.householdId !== member.householdId ||
         receipt.revision !== change.revision
       )
-        throw new Error(
+        throw userError(
           "En kvittering er endret etter rettelsen. Åpne den for å rette manuelt.",
+          "RECEIPT_CHANGED",
         );
       await commitReceiptChange(ctx, {
         receiptId: receipt._id,

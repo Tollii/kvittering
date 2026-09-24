@@ -56,6 +56,9 @@ export function errorDetails(cause: unknown): ErrorDetails {
   const expected =
     code === "UPDATE_REQUIRED" ||
     code === "SERVICE_PAUSED" ||
+    // The person sees the reason and can act on it; it is not a defect.
+    code === "RECEIPT_CHANGED" ||
+    code === "REJECTED" ||
     errorType === "AbortError" ||
     errorType === "TimeoutError" ||
     status === 429 ||

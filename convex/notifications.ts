@@ -1,3 +1,4 @@
+import { userError } from "./userErrors";
 import { clientMutation as mutation } from "./clientFunctions";
 import { v } from "convex/values";
 import { query, internalQuery, internalMutation } from "./_generated/server";
@@ -37,7 +38,7 @@ export const subscribe = mutation({
   handler: async (ctx, { token }) => {
     const member = await requireMember(ctx);
 
-    if (!validPushToken(token)) throw new Error("Ugyldig varslingsadresse.");
+    if (!validPushToken(token)) throw userError("Ugyldig varslingsadresse.");
 
     const existing = await ctx.db
       .query("deviceSubscriptions")
@@ -45,7 +46,7 @@ export const subscribe = mutation({
       .unique();
 
     if (existing && existing.identity !== member.identity)
-      throw new Error(
+      throw userError(
         "Slå av varsler for forrige konto på denne enheten først.",
       );
 
@@ -64,7 +65,7 @@ export const subscribe = mutation({
         .take(10);
 
       if (subscriptions.length >= 10)
-        throw new Error("Varsler er allerede aktivert på ti enheter.");
+        throw userError("Varsler er allerede aktivert på ti enheter.");
       await ctx.db.insert("deviceSubscriptions", values);
     }
 
@@ -194,14 +195,14 @@ export const remindLater = mutation({
       subscription.householdId !== member.householdId ||
       receipt.uploadedBy !== member.identity
     )
-      throw new Error("Slå på varsler for denne kontoen først.");
+      throw userError("Slå på varsler for denne kontoen først.");
 
     if (receipt.status !== "needs_review" || receipt.excluded)
-      throw new Error("Kvitteringen trenger ikke kontroll nå.");
+      throw userError("Kvitteringen trenger ikke kontroll nå.");
     const now = Date.now();
 
     if (!Number.isFinite(at) || at <= now || at > now + 48 * 60 * 60 * 1000)
-      throw new Error("Velg et tidspunkt innen to døgn.");
+      throw userError("Velg et tidspunkt innen to døgn.");
 
     const existing = await ctx.db
       .query("receiptReminders")
@@ -222,7 +223,7 @@ export const remindLater = mutation({
         .take(50);
 
       if (pending.length >= 50)
-        throw new Error("Du har allerede 50 påminnelser.");
+        throw userError("Du har allerede 50 påminnelser.");
     }
 
     const scheduledId = await ctx.scheduler.runAt(

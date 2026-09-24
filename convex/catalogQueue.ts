@@ -1,3 +1,4 @@
+import { userError } from "./userErrors";
 import { featureEnabled } from "./featureFlags";
 import { v } from "convex/values";
 import { Workpool, vOnCompleteArgs } from "@convex-dev/workpool";
@@ -62,7 +63,7 @@ export async function ensureRequest(
   input: CatalogRequest,
 ): Promise<Doc<"catalogRequests">> {
   if (!(await featureEnabled(ctx, "productLookup")))
-    throw new Error("Produktkatalogen er midlertidig satt på pause.");
+    throw userError("Produktkatalogen er midlertidig satt på pause.");
   const request = normalizeRequest(input);
   const key = requestKey(request);
 

@@ -19,6 +19,7 @@ import { QueryLifecycleProvider } from "@/features/query-lifecycle";
 import { SessionProvider } from "@/features/session";
 import { useTheme } from "@/constants/theme";
 import { Button, Notice, Screen } from "@/components/ui";
+import { parseUserError } from "@/lib/user-errors";
 import { ShareIntentRoot, ShareIntentRouting } from "@/features/share-intent";
 
 export function ErrorBoundary({ retry, error }: Readonly<ErrorBoundaryProps>) {
@@ -32,7 +33,8 @@ export function ErrorBoundary({ retry, error }: Readonly<ErrorBoundaryProps>) {
         <Notice error>
           {error instanceof ReceiptMigrationError
             ? error.message
-            : "Kontroller nettilkoblingen og prøv igjen."}
+            : (parseUserError(error)?.message ??
+              "Kontroller nettilkoblingen og prøv igjen.")}
         </Notice>
         <Button title="Prøv igjen" onPress={retry} />
       </Screen>

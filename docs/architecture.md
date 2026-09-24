@@ -14,6 +14,7 @@ The Expo application starts in `src/app/_layout.tsx`. Session context contains a
 - Use React effects for external synchronization, event handlers for user actions, and render or pure functions for calculations. Give subscriptions, timers, persistence, and lifecycle listeners an owner and cleanup path.
 - Read only the scope and fields needed. Avoid complete household history in root providers. Growing collections use indexes and pagination; background work uses bounded batches with continuation, not silent truncation.
 - Persistent caches serve startup, offline use, or external providers. Their validity includes account/household scope, source, and completeness. A cached product summary is not a complete product record. Transport and cache policy belong behind feature interfaces; callers do not manage freshness.
+- Failures a person can act on are thrown with `userError` (`convex/userErrors.ts`), a `ConvexError` whose `{ code, message }` reaches clients in production. Plain `Error` messages are redacted there, so use them only for defects and operator problems that should reach Sentry. `RECEIPT_CHANGED` marks revision conflicts; other rejections use `REJECTED`. The client reads them with `parseUserError` and records them as expected. The image upload route keeps user errors on its existing plain-text 403 response for installed clients.
 - Separate tables when lifecycle, ownership, or retention differs. Table count alone does not justify merging them.
 
 ## Receipt flow
