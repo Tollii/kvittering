@@ -232,6 +232,7 @@ export const finish = internalMutation({
           cursor: args.duplicateCursor ?? null,
           numItems: 100,
           maximumRowsRead: 100,
+          maximumBytesRead: 500_000,
         });
 
       const others = page.page;

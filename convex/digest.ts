@@ -1,5 +1,11 @@
 import { CalendarDate } from "../src/lib/domain/calendar";
 import type { Ore } from "../src/lib/domain/ore";
+import {
+  receiptSpendingTotals,
+  receiptComparisonCategories,
+  addSpendingTotals,
+  addCategoryTotals,
+} from "../src/lib/domain/receipt-summary";
 import { dailyDigest } from "../src/lib/domain/daily-digest";
 import { receiptPeriodPage } from "./receipts";
 import { featureEnabled } from "./featureFlags";
@@ -13,7 +19,7 @@ import { internalMutation } from "./serverFunctions";
 import { internal } from "./_generated/api";
 import type { Doc, Id } from "./_generated/dataModel";
 import schema from "./schema";
-import { weeklyDigest, digestPeriod } from "../src/lib/domain/budget";
+import { digestPeriod } from "../src/lib/domain/budget";
 
 const device = v.object({
   householdId: v.id("households"),
@@ -110,7 +116,7 @@ export const forHousehold = internalAction({
     const summary = await ctx.runQuery(internal.digest.summary, args);
 
     if (summary) return summary;
-    const receipts: Doc<"receipts">[] = [];
+    const days = new Map<string, Parameters<typeof dailyDigest>[0][number]>();
     let cursor: string | null = null;
     let budget: Ore | null = null;
 
@@ -129,13 +135,30 @@ export const forHousehold = internalAction({
 
       if (!result.household) return null;
       budget = result.household.monthlyBudgetOre ?? null;
-      receipts.push(...result.receipts.page);
+
+      for (const receipt of result.receipts.page) {
+        const date = receipt.data?.purchaseDate;
+
+        if (!date) continue;
+        const previous = days.get(date);
+        const totals = receiptSpendingTotals(receipt);
+        const categories = receiptComparisonCategories(receipt);
+        days.set(date, {
+          date,
+          totals: previous
+            ? addSpendingTotals(previous.totals, totals)
+            : totals,
+          categories: previous
+            ? addCategoryTotals(previous.categories, categories)
+            : categories,
+        });
+      }
 
       if (result.receipts.isDone) break;
       cursor = result.receipts.continueCursor;
     }
 
-    const digest = weeklyDigest(receipts, budget, digestDate(args.today));
+    const digest = dailyDigest([...days.values()], budget, digestDate(args.today));
 
     return { title: digest.title, body: digest.body };
   },

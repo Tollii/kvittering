@@ -1,10 +1,12 @@
+import type { FunctionReturnType } from "convex/server";
+import { getConvexSize } from "convex/values";
 /// <reference types="vite/client" />
 import { convexTest } from "convex-test";
 import { register as registerRateLimiter } from "@convex-dev/rate-limiter/test";
 import { expect, it } from "vitest";
 import { api, internal } from "./_generated/api";
 import schema from "./schema";
-import { weeklyShopFixture } from "../src/lib/domain/receipt";
+import { weeklyShopFixture, parseReceipt } from "../src/lib/domain/receipt";
 import { weeklyDigest } from "../src/lib/domain/budget";
 import { updateReceiptReadModel } from "./receiptReadModel";
 import { receiptFixture } from "../src/lib/testing/receipts";
@@ -245,4 +247,115 @@ it("continues after concurrent changes move records beyond a bounded synchroniza
       })
     ).changes,
   ).toEqual([]);
+});
+
+it("keeps large receipt pages bounded without dropping totals or synchronization entries", async () => {
+  const { t, user, householdId } = await setup();
+  const data = weeklyShopFixture();
+  data.originalText = "a".repeat(60_000);
+  data.lines = Array.from({ length: 300 }, (_, index) => ({
+    ...data.lines[0],
+    id: `large-line-${index}`,
+    name: "a".repeat(500),
+    originalText: "a".repeat(1500),
+  }));
+  data.purchaseDate = "2026-09-18";
+  expect(parseReceipt(data).kind).toBe("parsed");
+  expect(getConvexSize(data)).toBeLessThan(1024 * 1024);
+  expect(getConvexSize(data) * 50).toBeGreaterThan(16 * 1024 * 1024);
+
+  const receipts = await t.run(async (ctx) => {
+    const result = [];
+
+    for (let index = 0; index < 8; index++) {
+      const { _id, _creationTime, ...fields } = receiptFixture({
+        householdId,
+        data,
+        clientId: `large-${index}`,
+      });
+
+      const id = await ctx.db.insert("receipts", fields);
+      result.push((await ctx.db.get("receipts", id))!);
+    }
+
+    return result;
+  });
+
+  let cursor: string | null = null;
+  const seen = new Set<string>();
+
+  while (true) {
+    const page: FunctionReturnType<typeof api.receipts.list> = await user.query(
+      api.receipts.list,
+      {
+        paginationOpts: {
+          cursor,
+          numItems: 100,
+          maximumBytesRead: 100_000_000,
+        },
+      },
+    );
+
+    expect(page.page.length).toBeLessThanOrEqual(2);
+
+    for (const receipt of page.page) {
+      expect(seen.has(receipt._id)).toBe(false);
+      seen.add(receipt._id);
+    }
+
+    if (page.isDone) break;
+    expect(page.continueCursor).not.toBe(cursor);
+    cursor = page.continueCursor;
+  }
+
+  expect(seen.size).toBe(8);
+
+  const filtered = await user.query(api.receipts.readPage, {
+    scope: { kind: "inbox" },
+    paginationOpts: { cursor: null, numItems: 100 },
+  });
+
+  expect(filtered.page).toEqual([]);
+  expect(filtered.isDone).toBe(false);
+  expect(
+    (await user.query(api.receipts.editorContext, { id: receipts[0]._id }))
+      .recentCategories.length,
+  ).toBeLessThanOrEqual(600);
+  const expected = weeklyDigest(receipts, null, "2026-09-18");
+  expect(
+    await t.action(internal.digest.forHousehold, {
+      householdId,
+      today: "2026-09-18",
+    }),
+  ).toEqual({ title: expected.title, body: expected.body });
+
+  while (!(await t.mutation(internal.receiptSync.backfill, {})).ready) {
+    /* Complete the bounded migration. */
+  }
+
+  const head = await user.query(api.receiptSync.head, {});
+  let after = 0;
+  const synchronized = new Set<string>();
+
+  while (true) {
+    const page = await user.query(api.receiptSync.changes, {
+      after,
+      through: head.sequence,
+    });
+
+    expect(getConvexSize(page)).toBeLessThan(8 * 1024 * 1024);
+    page.changes.forEach((change) => synchronized.add(change.id));
+
+    if (page.done) break;
+    expect(page.through).toBeGreaterThan(after);
+    after = page.through;
+  }
+
+  expect(synchronized).toEqual(seen);
+  expect(
+    await t.query(internal.digest.summary, {
+      householdId,
+      today: "2026-09-18",
+    }),
+  ).toEqual({ title: expected.title, body: expected.body });
 });

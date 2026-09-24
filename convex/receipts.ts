@@ -66,7 +66,11 @@ export const list = query({
         q.eq("householdId", member.householdId),
       )
       .order("desc")
-      .paginate(args.paginationOpts);
+      .paginate({
+        ...args.paginationOpts,
+        maximumRowsRead: 100,
+        maximumBytesRead: 500_000,
+      });
   },
 });
 
@@ -668,7 +672,11 @@ export const history = query({
         q.eq("householdId", member.householdId),
       )
       .order("desc")
-      .paginate({ ...paginationOpts, maximumRowsRead: 100 });
+      .paginate({
+        ...paginationOpts,
+        maximumRowsRead: 100,
+        maximumBytesRead: 500_000,
+      });
 
     const term = search.trim().toLocaleLowerCase("nb-NO");
 
@@ -721,7 +729,12 @@ export const readPage = query({
   returns: paginationResultValidator(schema.doc("receipts")),
   handler: async (ctx, { scope, paginationOpts }) => {
     const member = await requireMember(ctx);
-    const options = { ...paginationOpts, maximumRowsRead: 100 };
+
+    const options = {
+      ...paginationOpts,
+      maximumRowsRead: 100,
+      maximumBytesRead: 500_000,
+    };
 
     if (scope.kind === "undated")
       return ctx.db
@@ -802,7 +815,12 @@ export const editorContext = query({
         q.eq("householdId", member.householdId),
       )
       .order("desc")
-      .take(50);
+      .paginate({
+        cursor: null,
+        numItems: 50,
+        maximumRowsRead: 50,
+        maximumBytesRead: 500_000,
+      });
 
     const pending = await Promise.all(
       attentionStatuses.map(async (status) => {
@@ -823,7 +841,7 @@ export const editorContext = query({
     );
 
     return {
-      recentCategories: recent.flatMap(
+      recentCategories: recent.page.flatMap(
         (receipt) =>
           receipt.data?.lines.flatMap((line) =>
             line.categoryId ? [line.categoryId] : [],
@@ -853,13 +871,14 @@ export const attentionCount = query({
               .eq("status", status)
               .eq("excluded", false),
           )
-          .take(100),
+          // Two reads of at most five 1 MiB documents stay below the transaction limit.
+          .take(5),
       ),
     );
 
     return {
       count: pages.reduce((sum, page) => sum + page.length, 0),
-      capped: pages.some((page) => page.length === 100),
+      capped: pages.some((page) => page.length === 5),
     };
   },
 });
@@ -880,5 +899,9 @@ export function receiptPeriodPage(
         .gte("data.purchaseDate", start)
         .lte("data.purchaseDate", end),
     )
-    .paginate({ ...paginationOpts, maximumRowsRead: 100 });
+    .paginate({
+      ...paginationOpts,
+      maximumRowsRead: 100,
+      maximumBytesRead: 500_000,
+    });
 }

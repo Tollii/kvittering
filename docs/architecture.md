@@ -128,3 +128,18 @@ for receipts already deleted are cleaned after discovery, including cancellation
 of active work. Legacy null completion contexts and old scheduled arguments
 remain valid. A failed callback is recovered by the inventory. This additive
 association table requires no receipt backfill and no client minimum change.
+
+## Receipt read budgets
+
+Full-receipt pages use a server-selected 500,000-byte budget as well as row
+limits. One document can exceed the page target; the maximum document size
+still bounds that read. Clients must continue across empty filtered pages until
+`isDone`. This also applies to the legacy list API. Recent category suggestions
+and Spotlight use bounded samples. The attention indicator reports a lower
+bound once either status has five receipts, using an index that excludes
+receipts omitted from reports. This avoids scanning excluded documents.
+
+The pre-backfill digest fallback reduces each bounded receipt page into daily
+totals. It retains at most the days in the report period. Normal digests still
+use persisted daily totals. Synchronization and backfill keep their existing
+4 MiB budgets; synchronization also bounds its returned full-record payload.

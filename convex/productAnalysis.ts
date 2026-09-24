@@ -538,7 +538,12 @@ export const repair = internalMutation({
           .eq("householdId", args.householdId)
           .lte("_creationTime", args.through),
       )
-      .paginate({ cursor: args.cursor, numItems: 10, maximumRowsRead: 10 });
+      .paginate({
+        cursor: args.cursor,
+        numItems: 10,
+        maximumRowsRead: 10,
+        maximumBytesRead: 500_000,
+      });
 
     for (const receipt of page.page) await launch(ctx, receipt, "manual");
 

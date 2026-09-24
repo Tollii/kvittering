@@ -203,15 +203,21 @@ export const preview = query({
         q.eq("householdId", correction.householdId),
       )
       .order("desc")
-      .take(201);
+      .paginate({
+        cursor: null,
+        numItems: 201,
+        maximumRowsRead: 201,
+        maximumBytesRead: 500_000,
+      });
 
-    const targets = receipts
+    const targets = receipts.page
       .slice(0, 200)
       .flatMap((receipt) => correctionTargets(receipt, correction));
 
     return {
       targets: targets.slice(0, 20),
-      truncated: receipts.length > 200 || targets.length > 20,
+      truncated:
+        !receipts.isDone || receipts.page.length > 200 || targets.length > 20,
     };
   },
 });
@@ -391,7 +397,11 @@ export const previewPage = query({
         q.eq("householdId", correction.householdId),
       )
       .order("desc")
-      .paginate({ ...paginationOpts, maximumRowsRead: 20 });
+      .paginate({
+        ...paginationOpts,
+        maximumRowsRead: 20,
+        maximumBytesRead: 500_000,
+      });
 
     return {
       ...page,

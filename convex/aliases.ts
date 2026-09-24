@@ -162,7 +162,11 @@ export const applyToMatching = internalMutation({
     const page = await ctx.db
       .query("receipts")
       .withIndex("by_householdId", (q) => q.eq("householdId", args.householdId))
-      .paginate({ cursor: args.cursor, numItems: 10 });
+      .paginate({
+        cursor: args.cursor,
+        numItems: 10,
+        maximumBytesRead: 500_000,
+      });
 
     for (const receipt of page.page) {
       // Completion applies current aliases after the extraction owns the state transition.

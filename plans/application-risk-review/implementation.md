@@ -62,3 +62,19 @@ and receipt deletion. They verify that active journals remain readable before
 deletion and that repeated cleanup is safe. The new table is additive; old
 callback contexts and scheduled arguments remain accepted. No live cleanup was
 run. A hosted recovery/replay exercise remains part of release verification.
+
+## 007 — Receipt read budgets
+
+Legacy and current full-receipt pages now enforce server byte budgets. Editor
+suggestions, correction previews, Spotlight, duplicate detection, alias scans,
+and analysis repair also have bounded reads. A new additive status/exclusion
+index bounds attention counts and pending-receipt lookup. The count explicitly
+reports its lower-bound status instead of scanning arbitrary excluded history.
+Digest fallback retains daily aggregates instead of all receipt payloads.
+
+Large valid receipt fixtures verify that callers cannot increase the page byte
+budget, cursors deliver every receipt, empty filtered pages remain incomplete,
+and fallback/aggregate digests agree. The existing sync and backfill byte caps
+were retained and tested with the same large data. In-process checks do not
+measure hosted transaction contention or action memory. Hosted load and recovery
+checks remain release work; no projection was deployed or backfilled here.

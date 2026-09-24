@@ -2,7 +2,7 @@ import { v } from "convex/values";
 import { query } from "./_generated/server";
 import { requireMember } from "./access";
 
-/** The optional device index covers the latest 100 receipts; it is not household storage. */
+/** The optional device index covers up to 100 recent receipts within a byte budget; it is not household storage. */
 export const recent = query({
   args: {},
   returns: v.array(
@@ -22,9 +22,14 @@ export const recent = query({
         q.eq("householdId", member.householdId),
       )
       .order("desc")
-      .take(100);
+      .paginate({
+        cursor: null,
+        numItems: 100,
+        maximumRowsRead: 100,
+        maximumBytesRead: 500_000,
+      });
 
-    return receipts.flatMap((receipt) =>
+    return receipts.page.flatMap((receipt) =>
       receipt.data && !receipt.excluded
         ? [
             {
