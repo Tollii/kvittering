@@ -29,6 +29,7 @@ module.exports = defineConfig([
     plugins: { sonarjs, kvitto },
     rules: {
       "kvitto/no-undefined-record": "error",
+      "kvitto/no-effect-fetch": "error",
       ...Object.fromEntries(
         Object.entries(sonarjs.rules).flatMap(([name, rule]) =>
           rule.meta.deprecated ? [] : [[`sonarjs/${name}`, "error"]],

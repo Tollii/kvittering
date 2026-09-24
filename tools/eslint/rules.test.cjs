@@ -39,12 +39,32 @@ tester.run("no-undefined-record", plugin.rules["no-undefined-record"], {
   ].map((code) => ({ code, errors: [{ messageId: "explicitType" }] })),
 });
 
+tester.run("no-effect-fetch", plugin.rules["no-effect-fetch"], {
+  valid: [
+    "async function load() { return fetch('/receipts'); }",
+    "const onPress = () => fetch('/receipts');",
+    "useEffect(() => { const timer = setTimeout(tick, 100); return () => clearTimeout(timer); }, []);",
+    "useMemo(() => fetch('/receipts'), []);",
+    "useEffect(() => subscribe(listener), []);",
+  ],
+  invalid: [
+    "useEffect(() => { fetch('/receipts').then(setReceipts); }, []);",
+    "React.useEffect(() => { void fetch('/receipts'); }, []);",
+    "useLayoutEffect(function () { fetch('/receipts'); }, []);",
+    "useEffect(() => { async function load() { await fetch('/receipts'); } void load(); }, []);",
+    "useEffect(() => { const request = new XMLHttpRequest(); }, []);",
+  ].map((code) => ({ code, errors: [{ messageId: "subscription" }] })),
+});
+
 it("runs the same rule in the repository Oxlint configuration", () => {
   const directory = mkdtempSync(join(process.cwd(), "tools", "rule-test-"));
 
   try {
     const file = join(directory, "invalid.ts");
-    writeFileSync(file, "export type Invalid = Record<string, undefined>;\n");
+    writeFileSync(
+      file,
+      "export type Invalid = Record<string, undefined>;\nuseEffect(() => { void fetch('/receipts'); }, []);\n",
+    );
 
     const result = spawnSync(
       process.execPath,
@@ -61,11 +81,13 @@ it("runs the same rule in the repository Oxlint configuration", () => {
 
     assert.equal(result.status, 1, result.stderr);
     const report = JSON.parse(result.stdout);
-    assert.ok(
-      report.diagnostics.some(
-        (diagnostic) => diagnostic.code === "kvitto(no-undefined-record)",
-      ),
+
+    const codes = new Set(
+      report.diagnostics.map((diagnostic) => diagnostic.code),
     );
+
+    assert.ok(codes.has("kvitto(no-undefined-record)"));
+    assert.ok(codes.has("kvitto(no-effect-fetch)"));
   } finally {
     rmSync(directory, { recursive: true, force: true });
   }

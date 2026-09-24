@@ -2,6 +2,74 @@
 module.exports = {
   meta: { name: "kvitto" },
   rules: {
+    "no-effect-fetch": {
+      meta: {
+        type: "problem",
+        schema: [],
+        messages: {
+          subscription:
+            "Load server data through a Convex subscription or a TanStack query. Requests started in effects have no cache, deduplication, cancellation, or ordering between responses.",
+        },
+      },
+      create(context) {
+        const effectHooks = new Set([
+          "useEffect",
+          "useLayoutEffect",
+          "useInsertionEffect",
+        ]);
+
+        /** Whether a function node is the callback passed to a React effect hook. */
+        function isEffectCallback(node) {
+          const call = node.parent;
+
+          if (call?.type !== "CallExpression" || call.arguments[0] !== node)
+            return false;
+          const callee = call.callee;
+
+          const name =
+            callee.type === "Identifier"
+              ? callee.name
+              : callee.type === "MemberExpression" &&
+                  callee.property.type === "Identifier"
+                ? callee.property.name
+                : null;
+
+          return effectHooks.has(name);
+        }
+
+        function insideEffect(node) {
+          for (let current = node.parent; current; current = current.parent) {
+            if (
+              (current.type === "ArrowFunctionExpression" ||
+                current.type === "FunctionExpression") &&
+              isEffectCallback(current)
+            )
+              return true;
+          }
+
+          return false;
+        }
+
+        return {
+          CallExpression(node) {
+            if (
+              node.callee.type === "Identifier" &&
+              node.callee.name === "fetch" &&
+              insideEffect(node)
+            )
+              context.report({ node, messageId: "subscription" });
+          },
+          NewExpression(node) {
+            if (
+              node.callee.type === "Identifier" &&
+              node.callee.name === "XMLHttpRequest" &&
+              insideEffect(node)
+            )
+              context.report({ node, messageId: "subscription" });
+          },
+        };
+      },
+    },
     "no-undefined-record": {
       meta: {
         type: "problem",
