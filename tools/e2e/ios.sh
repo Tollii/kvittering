@@ -55,6 +55,13 @@ npx convex env set BETTER_AUTH_SECRET "$(openssl rand -hex 32)" >/dev/null
 npx convex env set RECEIPT_PROVIDER mock >/dev/null
 grep "^EXPO_PUBLIC_CONVEX" .env.local
 
+# The local backend loads function code on first use, and a query has one
+# second. On a busy runner the app's first startup queries missed that limit,
+# so load the code before the app starts.
+for query in featureFlags:get releasePolicy:getVersions; do
+  npx convex run "$query" '{"platform":"ios"}' >/dev/null
+done
+
 if [[ -n "${E2E_APP_CACHE:-}" && -d "$E2E_APP_CACHE" ]]; then
   echo "▸ Reusing the native build; embedding the current JavaScript"
   rm -rf "$app"
