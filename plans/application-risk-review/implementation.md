@@ -47,3 +47,18 @@ orphan copies with the same rule. Run it once after deployment; it was not run
 against a live deployment here. Fixture tests verify mixed-batch undo, private
 household access, repeated cleanup, and historical orphan repair. All 347 tests
 and `check:ci` passed. No schema migration or new association is required.
+
+## 006 — Workflow journal retention
+
+All three workflow families record their component and receipt association.
+All terminal outcomes have a 30-day deadline. Deletion cancels active associated
+work and cleans terminal journals. Daily bounded inventories recover missed
+callbacks and discover older runs in both components. Older terminal runs get
+30 days from discovery; old receipt deletion is handled on discovery.
+
+Component integration tests store sensitive step arguments and results, then
+verify actual removal for success, failure, cancellation, legacy inventory,
+and receipt deletion. They verify that active journals remain readable before
+deletion and that repeated cleanup is safe. The new table is additive; old
+callback contexts and scheduled arguments remain accepted. No live cleanup was
+run. A hosted recovery/replay exercise remains part of release verification.

@@ -9,6 +9,7 @@ import {
   isReceiptProcessing,
   receiptStatusValidator,
 } from "../src/lib/domain/receipt-state";
+import { trackWorkflow } from "./retention";
 import { consumeReceiptQuota } from "./rateLimits";
 import { notifyReceiptActivities } from "./liveActivities";
 import type { Id } from "./_generated/dataModel";
@@ -164,12 +165,18 @@ async function beginUploadedReceipt(
   imageCount: number,
 ) {
   await ctx.db.patch("receipts", id, { status: "uploaded", generation: 1 });
-  await start(
+
+  const workflowId = await start(
     ctx,
     internal.processing.processReceipt,
     { id, generation: 1 },
-    { onComplete: internal.retention.workflowCompleted, context: null },
+    {
+      onComplete: internal.retention.workflowCompleted,
+      context: { component: "processing", receiptId: id },
+    },
   );
+
+  await trackWorkflow(ctx, workflowId, "processing", id);
   console.info("receipt.upload_completed", {
     receiptId: id,
     generation: 1,
@@ -216,12 +223,18 @@ export const retry = mutation({
       generation,
       error: undefined,
     });
-    await start(
+
+    const workflowId = await start(
       ctx,
       internal.processing.processReceipt,
       { id, generation },
-      { onComplete: internal.retention.workflowCompleted, context: null },
+      {
+        onComplete: internal.retention.workflowCompleted,
+        context: { component: "processing", receiptId: id },
+      },
     );
+
+    await trackWorkflow(ctx, workflowId, "processing", id);
     console.info("receipt.processing_retried", { receiptId: id, generation });
 
     return null;
@@ -569,6 +582,11 @@ export const remove = mutation({
         "RECEIPT_CHANGED",
       );
     await ctx.db.delete("receipts", id);
+    await ctx.scheduler.runAfter(
+      0,
+      internal.retention.deletedReceiptWorkflows,
+      { receiptId: id },
+    );
     await notifyReceiptActivities(ctx, receipt.householdId);
     await ctx.runMutation(internal.receipts.cleanupDeleted, { id });
     await ctx.scheduler.runAfter(0, internal.retention.deletedReceiptBatches, {

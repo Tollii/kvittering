@@ -1,6 +1,7 @@
 import { unclearCategoryId } from "../src/lib/domain/categories";
 import { userError } from "./userErrors";
 import { hasReceiptBeenRead } from "../src/lib/domain/receipt-state";
+import { trackWorkflow } from "./retention";
 import { featureEnabled } from "./featureFlags";
 import { clientMutation as mutation } from "./clientFunctions";
 import { productAttributesValidator } from "../src/lib/domain/product-attributes";
@@ -113,7 +114,8 @@ async function launch(
     (previous.state !== "error" || origin === "automatic")
   )
     return "current" as const;
-  await manager.start(
+
+  const workflowId = await manager.start(
     ctx,
     internal.productAnalysis.process,
     {
@@ -122,8 +124,13 @@ async function launch(
       revision: receipt.revision,
       version: productAnalysisVersion,
     },
-    { onComplete: internal.retention.workflowCompleted, context: null },
+    {
+      onComplete: internal.retention.workflowCompleted,
+      context: { component: "analysis", receiptId: receipt._id },
+    },
   );
+
+  await trackWorkflow(ctx, workflowId, "analysis", receipt._id);
   await ctx.db.patch("receipts", receipt._id, {
     productAnalysis: {
       version: productAnalysisVersion,

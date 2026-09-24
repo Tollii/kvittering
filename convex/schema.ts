@@ -56,6 +56,14 @@ export const receiptFields = {
 };
 
 export default defineSchema({
+  workflowJournals: defineTable({
+    workflowId: vWorkflowId,
+    component: v.union(v.literal("processing"), v.literal("analysis")),
+    receiptId: v.id("receipts").optional(),
+    expiresAt: v.number().optional(),
+  })
+    .index("by_component_and_workflowId", ["component", "workflowId"])
+    .index("by_receiptId", ["receiptId"]),
   receiptReadModel: defineTable({
     name: v.literal("receipts-v1"),
     cursor: v.union(v.string(), v.null()),

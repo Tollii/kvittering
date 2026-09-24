@@ -1,5 +1,6 @@
 import { userError } from "./userErrors";
 import { isReceiptProcessing } from "../src/lib/domain/receipt-state";
+import { trackWorkflow } from "./retention";
 import { commitReceiptChange } from "./receiptChanges";
 import { isCategoryUncertain } from "../src/lib/domain/receipt-issues";
 import { featureEnabled } from "./featureFlags";
@@ -11,7 +12,7 @@ import {
   vWorkflowId,
 } from "@convex-dev/workflow";
 import { components, internal } from "./_generated/api";
-import { internalQuery, env } from "./_generated/server";
+import { internalQuery, env, type MutationCtx } from "./_generated/server";
 import { internalMutation } from "./serverFunctions";
 import { requireReceipt } from "./access";
 import schema from "./schema";
@@ -134,19 +135,26 @@ export const process = workflow
   });
 
 async function launch(
-  ctx: Parameters<typeof startWorkflow>[0],
+  ctx: MutationCtx,
   id: Id<"receipts">,
   generation: number,
 ) {
-  return startWorkflow(
+  const workflowId = await startWorkflow(
     ctx,
     internal.catalogMatching.process,
     {
       id,
       generation,
     },
-    { onComplete: internal.retention.workflowCompleted, context: null },
+    {
+      onComplete: internal.retention.workflowCompleted,
+      context: { component: "processing", receiptId: id },
+    },
   );
+
+  await trackWorkflow(ctx, workflowId, "processing", id);
+
+  return workflowId;
 }
 
 export const start = internalMutation({

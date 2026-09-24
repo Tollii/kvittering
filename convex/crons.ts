@@ -25,4 +25,12 @@ crons.interval(
   { state: "error" },
 );
 
+for (const component of ["processing", "analysis"] as const)
+  crons.interval(
+    `remove expired ${component} workflows`,
+    { hours: 24 },
+    internal.retention.inventoryWorkflows,
+    { component },
+  );
+
 export default crons;

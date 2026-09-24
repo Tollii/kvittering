@@ -30,7 +30,7 @@ working copy. Reuse that work; the baseline findings are not all still unchanged
 | [003](application-risk-review/003-draft-preservation.md) | Preserve drafts through pending saves and required updates | P1 | None | TODO |
 | [004](application-risk-review/004-alias-processing-state.md) | Keep alias propagation from completing active processing | P2 | None | DONE |
 | [005](application-risk-review/005-correction-history-deletion.md) | Remove deleted receipt data from correction batches | P2 | None | DONE |
-| [006](application-risk-review/006-workflow-retention.md) | Complete workflow payload retention | P2 | Existing retention callback; coordinate with 005 | IN PROGRESS |
+| [006](application-risk-review/006-workflow-retention.md) | Complete workflow payload retention | P2 | Existing retention callback; coordinate with 005 | DONE |
 | [007](application-risk-review/007-receipt-read-budgets.md) | Complete receipt read budgets | P2 | Existing summaries and cache in the other task | IN PROGRESS |
 | [008](application-risk-review/008-alias-work-scheduling.md) | Bound and combine household alias propagation | P2 | Coordinate with 001 and 004 | TODO |
 | [009](application-risk-review/009-five-image-limit.md) | Limit new receipts to five images | P2 | Legacy queue recovery before enforcement | TODO |

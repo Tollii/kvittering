@@ -112,3 +112,19 @@ Queued uploads and editor drafts remain separate from disposable caches.
 See [Convex operating cost](convex-costs.md) for synchronization, backfill,
 retention, release order, and usage measurements. Existing receipt endpoints
 remain available to installed clients and during the backfill.
+
+## Workflow journal retention
+
+Receipt processing and catalog matching use the processing workflow component.
+Product analysis uses its own component. `workflowJournals` stores the component,
+workflow ID, receipt ID, and cleanup deadline. It stores no receipt payload.
+All terminal outcomes retain diagnostics for 30 days. Receipt deletion schedules
+cancellation of active associated work and cleanup of terminal journals. Cleanup
+uses the component API and does not force deletion of active journals.
+
+A daily bounded inventory discovers older journals in both components. Existing
+terminal journals get a full 30-day grace period from first discovery. Journals
+for receipts already deleted are cleaned after discovery, including cancellation
+of active work. Legacy null completion contexts and old scheduled arguments
+remain valid. A failed callback is recovered by the inventory. This additive
+association table requires no receipt backfill and no client minimum change.
