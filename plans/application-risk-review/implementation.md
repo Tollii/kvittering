@@ -139,7 +139,7 @@ select an unattributed provider operation.
 
 Catalog classification uses 12-product batches, with at most 108 questions per
 request. Initial allowance values and their fixed UTC windows are documented
-in `docs/api-limits.md`. They are operating choices, not currency budgets or
+in `convex/rateLimits.ts`. They are operating choices, not currency budgets or
 measurements of normal traffic. New catalog payer metadata is optional for old
 rows; internal optional arguments and replay options preserve existing journals.
 
@@ -172,7 +172,6 @@ enforcement. Existing eight-image reservations retain their original capacity.
 The historical correction cleanup remains an operator step after deployment.
 At that stage, no code was pushed or deployed, and no release minimum was changed.
 
-
 ## Integration with current main
 
 Rebased the audit and its API-safeguard base onto `5a8c16d`. Kept the current
@@ -186,7 +185,6 @@ The integrated branch passes `npm run check:ci`: 406 tests in 71 files, type
 checks, lint, unused-code checks, rule tests, and coverage collection. Native
 seeded-data tests and hosted PR checks follow the verification-tooling merge.
 This integration does not deploy a backend or publish a client update.
-
 
 ## Integration with verification tooling and seeded tests
 
@@ -225,7 +223,6 @@ history (20 s), and saving followed by a clean-device read (52 s). The Expo
 package check, shell syntax checks, formatting, and documentation links also pass.
 No paid provider was contacted. Signed-device upgrades and staged deployment
 remain outside this merge task.
-
 
 ## Client review follow-up
 
