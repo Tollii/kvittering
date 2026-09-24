@@ -10,7 +10,7 @@ Needs Node.js 24 and Xcode 26.4 or later.
 
 ```sh
 npm install
-cp .env.example .env.local  # set your Convex deployment and its two URLs
+[ -e .env.local ] || cp .env.example .env.local  # then set your deployment and URLs
 npm run backend             # Convex dev deployment, in one terminal
 npm run ios:build           # build and open the app; later, npm start
 ```

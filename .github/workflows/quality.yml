@@ -5,6 +5,7 @@ name: Code quality
 # status check; see docs/quality.md.
 on:
   pull_request:
+    types: [opened, synchronize, reopened, labeled, unlabeled]
   merge_group:
   push:
     branches: [main]
@@ -149,16 +150,20 @@ jobs:
         env:
           BASE: ${{ needs.changes.outputs.base }}
           GH_TOKEN: ${{ github.token }}
-          PR_LABELS: ${{ join(github.event.pull_request.labels.*.name, ',') }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
           QUEUE_REF: ${{ github.event.merge_group.head_ref }}
         run: |
           if ! git show "$BASE:convex/contract.json" > "$RUNNER_TEMP/base-contract.json" 2>/dev/null; then
             echo "The base branch has no contract snapshot yet." >> "$GITHUB_STEP_SUMMARY"
             exit 0
           fi
-          # A merge queue run reads the labels of the pull request it tests.
+          # Label changes and reruns must use current labels, not the old event payload.
           if [[ -n "$QUEUE_REF" && "$QUEUE_REF" =~ pr-([0-9]+)- ]]; then
-            PR_LABELS="$(gh pr view "${BASH_REMATCH[1]}" --repo "$GITHUB_REPOSITORY" --json labels --jq '[.labels[].name] | join(",")')"
+            PR_NUMBER="${BASH_REMATCH[1]}"
+          fi
+          PR_LABELS=""
+          if [[ -n "$PR_NUMBER" ]]; then
+            PR_LABELS="$(gh pr view "$PR_NUMBER" --repo "$GITHUB_REPOSITORY" --json labels --jq '[.labels[].name] | join(",")')"
           fi
           flag=""
           if [[ ",$PR_LABELS," == *",breaking-contract,"* ]]; then flag="--allow-breaking"; fi

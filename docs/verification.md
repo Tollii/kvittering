@@ -16,7 +16,7 @@ when you add behavior. It applies to people and agents alike.
 | Coverage of changed lines     | `node tools/diff-coverage.mts` after `check:ci` | seconds   |
 
 `check:changed` checks the files changed since `main`, including uncommitted
-and untracked files: formatting, types, lint, unused code, tests related to
+and untracked files, including deletions: formatting, types, lint, unused code, tests related to
 the changed files, the backend contract, lint-rule tests, and documentation
 references. It prints output only for failing steps.
 
@@ -24,6 +24,8 @@ In Claude Code, the project hooks install dependencies at the start of a cloud
 session and run `check:changed` when the agent stops. A failure keeps the agent
 working with the findings; a passing tree is remembered and not checked again.
 Other agents should run the same command before reporting a change as done.
+If no main branch is available, fetch `origin/main` before running change checks.
+Deleting a file still runs the type, unused-code, and documentation checks.
 
 Cloud agent sessions cannot start a local Convex backend or an iOS Simulator.
 Start the end-to-end workflow instead: run the `End-to-end` workflow with
@@ -35,14 +37,14 @@ then read the job summary and the `e2e-ios` artifact with its screenshots.
 `Code quality` runs on pull requests, merge queue groups, and pushes to `main`.
 `CI result` passes only when every required job passes or is skipped:
 
-| Job                           | Proves                                                                                                  |
-| ----------------------------- | ------------------------------------------------------------------------------------------------------- |
-| Quality checks                | Formatting, types, lint, documentation references, rule tests, application and component tests          |
-| App bundle and generated code | The iOS JavaScript bundle builds, Expo SDK packages match, and the generated catalog client is current  |
-| Backend contract              | No public function, queued internal argument, or HTTP route breaks for installed apps or scheduled work |
-| Native fingerprint            | Reports whether the native runtime changed, which decides between a TestFlight build and an OTA update  |
-| Workflow and secret checks    | actionlint, zizmor, and gitleaks over the full history                                                  |
-| Dependency review             | No new dependency with a high-severity advisory (once the repository is public)                         |
+| Job                           | Proves                                                                                                                          |
+| ----------------------------- | ------------------------------------------------------------------------------------------------------------------------------- |
+| Quality checks                | Formatting, types, lint, documentation references, rule tests, application and component tests                                  |
+| App bundle and generated code | The iOS JavaScript bundle builds, Expo SDK packages match, and the generated catalog client is current                          |
+| Backend contract              | No public function, queued internal argument, stored workflow result, or HTTP route breaks for installed apps or scheduled work |
+| Native fingerprint            | Reports whether the native runtime changed, which decides between a TestFlight build and an OTA update                          |
+| Workflow and secret checks    | actionlint, zizmor, and gitleaks over the full history                                                                          |
+| Dependency review             | No new dependency with a high-severity advisory (once the repository is public)                                                 |
 
 The `Change areas` job summary lists the review checklist for each area the
 change touches, from [`tools/presubmit.mts`](../tools/presubmit.mts). Pull

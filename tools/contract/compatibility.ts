@@ -295,11 +295,15 @@ function functionChanges(
     ...argProblems.map((detail) => ({ subject: name, breaking: true, detail })),
   );
 
-  // Only installed clients read public results; the server reads internal ones.
-  if (before.visibility === "public" && before.returns) {
+  // Installed clients read new public results. Workflows can replay old internal results.
+  if (before.returns) {
     const returnProblems = after.returns
-      ? incompatibilities(before.returns, after.returns, "open", "returns")
-      : ["returns: validator removed"];
+      ? before.visibility === "public"
+        ? incompatibilities(before.returns, after.returns, "open", "returns")
+        : incompatibilities(after.returns, before.returns, "open", "returns")
+      : before.visibility === "public"
+        ? ["returns: validator removed"]
+        : [];
 
     changes.push(
       ...returnProblems.map((detail) => ({

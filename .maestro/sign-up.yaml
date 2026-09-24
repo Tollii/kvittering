@@ -52,4 +52,4 @@ name: Sign up and start a household
     timeout: 30000
 - tapOn: "Innboks"
 - tapOn: "Historikk"
-- assertVisible: "Historikk"
+- assertVisible: "Historikken begynner her"

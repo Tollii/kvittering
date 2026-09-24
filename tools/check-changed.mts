@@ -3,6 +3,7 @@
  * uncommitted and untracked files. Agents run this after each change;
  * `npm run check` remains the complete check before committing.
  */
+import { existsSync } from "node:fs";
 import { spawnSync } from "node:child_process";
 import { changedFiles, mergeBase } from "./changes.mts";
 
@@ -15,15 +16,20 @@ if (changed.length === 0) {
   process.exit(0);
 }
 
-const code = changed.filter((path) => /\.[cm]?[jt]sx?$/.test(path));
+const existing = changed.filter(existsSync);
+
+const deleted = changed.length !== existing.length;
+
+const code = existing.filter((path) => /\.[cm]?[jt]sx?$/.test(path));
 
 const failures: string[] = [];
 
-run("Formatting", "prettier/bin/prettier.cjs", [
-  "--check",
-  "--ignore-unknown",
-  ...changed,
-]);
+if (existing.length > 0)
+  run("Formatting", "prettier/bin/prettier.cjs", [
+    "--check",
+    "--ignore-unknown",
+    ...existing,
+  ]);
 
 run("Types", "typescript/bin/tsc", ["--noEmit"]);
 
@@ -47,7 +53,7 @@ if (code.length > 0) {
     "--no-warn-ignored",
     ...code,
   ]);
-  run("Unused code", "knip/bin/knip.js", ["--no-progress"]);
+
   run("Related tests", "vitest/vitest.mjs", [
     "related",
     "--run",
@@ -65,6 +71,9 @@ if (code.length > 0) {
     ]);
 }
 
+if (code.length > 0 || deleted)
+  run("Unused code", "knip/bin/knip.js", ["--no-progress"]);
+
 if (changed.some((path) => path.startsWith("convex/")))
   run("Backend contract", "vitest/vitest.mjs", [
     "run",
@@ -74,7 +83,10 @@ if (changed.some((path) => path.startsWith("convex/")))
 if (changed.some((path) => path.startsWith("tools/eslint/")))
   run("Lint rule tests", null, ["--test", "tools/eslint/rules.test.cjs"]);
 
-if (changed.some((path) => path.endsWith(".md") || path === "package.json"))
+if (
+  deleted ||
+  changed.some((path) => path.endsWith(".md") || path === "package.json")
+)
   run("Documentation references", null, ["tools/check-docs.mts"]);
 
 if (failures.length > 0) {

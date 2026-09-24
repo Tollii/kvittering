@@ -1,6 +1,5 @@
 /** Files changed on this branch, shared by the local and CI change checks. */
 import { execFileSync, spawnSync } from "node:child_process";
-import { existsSync } from "node:fs";
 
 export function git(args: string[]): string[] {
   // eslint-disable-next-line sonarjs/no-os-command-from-path -- Git is the contributor's own installation; the repository cannot pin its path.
@@ -9,7 +8,7 @@ export function git(args: string[]): string[] {
     .filter(Boolean);
 }
 
-/** The commit this branch started from, or HEAD when no main branch is known. */
+/** The common ancestor with main; fail if committed changes cannot be identified. */
 export function mergeBase(): string {
   for (const branch of ["origin/main", "main"]) {
     // eslint-disable-next-line sonarjs/no-os-command-from-path -- Git is the contributor's own installation; the repository cannot pin its path.
@@ -20,15 +19,15 @@ export function mergeBase(): string {
     if (result.status === 0) return result.stdout.trim();
   }
 
-  return "HEAD";
+  throw new Error(
+    "Cannot determine merge base: fetch origin/main or pass an explicit base.",
+  );
 }
 
-/** Existing files changed since `base`, including uncommitted and untracked files. */
+/** Paths changed since `base`, including deletions, uncommitted and untracked files. */
 export function changedFiles(base: string): string[] {
   return [
-    ...git(["diff", "--name-only", "--diff-filter=ACMR", base]),
+    ...git(["diff", "--name-only", base]),
     ...git(["ls-files", "--others", "--exclude-standard"]),
-  ].filter(
-    (path, index, all) => all.indexOf(path) === index && existsSync(path),
-  );
+  ].filter((path, index, all) => all.indexOf(path) === index);
 }

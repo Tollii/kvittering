@@ -57,6 +57,10 @@ function query(
   return { kind: "query", visibility: "public", args, returns };
 }
 
+function internalQuery(returns: ValidatorJson): FunctionContract {
+  return { kind: "query", visibility: "internal", args: object({}), returns };
+}
+
 describe("argument compatibility", () => {
   test("accepts a new optional argument and a widened union", () => {
     const before = object({ platform: literal("ios") });
@@ -199,18 +203,32 @@ describe("contract comparison", () => {
     ]);
   });
 
-  test("ignores internal result changes read only by the server", () => {
-    const internal = (returns: ValidatorJson): FunctionContract => ({
-      kind: "query",
-      visibility: "internal",
-      args: object({}),
-      returns,
-    });
-
+  test("allows removal of internal fields that old workflow results may retain", () => {
     expect(
       compareContracts(
-        contract({ "a:b": internal(object({ x: number })) }),
-        contract({ "a:b": internal(object({})) }),
+        contract({ "a:b": internalQuery(object({ x: number })) }),
+        contract({ "a:b": internalQuery(object({})) }),
+      ).filter((change) => change.breaking),
+    ).toEqual([]);
+  });
+
+  test("rejects a new internal field missing from stored workflow results", () => {
+    expect(
+      compareContracts(
+        contract({ "a:b": internalQuery(object({ total: number })) }),
+        contract({ "a:b": internalQuery(object({ totalOre: number })) }),
+      ),
+    ).toContainEqual({
+      subject: "a:b",
+      breaking: true,
+      detail: "returns.totalOre: became required",
+    });
+    expect(
+      compareContracts(
+        contract({ "a:b": internalQuery(object({ total: number })) }),
+        contract({
+          "a:b": internalQuery(object({ total: number }, { currency: string })),
+        }),
       ).filter((change) => change.breaking),
     ).toEqual([]);
   });
