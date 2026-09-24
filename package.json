@@ -107,6 +107,7 @@
     "test:rules": "node --test tools/eslint/rules.test.cjs",
     "test:coverage": "vitest run --coverage",
     "test:mutation": "stryker run",
+    "contract:update": "vitest run convex/contract.test.ts --update",
     "check:fast": "npm run format:check && npm run typecheck && npm run lint",
     "check": "npm run check:fast && npm run test:rules && npm test",
     "check:ci": "npm run check:fast && npm run test:rules && npm run test:coverage",
