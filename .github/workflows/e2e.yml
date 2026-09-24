@@ -68,7 +68,7 @@ jobs:
     name: iOS Simulator flows
     needs: scope
     if: needs.scope.outputs.run == 'true'
-    runs-on: macos-15
+    runs-on: macos-26
     timeout-minutes: 75
     env:
       MAESTRO_VERSION: 2.10.0
