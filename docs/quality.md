@@ -99,6 +99,7 @@ Further repository rules, in `tools/eslint/index.cjs`, run in ESLint:
 | ------------------------------- | -------------------- | ----------------------------------------------------------------------------------------------------------------------------------- |
 | `kvitto/no-leaked-render`       | TypeScript           | `a && <View/>` when `a` can be `0`, `NaN`, or `""`; React Native crashes when such a value renders outside `<Text>`. Uses types.    |
 | `kvitto/no-ore-arithmetic`      | TypeScript           | `+ - * / %`, compound assignment, and negation on `Ore` amounts outside `ore.ts`. Uses types.                                       |
+| `kvitto/no-calendar-string-ops` | TypeScript           | String methods and template interpolation on `CalendarDate` and `CalendarMonth` outside `calendar.ts`. Uses types.                  |
 | `kvitto/no-inline-literal-set`  | Application, backend | `["a", "b"].includes(x)`. Name the rule as a predicate beside its type, or a module-level `Set`.                                    |
 | `kvitto/convex-function-access` | Backend              | A public `query`, `mutation`, or `action` without an access check, unless a preceding `// Access:` comment states why it is public. |
 | `kvitto/no-db-query-filter`     | Backend              | `.filter()` on a database query. Select with an index range.                                                                        |
@@ -129,6 +130,22 @@ object is the only way to create or combine them: `Ore.of`, `fromKroner`,
 data keep plain numbers; `oreValidator` brands Convex fields without changing
 them. Unit prices are rates in fractional øre per unit, so they are plain
 numbers named `…UnitPrice`, not amounts.
+
+## Dates and categories
+
+Calendar days are `CalendarDate` ("YYYY-MM-DD") and months are `CalendarMonth`
+("YYYY-MM"), branded strings without a time zone. Their companion objects parse,
+read parts, shift, clamp, compare, and format them; `CalendarDate.today()` is
+the date in Oslo. Stored purchase dates stay strings; `calendarDateValidator`
+brands them, and receipt writes parse them. Report period bounds use
+`CalendarDate.parseBound`, because installed clients end every month on day 31.
+Tests build dates with `date("2026-09-18")` and `month("2026-09")`.
+
+`CategoryId` is the closed set of category leaves. Stored ids stay strings,
+because they may predate merged or renamed categories. Parse them with
+`parseCategoryId`, `isCategoryId`, or `isDecidedCategory`, and read names with
+`category(id)` or `categoryOf(stored)`. Functions that decide a category take a
+`CategoryId`.
 
 ## Type safety
 
