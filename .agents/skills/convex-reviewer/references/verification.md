@@ -1,6 +1,6 @@
 # Backend verification
 
-Use the existing Vitest and convex-test configuration and nearby examples. Select checks from the repository's quality guide. Keep fixtures small and use the app's actual authentication and household membership model.
+Use the existing Vitest and convex-test configuration and nearby examples. Select checks from [README](../../../../README.md#checks). Keep fixtures small and use the app's actual authentication and household membership model.
 
 Test observable behavior at the boundary that owns it:
 

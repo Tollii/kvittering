@@ -4,7 +4,7 @@ Read the relevant section when changing registrations, HTTP routes, storage, or 
 
 ## Registration and runtime
 
-Application function constructors come from the application's generated server module; generated `api`, `internal`, and component references come from its generated API module. Use object-form registrations and the project's argument and result validators. Model fixed values with literal validators and unions. Distinguish missing optional fields from an explicit null result; JavaScript `undefined` is not a persisted Convex value.
+Application mutation constructors come from `convex/serverFunctions.ts` so receipt triggers run; generated `api`, `internal`, and component references come from its generated API module. Use object-form registrations and the project's argument and result validators. Model fixed values with literal validators and unions. Distinguish missing optional fields from an explicit null result; JavaScript `undefined` is not a persisted Convex value.
 
 Use table-specific identifiers where the boundary preserves their table identity. Across a component boundary, follow that component's actual identifier contract instead of assuming an app `Id` validator is valid there.
 
