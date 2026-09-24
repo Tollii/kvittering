@@ -26,9 +26,12 @@ name: Sign up and start a household
 - tapOn:
     id: "sign-in-name"
 - inputText: "E2E Tester"
+# The keyboard covers the fields below; Maestro taps screen coordinates.
+- hideKeyboard
 - tapOn:
     id: "sign-in-email"
 - inputText: ${E2E_EMAIL}
+- hideKeyboard
 - tapOn:
     id: "sign-in-password"
 - inputText: "correct horse battery staple"

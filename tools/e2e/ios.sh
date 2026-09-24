@@ -106,6 +106,8 @@ if ! maestro --device "$device" test .maestro \
   --env E2E_EMAIL="e2e-$(date +%s)@example.com" \
   --format junit --output "$out/maestro.xml" \
   --debug-output "$out/maestro"; then
+  echo "Failed step:" >&2
+  grep -oE '<failure[^>]*>[^<]*' "$out/maestro.xml" >&2 || true
   # Name what the screen showed; screenshots are in the uploaded artifact.
   echo "Visible text when the flow failed:" >&2
   maestro --device "$device" hierarchy >"$out/hierarchy.json" 2>/dev/null || true
