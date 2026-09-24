@@ -27,13 +27,16 @@ export function MoneyField({
       onChangeText={(next) => {
         setText(next);
 
-        try {
-          const amount = parseOre(next);
-          onError(null);
-          onChange(amount);
-        } catch (cause) {
-          onError(cause instanceof Error ? cause.message : "Ugyldig beløp.");
+        const amount = parseOre(next);
+
+        if (amount.kind === "invalid") {
+          onError(amount.message);
+
+          return;
         }
+
+        onError(null);
+        onChange(amount.ore);
       }}
     />
   );

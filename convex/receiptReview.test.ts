@@ -190,6 +190,48 @@ it("rejects stale commits without data or history changes and returns a small sa
   ).toBe(1);
 });
 
+it("returns a readable rejection for an impossible date without saving", async () => {
+  const t = convexTest(schema, modules);
+
+  const user = t.withIdentity({
+    subject: "person",
+    issuer: "https://test.local",
+  });
+
+  const householdId = await user.mutation(api.households.create, {
+    name: "Home",
+    invitation: "0123456789abcdef0123456789abcdef",
+  });
+
+  const id = await user.mutation(api.receipts.reserve, {
+    householdId,
+    clientId: "invalid-date-0001",
+    imageCount: 1,
+  });
+
+  const data = batteryFixture();
+  await t.run((ctx) =>
+    ctx.db.patch("receipts", id, { data, status: "needs_review" }),
+  );
+
+  await expect(
+    user.mutation(api.receipts.save, {
+      id,
+      revision: 0,
+      data: { ...data, purchaseDate: "2026-13-01" },
+      reviewed: false,
+      rememberLineIds: [],
+      duplicateResolved: false,
+      excluded: false,
+    }),
+  ).rejects.toMatchObject({
+    data: { code: "REJECTED", message: "Ugyldig dato." },
+  });
+  expect(
+    (await user.query(api.receipts.detail, { id }))!.receipt,
+  ).toMatchObject({ revision: 0, data: { purchaseDate: data.purchaseDate } });
+});
+
 it("persists category uncertainty in the representation understood by installed editors", async () => {
   const t = convexTest(schema, modules);
   const user = t.withIdentity({ subject: "legacy-reviewer", issuer: "test" });

@@ -35,7 +35,7 @@ import { requireMember, requireReceipt } from "./access";
 import {
   reconcile,
   receiptDataValidator,
-  validateReceipt,
+  checkReceipt,
   aliasKey,
 } from "../src/lib/domain/receipt";
 import { canAcceptReceipt } from "../src/lib/domain/receipt-review";
@@ -232,14 +232,12 @@ export const save = mutation({
         "RECEIPT_CHANGED",
       );
 
-    if (
-      receipt.status === "processing" ||
-      receipt.status === "uploaded" ||
-      receipt.status === "uploading"
-    )
+    if (isReceiptProcessing(receipt.status))
       throw userError("Vent til behandlingen er ferdig.");
     args = { ...args, data: structuredClone(args.data) };
-    validateReceipt(args.data);
+    const checked = checkReceipt(args.data);
+
+    if (checked.kind === "invalid") throw userError(checked.message);
 
     const acceptable = canAcceptReceipt(
       args.data,

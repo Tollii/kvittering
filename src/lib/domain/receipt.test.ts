@@ -7,6 +7,7 @@ import {
   parseOre,
   spendingLines,
   validateReceipt,
+  checkReceipt,
   parseReceipt,
   aliasKey,
   classificationInputs,
@@ -61,10 +62,17 @@ describe("receipt accounting", () => {
     expect(receipt.totalOre).toBe(2600);
   });
   it("parses Norwegian decimals exactly and rejects extra decimals", () => {
-    expect(parseOre("−2,59")).toBe(-259);
-    expect(parseOre("1 250,10")).toBe(125010);
-    expect(parseOre("")).toBeNull();
-    expect(() => parseOre("1,234")).toThrow(Error);
+    expect(parseOre("−2,59")).toEqual({ kind: "amount", ore: -259 });
+    expect(parseOre("1 250,10")).toEqual({ kind: "amount", ore: 125010 });
+    expect(parseOre("")).toEqual({ kind: "amount", ore: null });
+    expect(parseOre("1,234")).toEqual({
+      kind: "invalid",
+      message: "Bruk et beløp med høyst to desimaler.",
+    });
+    expect(parseOre("2000000")).toEqual({
+      kind: "invalid",
+      message: "Beløpet er for stort.",
+    });
   });
   it("allocates receipt discounts without losing øre and retains unlinked discounts", () => {
     const receipt = batteryFixture();
@@ -96,11 +104,25 @@ describe("receipt accounting", () => {
   it("rejects fractional øre and duplicate line IDs", () => {
     const receipt = batteryFixture();
     receipt.lines[0].amountOre = 1.1;
-    expect(() => validateReceipt(receipt)).toThrow(/hele øre|ulike ID-er/);
+    expect(checkReceipt(receipt)).toEqual({
+      kind: "invalid",
+      message: "Beløp må være hele øre.",
+    });
     receipt.lines[0].amountOre = 2590;
     receipt.lines.push(receipt.lines[0]);
-    expect(() => validateReceipt(receipt)).toThrow(/hele øre|ulike ID-er/);
+    expect(() => validateReceipt(receipt)).toThrow(
+      "Varelinjene må ha ulike ID-er.",
+    );
   });
+  it.each(["2026-02-30", "2026-13-01", "26-01-01"])(
+    "rejects the impossible purchase date %s with a readable reason",
+    (purchaseDate) => {
+      expect(checkReceipt({ ...batteryFixture(), purchaseDate })).toEqual({
+        kind: "invalid",
+        message: "Ugyldig dato.",
+      });
+    },
+  );
   it("accepts the retired energy-drink category without changing the source receipt", () => {
     const receipt = batteryFixture();
     receipt.lines[0].categoryId = "drinks.energy-drinks";
