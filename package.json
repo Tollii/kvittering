@@ -88,7 +88,7 @@
     "start": "expo start",
     "android": "expo run:android",
     "ios": "expo run:ios",
-    "lint": "npm run lint:oxlint && npm run lint:policy && npm run lint:eslint && npm run lint:unused",
+    "lint": "npm run lint:oxlint && npm run lint:policy && npm run lint:eslint && npm run lint:unused && npm run lint:docs",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "backend": "convex dev",
@@ -109,10 +109,12 @@
     "test:mutation": "stryker run",
     "contract:update": "vitest run convex/contract.test.ts --update",
     "check:fast": "npm run format:check && npm run typecheck && npm run lint",
+    "check:changed": "node tools/check-changed.mts",
     "check": "npm run check:fast && npm run test:rules && npm test",
     "check:ci": "npm run check:fast && npm run test:rules && npm run test:coverage",
     "format": "prettier --write . && oxlint --config oxlint.policy.config.mjs --allow all --deny anti-slop/require-readable-spacing --fix",
-    "format:check": "prettier --check ."
+    "format:check": "prettier --check .",
+    "lint:docs": "node tools/check-docs.mts"
   },
   "private": true,
   "overrides": {

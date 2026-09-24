@@ -8,6 +8,8 @@ export default defineConfig({
       "src/lib/**/*.test.ts",
       "tools/**/*.test.ts",
     ],
+    // Random order exposes tests that depend on state left by another test.
+    sequence: { shuffle: true },
     server: { deps: { inline: ["convex-test", "@better-auth/expo"] } },
     coverage: {
       provider: "v8",
