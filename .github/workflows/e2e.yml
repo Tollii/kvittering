@@ -86,9 +86,21 @@ jobs:
       - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6.5.0
         with:
           node-version: 24
-          cache: npm
+      # setup-node and actions/cache save only when the whole job succeeds, so
+      # a failing flow would never save them. Save each cache once it is filled.
+      - name: Restore the npm cache
+        id: npm
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/.npm
+          key: npm-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
       - name: Install dependencies
         run: npm ci
+      - uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        if: steps.npm.outputs.cache-hit != 'true'
+        with:
+          path: ~/.npm
+          key: npm-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
       - name: Fingerprint the native runtime
         id: fingerprint
         run: echo "hash=$(npx expo-updates fingerprint:generate --platform ios | jq -r .hash)" >> "$GITHUB_OUTPUT"
@@ -103,7 +115,8 @@ jobs:
         id: week
         run: echo "week=$(date -u +%G-%V)" >> "$GITHUB_OUTPUT"
       - name: Restore the local backend
-        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        id: backend
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: ~/.cache/convex/binaries
           key: convex-backend-${{ runner.os }}-${{ steps.week.outputs.week }}
@@ -117,7 +130,16 @@ jobs:
           E2E_APP_CACHE: ${{ steps.app.outputs.cache-hit == 'true' && 'build/cache/kvitto.app' || '' }}
           E2E_DEVICE: ${{ steps.simulator.outputs.device }}
         run: tools/e2e/ios.sh
-      # A finished build is reusable even when a flow fails.
+      # The backend and a finished build are reusable even when a flow fails.
+      - name: Check the downloaded backend
+        id: downloaded
+        if: always() && steps.backend.outputs.cache-hit != 'true'
+        run: test -n "$(ls -A ~/.cache/convex/binaries 2>/dev/null)"
+      - uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        if: always() && steps.downloaded.outcome == 'success'
+        with:
+          path: ~/.cache/convex/binaries
+          key: convex-backend-${{ runner.os }}-${{ steps.week.outputs.week }}
       - name: Save the simulator build
         id: built
         if: always() && steps.app.outputs.cache-hit != 'true' && hashFiles('build/kvitto.app/Info.plist') != ''
