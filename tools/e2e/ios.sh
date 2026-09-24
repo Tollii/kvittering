@@ -25,7 +25,9 @@ export SENTRY_DISABLE_AUTO_UPLOAD=true
 export EXPO_NO_TELEMETRY=1
 
 echo "▸ Starting a local Convex backend"
-CONVEX_AGENT_MODE=anonymous npx convex dev --typecheck disable >"$out/convex.log" 2>&1 &
+# A query may run for one second. While the simulator starts, the runner's few
+# cores leave the app's first queries short of that, so allow ten locally.
+DATABASE_UDF_USER_TIMEOUT_SECONDS=10 CONVEX_AGENT_MODE=anonymous npx convex dev --typecheck disable >"$out/convex.log" 2>&1 &
 convex_pid=$!
 trap 'kill "$convex_pid" 2>/dev/null || true' EXIT
 
@@ -93,13 +95,6 @@ maestro --device "$device" hierarchy >/dev/null 2>&1 &
 driver_pid=$!
 xcrun simctl install "$device" "$app"
 wait "$driver_pid" || true
-
-# The local backend loads function code on first use and unloads it when idle,
-# and a query has one second. On a busy runner the app's first startup queries
-# missed that limit, so load the code just before the flows start.
-for query in featureFlags:get releasePolicy:getVersions; do
-  npx convex run "$query" '{"platform":"ios"}' >/dev/null
-done
 
 echo "▸ Running Maestro flows"
 if ! maestro --device "$device" test .maestro \
