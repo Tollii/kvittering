@@ -30,6 +30,11 @@ module.exports = defineConfig([
     rules: {
       "kvitto/no-undefined-record": "error",
       "kvitto/no-effect-fetch": "error",
+      // A file past this size holds several responsibilities; split it along them.
+      "max-lines": [
+        "error",
+        { max: 750, skipBlankLines: true, skipComments: true },
+      ],
       ...Object.fromEntries(
         Object.entries(sonarjs.rules).flatMap(([name, rule]) =>
           rule.meta.deprecated ? [] : [[`sonarjs/${name}`, "error"]],
