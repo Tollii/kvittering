@@ -2,6 +2,74 @@
 module.exports = {
   meta: { name: "kvitto" },
   rules: {
+    "no-leaked-render": {
+      meta: {
+        type: "problem",
+        schema: [],
+        messages: {
+          leakedValue:
+            "This value can be 0, NaN, or an empty string, which React Native renders as text outside <Text> and crashes. Compare explicitly, for example `count > 0 &&`.",
+        },
+      },
+      create(context) {
+        const services = context.sourceCode.parserServices;
+
+        // The rule needs TypeScript types; Oxlint and untyped files skip it.
+        if (!services?.program) return {};
+        const ts = require("typescript");
+        const checker = services.program.getTypeChecker();
+
+        function canRenderAsText(type) {
+          return (type.isUnion() ? type.types : [type]).some((part) => {
+            const flags = part.getFlags();
+
+            if (part.isStringLiteral()) return part.value === "";
+
+            if (part.isNumberLiteral()) return part.value === 0;
+
+            return (
+              (flags &
+                (ts.TypeFlags.String |
+                  ts.TypeFlags.Number |
+                  ts.TypeFlags.BigInt |
+                  ts.TypeFlags.BigIntLiteral |
+                  ts.TypeFlags.Any |
+                  ts.TypeFlags.Unknown)) !==
+              0
+            );
+          });
+        }
+
+        function operands(node) {
+          return node.type === "LogicalExpression" && node.operator === "&&"
+            ? [...operands(node.left), ...operands(node.right)]
+            : [node];
+        }
+
+        return {
+          JSXExpressionContainer(container) {
+            const expression = container.expression;
+
+            if (
+              expression.type !== "LogicalExpression" ||
+              expression.operator !== "&&" ||
+              (container.parent.type !== "JSXElement" &&
+                container.parent.type !== "JSXFragment")
+            )
+              return;
+
+            for (const operand of operands(expression).slice(0, -1)) {
+              const type = checker.getTypeAtLocation(
+                services.esTreeNodeToTSNodeMap.get(operand),
+              );
+
+              if (canRenderAsText(type))
+                context.report({ node: operand, messageId: "leakedValue" });
+            }
+          },
+        };
+      },
+    },
     "no-effect-fetch": {
       meta: {
         type: "problem",

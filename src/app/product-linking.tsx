@@ -112,7 +112,7 @@ export default function ProductLinking() {
             <Copy size={24} weight="600" style={{ color: colors.onHero }}>
               {item.line.name}
             </Copy>
-            {item.line.receiptName &&
+            {!!item.line.receiptName &&
               item.line.receiptName !== item.line.name && (
                 <Copy size={13} style={{ color: colors.onHeroMuted }}>
                   På kvitteringen: {item.line.receiptName}

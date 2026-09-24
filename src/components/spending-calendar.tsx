@@ -9,6 +9,16 @@ import {
 } from "@/lib/domain/insights";
 import { formatMoney } from "@/lib/domain/receipt";
 
+const weekdays = [
+  ["monday", "M"],
+  ["tuesday", "T"],
+  ["wednesday", "O"],
+  ["thursday", "T"],
+  ["friday", "F"],
+  ["saturday", "L"],
+  ["sunday", "S"],
+] as const;
+
 export function SpendingCalendar({
   receipts,
   month,
@@ -64,9 +74,9 @@ export function SpendingCalendar({
   return (
     <View style={{ gap: 10 }}>
       <View style={{ flexDirection: "row" }}>
-        {["M", "T", "O", "T", "F", "L", "S"].map((label, index) => (
+        {weekdays.map(([day, label]) => (
           <Copy
-            key={index}
+            key={day}
             size={12}
             weight="600"
             muted

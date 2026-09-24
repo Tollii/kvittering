@@ -39,7 +39,7 @@ let subscriptions: Map<string, Subscription>;
 
 let client: ConvexReactClient;
 
-// eslint-disable-next-line sonarjs/deprecation -- The installed React Native test renderer exercises subscription lifecycle behavior.
+// eslint-disable-next-line sonarjs/deprecation, @typescript-eslint/no-deprecated -- The installed React Native test renderer exercises subscription lifecycle behavior.
 let renderer: ReactTestRenderer | undefined;
 
 beforeEach(() => {
@@ -122,7 +122,7 @@ async function show(component: (() => null) | null, scope = "household-a") {
 
   await act(async () => {
     if (renderer) renderer.update(tree);
-    // eslint-disable-next-line sonarjs/deprecation -- The installed React Native test renderer exercises subscription lifecycle behavior.
+    // eslint-disable-next-line sonarjs/deprecation, @typescript-eslint/no-deprecated -- The installed React Native test renderer exercises subscription lifecycle behavior.
     else renderer = create(tree);
   });
 }

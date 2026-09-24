@@ -3,7 +3,7 @@ import { useTheme } from "@/constants/theme";
 import { Copy, Panel, Row, Sheet } from "./ui";
 import { openReceipt, receiptStatusLabel } from "./receipt-card";
 import { formatMoney } from "@/lib/domain/receipt";
-import type { SpendingGroup } from "@/lib/domain/insights";
+import { contributionKey, type SpendingGroup } from "@/lib/domain/insights";
 import { formatDate } from "@/lib/format-date";
 
 export function SpendingBars({
@@ -120,7 +120,7 @@ export function SpendingDetails({
           <Panel style={{ gap: 0, paddingVertical: 4 }}>
             {selected.contributions.map((contribution, index) => (
               <View
-                key={`${contribution.receipt._id}-${index}`}
+                key={contributionKey(contribution)}
                 style={{
                   borderTopWidth: index ? 1 : 0,
                   borderTopColor: colors.line,

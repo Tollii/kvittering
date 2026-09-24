@@ -1,3 +1,9 @@
+import {
+  contributionKey,
+  matchLabel,
+  productHistory,
+  productPrices,
+} from "@/lib/domain/insights";
 import { ReceiptContextMenu } from "@/components/receipt-context-menu";
 import { router, Stack } from "expo-router";
 import {
@@ -23,11 +29,6 @@ import {
 import { IllustratedEmpty } from "@/components/monument-artwork";
 import { openReceipt } from "@/components/receipt-card";
 import { SpendingBars } from "@/components/spending-details";
-import {
-  matchLabel,
-  productHistory,
-  productPrices,
-} from "@/lib/domain/insights";
 import { formatMoney } from "@/lib/domain/receipt";
 import { formatDate } from "@/lib/format-date";
 import { useTheme } from "@/constants/theme";
@@ -304,7 +305,7 @@ export default function History() {
             <Panel style={{ gap: 0, paddingVertical: 4 }}>
               {selected.contributions.map((contribution, index) => (
                 <View
-                  key={index}
+                  key={contributionKey(contribution)}
                   style={{
                     borderTopWidth: index ? 1 : 0,
                     borderTopColor: colors.line,

@@ -92,6 +92,13 @@ module.exports = defineConfig([
       },
     },
     rules: {
+      // React Native crashes when 0 or "" is rendered outside <Text>.
+      "kvitto/no-leaked-render": "error",
+      "react/no-array-index-key": "error",
+      "react/jsx-no-useless-fragment": ["error", { allowExpressions: true }],
+      // Navigation options such as `headerRight` take render functions.
+      "react/no-unstable-nested-components": ["error", { allowAsProps: true }],
+      "@typescript-eslint/no-deprecated": "error",
       // Rest destructuring deliberately omits persisted metadata.
       "@typescript-eslint/no-unused-vars": [
         "warn",

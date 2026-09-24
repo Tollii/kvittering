@@ -16,6 +16,11 @@ export type Contribution = {
   amountOre: number;
 };
 
+/** A receipt contributes once per line, or once as a whole when it has no lines. */
+export function contributionKey({ receipt, line }: Contribution) {
+  return `${receipt._id}:${line?.id ?? "receipt"}`;
+}
+
 export type SpendingGroup = {
   id: string;
   name: string;

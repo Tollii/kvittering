@@ -186,7 +186,7 @@ export function ReceiptLineEditor({
           >
             {line.name || (missingName ? "Navn mangler" : "Ny vare")}
           </Copy>
-          {(kindLabel || (line.quantity && line.quantity !== 1)) && (
+          {!!(kindLabel || (line.quantity && line.quantity !== 1)) && (
             <Copy size={12} muted>
               {[
                 kindLabel,

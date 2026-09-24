@@ -80,7 +80,7 @@ export function ReceiptImages({
             <Button title="Prøv igjen" onPress={() => void load()} />
           </>
         )}
-        {token &&
+        {!!token &&
           Array.from({ length: receipt.imageCount }, (_, position) => (
             <ScrollView
               key={`${position}-${token}`}

@@ -92,7 +92,7 @@ export function CatalogProductPicker({
             <View
               style={{ flexDirection: "row", gap: 12, alignItems: "center" }}
             >
-              {(product.image || product.ean) && (
+              {!!(product.image || product.ean) && (
                 <CatalogImage
                   key={product.key}
                   sources={catalogImageSources(product)}
@@ -257,7 +257,7 @@ export function CatalogProductSheet({
           ))}
         </Disclosure>
       )}
-      {full?.ingredients && (
+      {!!full?.ingredients && (
         <Disclosure title="Ingredienser">
           <Copy size={14}>{full.ingredients}</Copy>
         </Disclosure>
@@ -276,7 +276,7 @@ export function CatalogProductSheet({
       {!!full?.labels.length && (
         <Copy size={13}>{full.labels.join(" · ")}</Copy>
       )}
-      {product.ean && (
+      {!!product.ean && (
         <Copy muted size={12}>
           Strekkode: {product.ean}
         </Copy>
@@ -302,6 +302,7 @@ export function CatalogProductSheet({
             )}
             {prices.data?.prices.map((price, index) => (
               <Row
+                // eslint-disable-next-line react/no-array-index-key -- Provider prices have no identity and are never reordered.
                 key={`${price.store}-${index}`}
                 title={price.store}
                 detail={

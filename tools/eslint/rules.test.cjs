@@ -56,6 +56,39 @@ tester.run("no-effect-fetch", plugin.rules["no-effect-fetch"], {
   ].map((code) => ({ code, errors: [{ messageId: "subscription" }] })),
 });
 
+const typedTester = new RuleTester({
+  languageOptions: {
+    parser,
+    parserOptions: {
+      ecmaFeatures: { jsx: true },
+      project: "./tsconfig.json",
+      tsconfigRootDir: join(__dirname, "fixtures"),
+    },
+  },
+});
+
+const typed = (code) => ({
+  code,
+  filename: join(__dirname, "fixtures", "file.tsx"),
+});
+
+typedTester.run("no-leaked-render", plugin.rules["no-leaked-render"], {
+  valid: [
+    "declare const busy: boolean; const view = <>{busy && <b />}</>;",
+    "declare const count: number; const view = <>{count > 0 && <b />}</>;",
+    "declare const name: string; const view = <>{!!name && <b />}</>;",
+    "declare const label: 'Lagre' | null; const view = <>{label && <b />}</>;",
+    "declare const count: 1 | 2; const view = <>{count && <b />}</>;",
+    "declare const name: string; const view = <b title={name && 'x'} />;",
+  ].map(typed),
+  invalid: [
+    "declare const count: number; const view = <>{count && <b />}</>;",
+    "declare const name: string | undefined; const view = <div>{name && <b />}</div>;",
+    "declare const node: React.ReactNode; const view = <>{node && <b />}</>;",
+    "declare const ok: boolean; declare const count: 0 | 1; const view = <>{ok && count && <b />}</>;",
+  ].map((code) => ({ ...typed(code), errors: [{ messageId: "leakedValue" }] })),
+});
+
 it("runs the same rule in the repository Oxlint configuration", () => {
   const directory = mkdtempSync(join(process.cwd(), "tools", "rule-test-"));
 

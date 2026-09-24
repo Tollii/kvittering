@@ -112,7 +112,7 @@ export function ReceiptCard({
           )}
           <Icon name="chevron.right" size={12} color={colors.secondary} />
         </View>
-        {(!compact || needs.length > 0 || receipt.error) && (
+        {!!(!compact || needs.length > 0 || receipt.error) && (
           <Copy size={13} weight="500" muted>
             <Copy
               size={13}

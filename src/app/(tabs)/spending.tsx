@@ -433,7 +433,7 @@ function Spending({ initialMonth }: Readonly<{ initialMonth: string }>) {
                 { value: "type", label: "Varetype" },
               ]}
             />
-            {group && (
+            {!!group && (
               <Pressable
                 accessibilityRole="button"
                 onPress={() => setGroup(null)}

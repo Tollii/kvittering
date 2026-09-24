@@ -132,7 +132,7 @@ export function CategoryPicker({
           <Copy size={15} weight="600" numberOfLines={2}>
             {name}
           </Copy>
-          {(originalText || brand || confidence != null) && (
+          {!!(originalText || brand || confidence != null) && (
             <Copy size={12} muted numberOfLines={2}>
               {[
                 originalText && originalText !== name

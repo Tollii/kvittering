@@ -254,7 +254,7 @@ export function Empty({
           {message}
         </Copy>
       )}
-      {children && <View style={{ paddingTop: 8, gap: 8 }}>{children}</View>}
+      {!!children && <View style={{ paddingTop: 8, gap: 8 }}>{children}</View>}
     </Panel>
   );
 }
