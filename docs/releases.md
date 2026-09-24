@@ -58,7 +58,7 @@ Shared server work stops if either platform's corresponding flag is disabled. Pl
 
 ## Release sequence
 
-1. Deploy additive backend changes that support old and new clients. Test legacy requests and queues, not only regenerated client types.
+1. Deploy additive backend changes that support old and new clients. Test legacy requests and queues, not only regenerated client types. The `Backend contract` CI job reports changes that would break installed clients or queued work; see [quality checks](quality.md#backend-contract).
 2. Build and submit with `npm run testflight` or the TestFlight GitHub workflow.
 3. Confirm the replacement is available and usable. Test with a real old installation, retained login and queued receipts.
 4. Set the recommended version. The notice can be dismissed for three days.

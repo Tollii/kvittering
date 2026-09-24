@@ -74,6 +74,7 @@ export function Button({
   compact = false,
   icon,
   style,
+  testID,
 }: Readonly<{
   title: string;
   onPress: () => void;
@@ -84,6 +85,8 @@ export function Button({
   compact?: boolean;
   icon?: SymbolViewProps["name"];
   style?: StyleProp<ViewStyle>;
+  /** Identifies the button for end-to-end flows. */
+  testID?: string;
 }>) {
   const colors = useTheme();
 
@@ -96,6 +99,7 @@ export function Button({
 
   return (
     <Pressable
+      testID={testID}
       accessibilityRole="button"
       accessibilityState={{ disabled: disabled || busy, busy }}
       disabled={disabled || busy}

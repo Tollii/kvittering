@@ -1,0 +1,55 @@
+# A new household member signs up with email, starts a household, and reaches
+# the main tabs. This covers native start-up, authentication, Convex
+# subscriptions, and the first household mutation against a real backend.
+appId: no.tolnes.kvitto
+name: Sign up and start a household
+---
+- launchApp:
+    clearState: true
+    clearKeychain: true
+    permissions:
+      all: allow
+# Without Sign in with Apple (an unsigned simulator build), the app opens the
+# email login form directly; with it, the welcome screen offers email sign-up.
+- extendedWaitUntil:
+    visible: "Opprett konto med e-post|Ny her\\? Opprett konto"
+    timeout: 60000
+- runFlow:
+    when:
+      visible: "Opprett konto med e-post"
+    commands:
+      - tapOn: "Opprett konto med e-post"
+- runFlow:
+    when:
+      visible: "Ny her\\? Opprett konto"
+    commands:
+      - tapOn: "Ny her\\? Opprett konto"
+- tapOn:
+    id: "sign-in-name"
+- inputText: "E2E Tester"
+# The keyboard covers the fields below; Maestro taps screen coordinates.
+- hideKeyboard
+- tapOn:
+    id: "sign-in-email"
+- inputText: ${E2E_EMAIL}
+- hideKeyboard
+- tapOn:
+    id: "sign-in-password"
+- inputText: "correct horse battery staple"
+- hideKeyboard
+# The button is enabled only when name, email, and password are valid.
+- assertVisible:
+    id: "sign-in-submit"
+    enabled: true
+- tapOn:
+    id: "sign-in-submit"
+- extendedWaitUntil:
+    visible: "Start med mine kvitteringer"
+    timeout: 30000
+- tapOn: "Start med mine kvitteringer"
+- extendedWaitUntil:
+    visible: "Innboks"
+    timeout: 30000
+- tapOn: "Innboks"
+- tapOn: "Historikk"
+- assertVisible: "Historikken begynner her"

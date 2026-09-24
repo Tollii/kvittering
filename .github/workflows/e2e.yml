@@ -1,0 +1,165 @@
+name: End-to-end
+
+# Maestro flows on the iOS Simulator against a local Convex backend. The
+# simulator app is cached by native fingerprint, so a JavaScript-only change
+# reuses the build and only re-embeds its bundle.
+#
+# While the repository is private, macOS minutes are billed, so the job runs
+# automatically only for changes to the flows themselves or with the `e2e`
+# label. Once public, it also runs for native changes and nightly on main.
+# Agents and people can start it for any branch with workflow_dispatch.
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, labeled]
+  schedule:
+    - cron: "0 3 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: e2e-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  scope:
+    name: Decide whether to run
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      run: ${{ steps.decide.outputs.run }}
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6.5.0
+        with:
+          node-version: 24
+      - name: List change areas
+        id: areas
+        if: github.event_name == 'pull_request'
+        env:
+          BASE: ${{ github.event.pull_request.base.sha }}
+        run: node tools/presubmit.mts "$BASE"
+      - name: Decide
+        id: decide
+        env:
+          EVENT: ${{ github.event_name }}
+          PRIVATE: ${{ github.event.repository.private }}
+          LABELLED: ${{ contains(github.event.pull_request.labels.*.name, 'e2e') }}
+          NATIVE: ${{ steps.areas.outputs.native }}
+          FLOWS: ${{ steps.areas.outputs.e2e }}
+        run: |
+          run=false
+          case "$EVENT" in
+            workflow_dispatch) run=true ;;
+            schedule) [[ "$PRIVATE" == "false" ]] && run=true ;;
+            pull_request)
+              if [[ "$LABELLED" == "true" || "$FLOWS" == "true" ]]; then run=true; fi
+              if [[ "$PRIVATE" == "false" && "$NATIVE" == "true" ]]; then run=true; fi
+              ;;
+          esac
+          echo "run=$run" >> "$GITHUB_OUTPUT"
+          echo "End-to-end run: $run ($EVENT)" >> "$GITHUB_STEP_SUMMARY"
+
+  ios:
+    name: iOS Simulator flows
+    needs: scope
+    if: needs.scope.outputs.run == 'true'
+    runs-on: xcode-27
+    timeout-minutes: 75
+    env:
+      MAESTRO_VERSION: 2.10.0
+      DEVELOPER_DIR: /Applications/Xcode_27.0.app/Contents/Developer
+      E2E_IOS_RUNTIME: com.apple.CoreSimulator.SimRuntime.iOS-27-0
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        with:
+          persist-credentials: false
+      # A fresh simulator's first boot takes minutes; start it before setup.
+      - name: Start booting the simulator
+        id: simulator
+        run: |
+          device="$(tools/e2e/simulator.sh)"
+          xcrun simctl boot "$device" || true
+          echo "device=$device" >> "$GITHUB_OUTPUT"
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6.5.0
+        with:
+          node-version: 24
+      # setup-node and actions/cache save only when the whole job succeeds, so
+      # a failing flow would never save them. Save each cache once it is filled.
+      - name: Restore the npm cache
+        id: npm
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/.npm
+          key: npm-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
+      - name: Install dependencies
+        run: npm ci
+      - uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        if: steps.npm.outputs.cache-hit != 'true'
+        with:
+          path: ~/.npm
+          key: npm-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
+      - name: Fingerprint the native runtime
+        id: fingerprint
+        run: |
+          echo "hash=$(npx expo-updates fingerprint:generate --platform ios | jq -r .hash)" >> "$GITHUB_OUTPUT"
+          echo "xcode=$(xcodebuild -version | awk 'NR == 2 { print $3 }')" >> "$GITHUB_OUTPUT"
+      - name: Restore the simulator build
+        id: app
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: build/cache/kvitto.app
+          key: e2e-ios-app-${{ runner.arch }}-${{ steps.fingerprint.outputs.xcode }}-${{ env.E2E_IOS_RUNTIME }}-${{ steps.fingerprint.outputs.hash }}
+      # The Convex CLI downloads the latest local backend; reuse it within a week.
+      - name: Choose the backend cache week
+        id: week
+        run: echo "week=$(date -u +%G-%V)" >> "$GITHUB_OUTPUT"
+      - name: Restore the local backend
+        id: backend
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/.cache/convex/binaries
+          key: convex-backend-${{ runner.os }}-${{ steps.week.outputs.week }}
+          restore-keys: convex-backend-${{ runner.os }}-
+      - name: Install Maestro
+        run: |
+          curl -fsSL "https://get.maestro.mobile.dev" | bash
+          echo "$HOME/.maestro/bin" >> "$GITHUB_PATH"
+      - name: Run flows
+        env:
+          E2E_APP_CACHE: ${{ steps.app.outputs.cache-hit == 'true' && 'build/cache/kvitto.app' || '' }}
+          E2E_DEVICE: ${{ steps.simulator.outputs.device }}
+        run: tools/e2e/ios.sh
+      # The backend and a finished build are reusable even when a flow fails.
+      - name: Check the downloaded backend
+        id: downloaded
+        if: always() && steps.backend.outputs.cache-hit != 'true'
+        run: test -n "$(ls -A ~/.cache/convex/binaries 2>/dev/null)"
+      - uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        if: always() && steps.downloaded.outcome == 'success'
+        with:
+          path: ~/.cache/convex/binaries
+          key: convex-backend-${{ runner.os }}-${{ steps.week.outputs.week }}
+      - name: Save the simulator build
+        id: built
+        if: always() && steps.app.outputs.cache-hit != 'true' && hashFiles('build/kvitto.app/Info.plist') != ''
+        run: |
+          mkdir -p build/cache
+          cp -R build/kvitto.app build/cache/kvitto.app
+      - uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        if: always() && steps.built.outcome == 'success'
+        with:
+          path: build/cache/kvitto.app
+          key: e2e-ios-app-${{ runner.arch }}-${{ steps.fingerprint.outputs.xcode }}-${{ env.E2E_IOS_RUNTIME }}-${{ steps.fingerprint.outputs.hash }}
+      - name: Upload screenshots and logs
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: e2e-ios
+          path: build/e2e/
+          if-no-files-found: ignore
+          retention-days: 14

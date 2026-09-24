@@ -12,8 +12,9 @@ export default {
   },
   mutate: ["src/lib/domain/**/*.ts", "!src/lib/domain/**/*.test.ts"],
   coverageAnalysis: "off",
-  reporters: ["clear-text", "progress", "html"],
+  reporters: ["clear-text", "progress", "html", "json"],
   htmlReporter: { fileName: "coverage/mutation/index.html" },
+  jsonReporter: { fileName: "coverage/mutation/mutation.json" },
   tempDirName: ".stryker-tmp",
   // Only source and configuration are copied into the sandbox.
   ignorePatterns: [

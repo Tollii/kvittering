@@ -48,3 +48,6 @@ example
 # Mutation testing workspace
 .stryker-tmp/
 reports/
+
+# End-to-end build output
+/build

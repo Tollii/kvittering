@@ -1,7 +1,12 @@
 name: Code quality
 
+# Every job below is required through `CI result`, except the advisory reports
+# (mutation and changed-line coverage). Make `CI result` the only required
+# status check; see docs/quality.md.
 on:
   pull_request:
+    types: [opened, synchronize, reopened, labeled, unlabeled]
+  merge_group:
   push:
     branches: [main]
 
@@ -12,26 +17,267 @@ concurrency:
   group: quality-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
+env:
+  EXPO_NO_TELEMETRY: "1"
+
 jobs:
+  changes:
+    name: Change areas
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      base: ${{ steps.base.outputs.sha }}
+      backend: ${{ steps.areas.outputs.backend }}
+      domain: ${{ steps.areas.outputs.domain }}
+      native: ${{ steps.areas.outputs.native }}
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6.5.0
+        with:
+          node-version: 24
+      - name: Select the base commit
+        id: base
+        env:
+          PR_BASE: ${{ github.event.pull_request.base.sha }}
+          QUEUE_BASE: ${{ github.event.merge_group.base_sha }}
+          PUSH_BASE: ${{ github.event.before }}
+        run: |
+          base="${PR_BASE:-${QUEUE_BASE:-$PUSH_BASE}}"
+          if ! git cat-file -e "${base}^{commit}" 2>/dev/null; then
+            base="$(git rev-parse HEAD~1)"
+          fi
+          echo "sha=$base" >> "$GITHUB_OUTPUT"
+      - name: List change areas
+        id: areas
+        env:
+          BASE: ${{ steps.base.outputs.sha }}
+        run: node tools/presubmit.mts "$BASE" >> "$GITHUB_STEP_SUMMARY"
+
   quality:
     name: Quality checks
+    needs: changes
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 20
     steps:
-      - uses: actions/checkout@v5
-      - uses: actions/setup-node@v6
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6.5.0
         with:
           node-version: 24
           cache: npm
       - name: Install dependencies
         run: npm ci
-      - name: Check formatting, types, lint rules, and tests
-        run: npm run check:ci
+      - name: Check formatting, types, lint rules, documentation, and tests
+        # Tests run in random order; the seed reproduces a failure locally.
+        env:
+          SEED: ${{ github.run_id }}
+        run: |
+          echo "Test order seed: $SEED (npx vitest run --sequence.seed=$SEED)"
+          npm run check:fast
+          npm run test:rules
+          npm run test:coverage -- --sequence.seed="$SEED"
+          npm run test:components -- --ci --coverage
+      - name: Report changed lines without coverage
+        if: github.event_name == 'pull_request'
+        env:
+          BASE: ${{ needs.changes.outputs.base }}
+        run: node tools/diff-coverage.mts "$BASE" >> "$GITHUB_STEP_SUMMARY"
       - name: Upload coverage report
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: coverage
           path: coverage/
           if-no-files-found: ignore
           retention-days: 14
+
+  app:
+    name: App bundle and generated code
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6.5.0
+        with:
+          node-version: 24
+          cache: npm
+      - name: Install dependencies
+        run: npm ci
+      - name: Bundle the iOS app
+        run: npx expo export --platform ios --output-dir dist
+      - name: Check Expo SDK package versions
+        run: |
+          if ! npx expo install --check; then
+            echo "::error::Expo SDK packages differ from the versions this SDK expects. Run npx expo install --fix, review the native change with the release-review skill, and commit. To keep a deliberate version, add the package to expo.install.exclude in package.json."
+            exit 1
+          fi
+      - name: Check generated catalog client
+        run: |
+          npm run generate:catalog
+          if ! git diff --exit-code; then
+            echo "::error::The generated catalog client is out of date. Run npm run generate:catalog and commit the result."
+            exit 1
+          fi
+
+  contract:
+    name: Backend contract
+    needs: changes
+    if: github.event_name != 'push'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      pull-requests: read
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6.5.0
+        with:
+          node-version: 24
+          cache: npm
+      - name: Install dependencies
+        run: npm ci
+      - name: Compare with the base branch
+        env:
+          BASE: ${{ needs.changes.outputs.base }}
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          QUEUE_REF: ${{ github.event.merge_group.head_ref }}
+        run: |
+          if ! git show "$BASE:convex/contract.json" > "$RUNNER_TEMP/base-contract.json" 2>/dev/null; then
+            echo "The base branch has no contract snapshot yet." >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          # Label changes and reruns must use current labels, not the old event payload.
+          if [[ -n "$QUEUE_REF" && "$QUEUE_REF" =~ pr-([0-9]+)- ]]; then
+            PR_NUMBER="${BASH_REMATCH[1]}"
+          fi
+          PR_LABELS=""
+          if [[ -n "$PR_NUMBER" ]]; then
+            PR_LABELS="$(gh pr view "$PR_NUMBER" --repo "$GITHUB_REPOSITORY" --json labels --jq '[.labels[].name] | join(",")')"
+          fi
+          flag=""
+          if [[ ",$PR_LABELS," == *",breaking-contract,"* ]]; then flag="--allow-breaking"; fi
+          node tools/contract/compare.mts "$RUNNER_TEMP/base-contract.json" convex/contract.json $flag | tee -a "$GITHUB_STEP_SUMMARY"
+          exit "${PIPESTATUS[0]}"
+
+  fingerprint:
+    name: Native fingerprint
+    needs: changes
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6.5.0
+        with:
+          node-version: 24
+          cache: npm
+      - name: Fingerprint this change
+        run: |
+          npm ci
+          npx expo-updates fingerprint:generate --platform ios > "$RUNNER_TEMP/head.json"
+      - name: Fingerprint the base branch
+        env:
+          BASE: ${{ needs.changes.outputs.base }}
+        run: |
+          git worktree add "$RUNNER_TEMP/base" "$BASE"
+          cd "$RUNNER_TEMP/base"
+          npm ci
+          npx expo-updates fingerprint:generate --platform ios > "$RUNNER_TEMP/base.json"
+      - name: Compare
+        run: node tools/fingerprint-diff.mts "$RUNNER_TEMP/base.json" "$RUNNER_TEMP/head.json" >> "$GITHUB_STEP_SUMMARY"
+
+  workflows:
+    name: Workflow and secret checks
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Lint workflows with actionlint
+        run: docker run --rm -v "$PWD:/repo" -w /repo rhysd/actionlint:1.7.12 -color
+      - name: Audit workflows with zizmor
+        run: pipx run zizmor==1.30.1 --format github --min-severity medium .github/workflows
+      - name: Scan history for secrets with gitleaks
+        run: docker run --rm -v "$PWD:/repo" ghcr.io/gitleaks/gitleaks:v8.30.1 git /repo --redact --no-banner
+
+  dependencies:
+    name: Dependency review
+    # GitHub offers dependency review for private repositories only with Advanced Security.
+    if: github.event_name == 'pull_request' && !github.event.repository.private
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/dependency-review-action@2031cfc080254a8a887f58cffee85186f0e49e48 # v4.9.0
+        with:
+          fail-on-severity: high
+
+  mutation:
+    name: Mutation report (advisory)
+    needs: changes
+    if: github.event_name == 'pull_request' && needs.changes.outputs.domain == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6.5.0
+        with:
+          node-version: 24
+          cache: npm
+      - name: Install dependencies
+        run: npm ci
+      - name: Mutate changed domain rules
+        env:
+          BASE: ${{ needs.changes.outputs.base }}
+        run: |
+          files="$(git diff --name-only --diff-filter=AM "$BASE" -- 'src/lib/domain/*.ts' ':!src/lib/domain/*.test.ts' | paste -sd, -)"
+          if [[ -z "$files" ]]; then exit 0; fi
+          npx stryker run --mutate "$files"
+          node tools/mutation-summary.mts coverage/mutation/mutation.json >> "$GITHUB_STEP_SUMMARY"
+      - name: Upload mutation report
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: mutation
+          path: coverage/mutation/
+          if-no-files-found: ignore
+          retention-days: 14
+
+  result:
+    name: CI result
+    if: always()
+    needs:
+      [changes, quality, app, contract, fingerprint, workflows, dependencies]
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - name: Require every check to pass or be skipped
+        env:
+          RESULTS: ${{ join(needs.*.result, ' ') }}
+        run: |
+          echo "Results: $RESULTS"
+          for result in $RESULTS; do
+            if [[ "$result" != "success" && "$result" != "skipped" ]]; then
+              echo "::error::A required check did not pass. Open the failed job; its message names the fix."
+              exit 1
+            fi
+          done

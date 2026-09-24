@@ -2,29 +2,37 @@
 
 Use Node.js 24 and `npm ci`. The checks require no server, account, or secrets.
 
-| Command                 | Purpose                                                                   |
-| ----------------------- | ------------------------------------------------------------------------- |
-| `npm run check:fast`    | Formatting, TypeScript, Oxlint, repository rules, and Expo/SonarJS checks |
-| `npm run check`         | Fast checks, custom lint-rule tests, and application tests                |
-| `npm run check:ci`      | The same checks with application coverage reports                         |
-| `npm run lint:fix`      | Apply available lint fixes; review the changes before committing          |
-| `npm run lint:oxlint`   | Native Oxlint correctness and test checks                                 |
-| `npm run lint:policy`   | All general anti-slop rules                                               |
-| `npm run lint:eslint`   | Expo, React, type-aware TypeScript, repository, and SonarJS checks        |
-| `npm run lint:unused`   | Unused files, dependencies, and exports (knip)                            |
-| `npm run test:rules`    | Custom rule tests in ESLint and the actual Oxlint CLI                     |
-| `npm run test:mutation` | On-demand mutation report for domain rules (Stryker)                      |
+| Command                   | Purpose                                                                   |
+| ------------------------- | ------------------------------------------------------------------------- |
+| `npm run check:changed`   | Fast checks and related tests for the files changed since `main`          |
+| `npm run check:fast`      | Formatting, TypeScript, Oxlint, repository rules, and Expo/SonarJS checks |
+| `npm run check`           | Fast checks, custom lint-rule tests, application and component tests      |
+| `npm run check:ci`        | The same checks with coverage reports                                     |
+| `npm run lint:fix`        | Apply available lint fixes; review the changes before committing          |
+| `npm run lint:oxlint`     | Native Oxlint correctness and test checks                                 |
+| `npm run lint:policy`     | All general anti-slop rules                                               |
+| `npm run lint:eslint`     | Expo, React, type-aware TypeScript, repository, and SonarJS checks        |
+| `npm run lint:unused`     | Unused files, dependencies, and exports (knip)                            |
+| `npm run lint:docs`       | Documentation links, headings, and `npm run` references                   |
+| `npm run test:rules`      | Custom rule tests in ESLint and the actual Oxlint CLI                     |
+| `npm run test:components` | React Native component tests (Jest with `jest-expo`)                      |
+| `npm run contract:update` | Rewrite `convex/contract.json` after a backend signature change           |
+| `npm run test:mutation`   | On-demand mutation report for domain rules (Stryker)                      |
+| `npm run e2e:ios`         | Maestro flows on the iOS Simulator with a local backend (macOS)           |
 
-`Code quality / Quality checks` runs on pull requests and pushes to `main`.
-The TestFlight workflow runs `npm run check` before a new build. Set
-`Quality checks` as a required status check in the GitHub branch rules to prevent
-merges after a failed check. This repository change does not change branch rules.
+`Code quality` runs on pull requests, merge queue groups, and pushes to `main`.
+Its `CI result` job passes only when every required job passes; make it the
+only required status check. [Verification](verification.md) lists the jobs, the
+advisory reports, the end-to-end workflow, and how to add checks. The
+TestFlight and OTA workflows run `npm run check` before publishing.
 
 Warnings and errors fail the lint commands. Generated clients, native build
 output, agent assets, the retired `sveltemo` application, and vendored rule source
 are excluded. Application and backend source have no findings baseline.
-Coverage reports are written to `coverage/` and retained as CI artifacts for
-14 days. Coverage is reported, not used as an arbitrary percentage gate. Test
+Coverage reports are written to `coverage/` (component tests to
+`coverage/components/`) and retained as CI artifacts for 14 days. Coverage is
+reported, not used as an arbitrary percentage gate; pull requests list changed
+lines that no test executed. Test
 business rules and important failures; do not add tests only to raise a number.
 
 ## Formatting
@@ -243,12 +251,27 @@ references, scheduled functions, workflow callbacks, and installed clients.
 
 Dependabot proposes weekly npm updates and monthly GitHub Actions updates. Expo,
 React, and React Native minor and major versions are excluded; upgrade the SDK
-with `npx expo install --fix` and review it with the release policy.
+with `npx expo install --fix` and review it with the release policy. CI fails
+when installed Expo packages differ from the SDK's expected versions.
+`@sentry/react-native` is excluded in `expo.install.exclude` because the app
+deliberately uses a newer major version than the SDK recommends.
 
 `npm run test:mutation` changes domain rules one at a time and reports which
 changes no test notices. Pass `-- --mutate src/lib/domain/<module>.ts` for one
 module. The HTML report is written to `coverage/mutation/`. It uses the command
 runner and `vitest.mutation.config.mts`, a node-environment copy of the domain
-tests. It is a review aid, not a CI gate or percentage target.
+tests. It is a review aid, not a CI gate or percentage target. Pull requests
+that change domain rules get the same report for the changed files in the job
+summary, without blocking the merge.
 
-A required PR status check and secret scanning remain useful next steps.
+## Backend contract
+
+`convex/contract.json` records every public function's arguments and result,
+every internal function's arguments, and the HTTP routes. Installed apps call
+the public functions; the scheduler and workflows hold internal arguments
+across a deployment. A test keeps the file current, and the `Backend contract`
+job compares it with the base branch. Removing a function or route, requiring a
+new argument, narrowing an accepted value, or removing a result field that
+clients read is breaking; adding optional arguments or result fields is not.
+A breaking change fails the job unless the pull request has the
+`breaking-contract` label after the release review in [releases](releases.md).
