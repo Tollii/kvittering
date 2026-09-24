@@ -1,5 +1,6 @@
 import type { Id } from "../../convex/_generated/dataModel";
 import type { DiagnosticFields } from "./diagnostics";
+import { parseUserError } from "./user-errors";
 
 export type LocalReceipt = {
   schemaVersion: 1;
@@ -25,19 +26,47 @@ export interface UploadTransport {
   complete(id: Id<"receipts">, entry: LocalReceipt): Promise<void>;
 }
 
-/** Persist each completed step. Repeated requests use the same server reservation. */
+export const retryPolicy = { firstDelayMs: 15_000, maxAttempts: 6 };
+
+/**
+ * When a failed capture may be tried again automatically. A rejection the
+ * person must act on waits for them; other failures back off and stop after
+ * the attempt cap. Returns null when only a manual retry or restart may retry.
+ */
+export function nextAttemptAt(
+  failures: number,
+  rejected: boolean,
+  now: number,
+): number | null {
+  if (rejected || failures >= retryPolicy.maxAttempts) return null;
+
+  return now + retryPolicy.firstDelayMs * 2 ** (failures - 1);
+}
+
+type RetryState = { failures: number; nextAttemptAt: number | null };
+
+/**
+ * Persist each completed step. Repeated requests use the same server reservation.
+ * Retry limits live only for this app process, so every app start tries again.
+ */
 export function createQueueRunner(
   store: QueueStore,
   record: (event: string, fields: DiagnosticFields) => void = () => {},
+  clock: () => number = Date.now,
 ) {
   let running = false;
+  const retries = new Map<string, RetryState>();
 
   return async (
     owner: string,
     householdId: Id<"households">,
     transport: UploadTransport,
     active: () => boolean,
+    { retryFailed = false }: { retryFailed?: boolean } = {},
   ) => {
+    // A manual retry applies even if a drain is already running.
+    if (retryFailed) retries.clear();
+
     if (running) return;
     running = true;
 
@@ -50,6 +79,13 @@ export function createQueueRunner(
         };
 
         if (!active()) break;
+        const retry = retries.get(entry.id);
+
+        if (
+          retry &&
+          (retry.nextAttemptAt === null || clock() < retry.nextAttemptAt)
+        )
+          continue;
 
         try {
           entry.error = undefined;
@@ -92,6 +128,7 @@ export function createQueueRunner(
           if (!active()) return;
           await transport.complete(entry.receiptId, entry);
           store.remove(entry);
+          retries.delete(entry.id);
           record("receipt.upload_completed", {
             receiptId: entry.receiptId,
             imageCount: entry.images.length,
@@ -100,6 +137,21 @@ export function createQueueRunner(
           entry.error =
             cause instanceof Error ? cause.message : "Opplastingen mislyktes.";
           store.update(entry);
+          const failures = (retry?.failures ?? 0) + 1;
+
+          const next = nextAttemptAt(
+            failures,
+            parseUserError(cause)?.code === "REJECTED",
+            clock(),
+          );
+
+          retries.set(entry.id, { failures, nextAttemptAt: next });
+
+          if (next === null)
+            record("receipt.upload_paused", {
+              captureId: entry.id,
+              attempts: failures,
+            });
         }
       }
     } finally {

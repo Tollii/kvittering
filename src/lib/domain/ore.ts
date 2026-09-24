@@ -13,6 +13,10 @@ declare const oreBrand: unique symbol;
  */
 export type Ore = number & { readonly [oreBrand]: true };
 
+/** Typed text read as an amount, or the reason it cannot be one. */
+export type OreInput =
+  { kind: "amount"; ore: Ore | null } | { kind: "invalid"; message: string };
+
 /** Amounts a person can enter: up to one million kroner either way. */
 const inputLimit = 100_000_000;
 
@@ -56,17 +60,20 @@ export const Ore = {
   fromKroner: (kroner: number): Ore => of(Math.round(kroner * 100)),
 
   /** Parses a Norwegian amount such as "12,50" or "-3"; empty text is unknown. */
-  parse(text: string): Ore | null {
+  parse(text: string): OreInput {
     const value = text
       .trim()
       .replaceAll(/\s/g, "")
       .replace("−", "-")
       .replace(",", ".");
 
-    if (!value) return null;
+    if (!value) return { kind: "amount", ore: null };
 
     if (!/^-?\d+(\.\d{1,2})?$/.test(value))
-      throw new Error("Bruk et beløp med høyst to desimaler.");
+      return {
+        kind: "invalid",
+        message: "Bruk et beløp med høyst to desimaler.",
+      };
     const [whole, fraction = ""] = value.replace("-", "").split(".");
 
     const result =
@@ -74,9 +81,9 @@ export const Ore = {
       (value.startsWith("-") ? -1 : 1);
 
     if (!Number.isSafeInteger(result) || Math.abs(result) > inputLimit)
-      throw new Error("Beløpet er for stort.");
+      return { kind: "invalid", message: "Beløpet er for stort." };
 
-    return of(result);
+    return { kind: "amount", ore: of(result) };
   },
 
   add: (a: Ore, b: Ore): Ore => of(a + b),

@@ -7,6 +7,7 @@ import {
   emptyLine,
   spendingLines,
   validateReceipt,
+  checkReceipt,
   parseReceipt,
   aliasKey,
   classificationInputs,
@@ -94,11 +95,25 @@ describe("receipt accounting", () => {
     const receipt = batteryFixture();
     // SAFETY: A fractional amount is built deliberately to test the receipt boundary.
     present(receipt.lines[0]).amountOre = 1.1 as Ore;
-    expect(() => validateReceipt(receipt)).toThrow(/hele øre|ulike ID-er/);
+    expect(checkReceipt(receipt)).toEqual({
+      kind: "invalid",
+      message: "Beløp må være hele øre.",
+    });
     present(receipt.lines[0]).amountOre = Ore.of(2590);
     receipt.lines.push(present(receipt.lines[0]));
-    expect(() => validateReceipt(receipt)).toThrow(/hele øre|ulike ID-er/);
+    expect(() => validateReceipt(receipt)).toThrow(
+      "Varelinjene må ha ulike ID-er.",
+    );
   });
+  it.each(["2026-02-30", "2026-13-01", "26-01-01"])(
+    "rejects the impossible purchase date %s with a readable reason",
+    (purchaseDate) => {
+      expect(checkReceipt({ ...batteryFixture(), purchaseDate })).toEqual({
+        kind: "invalid",
+        message: "Ugyldig dato.",
+      });
+    },
+  );
   it("accepts the retired energy-drink category without changing the source receipt", () => {
     const receipt = batteryFixture();
     present(receipt.lines[0]).categoryId = "drinks.energy-drinks";

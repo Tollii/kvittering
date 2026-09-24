@@ -1,3 +1,4 @@
+import { userError } from "./userErrors";
 import { isReceiptProcessing } from "../src/lib/domain/receipt-state";
 import { commitReceiptChange } from "./receiptChanges";
 import { isCategoryUncertain } from "../src/lib/domain/receipt-issues";
@@ -191,7 +192,7 @@ export const enrich = mutation({
     if (onlyIfMissing && receipt.catalogStatus) return null;
 
     if (!receipt.data || isReceiptProcessing(receipt.status))
-      throw new Error("Vent til kvitteringen er lest.");
+      throw userError("Vent til kvitteringen er lest.");
 
     if (!env.KASSALAPP_API_KEY)
       throw new Error("Legg til KASSALAPP_API_KEY i Convex først.");

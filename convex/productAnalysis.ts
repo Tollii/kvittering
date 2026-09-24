@@ -1,3 +1,4 @@
+import { userError } from "./userErrors";
 import { hasReceiptBeenRead } from "../src/lib/domain/receipt-state";
 import { featureEnabled } from "./featureFlags";
 import { clientMutation as mutation } from "./clientFunctions";
@@ -149,7 +150,7 @@ export const ensure = mutation({
   args: { ids: v.array(v.id("receipts")) },
   returns: v.null(),
   handler: async (ctx, { ids }) => {
-    if (ids.length > 20) throw new Error("For mange kvitteringer.");
+    if (ids.length > 20) throw userError("For mange kvitteringer.");
 
     for (const id of ids) {
       const { receipt } = await requireReceipt(ctx, id);

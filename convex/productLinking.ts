@@ -1,3 +1,4 @@
+import { userError } from "./userErrors";
 import { v } from "convex/values";
 import {
   paginationOptsValidator,
@@ -145,12 +146,15 @@ export const choose = mutation({
     const { receipt: row, member } = await requireReceipt(ctx, args.receiptId);
 
     if (row.revision !== args.revision || row.generation !== args.generation)
-      throw new Error("Kvitteringen er endret. Prøv igjen med siste versjon.");
+      throw userError(
+        "Kvitteringen er endret. Prøv igjen med siste versjon.",
+        "RECEIPT_CHANGED",
+      );
     const receipt = linkable(row);
     const line = receipt?.data.lines.find((item) => item.id === args.lineId);
 
     if (!receipt || !line || !needsProductLink(line))
-      throw new Error("Varen er ikke lenger klar for produktkobling.");
+      throw userError("Varen er ikke lenger klar for produktkobling.");
     const retailer = matchingKey(receipt.data.store);
     const before = await findMapping(ctx, member.householdId, retailer, line);
 
@@ -213,7 +217,10 @@ export const undo = mutation({
       undo.revision !== revision ||
       undo.generation !== receipt.generation
     )
-      throw new Error("Valget kan ikke angres fordi kvitteringen er endret.");
+      throw userError(
+        "Valget kan ikke angres fordi kvitteringen er endret.",
+        "RECEIPT_CHANGED",
+      );
     const mapping = await ctx.db.get("productMappings", undo.mappingId);
 
     if (
@@ -221,7 +228,7 @@ export const undo = mutation({
       mapping.householdId !== member.householdId ||
       mapping.revision !== undo.mappingRevision
     )
-      throw new Error("Produktvalget er endret senere og kan ikke angres.");
+      throw userError("Produktvalget er endret senere og kan ikke angres.");
 
     if (undo.previousMapping)
       await ctx.db.replace("productMappings", mapping._id, {
