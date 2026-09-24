@@ -99,13 +99,15 @@ jobs:
         env:
           E2E_APP_CACHE: ${{ steps.app.outputs.cache-hit == 'true' && 'build/cache/kvitto.app' || '' }}
         run: tools/e2e/ios.sh
+      # A finished build is reusable even when a flow fails.
       - name: Save the simulator build
-        if: steps.app.outputs.cache-hit != 'true'
+        id: built
+        if: always() && steps.app.outputs.cache-hit != 'true' && hashFiles('build/kvitto.app/Info.plist') != ''
         run: |
           mkdir -p build/cache
           cp -R build/kvitto.app build/cache/kvitto.app
       - uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
-        if: steps.app.outputs.cache-hit != 'true'
+        if: always() && steps.built.outcome == 'success'
         with:
           path: build/cache/kvitto.app
           key: e2e-ios-app-${{ steps.fingerprint.outputs.hash }}

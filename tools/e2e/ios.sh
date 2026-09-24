@@ -54,7 +54,7 @@ if [[ -n "${E2E_APP_CACHE:-}" && -d "$E2E_APP_CACHE" ]]; then
     --entry-file node_modules/expo-router/entry.js \
     --bundle-output "$app/main.jsbundle" --assets-dest "$app"
 else
-  echo "▸ Building the app for the iOS Simulator with $(xcodebuild -version | head -n 1)"
+  echo "▸ Building the app for the iOS Simulator with $(xcodebuild -version | awk 'NR == 1')"
   npx expo prebuild --platform ios --clean
   # Installed updates would replace the JavaScript under test.
   plutil -replace EXUpdatesEnabled -bool NO ios/kvitto/Supporting/Expo.plist
