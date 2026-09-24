@@ -6,6 +6,9 @@
 #
 # E2E_APP_CACHE: optional path of a previously built kvitto.app for the same
 # native fingerprint; its JavaScript bundle is replaced instead of rebuilding.
+#
+# The app is signed ad hoc, as Xcode's "Sign to Run Locally" does: without
+# entitlements the Keychain refuses expo-secure-store and the app stops.
 set -euo pipefail
 
 cd "$(dirname "$0")/../.."
@@ -50,9 +53,13 @@ if [[ -n "${E2E_APP_CACHE:-}" && -d "$E2E_APP_CACHE" ]]; then
   echo "▸ Reusing the native build; embedding the current JavaScript"
   rm -rf "$app"
   cp -R "$E2E_APP_CACHE" "$app"
+  codesign -d --entitlements - --xml "$app" >"$out/entitlements.plist" 2>/dev/null
   npx expo export:embed --platform ios --dev false --bytecode \
     --entry-file node_modules/expo-router/entry.js \
     --bundle-output "$app/main.jsbundle" --assets-dest "$app"
+  # The new bundle invalidates the signature that carries the entitlements.
+  codesign --force --sign - --entitlements "$out/entitlements.plist" \
+    --timestamp=none "$app"
 else
   echo "▸ Building the app for the iOS Simulator with $(xcodebuild -version | awk 'NR == 1')"
   npx expo prebuild --platform ios --clean
@@ -62,7 +69,8 @@ else
     -configuration Release -sdk iphonesimulator \
     -destination "generic/platform=iOS Simulator" \
     -derivedDataPath build/derived \
-    CODE_SIGNING_ALLOWED=NO ONLY_ACTIVE_ARCH=YES \
+    CODE_SIGN_IDENTITY=- CODE_SIGN_STYLE=Manual DEVELOPMENT_TEAM= \
+    PROVISIONING_PROFILE_SPECIFIER= ONLY_ACTIVE_ARCH=YES \
     >"$out/xcodebuild.log" 2>&1; then
     grep -E -A 20 "error:|BUILD FAILED|Command .* failed" "$out/xcodebuild.log" | head -n 150 >&2
     echo "error: the simulator build failed; the full log is $out/xcodebuild.log." >&2
