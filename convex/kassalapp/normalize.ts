@@ -1,3 +1,4 @@
+import { Ore } from "../../src/lib/domain/ore";
 import { parseProductEvidence } from "../../src/lib/domain/product-evidence";
 import { z } from "zod";
 import type {
@@ -198,7 +199,7 @@ export function normalizePrices(response: unknown): CatalogResult {
       if (price.price < 0 || !Number.isFinite(price.price)) continue;
       result.prices.push({
         store: store ?? "Ukjent butikk",
-        priceOre: Math.round(price.price * 100),
+        priceOre: Ore.fromKroner(price.price),
         checkedAt:
           ("useUpdatedAt" in price ? value.updated_at : price.date) ??
           undefined,

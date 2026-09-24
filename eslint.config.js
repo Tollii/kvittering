@@ -92,6 +92,8 @@ module.exports = defineConfig([
     rules: {
       // React Native crashes when 0 or "" is rendered outside <Text>.
       "kvitto/no-leaked-render": "error",
+      // Amounts change only through the Ore operations.
+      "kvitto/no-ore-arithmetic": "error",
       "react/no-array-index-key": "error",
       "react/jsx-no-useless-fragment": ["error", { allowExpressions: true }],
       // Navigation options such as `headerRight` take render functions.
@@ -127,6 +129,10 @@ module.exports = defineConfig([
         { considerDefaultExhaustiveForUnions: true },
       ],
     },
+  },
+  {
+    files: ["src/lib/domain/ore.ts"],
+    rules: { "kvitto/no-ore-arithmetic": "off" },
   },
   {
     files: ["**/*.{js,cjs,mjs}"],

@@ -1,3 +1,4 @@
+import { Ore } from "./ore";
 import { receiptFixture, testId } from "../testing/receipts";
 import { expect, it } from "vitest";
 import { batteryFixture, emptyLine } from "./receipt";
@@ -16,10 +17,22 @@ import {
 function receipt(): Receipt {
   const data = batteryFixture();
   data.lines = [
-    { ...emptyLine("pack"), name: "Coca-Cola 10pk", amountOre: 10000 },
-    { ...emptyLine("bottle"), name: "Coca-Cola 500ml", amountOre: 2500 },
-    { ...emptyLine("zero"), name: "Coca-Cola Zero 500ml", amountOre: 2500 },
-    { ...emptyLine("deposit"), kind: "deposit" as const, amountOre: 2400 },
+    { ...emptyLine("pack"), name: "Coca-Cola 10pk", amountOre: Ore.of(10000) },
+    {
+      ...emptyLine("bottle"),
+      name: "Coca-Cola 500ml",
+      amountOre: Ore.of(2500),
+    },
+    {
+      ...emptyLine("zero"),
+      name: "Coca-Cola Zero 500ml",
+      amountOre: Ore.of(2500),
+    },
+    {
+      ...emptyLine("deposit"),
+      kind: "deposit" as const,
+      amountOre: Ore.of(2400),
+    },
   ];
 
   return receiptFixture({

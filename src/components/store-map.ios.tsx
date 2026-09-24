@@ -1,9 +1,9 @@
+import { Ore } from "@/lib/domain/ore";
 import { useEffect, useRef, useState } from "react";
 import { View } from "react-native";
 import MapView, { Marker } from "react-native-maps";
 import { useTheme } from "@/constants/theme";
 import { Copy } from "@/components/ui";
-import { formatMoney } from "@/lib/domain/receipt";
 import type { StoreMapProps } from "./store-map";
 import { z } from "zod";
 
@@ -68,13 +68,13 @@ export function StoreMap({ stores, onSelect }: Readonly<StoreMapProps>) {
                 key={store.id}
                 coordinate={store.location}
                 title={store.name}
-                description={formatMoney(store.amountOre)}
+                description={Ore.format(store.amountOre)}
                 onPress={() => onSelect(store.id)}
               >
                 <View
                   accessible
                   accessibilityRole="button"
-                  accessibilityLabel={`${store.name}, ${formatMoney(store.amountOre)}`}
+                  accessibilityLabel={`${store.name}, ${Ore.format(store.amountOre)}`}
                   style={{
                     width: size,
                     height: size,

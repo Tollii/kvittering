@@ -1,3 +1,4 @@
+import { Ore } from "./ore";
 import { receiptFixture, testId } from "../testing/receipts";
 import { expect, it } from "vitest";
 import { storeSpending, type StorePurchase } from "./store-spending";
@@ -23,7 +24,7 @@ function purchase(
     date: "2026-09-01",
     retailer: "KIWI",
     branch,
-    amountOre: 1000,
+    amountOre: Ore.of(1000),
     unknownAmounts: 0,
     provisional: false,
     ...overrides,
@@ -38,8 +39,16 @@ it("groups stable branch IDs, keeps branches separate, and includes unlocated pu
       branch: { ...branch, name: "Kiwi Storgata" },
     }),
     purchase("c", { branch: { ...branch, id: 20, name: "KIWI Sentrum" } }),
-    purchase("d", { branch: undefined, retailer: "Kiwi", amountOre: 500 }),
-    purchase("e", { branch: undefined, retailer: undefined, amountOre: 100 }),
+    purchase("d", {
+      branch: undefined,
+      retailer: "Kiwi",
+      amountOre: Ore.of(500),
+    }),
+    purchase("e", {
+      branch: undefined,
+      retailer: undefined,
+      amountOre: Ore.of(100),
+    }),
   ];
 
   const before = structuredClone(input);
@@ -89,12 +98,16 @@ it("preserves known coordinates while refusing invalid or incomplete positions",
 
 it("retains refunds, unknown amounts and review state without inventing spending", () => {
   const result = storeSpending([
-    purchase("a", { amountOre: -1200 }),
-    purchase("b", { amountOre: 0, unknownAmounts: 2, provisional: true }),
+    purchase("a", { amountOre: Ore.of(-1200) }),
+    purchase("b", {
+      amountOre: Ore.of(0),
+      unknownAmounts: 2,
+      provisional: true,
+    }),
   ]);
 
   expect(result.stores[0]).toMatchObject({
-    amountOre: -1200,
+    amountOre: Ore.of(-1200),
     unknownAmounts: 2,
   });
   expect(result.stores[0].purchases[1].provisional).toBe(true);
@@ -123,7 +136,7 @@ it("agrees with Forbruk accounting, period, currency, exclusion and review filte
     data: {
       ...data,
       physicalStore: null,
-      lines: [{ ...emptyLine(), amountOre: 1000 }, emptyLine()],
+      lines: [{ ...emptyLine(), amountOre: Ore.of(1000) }, emptyLine()],
     },
   });
 
@@ -151,10 +164,10 @@ it("agrees with Forbruk accounting, period, currency, exclusion and review filte
   const totals = monthlyInsights(receipts, "2026-09");
   const result = storeSpending(totals.storePurchases);
   expect(totals.products).toBe(3331);
-  expect(result.stores.reduce((sum, store) => sum + store.amountOre, 0)).toBe(
+  expect(Ore.sum(result.stores.map((store) => store.amountOre))).toBe(
     totals.products,
   );
-  expect(result.chains.reduce((sum, store) => sum + store.amountOre, 0)).toBe(
+  expect(Ore.sum(result.chains.map((store) => store.amountOre))).toBe(
     totals.products,
   );
   expect(

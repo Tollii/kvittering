@@ -1,3 +1,4 @@
+import { Ore } from "./ore";
 import { receiptFixture, testId } from "../testing/receipts";
 import { expect, it } from "vitest";
 import {
@@ -62,11 +63,11 @@ it("groups linked products across receipt descriptions and keeps unknown items s
     _id: "second",
     data: {
       ...data,
-      totalOre: 3131,
+      totalOre: Ore.of(3131),
       lines: data.lines.map((l) => ({
         ...l,
         name: l.id === "battery" ? "BAT REMIX" : l.name,
-        amountOre: l.id === "battery" ? 3190 : l.amountOre,
+        amountOre: l.id === "battery" ? Ore.of(3190) : l.amountOre,
       })),
     },
   });

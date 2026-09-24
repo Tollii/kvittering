@@ -1,3 +1,4 @@
+import { Ore } from "@/lib/domain/ore";
 import type { ReactNode } from "react";
 import { Alert, View, useWindowDimensions } from "react-native";
 import { router } from "expo-router";
@@ -12,11 +13,7 @@ import {
   Panel,
 } from "@/components/ui";
 import { ReceiptImages } from "@/features/receipt-images";
-import {
-  formatMoney,
-  type reconcile,
-  type ReceiptData,
-} from "@/lib/domain/receipt";
+import { type reconcile, type ReceiptData } from "@/lib/domain/receipt";
 import {
   balanceWithAdjustment,
   type ReviewTask,
@@ -96,26 +93,22 @@ export function ReviewTaskChips({
       case "no-lines":
         return chip("Ingen varer lest", "plus", onAddLine);
       case "difference":
-        return chip(
-          `Avvik ${formatMoney(task.amountOre)}`,
-          "equal.circle",
-          () =>
-            Alert.alert(
-              `Avvik ${formatMoney(task.amountOre)}`,
-              `Linjene gir ${formatMoney(totals?.calculated ?? null)}. Kvitteringen sier ${formatMoney(data?.totalOre ?? null)}.`,
-              [
-                { text: "Avbryt", style: "cancel" },
-                { text: "Se alle linjer", onPress: () => onShowLines("all") },
-                {
-                  text: "Legg inn justering",
-                  onPress: () => {
-                    if (data)
-                      onChange(balanceWithAdjustment(data, randomUUID()));
-                    onShowLines("all");
-                  },
+        return chip(`Avvik ${Ore.format(task.amountOre)}`, "equal.circle", () =>
+          Alert.alert(
+            `Avvik ${Ore.format(task.amountOre)}`,
+            `Linjene gir ${Ore.format(totals?.calculated ?? null)}. Kvitteringen sier ${Ore.format(data?.totalOre ?? null)}.`,
+            [
+              { text: "Avbryt", style: "cancel" },
+              { text: "Se alle linjer", onPress: () => onShowLines("all") },
+              {
+                text: "Legg inn justering",
+                onPress: () => {
+                  if (data) onChange(balanceWithAdjustment(data, randomUUID()));
+                  onShowLines("all");
                 },
-              ],
-            ),
+              },
+            ],
+          ),
         );
       case "receipt-issues":
         return chip(
@@ -217,7 +210,7 @@ export function ReceiptSummary({
               selectable
               style={{ color: colors.onHero }}
             >
-              {formatMoney(data?.totalOre ?? null)}
+              {Ore.format(data?.totalOre ?? null)}
             </Copy>
           </View>
           <View style={{ flexDirection: "row", gap: 6 }}>
@@ -287,13 +280,13 @@ export function PurchaseTotals({
   const { fontScale } = useWindowDimensions();
 
   // Components appear only when present; the line sum and paid amount always do.
-  const rows: { label: string; amount: number | null }[] = [
+  const rows: { label: string; amount: Ore | null }[] = [
     ...[
       { label: "Varer før rabatt", amount: totals.products },
       { label: "Rabatter", amount: totals.discounts },
       {
         label: "Pant og pantretur",
-        amount: totals.deposits + totals.returns,
+        amount: Ore.add(totals.deposits, totals.returns),
       },
       { label: "Andre justeringer", amount: totals.adjustments },
     ].filter((row) => row.amount !== 0),
@@ -321,7 +314,7 @@ export function PurchaseTotals({
         <Notice tone="warning">
           {totals.difference === null
             ? "Betalt beløp mangler"
-            : `Avvik mellom varelinjer og betalt beløp: ${formatMoney(totals.difference)}`}
+            : `Avvik mellom varelinjer og betalt beløp: ${Ore.format(totals.difference)}`}
         </Notice>
       )}
       {rows.map((row) => (
@@ -338,7 +331,7 @@ export function PurchaseTotals({
             {row.label}
           </Copy>
           <Copy size={14} weight={row.label === "Betalt" ? "700" : "500"}>
-            {formatMoney(row.amount)}
+            {Ore.format(row.amount)}
           </Copy>
         </View>
       ))}

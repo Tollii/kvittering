@@ -1,8 +1,8 @@
+import { Ore } from "@/lib/domain/ore";
 import { Pressable, View, useWindowDimensions } from "react-native";
 import { useTheme } from "@/constants/theme";
 import { Copy, Panel, Row, Sheet } from "./ui";
 import { openReceipt, receiptStatusLabel } from "./receipt-card";
-import { formatMoney } from "@/lib/domain/receipt";
 import { contributionKey, type SpendingGroup } from "@/lib/domain/insights";
 import { formatDate } from "@/lib/format-date";
 
@@ -34,7 +34,7 @@ export function SpendingBars({
           <Pressable
             key={row.id}
             accessibilityRole="button"
-            accessibilityLabel={`${row.name}, ${formatMoney(row.amountOre)}${shareLabel}`}
+            accessibilityLabel={`${row.name}, ${Ore.format(row.amountOre)}${shareLabel}`}
             onPress={() => onSelect(row)}
             style={({ pressed }) => ({
               minHeight: 62,
@@ -67,7 +67,7 @@ export function SpendingBars({
                 </Copy>
               )}
               <Copy size={15} weight="600">
-                {formatMoney(row.amountOre)}
+                {Ore.format(row.amountOre)}
               </Copy>
             </View>
             <View
@@ -111,7 +111,7 @@ export function SpendingDetails({
       {selected && (
         <>
           <Copy size={34} weight="800">
-            {formatMoney(selected.amountOre)}
+            {Ore.format(selected.amountOre)}
           </Copy>
           <Copy size={13} muted>
             {selected.contributions.length}{" "}
@@ -133,7 +133,7 @@ export function SpendingDetails({
                     "Kvittering"
                   }
                   detail={`${formatDate(contribution.receipt.data?.purchaseDate)} · ${contribution.line ? (contribution.receipt.data?.store ?? "") : receiptStatusLabel(contribution.receipt)}`}
-                  value={formatMoney(contribution.amountOre)}
+                  value={Ore.format(contribution.amountOre)}
                   onPress={() => {
                     onClose();
                     openReceipt(contribution.receipt);

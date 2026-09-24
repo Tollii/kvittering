@@ -1,3 +1,4 @@
+import { Ore } from "../src/lib/domain/ore";
 import { clientMutation as mutation } from "./clientFunctions";
 import { v } from "convex/values";
 import { query, internalQuery, internalMutation } from "./_generated/server";
@@ -5,7 +6,6 @@ import { requireMember, requireReceipt } from "./access";
 import schema from "./schema";
 import { internal } from "./_generated/api";
 import { reviewSummary } from "../src/lib/domain/receipt-review";
-import { formatMoney } from "../src/lib/domain/receipt";
 
 export function validPushToken(token: string) {
   return /^(ExponentPushToken|ExpoPushToken)\[[A-Za-z0-9_-]{10,200}\]$/.test(
@@ -137,7 +137,7 @@ export const delivery = internalQuery({
 
     const amount =
       receipt.data?.totalOre !== null && receipt.data?.totalOre !== undefined
-        ? formatMoney(receipt.data.totalOre)
+        ? Ore.format(receipt.data.totalOre)
         : null;
 
     return {

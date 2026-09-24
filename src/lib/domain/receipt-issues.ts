@@ -1,3 +1,5 @@
+import { Ore } from "./ore";
+
 export type ReceiptIssue =
   | {
       code:
@@ -14,7 +16,7 @@ export type ReceiptIssue =
         | "date_missing";
     }
   | { code: "amounts_missing"; count: number }
-  | { code: "difference"; amountOre: number }
+  | { code: "difference"; amountOre: Ore }
   | { code: "reader_issue"; message: string };
 
 export const categoryUncertainIssue = "category_uncertain";
@@ -82,7 +84,7 @@ export function receiptIssueText(issue: ReceiptIssue): string {
     case "amounts_missing":
       return `${issue.count} linje(r) mangler beløp.`;
     case "difference":
-      return `Avvik mot betalt: ${new Intl.NumberFormat("nb-NO", { style: "currency", currency: "NOK" }).format(issue.amountOre / 100)}.`;
+      return `Avvik mot betalt: ${Ore.format(issue.amountOre)}.`;
     case "reader_issue":
       return issue.message;
   }

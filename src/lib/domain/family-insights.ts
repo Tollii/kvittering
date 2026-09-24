@@ -1,3 +1,4 @@
+import { Ore } from "./ore";
 import type { Receipt, Contribution } from "./insights";
 import {
   preparePurchases,
@@ -12,7 +13,7 @@ import {
 export type FamilyPurchase = {
   id: string;
   name: string;
-  amountOre: number;
+  amountOre: Ore;
   quantity: PurchaseQuantity;
   coverage: Record<keyof PurchaseQuantity, number>;
   contributions: (Contribution & { quantity: PurchaseQuantity })[];
@@ -41,13 +42,13 @@ export function familyInsights(receipts: Receipt[]) {
       const family = families.get(result.family.id) ?? {
         id: result.family.id,
         name: result.family.name,
-        amountOre: 0,
+        amountOre: Ore.zero,
         quantity: emptyPurchaseQuantity(),
         coverage: { packages: 0, units: 0, grams: 0, millilitres: 0 },
         contributions: [],
       };
 
-      family.amountOre += line.netOre;
+      family.amountOre = Ore.add(family.amountOre, line.netOre);
       family.contributions.push({
         receipt,
         line,
@@ -69,7 +70,9 @@ export function familyInsights(receipts: Receipt[]) {
   }
 
   return {
-    families: [...families.values()].sort((a, b) => b.amountOre - a.amountOre),
+    families: [...families.values()].sort((a, b) =>
+      Ore.compare(b.amountOre, a.amountOre),
+    ),
     total,
     linked,
     pending,

@@ -1,3 +1,4 @@
+import { Ore } from "./ore";
 import { productIdentityKey, productReference } from "./product-reference";
 import { receiptMonth, type Receipt } from "./insights";
 import { type ReceiptLine } from "./receipt";
@@ -13,11 +14,11 @@ export type PriceSignal = {
   basis: keyof PurchaseQuantity;
   quantity: number;
   name: string;
-  /** Net unit price paid on this line. */
-  currentOre: number;
+  /** Net price per unit of `basis` on this line, in fractional øre. */
+  currentUnitPrice: number;
   /** Median net unit price across the household's other purchases. */
-  typicalOre: number;
-  /** currentOre / typicalOre. */
+  typicalUnitPrice: number;
+  /** currentUnitPrice / typicalUnitPrice. */
   ratio: number;
   observations: number;
   receipt: Receipt;
@@ -53,7 +54,7 @@ type Observation = {
   key: string;
   basis: keyof PurchaseQuantity;
   quantity: number;
-  ore: number;
+  unitPrice: number;
 };
 
 const bases = ["packages", "units", "grams", "millilitres"] as const;
@@ -80,7 +81,7 @@ function observations(purchases: PreparedPurchase[]) {
               key,
               basis,
               quantity,
-              ore: purchase.amountOre / quantity,
+              unitPrice: Ore.per(purchase.amountOre, quantity),
             },
           ]
         : [];
@@ -113,7 +114,7 @@ function comparePrices(
       key,
       basis,
       quantity,
-      ore,
+      unitPrice,
     } = observation;
 
     if (result.has(line.id)) continue;
@@ -123,10 +124,10 @@ function comparePrices(
     );
 
     if (others.length < priceSignalMinimumObservations) continue;
-    const typicalOre = median(others.map((item) => item.ore));
+    const typicalUnitPrice = median(others.map((item) => item.unitPrice));
 
-    if (typicalOre <= 0) continue;
-    const ratio = ore / typicalOre;
+    if (typicalUnitPrice <= 0) continue;
+    const ratio = unitPrice / typicalUnitPrice;
 
     if (Math.abs(ratio - 1) < priceSignalThreshold) continue;
     result.set(line.id, {
@@ -134,8 +135,8 @@ function comparePrices(
       basis,
       quantity,
       name: line.catalogProduct?.name ?? line.productName ?? line.name,
-      currentOre: ore,
-      typicalOre,
+      currentUnitPrice: unitPrice,
+      typicalUnitPrice,
       ratio,
       observations: others.length,
       receipt,
@@ -175,8 +176,8 @@ export function monthPriceSignals(receipts: Receipt[], month: string) {
     .flatMap((item) => [...comparePrices(history, item.purchases).values()])
     .sort(
       (a, b) =>
-        (b.currentOre - b.typicalOre) * b.quantity -
-        (a.currentOre - a.typicalOre) * a.quantity,
+        (b.currentUnitPrice - b.typicalUnitPrice) * b.quantity -
+        (a.currentUnitPrice - a.typicalUnitPrice) * a.quantity,
     );
 }
 

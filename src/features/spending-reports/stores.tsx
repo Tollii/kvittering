@@ -1,3 +1,4 @@
+import { Ore } from "@/lib/domain/ore";
 import { useState } from "react";
 import { Platform, View } from "react-native";
 import { router } from "expo-router";
@@ -15,7 +16,6 @@ import {
 } from "@/components/ui";
 import { StoreMap } from "@/components/store-map";
 import { useTheme } from "@/constants/theme";
-import { formatMoney } from "@/lib/domain/receipt";
 import { formatDate } from "@/lib/format-date";
 import {
   storeSpending,
@@ -65,10 +65,7 @@ function StoreReport({
     0,
   );
 
-  const unlocatedAmount = unlocated.reduce(
-    (sum, store) => sum + store.amountOre,
-    0,
-  );
+  const unlocatedAmount = Ore.sum(unlocated.map((store) => store.amountOre));
 
   if (!purchases.length)
     return (
@@ -93,7 +90,7 @@ function StoreReport({
           </Copy>
           {!!selected.address && <Copy muted>{selected.address}</Copy>}
           <Copy size={30} weight="700">
-            {formatMoney(selected.amountOre)}
+            {Ore.format(selected.amountOre)}
           </Copy>
           <Copy muted>Vareforbruk · {selected.purchases.length} kjøp</Copy>
           <Copy size={14} muted>
@@ -124,7 +121,7 @@ function StoreReport({
               ]
                 .filter(Boolean)
                 .join(" · ")}
-              value={formatMoney(purchase.amountOre)}
+              value={Ore.format(purchase.amountOre)}
               onPress={() => {
                 onClose();
                 router.push({
@@ -159,7 +156,7 @@ function StoreReport({
           )}
           {unlocatedCount > 0 && (
             <Notice icon="mappin.slash">
-              {unlocatedCount} kjøp ({formatMoney(unlocatedAmount)}) mangler
+              {unlocatedCount} kjøp ({Ore.format(unlocatedAmount)}) mangler
               kartposisjon. De er med i listen og kjedetotalene.
             </Notice>
           )}
@@ -201,7 +198,7 @@ function StoreReport({
                 ]
                   .filter(Boolean)
                   .join(" · ")}
-                value={formatMoney(store.amountOre)}
+                value={Ore.format(store.amountOre)}
                 onPress={() => setSelectedId(store.id)}
               />
             </View>

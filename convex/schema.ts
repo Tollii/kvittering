@@ -1,3 +1,4 @@
+import { oreValidator } from "../src/lib/domain/ore";
 import { receiptStatusValidator } from "../src/lib/domain/receipt-status";
 import { productReferenceValidator } from "../src/lib/domain/product-reference";
 import { productLinkUndoValidator } from "../src/lib/domain/product-linking";
@@ -231,7 +232,7 @@ export default defineSchema({
     name: v.string(),
     invitation: v.string(),
     /** Monthly product-spending budget in øre; unset means no budget. */
-    monthlyBudgetOre: v.number().optional(),
+    monthlyBudgetOre: oreValidator.optional(),
   }).index("by_invitation", ["invitation"]),
   members: defineTable({
     householdId: v.id("households"),

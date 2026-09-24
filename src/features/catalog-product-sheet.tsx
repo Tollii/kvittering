@@ -1,3 +1,4 @@
+import { Ore } from "@/lib/domain/ore";
 import { useFeatureFlag } from "@/features/featureFlags";
 import { useCompleteReceipts } from "./receipt-queries";
 import { useState } from "react";
@@ -20,7 +21,6 @@ import {
   useCatalogSearch,
 } from "./catalog-queries";
 import type { CatalogIdentity, CatalogProduct } from "@/lib/catalog/model";
-import { formatMoney } from "@/lib/domain/receipt";
 import { formatDate } from "@/lib/format-date";
 import { catalogInsights } from "@/lib/catalog/insights";
 import { productSearch, rankCatalogProducts } from "@/lib/catalog/matching";
@@ -233,7 +233,7 @@ export function CatalogProductSheet({
       {purchases && completeReceipts && (
         <Panel>
           <Copy weight="600">Deres kjøp</Copy>
-          <Row title="Kjøpt for" value={formatMoney(purchases.amountOre)} />
+          <Row title="Kjøpt for" value={Ore.format(purchases.amountOre)} />
           <Copy muted size={13}>
             {
               new Set(purchases.contributions.map((item) => item.receipt._id))
@@ -314,7 +314,7 @@ export function CatalogProductSheet({
                     ? formatDate(price.checkedAt.slice(0, 10))
                     : "Dato ukjent"
                 }
-                value={formatMoney(price.priceOre)}
+                value={Ore.format(price.priceOre)}
               />
             ))}
             {prices.data?.status === "ready" && !prices.data.prices.length && (

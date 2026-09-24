@@ -1,3 +1,4 @@
+import { Ore } from "@/lib/domain/ore";
 import { useEffect } from "react";
 import { useHousehold } from "./household-context";
 import { storageSuffix } from "@/lib/deployment-storage";
@@ -13,7 +14,7 @@ export function usePurchaseWidget({
 }: Readonly<{
   ready: boolean;
   month: string;
-  amountOre: number;
+  amountOre: Ore;
   provisional: number;
 }>) {
   const { owner, household, details } = useHousehold();

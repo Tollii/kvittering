@@ -1,3 +1,4 @@
+import { Ore } from "./ore";
 import { expect, it } from "vitest";
 import { batteryFixture, reconcile, weeklyShopFixture } from "./receipt";
 import {
@@ -23,7 +24,7 @@ it("accepts balanced receipts without optional package details or product links"
 it("requires review for amounts, identity, overlap and missing receipt information", () => {
   for (const modify of [
     (data: ReturnType<typeof batteryFixture>) => {
-      data.totalOre! += 1;
+      data.totalOre = Ore.add(data.totalOre!, Ore.of(1));
     },
     (data: ReturnType<typeof batteryFixture>) => {
       data.purchaseDate = null;
@@ -108,20 +109,20 @@ it("hides the total difference while amounts are still missing", () => {
   expect(reviewTasks(data, false).map((task) => task.kind)).toEqual([
     "amounts",
   ]);
-  data.lines[1].amountOre = -100;
+  data.lines[1].amountOre = Ore.of(-100);
   expect(reviewTasks(data, false)).toEqual([
-    { kind: "difference", amountOre: 159 },
+    { kind: "difference", amountOre: Ore.of(159) },
   ]);
 });
 
 it("balances a receipt with an explicit adjustment line", () => {
   const data = batteryFixture();
-  data.totalOre = 2500;
+  data.totalOre = Ore.of(2500);
   const balanced = balanceWithAdjustment(data, "fix");
   expect(balanced.lines.at(-1)).toMatchObject({
     id: "fix",
     kind: "adjustment",
-    amountOre: -31,
+    amountOre: Ore.of(-31),
     categoryId: null,
     manual: true,
   });
@@ -188,7 +189,7 @@ it("walks a weekly shop from reading to approval", () => {
     "amounts",
   ]);
   expect(reviewSummary(data, false)).toEqual(["1 beløp mangler"]);
-  data.lines.find((line) => line.id === "unknown")!.amountOre = 13000;
+  data.lines.find((line) => line.id === "unknown")!.amountOre = Ore.of(13000);
   // Now the lines sum to 41980 minus nothing missing: check reconcile agrees with the printed total.
   expect(reconcile(data).difference).toBe(0);
   expect(
@@ -196,7 +197,12 @@ it("walks a weekly shop from reading to approval", () => {
       ?.issues,
   ).toEqual(data.lines.find((line) => line.id === "cheez")?.issues);
   expect(canAcceptReceipt(confirmSuggestedCategories(data), false)).toBe(true);
-  const balanced = balanceWithAdjustment({ ...data, totalOre: 42000 }, "adj");
+
+  const balanced = balanceWithAdjustment(
+    { ...data, totalOre: Ore.of(42000) },
+    "adj",
+  );
+
   expect(reconcile(balanced).difference).toBe(0);
   expect(balanced.lines.at(-1)?.amountOre).toBe(20);
 });

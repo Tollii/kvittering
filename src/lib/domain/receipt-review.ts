@@ -1,3 +1,4 @@
+import { Ore } from "./ore";
 import {
   isCategoryUncertain,
   isReceiptLevelIssue,
@@ -122,7 +123,7 @@ export function balanceWithAdjustment(
         ...emptyLine(id),
         kind: "adjustment",
         name: "Justering mot betalt beløp",
-        amountOre: -difference,
+        amountOre: Ore.negate(difference),
         categoryId: null,
       },
     ],
@@ -148,7 +149,7 @@ export type ReviewTask =
   | { kind: "total" }
   | { kind: "date" }
   | { kind: "currency" }
-  | { kind: "difference"; amountOre: number }
+  | { kind: "difference"; amountOre: Ore }
   | { kind: "no-lines" }
   | { kind: "amounts"; count: number }
   | { kind: "names"; count: number }

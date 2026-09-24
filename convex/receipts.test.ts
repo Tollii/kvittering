@@ -1,3 +1,4 @@
+import { Ore } from "../src/lib/domain/ore";
 /// <reference types="vite/client" />
 import { convexTest } from "convex-test";
 import { expect, it } from "vitest";
@@ -184,7 +185,7 @@ it("duplicate processing commits once and preserves all manual edits during repr
   ).toHaveLength(1);
   data.lines[0].name = "Corrected product";
   data.lines = data.lines.filter((line) => line.id !== "deposit");
-  data.totalOre = 2331;
+  data.totalOre = Ore.of(2331);
   await first.mutation(api.receipts.save, {
     id,
     revision: 0,
@@ -530,7 +531,7 @@ it("trusts a category after two approvals and settles the next reading without a
   const approved = () => {
     const data = weeklyShopFixture();
     data.lines = data.lines.filter((line) => line.id !== "unknown");
-    data.totalOre = 28980;
+    data.totalOre = Ore.of(28980);
     const cheez = data.lines.find((line) => line.id === "cheez")!;
     cheez.issues = [];
     cheez.confidence = 1;

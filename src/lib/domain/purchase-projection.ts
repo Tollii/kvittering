@@ -1,3 +1,4 @@
+import { Ore } from "./ore";
 import type { Receipt } from "./insights";
 import { reconcile, spendingLines, type ReceiptLine } from "./receipt";
 import {
@@ -29,8 +30,8 @@ export const comparisonPurchasePolicy: PurchasePolicy = {
 
 export type PreparedPurchase = {
   receipt: Receipt;
-  line: ReceiptLine & { netOre: number };
-  amountOre: number;
+  line: ReceiptLine & { netOre: Ore };
+  amountOre: Ore;
   analysis: ProductAnalysisResult | undefined;
 };
 

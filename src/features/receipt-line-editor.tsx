@@ -1,3 +1,4 @@
+import { Ore } from "@/lib/domain/ore";
 import {
   isMissingLineField,
   receiptIssueText,
@@ -29,7 +30,6 @@ import { MoneyField } from "@/components/money-field";
 import { categoryById } from "@/lib/domain/categories";
 import {
   lineKinds,
-  formatMoney,
   isTotalsLine,
   type ReceiptLine,
 } from "@/lib/domain/receipt";
@@ -178,7 +178,7 @@ export function ReceiptLineEditor({
     >
       <Pressable
         accessibilityRole="button"
-        accessibilityLabel={`${expanded ? "Skjul" : "Rediger"} ${line.name || "ny vare"}, ${formatMoney(line.amountOre)}`}
+        accessibilityLabel={`${expanded ? "Skjul" : "Rediger"} ${line.name || "ny vare"}, ${Ore.format(line.amountOre)}`}
         accessibilityState={{ expanded }}
         onPress={() => setExpanded(!expanded)}
         style={({ pressed: down }) => ({
@@ -220,7 +220,7 @@ export function ReceiptLineEditor({
             color: missingAmount ? colors.warning : colors.text,
           }}
         >
-          {missingAmount ? "Beløp?" : formatMoney(line.amountOre)}
+          {missingAmount ? "Beløp?" : Ore.format(line.amountOre)}
         </Copy>
         <Icon
           name={expanded ? "chevron.up" : "chevron.down"}
@@ -300,7 +300,7 @@ export function ReceiptLineEditor({
               label={priceSignalLabel(priceSignal)}
               icon={priceSignal.ratio > 1 ? "arrow.up" : "arrow.down"}
               tone={priceSignal.ratio > 1 ? "warning" : "success"}
-              accessibilityLabel={`${priceSignalLabel(priceSignal)}. Vanlig pris ${formatMoney(priceSignal.typicalOre)}`}
+              accessibilityLabel={`${priceSignalLabel(priceSignal)}. Vanlig pris ${Ore.format(Ore.round(priceSignal.typicalUnitPrice))}`}
             />
           )}
           <Pressable

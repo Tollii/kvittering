@@ -1,3 +1,4 @@
+import { Ore } from "./domain/ore";
 import { expect, it } from "vitest";
 import {
   resolveSpendingSelection,
@@ -14,20 +15,20 @@ it("resolves current totals and closes on deletion or period change", () => {
   };
 
   const contributions: Contribution[] = [
-    { receipt: receiptFixture(), line: null, amountOre: 100 },
+    { receipt: receiptFixture(), line: null, amountOre: Ore.of(100) },
   ];
 
   const original = {
     id: "drinks",
     name: "Drinks",
-    amountOre: 100,
+    amountOre: Ore.of(100),
     contributions,
   };
 
   expect(
     resolveSpendingSelection(selection, "2026-09", { category: [original] }),
   ).toBe(original);
-  const updated = { ...original, amountOre: 200 };
+  const updated = { ...original, amountOre: Ore.of(200) };
   expect(
     resolveSpendingSelection(selection, "2026-09", { category: [updated] })
       ?.amountOre,

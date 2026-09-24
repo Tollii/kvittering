@@ -1,10 +1,11 @@
+import { Ore } from "@/lib/domain/ore";
 import type { StoreLocation } from "@/lib/domain/store-spending";
 
 export type StoreMapPoint = {
   id: string;
   name: string;
   location: StoreLocation;
-  amountOre: number;
+  amountOre: Ore;
 };
 
 export type StoreMapProps = {

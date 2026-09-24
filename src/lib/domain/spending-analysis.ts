@@ -1,9 +1,9 @@
+import { Ore } from "./ore";
 import {
   preparePurchases,
   comparisonPurchasePolicy,
 } from "./purchase-projection";
 import type { Contribution, Receipt } from "./insights";
-import { formatMoney } from "./receipt";
 import {
   productProfileKey,
   type ProductAnalysisResult,
@@ -85,11 +85,11 @@ export function analysisPeriod(
 export type SpendingEffect = {
   id: string;
   name: string;
-  previousOre: number;
-  currentOre: number;
-  differenceOre: number;
-  priceOre: number | null;
-  quantityOre: number | null;
+  previousOre: Ore;
+  currentOre: Ore;
+  differenceOre: Ore;
+  priceOre: Ore | null;
+  quantityOre: Ore | null;
   currentQuantity: number | null;
   previousQuantity: number | null;
   unit: string | null;
@@ -130,8 +130,8 @@ export function spendingAnalysis(
   const groups = new Map<string, Group>();
   const categories = new Map<string, SpendingEffect>();
 
-  let currentOre = 0,
-    previousOre = 0,
+  let currentOre = Ore.zero,
+    previousOre = Ore.zero,
     missingAmounts = 0,
     measuredLines = 0,
     productLines = 0;
@@ -141,8 +141,9 @@ export function spendingAnalysis(
     ["previous", previous],
   ] as const) {
     for (const { receipt, totals: total, purchases } of selected) {
-      if (side === "current") currentOre += total.productSpending;
-      else previousOre += total.productSpending;
+      if (side === "current")
+        currentOre = Ore.add(currentOre, total.productSpending);
+      else previousOre = Ore.add(previousOre, total.productSpending);
       missingAmounts += total.unknown;
 
       for (const { line, analysis: result } of purchases) {
@@ -153,9 +154,9 @@ export function spendingAnalysis(
         const category = categories.get(categoryId) ?? {
           id: categoryId,
           name: categoryById.get(categoryId)?.name ?? "Ukjent",
-          currentOre: 0,
-          previousOre: 0,
-          differenceOre: 0,
+          currentOre: Ore.zero,
+          previousOre: Ore.zero,
+          differenceOre: Ore.zero,
           priceOre: null,
           quantityOre: null,
           currentQuantity: null,
@@ -164,8 +165,8 @@ export function spendingAnalysis(
           contributions: [],
         };
 
-        category[side === "current" ? "currentOre" : "previousOre"] +=
-          line.netOre;
+        const key = side === "current" ? "currentOre" : "previousOre";
+        category[key] = Ore.add(category[key], line.netOre);
         category.contributions.push(contribution);
         categories.set(categoryId, category);
 
@@ -189,15 +190,15 @@ export function spendingAnalysis(
     }
   }
 
-  let priceOre = 0,
-    quantityOre = 0;
+  let priceOre = Ore.zero,
+    quantityOre = Ore.zero;
 
   const effects: SpendingEffect[] = [];
 
   const currentOnly: {
     id: string;
     name: string;
-    amountOre: number;
+    amountOre: Ore;
     contributions: Contribution[];
   }[] = [];
 
@@ -205,10 +206,7 @@ export function spendingAnalysis(
     const all = [...group.current, ...group.previous];
 
     if (group.current.length && !group.previous.length) {
-      const amountOre = group.current.reduce(
-        (sum, item) => sum + item.amountOre,
-        0,
-      );
+      const amountOre = Ore.sum(group.current.map((item) => item.amountOre));
 
       if (amountOre > 0)
         currentOnly.push({
@@ -237,7 +235,7 @@ export function spendingAnalysis(
       continue;
 
     const sum = (items: MeasuredLine[]) =>
-      items.reduce((total, item) => total + item.amountOre, 0);
+      Ore.sum(items.map((item) => item.amountOre));
 
     const quantity = (items: MeasuredLine[]) =>
       items.reduce((total, item) => total + item.quantity![measure]!, 0);
@@ -248,17 +246,20 @@ export function spendingAnalysis(
       pq = quantity(group.previous);
 
     // Symmetric decomposition: price and quantity effects add exactly to the change.
-    const price = Math.round(((c / cq - p / pq) * (cq + pq)) / 2);
-    const amount = c - p - price;
-    priceOre += price;
-    quantityOre += amount;
+    const price = Ore.round(
+      ((Ore.per(c, cq) - Ore.per(p, pq)) * (cq + pq)) / 2,
+    );
+
+    const amount = Ore.subtract(Ore.subtract(c, p), price);
+    priceOre = Ore.add(priceOre, price);
+    quantityOre = Ore.add(quantityOre, amount);
     measuredLines += all.length;
     effects.push({
       id,
       name: group.name,
       currentOre: c,
       previousOre: p,
-      differenceOre: c - p,
+      differenceOre: Ore.subtract(c, p),
       priceOre: price,
       quantityOre: amount,
       currentQuantity: cq,
@@ -269,8 +270,10 @@ export function spendingAnalysis(
     });
   }
 
-  effects.sort((a, b) => Math.abs(b.differenceOre) - Math.abs(a.differenceOre));
-  const differenceOre = currentOre - previousOre;
+  effects.sort((a, b) =>
+    Ore.compare(Ore.abs(b.differenceOre), Ore.abs(a.differenceOre)),
+  );
+  const differenceOre = Ore.subtract(currentOre, previousOre);
 
   return {
     period,
@@ -279,7 +282,7 @@ export function spendingAnalysis(
     differenceOre,
     priceOre,
     quantityOre,
-    unexplainedOre: differenceOre - priceOre - quantityOre,
+    unexplainedOre: Ore.subtract(differenceOre, Ore.add(priceOre, quantityOre)),
     currentReceipts: current.length,
     previousReceipts: previous.length,
     provisionalReceipts: [...current, ...previous].filter(
@@ -290,14 +293,17 @@ export function spendingAnalysis(
     productLines,
     effects,
     currentOnly: currentOnly.toSorted(
-      (a, b) => b.amountOre - a.amountOre || a.id.localeCompare(b.id),
+      (a, b) =>
+        Ore.compare(b.amountOre, a.amountOre) || a.id.localeCompare(b.id),
     ),
     categories: [...categories.values()]
       .map((row) => ({
         ...row,
-        differenceOre: row.currentOre - row.previousOre,
+        differenceOre: Ore.subtract(row.currentOre, row.previousOre),
       }))
-      .sort((a, b) => Math.abs(b.differenceOre) - Math.abs(a.differenceOre)),
+      .sort((a, b) =>
+        Ore.compare(Ore.abs(b.differenceOre), Ore.abs(a.differenceOre)),
+      ),
   };
 }
 
@@ -314,8 +320,8 @@ export function analysisSummary(
   const largest = report.categories[0];
 
   const categoryChange = largest?.differenceOre
-    ? ` Største kategoriendring: ${largest.name}, ${formatMoney(largest.differenceOre)}.`
+    ? ` Største kategoriendring: ${largest.name}, ${Ore.format(largest.differenceOre)}.`
     : "";
 
-  return `Registrert forbruk er ${formatMoney(Math.abs(report.differenceOre))} ${report.differenceOre > 0 ? "høyere" : "lavere"}.${categoryChange}`;
+  return `Registrert forbruk er ${Ore.format(Ore.abs(report.differenceOre))} ${report.differenceOre > 0 ? "høyere" : "lavere"}.${categoryChange}`;
 }

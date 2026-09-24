@@ -1,5 +1,7 @@
 "use node";
 
+import { Ore } from "../src/lib/domain/ore";
+
 import {
   readAttributes,
   type ProductAttributes,
@@ -344,7 +346,7 @@ export const analyze = internalAction({
           family: item.family,
           attributes: item.attributes,
           quantity:
-            (item.line.amountOre ?? 0) < 0
+            (item.line.amountOre ?? Ore.zero) < 0
               ? emptyPurchaseQuantity()
               : normalizePurchase(
                   item.profile,

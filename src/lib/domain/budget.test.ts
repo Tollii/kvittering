@@ -1,3 +1,4 @@
+import { Ore } from "./ore";
 import { receiptFixture } from "../testing/receipts";
 import { expect, it } from "vitest";
 import { budgetPace, paceLabel, weeklyDigest, daysInMonth } from "./budget";
@@ -8,7 +9,14 @@ const plain = (text: string) => text.replace(/\s/g, " ");
 
 it("measures pace against the elapsed share of the month", () => {
   expect(daysInMonth("2026-09")).toBe(30);
-  const pace = budgetPace(600000, 372000, "2026-09", "2026-09-18");
+
+  const pace = budgetPace(
+    Ore.of(600000),
+    Ore.of(372000),
+    "2026-09",
+    "2026-09-18",
+  );
+
   expect(pace.dayOfMonth).toBe(18);
   expect(pace.elapsedShare).toBeCloseTo(0.6);
   expect(pace.expectedOre).toBe(360000);
@@ -18,20 +26,28 @@ it("measures pace against the elapsed share of the month", () => {
   expect(plain(paceLabel(pace))).toBe(
     "Dag 18 av 30 · 62 % brukt · 2 280,00 kr igjen",
   );
-  expect(budgetPace(600000, 450000, "2026-09", "2026-09-18").status).toBe(
-    "over",
-  );
-  expect(budgetPace(600000, 200000, "2026-09", "2026-09-18").status).toBe(
-    "under",
-  );
+  expect(
+    budgetPace(Ore.of(600000), Ore.of(450000), "2026-09", "2026-09-18").status,
+  ).toBe("over");
+  expect(
+    budgetPace(Ore.of(600000), Ore.of(200000), "2026-09", "2026-09-18").status,
+  ).toBe("under");
 });
 
 it("treats past months as complete and future months as untouched", () => {
-  const past = budgetPace(600000, 650000, "2026-08", "2026-09-18");
+  const past = budgetPace(
+    Ore.of(600000),
+    Ore.of(650000),
+    "2026-08",
+    "2026-09-18",
+  );
+
   expect(past.dayOfMonth).toBe(31);
   expect(past.dailyAllowanceOre).toBeNull();
   expect(plain(paceLabel(past))).toBe("108 % av budsjettet · 500,00 kr over");
-  expect(budgetPace(600000, 0, "2026-10", "2026-09-18").dayOfMonth).toBe(0);
+  expect(
+    budgetPace(Ore.of(600000), Ore.of(0), "2026-10", "2026-09-18").dayOfMonth,
+  ).toBe(0);
 });
 
 it("summarises the week from Monday with the budget position", () => {
@@ -49,7 +65,7 @@ it("summarises the week from Monday with the budget position", () => {
     receipt("2026-09-12"),
   ];
 
-  const digest = weeklyDigest(receipts, 600000, "2026-09-18");
+  const digest = weeklyDigest(receipts, Ore.of(600000), "2026-09-18");
   expect(digest.weekStart).toBe("2026-09-14");
   expect(digest.weekReceipts).toBe(2);
   // products 35500 - discounts 4220 per receipt (coffee amount unknown counts as 0)

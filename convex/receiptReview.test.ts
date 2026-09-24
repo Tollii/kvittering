@@ -1,3 +1,4 @@
+import { Ore } from "../src/lib/domain/ore";
 import {
   decideReceiptChange,
   commitReceiptChange,
@@ -61,7 +62,8 @@ it("keeps unresolved extraction issues, mismatches, duplicates and mock results 
       data.lines[0].manual = false;
     }
 
-    if (scenario === "mismatch") data.totalOre! += 100;
+    if (scenario === "mismatch")
+      data.totalOre = Ore.add(data.totalOre!, Ore.of(100));
     await t.mutation(internal.processing.finish, {
       id,
       generation: 1,

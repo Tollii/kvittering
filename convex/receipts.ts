@@ -1,3 +1,4 @@
+import { Ore, oreValidator } from "../src/lib/domain/ore";
 import {
   attentionStatuses,
   isReceiptProcessing,
@@ -603,8 +604,8 @@ export const history = query({
       status: receiptStatusValidator,
       store: v.union(v.string(), v.null()),
       purchaseDate: v.union(v.string(), v.null()),
-      totalOre: v.union(v.number(), v.null()),
-      spendingOre: v.number(),
+      totalOre: v.union(oreValidator, v.null()),
+      spendingOre: oreValidator,
       excluded: v.boolean(),
     }),
   ),
@@ -649,7 +650,7 @@ export const history = query({
           spendingOre:
             receipt.data && !receipt.excluded
               ? reconcile(receipt.data).productSpending
-              : 0,
+              : Ore.zero,
           excluded: receipt.excluded,
         })),
     };

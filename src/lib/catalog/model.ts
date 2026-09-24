@@ -1,3 +1,4 @@
+import { oreValidator } from "../domain/ore";
 import { v, type Infer } from "convex/values";
 
 const text = v.string().optional();
@@ -44,7 +45,7 @@ export const physicalStoreValidator = v.object({
 
 export const catalogPriceValidator = v.object({
   store: v.string(),
-  priceOre: v.number(),
+  priceOre: oreValidator,
   checkedAt: text,
 });
 

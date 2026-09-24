@@ -1,3 +1,4 @@
+import { Ore } from "@/lib/domain/ore";
 import { shortcutMonth } from "@/lib/shortcut-selection";
 import { z } from "zod";
 import { WidgetTip } from "@/features/widget-tip";
@@ -40,7 +41,7 @@ import {
   receiptCoverage,
   type SpendingGroup,
 } from "@/lib/domain/insights";
-import { formatMoney, isDiscountLine, osloDate } from "@/lib/domain/receipt";
+import { isDiscountLine, osloDate } from "@/lib/domain/receipt";
 import { categoryById } from "@/lib/domain/categories";
 import { receiptNeeds } from "@/components/receipt-card";
 import { useTheme } from "@/constants/theme";
@@ -121,9 +122,10 @@ function Spending({ initialMonth }: Readonly<{ initialMonth: string }>) {
 
   const change = comparison.previous.products
     ? Math.round(
-        ((totals.products - comparison.previous.products) /
-          Math.abs(comparison.previous.products)) *
-          100,
+        Ore.ratio(
+          Ore.subtract(totals.products, comparison.previous.products),
+          Ore.abs(comparison.previous.products),
+        ) * 100,
       )
     : null;
 
@@ -157,7 +159,7 @@ function Spending({ initialMonth }: Readonly<{ initialMonth: string }>) {
     receipt.data!.lines.map((line) => ({
       receipt,
       line,
-      amountOre: line.amountOre ?? 0,
+      amountOre: line.amountOre ?? Ore.zero,
     })),
   );
 
@@ -165,7 +167,7 @@ function Spending({ initialMonth }: Readonly<{ initialMonth: string }>) {
     items.map((receipt) => ({
       receipt,
       line: null,
-      amountOre: receipt.data?.totalOre ?? 0,
+      amountOre: receipt.data?.totalOre ?? Ore.zero,
     }));
 
   function moveMonth(offset: number) {
@@ -242,7 +244,7 @@ function Spending({ initialMonth }: Readonly<{ initialMonth: string }>) {
       {
         id: "unlinked",
         name: "Uten produktkobling",
-        amountOre: 0,
+        amountOre: Ore.zero,
         contributions: receiptContributions(coverage.unlinked),
       },
     ],
@@ -317,7 +319,7 @@ function Spending({ initialMonth }: Readonly<{ initialMonth: string }>) {
                   selectable
                   style={{ color: colors.onHero }}
                 >
-                  {formatMoney(totals.products)}
+                  {Ore.format(totals.products)}
                 </Copy>
                 <Copy size={13} style={{ color: colors.onHeroMuted }}>
                   {totals.selected.length}{" "}

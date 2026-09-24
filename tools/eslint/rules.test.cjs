@@ -140,6 +140,23 @@ typedTester.run("no-leaked-render", plugin.rules["no-leaked-render"], {
   ].map((code) => ({ ...typed(code), errors: [{ messageId: "leakedValue" }] })),
 });
 
+const oreDeclaration =
+  "declare const oreBrand: unique symbol; type Ore = number & { readonly [oreBrand]: true }; declare const a: Ore; declare const b: Ore; declare let total: Ore;";
+
+typedTester.run("no-ore-arithmetic", plugin.rules["no-ore-arithmetic"], {
+  valid: [
+    `${oreDeclaration} const larger = a > b;`,
+    `${oreDeclaration} const same = a === b;`,
+    "declare const count: number; const next = count + 1;",
+  ].map(typed),
+  invalid: [
+    `${oreDeclaration} const sum = a + b;`,
+    `${oreDeclaration} const kroner = a / 100;`,
+    `${oreDeclaration} total += a;`,
+    `${oreDeclaration} const negative = -a;`,
+  ].map((code) => ({ ...typed(code), errors: [{ messageId: "operation" }] })),
+});
+
 it("runs the same rule in the repository Oxlint configuration", () => {
   const directory = mkdtempSync(join(process.cwd(), "tools", "rule-test-"));
 

@@ -1,3 +1,4 @@
+import { Ore } from "@/lib/domain/ore";
 import { completeReceiptTip } from "@/components/receipt-tip";
 import { useTheme } from "@/constants/theme";
 import { useRef, useState } from "react";
@@ -19,7 +20,6 @@ import { CatalogProductPicker } from "@/features/catalog-product-sheet";
 import { useHousehold } from "@/features/household-context";
 import { useReleaseMutation } from "@/lib/releases/requests";
 import { formatDate } from "@/lib/format-date";
-import { formatMoney } from "@/lib/domain/receipt";
 import { errorFeedback, successFeedback } from "@/lib/haptics";
 import type { ReceiptCommitAcknowledgement } from "../../convex/receiptChanges";
 
@@ -124,7 +124,7 @@ export default function ProductLinking() {
                 item.line.packageSize && item.line.packageUnit
                   ? `${item.line.packageSize} ${item.line.packageUnit}`
                   : null,
-                formatMoney(item.line.amountOre),
+                Ore.format(item.line.amountOre),
               ]
                 .filter(Boolean)
                 .join(" · ")}

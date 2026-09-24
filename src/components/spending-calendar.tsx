@@ -1,3 +1,4 @@
+import { Ore } from "@/lib/domain/ore";
 import { Pressable, View, useWindowDimensions } from "react-native";
 import { Copy, Empty, Row } from "./ui";
 import { formatDate } from "@/lib/format-date";
@@ -7,7 +8,6 @@ import {
   type Receipt,
   type SpendingGroup,
 } from "@/lib/domain/insights";
-import { formatMoney } from "@/lib/domain/receipt";
 
 const weekdays = [
   ["monday", "M"],
@@ -60,7 +60,7 @@ export function SpendingCalendar({
             key={day.date}
             title={formatDate(day.date)}
             detail={`${day.contributions.length} ${day.contributions.length === 1 ? "kvittering" : "kvitteringer"}`}
-            value={formatMoney(day.amountOre)}
+            value={Ore.format(day.amountOre)}
             onPress={day.future ? undefined : () => selectDay(day)}
           />
         ))}
@@ -101,7 +101,7 @@ export function SpendingCalendar({
                   <Pressable
                     key={day.date}
                     accessibilityRole="button"
-                    accessibilityLabel={`${day.date}, ${formatMoney(day.amountOre)}, ${day.contributions.length} kvitteringer`}
+                    accessibilityLabel={`${day.date}, ${Ore.format(day.amountOre)}, ${day.contributions.length} kvitteringer`}
                     disabled={day.future || !day.contributions.length}
                     accessibilityState={{
                       disabled: day.future || !day.contributions.length,
@@ -146,7 +146,7 @@ export function SpendingCalendar({
                             marginTop: -1,
                           }}
                         >
-                          {Math.round(day.amountOre / 100)}
+                          {Ore.formatWholeKroner(day.amountOre)}
                         </Copy>
                       )}
                     </View>

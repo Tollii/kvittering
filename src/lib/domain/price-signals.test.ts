@@ -1,3 +1,4 @@
+import { Ore } from "./ore";
 import { receiptFixture } from "../testing/receipts";
 import {
   productAnalysisVersion,
@@ -15,7 +16,7 @@ const receipt = (id: string, purchaseDate: string, colaOre: number) => {
   const data = weeklyShopFixture();
   data.purchaseDate = purchaseDate;
   const cola = data.lines.find((line) => line.id === "cola")!;
-  cola.amountOre = colaOre;
+  cola.amountOre = Ore.of(colaOre);
   cola.catalogProduct = {
     key: "ean:5000112637380",
     name: "Coca-Cola 330ml Sleek X 10pk bx",
@@ -62,8 +63,8 @@ it("flags a linked product priced well above what the household usually pays", (
   const cola = signals.get("cola")!;
   expect(cola).toBeDefined();
   // Net of the allocated receipt discount, so a little under the printed 94,90.
-  expect(cola.typicalOre).toBeGreaterThan(9000);
-  expect(cola.typicalOre).toBeLessThan(9490);
+  expect(cola.typicalUnitPrice).toBeGreaterThan(9000);
+  expect(cola.typicalUnitPrice).toBeLessThan(9490);
   expect(cola.observations).toBe(3);
   expect(priceSignalLabel(cola)).toMatch(/^\+3\d % vs vanlig$/);
   // Unlinked lines and lines within the band are silent.

@@ -1,6 +1,6 @@
+import { Ore } from "@/lib/domain/ore";
 import { useState } from "react";
 import type { TextInputProps } from "react-native";
-import { moneyInput, parseOre } from "@/lib/domain/receipt";
 import { Field } from "./ui";
 
 export function MoneyField({
@@ -11,11 +11,11 @@ export function MoneyField({
   ...props
 }: Omit<TextInputProps, "value" | "onChange" | "onChangeText"> & {
   label: string;
-  value: number | null;
-  onChange: (value: number | null) => void;
+  value: Ore | null;
+  onChange: (value: Ore | null) => void;
   onError: (error: string | null) => void;
 }) {
-  const [text, setText] = useState(() => moneyInput(value));
+  const [text, setText] = useState(() => Ore.formatInput(value));
 
   return (
     <Field
@@ -28,7 +28,7 @@ export function MoneyField({
         setText(next);
 
         try {
-          const amount = parseOre(next);
+          const amount = Ore.parse(next);
           onError(null);
           onChange(amount);
         } catch (cause) {

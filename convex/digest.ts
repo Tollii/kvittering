@@ -1,3 +1,4 @@
+import type { Ore } from "../src/lib/domain/ore";
 import { receiptPeriodPage } from "./receipts";
 import { featureEnabled } from "./featureFlags";
 import { v } from "convex/values";
@@ -101,7 +102,7 @@ export const forHousehold = internalAction({
   ): Promise<{ title: string; body: string } | null> => {
     const receipts: Doc<"receipts">[] = [];
     let cursor: string | null = null;
-    let budget: number | null = null;
+    let budget: Ore | null = null;
 
     while (true) {
       const result: {

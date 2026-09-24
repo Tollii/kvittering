@@ -6,6 +6,58 @@ const quoted = /^["'`]/;
 module.exports = {
   meta: { name: "kvitto" },
   rules: {
+    "no-ore-arithmetic": {
+      meta: {
+        type: "problem",
+        schema: [],
+        messages: {
+          operation:
+            "Combine amounts with Ore.add, Ore.subtract, Ore.sum, Ore.scale, or Ore.ratio. Arithmetic operators turn an amount into a plain number.",
+        },
+      },
+      create(context) {
+        const services = context.sourceCode.parserServices;
+
+        if (!services?.program) return {};
+        const checker = services.program.getTypeChecker();
+
+        function isOre(node) {
+          const type = checker.getTypeAtLocation(
+            services.esTreeNodeToTSNodeMap.get(node),
+          );
+
+          return (type.isUnion() ? type.types : [type]).some((part) =>
+            part
+              .getProperties()
+              .some((property) => property.getName().includes("oreBrand")),
+          );
+        }
+
+        const operators = new Set(["+", "-", "*", "/", "%"]);
+        const assignments = new Set(["+=", "-=", "*=", "/=", "%="]);
+
+        return {
+          BinaryExpression(node) {
+            if (
+              operators.has(node.operator) &&
+              (isOre(node.left) || isOre(node.right))
+            )
+              context.report({ node, messageId: "operation" });
+          },
+          AssignmentExpression(node) {
+            if (
+              assignments.has(node.operator) &&
+              (isOre(node.left) || isOre(node.right))
+            )
+              context.report({ node, messageId: "operation" });
+          },
+          UnaryExpression(node) {
+            if (node.operator === "-" && isOre(node.argument))
+              context.report({ node, messageId: "operation" });
+          },
+        };
+      },
+    },
     "no-inline-literal-set": {
       meta: {
         type: "suggestion",
