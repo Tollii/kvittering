@@ -1,5 +1,48 @@
 # Kvitto simplification review
 
+## Application risk review — 24 September 2026
+
+Review complete. Implementation is now authorized on this branch, starting from
+`8564c4c7287d936161b3d63041c5a0bfe2a44c0c`. See the
+[implementation record](application-risk-review/implementation.md). Original audit baseline:
+`96331941a84ca8fcb23da55b06478afacfce3eac`, from
+`claude/happy-archimedes-lyjuqa` before merge. Dedicated review branch:
+`codex/application-risk-review`. Application source is unchanged.
+
+Read the [risk report](application-risk-review/report.md),
+[public surface inventory](application-risk-review/public-surface.md),
+[paid-call analysis](application-risk-review/paid-calls.md), and
+[verification record](application-risk-review/verification.md).
+The review covers all 52 public functions and six HTTP route entries. The 122
+selected existing tests passed. Three defects were reproduced; a fourth failing
+check demonstrates the user-requested five-image limit. Each plan records
+source evidence, a concrete scenario, priority, and an observable proposed check.
+
+The [active-work comparison](application-risk-review/concurrent-work.md) checks
+**Add API rate limits and caps** against the audit. Plans 001, 006, and 007
+are partly implemented there. Six focused files with 24 tests passed in that
+working copy. Reuse that work; the baseline findings are not all still unchanged.
+
+| Plan | Title | Priority | Dependencies | Status |
+| --- | --- | --- | --- | --- |
+| [001](application-risk-review/001-paid-work-admission.md) | Complete paid-work admission coverage | P1 | Existing receipt/provider limits in the other task | IN PROGRESS |
+| [002](application-risk-review/002-evaluation-service-pause.md) | Apply service pauses to category evaluation | P1 | None; coordinate with 001 | TODO |
+| [003](application-risk-review/003-draft-preservation.md) | Preserve drafts through pending saves and required updates | P1 | None | TODO |
+| [004](application-risk-review/004-alias-processing-state.md) | Keep alias propagation from completing active processing | P2 | None | TODO |
+| [005](application-risk-review/005-correction-history-deletion.md) | Remove deleted receipt data from correction batches | P2 | None | TODO |
+| [006](application-risk-review/006-workflow-retention.md) | Complete workflow payload retention | P2 | Existing retention callback; coordinate with 005 | IN PROGRESS |
+| [007](application-risk-review/007-receipt-read-budgets.md) | Complete receipt read budgets | P2 | Existing summaries and cache in the other task | IN PROGRESS |
+| [008](application-risk-review/008-alias-work-scheduling.md) | Bound and combine household alias propagation | P2 | Coordinate with 001 and 004 | TODO |
+| [009](application-risk-review/009-five-image-limit.md) | Limit new receipts to five images | P2 | Legacy queue recovery before enforcement | TODO |
+
+Implement the remaining work as small changes. Start with 002–004 while the
+other task completes its overlapping work. Plan 001 now concerns remaining
+admission coverage, not a second receipt/provider limiter. Do not combine the
+plans into one application-wide implementation. This table is the authoritative
+status index for this review; the older simplification plans below keep their
+existing status.
+
+
 ## Product simplification assessment — 23 September 2026
 
 Status: IMPLEMENTED. See the [product assessment](product-simplification.md) for
