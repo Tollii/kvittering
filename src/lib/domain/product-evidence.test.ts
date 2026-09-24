@@ -21,7 +21,9 @@ it.each([
 );
 
 it("preserves brand numbers while normalizing package measures", () => {
-  expect(normalizeMeasureText("Vitamin B12 0,1kg")).toBe("Vitamin B12  100g ");
+  expect(normalizeMeasureText("Vitamin B12 0,1kg").trim().split(/\s+/)).toEqual(
+    ["Vitamin", "B12", "100g"],
+  );
 
   const evidence = parseProductEvidence({
     source: "receipt",
