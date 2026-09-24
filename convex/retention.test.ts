@@ -1,7 +1,7 @@
 import { createFunctionHandle } from "convex/server";
 import { register as registerWorkflow } from "@convex-dev/workflow/test";
 import { register as registerRateLimiter } from "@convex-dev/rate-limiter/test";
-import type { WorkflowId } from "@convex-dev/workflow";
+import { createEvent, type WorkflowId } from "@convex-dev/workflow";
 import { trackWorkflow } from "./retention";
 /// <reference types="vite/client" />
 import { convexTest } from "convex-test";
@@ -56,6 +56,7 @@ async function workflowFixture(
   component: "processing" | "analysis",
   legacy = false,
 ) {
+  vi.useFakeTimers();
   const t = convexTest(schema, modules);
   registerWorkflow(t);
   registerWorkflow(t, "productAnalysisWorkflow");
@@ -284,5 +285,46 @@ it("inventories legacy terminal journals in the correct component and retains a 
         paginationOpts: { cursor: null, numItems: 10 },
       })
     ).page,
+  ).toEqual([]);
+});
+
+it("removes a catalog waiter after its completed workflow journal has been cleaned", async () => {
+  vi.useFakeTimers();
+  const { t, owner, workflowId } = await workflowFixture("processing");
+
+  const requestId = await t.run(async (ctx) => {
+    const eventId = await createEvent(ctx, components.workflow, {
+      name: "catalog-ready",
+      workflowId,
+    });
+
+    const requestId = await ctx.db.insert("catalogRequests", {
+      key: "completed",
+      request: { kind: "products", search: "test" },
+      state: "ready",
+      result: emptyCatalogResult(),
+      expiresAt: 1,
+      attempts: 1,
+      scheduledAt: 0,
+    });
+
+    await ctx.db.insert("catalogRequestWaiters", { requestId, eventId });
+
+    return requestId;
+  });
+
+  await t.mutation(owner.workflow.complete, {
+    workflowId,
+    generationNumber: 0,
+    runResult: { kind: "success", returnValue: null },
+  });
+  vi.setSystemTime(Date.now() + 30 * 24 * 60 * 60_000);
+  await t.mutation(internal.retention.workflowJournal, {
+    workflowId,
+    component: "processing",
+  });
+  await t.mutation(internal.catalogQueue.notify, { id: requestId });
+  expect(
+    await t.run((ctx) => ctx.db.query("catalogRequestWaiters").collect()),
   ).toEqual([]);
 });

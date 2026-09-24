@@ -22,6 +22,24 @@ transaction. A rejected request does not consume any quota or change the receipt
 Quota errors use Norwegian text. The upload queue retains images and the original
 reservation identity after rejection. Users can retry after the quota recovers.
 
+## New optional work
+
+Each user and household shares these additional fixed UTC-hour and UTC-day
+allowances. Crossing an hour or midnight resets only that window.
+
+| Work                                       | Per hour | Per day |
+| ------------------------------------------ | -------: | ------: |
+| New interactive catalog requests           |      120 |     400 |
+| Category evaluations with examples         |        6 |      12 |
+| Manual receipt matching or analysis starts |       20 |      60 |
+
+Pending requests, fresh cached results, and current analysis versions do not
+consume new-work allowance. Admission and scheduling share one transaction.
+A rejected batch rolls back all its starts and counters. Operator repair is
+not an interactive start, but its outbound provider requests still count.
+These initial limits are source-controlled operating choices, not measured
+usage thresholds. Adjust them from observed usage without deleting queued work.
+
 ## Provider allowances
 
 | Provider  | Requests per UTC day | Requests per fixed 30-day period |
@@ -40,6 +58,28 @@ I/O. SDK retries, workflow retries, search fallbacks, product analysis, and
 operator evaluations all count. Failed requests and uncertain network outcomes
 are not refunded. A rejected allowance prevents the network call. If quota
 storage fails, the request fails without contacting the provider.
+
+In addition, attributed provider attempts consume both user and household limits:
+
+| Provider  | Per UTC hour | Per UTC day |
+| --------- | -----------: | ----------: |
+| OpenAI    |           30 |          60 |
+| TypeSafe  |          600 |       2,000 |
+| Kassalapp |          600 |       2,000 |
+
+Receipt work is attributed to its persisted uploader and household. New catalog
+cache misses record their originating user and household; shared cache hits are
+free. Direct evaluation uses the authenticated member. Retries use the same
+source. Attribution is resolved on the server, not supplied by public callers.
+One actor therefore cannot use the entire deployment allowance by issuing new
+attributed work. Many actors can still exhaust a shared deployment allowance;
+these limits do not reserve capacity for every account.
+
+Operator evaluations and older journaled calls without attribution retain the
+deployment limits. New public work supplies attribution. Optional internal
+arguments preserve old journals; no actor data is invented for old rows.
+Catalog matching uses at most 12 products and 108 questions per TypeSafe request.
+The other 12-product batches and 50-example evaluation limit remain unchanged.
 
 Receipt extraction permits at most 16,000 output tokens per request. Receipt
 new uploads permit at most five images of 10 MiB each. Existing server
@@ -71,7 +111,9 @@ feature flags, or deploy the backend. Configure the isolated end-to-end deployme
 mock receipt extraction and enable the [email registration flag](featureFlags.md#email-registration)
 before creating accounts. There is no public quota bypass for tests.
 
-Deploy the additive backend before distributing the updated sign-in screen.
+For the original API safeguards, deploy the additive backend before distributing
+the updated sign-in screen. The five-image tightening has the separate
+client-first transition below.
 Older clients keep their existing receipt API contracts and receive quota errors.
 They may still show email registration, but the server rejects it when disabled.
 No minimum version change or local queue migration is required. Device upgrade,

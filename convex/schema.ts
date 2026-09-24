@@ -195,6 +195,9 @@ export default defineSchema({
     ),
   }).index("by_householdId_and_key", ["householdId", "key"]),
   catalogRequests: defineTable({
+    payer: v
+      .object({ identity: v.string(), householdId: v.id("households") })
+      .optional(),
     key: v.string(),
     request: catalogRequestValidator,
     state: v.union(

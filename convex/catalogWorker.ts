@@ -37,7 +37,10 @@ export const execute = internalAction({
 
     if (!request) return null;
     const started = Date.now();
-    const options = { fetch: providerFetch(ctx, "kassalapp") };
+
+    const options = {
+      fetch: providerFetch(ctx, "kassalapp", { kind: "catalog", id }),
+    };
 
     try {
       let result: CatalogResult = emptyCatalogResult();

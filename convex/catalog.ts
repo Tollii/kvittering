@@ -1,4 +1,4 @@
-import { query, type QueryCtx } from "./_generated/server";
+import { query, type QueryCtx, type MutationCtx } from "./_generated/server";
 import { requireCompatibleClient } from "./releasePolicy";
 import { clientValidator } from "../src/lib/releases/policy";
 import {
@@ -9,6 +9,7 @@ import {
 import {
   catalogLookupValidator,
   type CatalogLookup,
+  type CatalogRequest,
   catalogResponseValidator,
   emptyCatalogResult,
   type CatalogResponse,
@@ -16,7 +17,7 @@ import {
 import { clientMutation as mutation } from "./clientFunctions";
 import { v } from "convex/values";
 import { requireMember, requireReceipt } from "./access";
-import { ensureRequest } from "./catalogQueue";
+import { ensureRequest as enqueueRequest } from "./catalogQueue";
 import type { Doc } from "./_generated/dataModel";
 import { retailerCode } from "../src/lib/catalog/matching";
 
@@ -32,6 +33,13 @@ const missingProduct = {
   status: "error" as const,
   message: "Produktet finnes ikke i den lagrede katalogen.",
 };
+
+/** Cache hits are free; only admitted new work records its originating caller. */
+async function ensureMemberRequest(ctx: MutationCtx, request: CatalogRequest) {
+  const payer = await requireMember(ctx);
+
+  return enqueueRequest(ctx, request, { payer, interactive: true });
+}
 
 /** Equivalent identities have no provider SKU from which to fetch details or prices. */
 function equivalentResponse(
@@ -82,7 +90,7 @@ export const searchProducts = mutation({
     await requireMember(ctx);
 
     return requestResponse(
-      await ensureRequest(ctx, { kind: "products", search: args.search }),
+      await ensureMemberRequest(ctx, { kind: "products", search: args.search }),
     );
   },
 });
@@ -95,7 +103,7 @@ export const searchStores = mutation({
     const { receipt } = await requireReceipt(ctx, args.receiptId);
 
     return requestResponse(
-      await ensureRequest(ctx, {
+      await ensureMemberRequest(ctx, {
         kind: "stores",
         search: args.search,
         chain: retailerCode(receipt.data?.store ?? null) ?? undefined,
@@ -124,7 +132,7 @@ export const prices = mutation({
     if (!record || id === null) return missingProduct;
 
     return requestResponse(
-      await ensureRequest(ctx, {
+      await ensureMemberRequest(ctx, {
         kind: "prices",
         productKey: record.key,
         id,
@@ -165,7 +173,7 @@ export const product = mutation({
       };
 
     const response = requestResponse(
-      await ensureRequest(ctx, {
+      await ensureMemberRequest(ctx, {
         kind: "details",
         productKey: key,
         id,
@@ -238,7 +246,7 @@ export const ensure = mutation({
       record.detailsFetchedAt + catalogDetailsTtl > Date.now()
     )
       return null;
-    await ensureRequest(ctx, request);
+    await ensureMemberRequest(ctx, request);
 
     return null;
   },

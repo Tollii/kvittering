@@ -1,5 +1,6 @@
 import { userError } from "./userErrors";
 import { isReceiptProcessing } from "../src/lib/domain/receipt-state";
+import { consumeWorkQuota } from "./rateLimits";
 import { trackWorkflow } from "./retention";
 import { commitReceiptChange } from "./receiptChanges";
 import { isCategoryUncertain } from "../src/lib/domain/receipt-issues";
@@ -88,7 +89,8 @@ export const process = workflow
         [...requests].map(async ([key, request]) => {
           const result = await step.runMutation(
             internal.catalogQueue.requestForWorkflow,
-            { request, workflowId: step.workflowId },
+            { request, workflowId: step.workflowId, receiptId: args.id },
+            { unstableArgs: true },
           );
 
           return { key, ...result };
@@ -104,12 +106,14 @@ export const process = workflow
       const decisions = await step.runAction(
         internal.catalogClassifier.classify,
         {
+          receiptId: args.id,
           items: inputs.map((item) => ({
             ...item,
             requestId:
               entries.find((entry) => entry.key === item.search)?.id ?? null,
           })),
         },
+        { unstableArgs: true },
       );
 
       await step.runMutation(internal.catalogMatching.apply, {
@@ -201,7 +205,7 @@ export const enrich = mutation({
   args: { id: v.id("receipts"), onlyIfMissing: v.boolean().optional() },
   returns: v.null(),
   handler: async (ctx, { id, onlyIfMissing }) => {
-    const { receipt } = await requireReceipt(ctx, id);
+    const { receipt, member } = await requireReceipt(ctx, id);
 
     if (onlyIfMissing && receipt.catalogStatus) return null;
 
@@ -212,6 +216,7 @@ export const enrich = mutation({
       throw new Error("Legg til KASSALAPP_API_KEY i Convex først.");
 
     if (receipt.catalogStatus === "pending") return null;
+    await consumeWorkQuota(ctx, member, "analysis");
     const workflowId = await launch(ctx, id, receipt.generation);
     await ctx.db.patch("receipts", id, {
       catalogStatus: "pending",

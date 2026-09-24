@@ -291,7 +291,19 @@ export const deletedReceiptBatches = internalMutation({
   returns: v.null(),
   handler: async (ctx, args) => {
     if (await ctx.db.get("receipts", args.receiptId)) return null;
-    const through = args.through ?? Date.now();
+
+    const through =
+      args.through ??
+      (
+        await ctx.db
+          .query("correctionBatches")
+          .withIndex("by_householdId", (q) =>
+            q.eq("householdId", args.householdId),
+          )
+          .order("desc")
+          .first()
+      )?._creationTime ??
+      Date.now();
 
     const page = await ctx.db
       .query("correctionBatches")
@@ -332,7 +344,11 @@ export const orphanedCorrectionBatches = internalMutation({
   args: { cursor: v.string().optional(), through: v.number().optional() },
   returns: v.null(),
   handler: async (ctx, args) => {
-    const through = args.through ?? Date.now();
+    const through =
+      args.through ??
+      (await ctx.db.query("correctionBatches").order("desc").first())
+        ?._creationTime ??
+      Date.now();
 
     const page = await ctx.db
       .query("correctionBatches")

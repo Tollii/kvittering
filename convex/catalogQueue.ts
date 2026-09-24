@@ -1,4 +1,5 @@
 import { userError } from "./userErrors";
+import { consumeWorkQuota, type QuotaActor } from "./rateLimits";
 import { featureEnabled } from "./featureFlags";
 import { v } from "convex/values";
 import { Workpool, vOnCompleteArgs } from "@convex-dev/workpool";
@@ -63,6 +64,7 @@ function isRequestInFlight(state: Doc<"catalogRequests">["state"]): boolean {
 export async function ensureRequest(
   ctx: MutationCtx,
   input: CatalogRequest,
+  options?: { payer: QuotaActor; interactive?: boolean },
 ): Promise<Doc<"catalogRequests">> {
   if (!(await featureEnabled(ctx, "productLookup")))
     throw userError("Produktkatalogen er midlertidig satt på pause.");
@@ -87,7 +89,16 @@ export async function ensureRequest(
     return existing;
   }
 
+  if (options?.interactive)
+    await consumeWorkQuota(ctx, options.payer, "catalog");
+
   const values = {
+    payer: options
+      ? {
+          identity: options.payer.identity,
+          householdId: options.payer.householdId,
+        }
+      : undefined,
     key,
     request,
     state: "pending" as const,
@@ -122,13 +133,35 @@ export const request = internalMutation({
 });
 
 export const requestForWorkflow = internalMutation({
-  args: { request: catalogRequestValidator, workflowId: vWorkflowId },
+  args: {
+    request: catalogRequestValidator,
+    workflowId: vWorkflowId,
+    receiptId: v.id("receipts").optional(),
+  },
   returns: v.object({
     id: v.id("catalogRequests"),
     eventId: v.union(vEventId(), v.null()),
   }),
   handler: async (ctx, args) => {
-    const request = await ensureRequest(ctx, args.request);
+    const receipt = args.receiptId
+      ? await ctx.db.get("receipts", args.receiptId)
+      : null;
+
+    if (args.receiptId && !receipt)
+      throw new Error("Receipt no longer exists.");
+
+    const request = await ensureRequest(
+      ctx,
+      args.request,
+      receipt
+        ? {
+            payer: {
+              identity: receipt.uploadedBy,
+              householdId: receipt.householdId,
+            },
+          }
+        : undefined,
+    );
 
     if (request.state === "ready" || request.state === "error")
       return { id: request._id, eventId: null };
@@ -191,7 +224,17 @@ export const notify = internalMutation({
       .take(50);
 
     for (const waiter of waiters) {
-      await sendEvent(ctx, components.workflow, { id: waiter.eventId });
+      try {
+        await sendEvent(ctx, components.workflow, { id: waiter.eventId });
+      } catch (cause) {
+        // The installed workflow API reports this when retention has removed the event.
+        if (
+          !(cause instanceof Error) ||
+          !cause.message.includes(`Event not found: ${waiter.eventId}`)
+        )
+          throw cause;
+      }
+
       await ctx.db.delete("catalogRequestWaiters", waiter._id);
     }
 

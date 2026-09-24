@@ -427,3 +427,53 @@ it("repairs historical orphan batches without changing live receipt history", as
     await t.run((ctx) => ctx.db.get("correctionBatches", batchId)),
   ).toBeNull();
 });
+
+it("admits six evaluations per hour and denies extra provider calls until recovery", async () => {
+  vi.useFakeTimers();
+
+  try {
+    const { t, first } = await setup();
+    const second = t.withIdentity({ subject: "second", issuer: "test" });
+    await second.mutation(api.households.join, {
+      invitation: "11111111111111111111111111111111",
+    });
+    vi.stubEnv("TYPESAFE_API_KEY", "test-placeholder");
+
+    const transport = vi.fn<typeof fetch>(async () =>
+      Response.json({
+        answers: {
+          category_0: {
+            type: "choice",
+            choice: "drinks.soft-drinks",
+            confidence: 1,
+          },
+        },
+      }),
+    );
+
+    vi.stubGlobal("fetch", transport);
+
+    for (let index = 0; index < 5; index++)
+      await first.action(api.correctionEvaluation.evaluate, {});
+
+    const attempts = await Promise.allSettled(
+      Array.from({ length: 4 }, () =>
+        first.action(api.correctionEvaluation.evaluate, {}),
+      ),
+    );
+
+    expect(
+      attempts.filter((attempt) => attempt.status === "fulfilled"),
+    ).toHaveLength(1);
+    expect(transport).toHaveBeenCalledTimes(6);
+    await expect(
+      second.action(api.correctionEvaluation.evaluate, {}),
+    ).rejects.toThrow("Bruksgrensen");
+    expect(transport).toHaveBeenCalledTimes(6);
+    vi.setSystemTime(Date.now() + 60 * 60_000);
+    await first.action(api.correctionEvaluation.evaluate, {});
+    expect(transport).toHaveBeenCalledTimes(7);
+  } finally {
+    vi.useRealTimers();
+  }
+});

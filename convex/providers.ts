@@ -65,7 +65,11 @@ export const extract = internalAction({
     const model = env.OPENAI_RECEIPT_MODEL ?? "gpt-6-luna";
 
     const client = new OpenAI({
-      fetch: providerFetch(ctx, "openai"),
+      fetch: providerFetch(
+        ctx,
+        "openai",
+        args.receiptId ? { kind: "receipt", id: args.receiptId } : undefined,
+      ),
       apiKey: env.OPENAI_API_KEY,
       timeout: 120000,
       maxRetries: 1,
@@ -150,7 +154,11 @@ export const classify = internalAction({
       };
 
     const client = new TypeSafeClient({
-      fetch: providerFetch(ctx, "typesafe"),
+      fetch: providerFetch(
+        ctx,
+        "typesafe",
+        args.receiptId ? { kind: "receipt", id: args.receiptId } : undefined,
+      ),
       apiKey: env.TYPESAFE_API_KEY,
       retry: { maxRetries: 0 },
     });

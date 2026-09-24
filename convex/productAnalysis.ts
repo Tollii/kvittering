@@ -1,6 +1,7 @@
 import { unclearCategoryId } from "../src/lib/domain/categories";
 import { userError } from "./userErrors";
 import { hasReceiptBeenRead } from "../src/lib/domain/receipt-state";
+import { consumeWorkQuota, type QuotaActor } from "./rateLimits";
 import { trackWorkflow } from "./retention";
 import { featureEnabled } from "./featureFlags";
 import { clientMutation as mutation } from "./clientFunctions";
@@ -92,7 +93,7 @@ export const process = manager
 async function launch(
   ctx: MutationCtx,
   receipt: Doc<"receipts">,
-  origin: "automatic" | "manual" = "automatic",
+  requester?: QuotaActor | "operator",
 ) {
   if (!(await featureEnabled(ctx, "spendingAnalysis")))
     return "disabled" as const;
@@ -111,9 +112,12 @@ async function launch(
     previous?.version === productAnalysisVersion &&
     previous.generation === receipt.generation &&
     previous.revision === receipt.revision &&
-    (previous.state !== "error" || origin === "automatic")
+    (previous.state !== "error" || !requester)
   )
     return "current" as const;
+
+  if (requester && requester !== "operator")
+    await consumeWorkQuota(ctx, requester, "analysis");
 
   const workflowId = await manager.start(
     ctx,
@@ -166,8 +170,8 @@ export const ensure = mutation({
     if (ids.length > 20) throw userError("For mange kvitteringer.");
 
     for (const id of ids) {
-      const { receipt } = await requireReceipt(ctx, id);
-      await launch(ctx, receipt, "manual");
+      const { receipt, member } = await requireReceipt(ctx, id);
+      await launch(ctx, receipt, member);
     }
 
     return null;
@@ -545,7 +549,7 @@ export const repair = internalMutation({
         maximumBytesRead: 500_000,
       });
 
-    for (const receipt of page.page) await launch(ctx, receipt, "manual");
+    for (const receipt of page.page) await launch(ctx, receipt, "operator");
 
     if (!page.isDone)
       await ctx.scheduler.runAfter(0, internal.productAnalysis.repair, {

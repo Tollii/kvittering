@@ -197,3 +197,42 @@ it("does not treat an unanswered competing group as a negative answer", async ()
   expect(result).toMatchObject({ productKey: null, reason: "provider_error" });
   expect(result.equivalentKeys).toBeUndefined();
 });
+
+it("bounds catalog question batches while retaining every line decision", async () => {
+  const batches: number[] = [];
+  vi.stubGlobal(
+    "fetch",
+    vi.fn<typeof fetch>(async (_url, init) => {
+      const body = JSON.parse(String(init?.body));
+      batches.push(Object.keys(body.questions).length);
+
+      const answers = Object.fromEntries(
+        Object.keys(body.questions).map((key) => [
+          key,
+          key.startsWith("product_")
+            ? { type: "noul", noul: 0.9 }
+            : {
+                type: "choice",
+                choice: "convenience.frozen-pizza",
+                confidence: 0.95,
+              },
+        ]),
+      );
+
+      return Response.json({ model: "jev-latest", answers });
+    }),
+  );
+
+  const results = await classifyCatalogProducts(
+    Array.from({ length: 25 }, (_, index) => item(index)),
+    client(),
+  );
+
+  expect(batches).toEqual([24, 24, 2]);
+  expect(results.map((result) => result.lineId)).toEqual(
+    Array.from({ length: 25 }, (_, index) => `pizza_${index}`),
+  );
+  expect(
+    results.every((result) => result.categoryId === "convenience.frozen-pizza"),
+  ).toBe(true);
+});

@@ -2,7 +2,7 @@
 
 ## Application risk review — 24 September 2026
 
-Review complete. Implementation is now authorized on this branch, starting from
+Review and local implementation are complete. Implementation starts from
 `8564c4c7287d936161b3d63041c5a0bfe2a44c0c`. See the
 [implementation record](application-risk-review/implementation.md). Original audit baseline:
 `96331941a84ca8fcb23da55b06478afacfce3eac`, from
@@ -25,7 +25,7 @@ working copy. Reuse that work; the baseline findings are not all still unchanged
 
 | Plan | Title | Priority | Dependencies | Status |
 | --- | --- | --- | --- | --- |
-| [001](application-risk-review/001-paid-work-admission.md) | Complete paid-work admission coverage | P1 | Existing receipt/provider limits in the other task | IN PROGRESS |
+| [001](application-risk-review/001-paid-work-admission.md) | Complete paid-work admission coverage | P1 | Existing receipt/provider limits in the other task | DONE |
 | [002](application-risk-review/002-evaluation-service-pause.md) | Apply service pauses to category evaluation | P1 | None; coordinate with 001 | DONE |
 | [003](application-risk-review/003-draft-preservation.md) | Preserve drafts through pending saves and required updates | P1 | None | DONE |
 | [004](application-risk-review/004-alias-processing-state.md) | Keep alias propagation from completing active processing | P2 | None | DONE |
@@ -35,12 +35,11 @@ working copy. Reuse that work; the baseline findings are not all still unchanged
 | [008](application-risk-review/008-alias-work-scheduling.md) | Bound and combine household alias propagation | P2 | Coordinate with 001 and 004 | DONE |
 | [009](application-risk-review/009-five-image-limit.md) | Limit new receipts to five images | P2 | Legacy queue recovery before enforcement | DONE |
 
-Implement the remaining work as small changes. Start with 002–004 while the
-other task completes its overlapping work. Plan 001 now concerns remaining
-admission coverage, not a second receipt/provider limiter. Do not combine the
-plans into one application-wide implementation. This table is the authoritative
-status index for this review; the older simplification plans below keep their
-existing status.
+All nine plans are implemented in local commits. DONE means local implementation
+and verification are complete; hosted load checks and signed-device release
+checks remain open as recorded in the implementation record. No release was
+published. This table is the authoritative status index for this review; the
+older simplification plans below keep their existing status.
 
 
 ## Product simplification assessment — 23 September 2026

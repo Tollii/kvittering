@@ -28,7 +28,10 @@ export const match = internalAction({
     const client =
       env.TYPESAFE_API_KEY && env.RECEIPT_PROVIDER !== "mock"
         ? new TypeSafeClient({
-            fetch: providerFetch(ctx, "typesafe"),
+            fetch: providerFetch(ctx, "typesafe", {
+              kind: "receipt",
+              id: args.id,
+            }),
             apiKey: env.TYPESAFE_API_KEY,
             timeout: 10000,
             retry: { maxRetries: 0 },

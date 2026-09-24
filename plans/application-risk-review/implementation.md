@@ -125,3 +125,49 @@ and explicit discard. Restoring the old guard makes that check fail. The harness
 uses supported React DOM and Happy DOM instead of the deprecated test renderer.
 No native module changed. A signed-device update-gate/restart and gesture flow
 remains required before distribution; it was not simulated as a real device run.
+
+## 001 — Paid-work admission
+
+The existing limiter now also admits new catalog jobs, category evaluations,
+and manual matching/analysis starts per user and household. Cached and current
+work is free. Every newly attributed provider attempt also has user/household
+hourly and daily caps before the shared deployment caps. Receipt source and
+catalog payer metadata are resolved from persisted records. Automatic work,
+manual retries, and SDK retries use the same attribution. Old journaled calls
+and trusted operator evaluations retain global limits. No public caller can
+select an unattributed provider operation.
+
+Catalog classification uses 12-product batches, with at most 108 questions per
+request. Initial allowance values and their fixed UTC windows are documented
+in `docs/api-limits.md`. They are operating choices, not currency budgets or
+measurements of normal traffic. New catalog payer metadata is optional for old
+rows; internal optional arguments and replay options preserve existing journals.
+
+Checks cover concurrent admission, shared-household limits, cache reuse, hourly
+recovery, other-household access, manual processing reuse, background attribution,
+and actual SDK retry effects. The OpenAI test supplies five images and observes
+only one network attempt when the retry exceeds the actor limit. No paid service
+was called. Hosted contention and signed-client behavior remain release checks.
+
+## Cleanup follow-up
+
+Final integration checks found two cleanup edge cases. Correction cleanup now
+uses the newest persisted creation timestamp, so a fractional timestamp cannot
+fall beyond a wall-clock boundary. Catalog notification removes only an obsolete
+waiter when the installed workflow API confirms its event no longer exists.
+Other notification failures still propagate. A component test removes the actual
+workflow journal and then verifies that catalog notification clears its waiter.
+
+## Final verification
+
+All nine plans are implemented in local commits based on `8564c4c`. The other
+task remains complete at that revision. `npm run check:ci` passed, including
+375 application tests in 63 files, lint, types, formatting, and the lint-rule
+tests. The iOS JavaScript export also passed. No paid provider was contacted.
+
+DONE in the plan index means local implementation and verification are complete.
+Hosted contention, load, workflow replay, and signed-device upgrade checks were
+not run. The client recovery flow must ship before stricter image-count
+enforcement. Existing eight-image reservations retain their original capacity.
+The historical correction cleanup remains an operator step after deployment.
+No code was pushed or deployed, and no release minimum was changed.

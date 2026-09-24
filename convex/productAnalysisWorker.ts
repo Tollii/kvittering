@@ -219,7 +219,7 @@ export const analyze = internalAction({
       throw new Error("Product analysis is unavailable.");
 
     const client = new TypeSafeClient({
-      fetch: providerFetch(ctx, "typesafe"),
+      fetch: providerFetch(ctx, "typesafe", { kind: "receipt", id: args.id }),
       apiKey: env.TYPESAFE_API_KEY,
       timeout: 20000,
       retry: { maxRetries: 0 },

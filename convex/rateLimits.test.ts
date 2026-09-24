@@ -1,7 +1,7 @@
 /// <reference types="vite/client" />
 import { convexTest } from "convex-test";
 import { register as registerRateLimiter } from "@convex-dev/rate-limiter/test";
-import { DAY, RateLimiter } from "@convex-dev/rate-limiter";
+import { DAY, HOUR, RateLimiter } from "@convex-dev/rate-limiter";
 import { afterEach, expect, it, vi } from "vitest";
 import { api, components, internal } from "./_generated/api";
 import schema from "./schema";
@@ -312,4 +312,142 @@ it("admits only the remaining allowance when reservations arrive concurrently", 
   expect(results.filter((result) => result.status === "rejected")).toHaveLength(
     3,
   );
+});
+
+it("charges background provider attempts to their source and leaves allowance for another household", async () => {
+  const { t, first, householdId } = await setup();
+
+  const id = await first.mutation(api.receipts.reserve, {
+    householdId,
+    clientId: "provider-source-request",
+    imageCount: 1,
+  });
+
+  const receipt = (await first.query(api.receipts.detail, { id }))!.receipt;
+  const limiter = new RateLimiter(components.rateLimiter);
+  await t.run((ctx) =>
+    limiter.limit(ctx, `provider:kassalapp:${HOUR}`, {
+      key: `user:${receipt.uploadedBy}`,
+      count: 599,
+      config: { kind: "fixed window", rate: 600, period: HOUR, start: 0 },
+    }),
+  );
+
+  const other = t.withIdentity({
+    subject: "provider-other",
+    issuer: "https://test.local",
+  });
+
+  const otherHousehold = await other.mutation(api.households.create, {
+    name: "Other",
+    invitation: "fedcba9876543210fedcba9876543210",
+  });
+
+  const otherId = await other.mutation(api.receipts.reserve, {
+    householdId: otherHousehold,
+    clientId: "provider-other-request",
+    imageCount: 1,
+  });
+
+  const transport = vi.fn<typeof fetch>(
+    async () => new Response(null, { status: 503 }),
+  );
+
+  vi.stubGlobal("fetch", transport);
+  await t.action(async (ctx) => {
+    const request = providerFetch(ctx, "kassalapp", { kind: "receipt", id });
+    await request("https://kassal.app/api/v1/products");
+    await expect(request("https://kassal.app/api/v1/products")).rejects.toThrow(
+      "Bruksgrensen",
+    );
+    await providerFetch(ctx, "kassalapp", { kind: "receipt", id: otherId })(
+      "https://kassal.app/api/v1/products",
+    );
+  });
+  expect(transport).toHaveBeenCalledTimes(2);
+
+  const remaining = await t.run((ctx) =>
+    limiter.check(ctx, `kassalapp:${DAY}`, {
+      count: providerAllowances.kassalapp.daily - 2,
+      config: {
+        kind: "fixed window",
+        rate: providerAllowances.kassalapp.daily,
+        period: DAY,
+        start: 0,
+      },
+    }),
+  );
+
+  expect(remaining.ok).toBe(true);
+  vi.setSystemTime(Date.now() + HOUR);
+  await t.action(async (ctx) => {
+    await providerFetch(ctx, "kassalapp", { kind: "receipt", id })(
+      "https://kassal.app/api/v1/products",
+    );
+  });
+  expect(transport).toHaveBeenCalledTimes(3);
+});
+
+it("sends five images and counts the OpenAI SDK retry before network I/O", async () => {
+  const { t, first, householdId } = await setup();
+  vi.stubEnv("OPENAI_API_KEY", "test-key");
+  vi.stubEnv("RECEIPT_PROVIDER", "openai");
+
+  const receiptId = await first.mutation(api.receipts.reserve, {
+    householdId,
+    clientId: "five-image-provider-request",
+    imageCount: 5,
+  });
+
+  const receipt = (await first.query(api.receipts.detail, { id: receiptId }))!
+    .receipt;
+
+  const storageIds = await t.run(async (ctx) => {
+    const ids = [];
+
+    for (let index = 0; index < 5; index++)
+      ids.push(
+        await ctx.storage.store(
+          new Blob([String(index)], { type: "image/jpeg" }),
+        ),
+      );
+
+    return ids;
+  });
+
+  const limiter = new RateLimiter(components.rateLimiter);
+  await t.run((ctx) =>
+    limiter.limit(ctx, `provider:openai:${HOUR}`, {
+      key: `user:${receipt.uploadedBy}`,
+      count: 29,
+      config: { kind: "fixed window", rate: 30, period: HOUR, start: 0 },
+    }),
+  );
+  let images = 0;
+
+  const transport = vi.fn<typeof fetch>(async (_url, init) => {
+    const body = JSON.parse(String(init?.body));
+    images = body.input[1].content.filter(
+      (item: { type: string }) => item.type === "input_image",
+    ).length;
+
+    return new Response(null, { status: 503 });
+  });
+
+  vi.stubGlobal("fetch", transport);
+
+  await Promise.all([
+    (async () => {
+      await expect(
+        t.action(internal.providers.extract, { receiptId, storageIds }),
+      ).rejects.toThrow(/Connection|Bruksgrensen/);
+    })(),
+    vi.advanceTimersByTimeAsync(5000),
+  ]);
+  expect(images).toBe(5);
+  expect(transport).toHaveBeenCalledTimes(1);
+  expect(
+    (await first.query(api.receipts.detail, { id: receiptId }))?.receipt
+      .imageCount,
+  ).toBe(5);
 });
