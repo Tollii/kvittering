@@ -108,5 +108,7 @@ if ! maestro --device "$device" test .maestro \
   echo "Last app log lines:" >&2
   grep -E "com.facebook.react.log|Unhandled|Terminating|ReactNativeJS" "$out/app.log" |
     tail -n 40 >&2 || true
+  echo "Backend log:" >&2
+  grep -vE "^\s*$" "$out/convex.log" | tail -n 60 >&2 || true
   exit 1
 fi
