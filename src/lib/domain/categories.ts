@@ -666,9 +666,51 @@ export const categories: Category[] = entries.flatMap((entry) =>
   ),
 );
 
-export const categoryById = new Map<string, Category>(
+const categoryById = new Map<string, Category>(
   categories.map((category) => [category.id, category]),
 );
+
+/** The category for items that could not be classified. */
+export const unclearCategoryId: CategoryId = "fallback.unclear";
+
+/** Ids that older receipts stored before categories were merged. */
+const legacyCategoryIds = new Map<string, CategoryId>([
+  ["drinks.energy-drinks", "drinks.soft-drinks"],
+]);
+
+export function isCategoryId(value: string): value is CategoryId {
+  return categoryById.has(value);
+}
+
+/** A stored or model-supplied id as a current category, or null when unknown. */
+export function parseCategoryId(
+  value: string | null | undefined,
+): CategoryId | null {
+  if (!value) return null;
+  const current = legacyCategoryIds.get(value) ?? value;
+
+  return isCategoryId(current) ? current : null;
+}
+
+/** Known and not unclear: a category someone or something actually decided. */
+export function isDecidedCategory(
+  value: string | null | undefined,
+): value is CategoryId {
+  return !!value && isCategoryId(value) && value !== unclearCategoryId;
+}
+
+/** Every CategoryId names a category, so this lookup is total. */
+export function category(id: CategoryId): Category {
+  const found = categoryById.get(id);
+
+  if (!found) throw new Error(`Category ${id} is not defined.`);
+
+  return found;
+}
+
+/** The category a stored id names; missing or unknown ids read as unclear. */
+export const categoryOf = (value: string | null | undefined): Category =>
+  category(parseCategoryId(value) ?? unclearCategoryId);
 
 export const categoryRules =
   "Choose one leaf. Soda and energy drinks both belong to drinks.soft-drinks. Frozen pizza is convenience.frozen-pizza; fresh ready-to-eat pizza and hot meals from the grocery counter are convenience.fresh-meals. Filled baguettes, including taco baguettes, are convenience.sandwiches; plain baguettes are bakery.rolls. Packaged Wasa crispbread sandwiches are bakery.crispbread. Prepared meal salads are convenience.salads; plain lettuce and salad leaves remain produce.vegetables. Snack carrots are vegetables, not crisps. Yoghurt ice cream is snacks.ice-cream, not dairy.yoghurt. Vitamins and supplements, including melatonin, are personal-care.supplements. Sliced ham is toppings.sliced-meat, raw pork is meat-fish.pork, and fish spreads are toppings.fish-spreads. Frozen vegetables remain produce.vegetables. Do not infer ingredients, sugar content, package size or purpose from vague names. Use fallback.unclear when uncertain. Deposits and discounts are accounting lines, not products.";

@@ -157,6 +157,26 @@ typedTester.run("no-ore-arithmetic", plugin.rules["no-ore-arithmetic"], {
   ].map((code) => ({ ...typed(code), errors: [{ messageId: "operation" }] })),
 });
 
+const calendarDeclaration =
+  "declare const dateBrand: unique symbol; type CalendarDate = string & { readonly [dateBrand]: true }; declare const day: CalendarDate;";
+
+typedTester.run(
+  "no-calendar-string-ops",
+  plugin.rules["no-calendar-string-ops"],
+  {
+    valid: [
+      `${calendarDeclaration} const same = day === day;`,
+      `${calendarDeclaration} const size = day.length;`,
+      "declare const text: string; const month = text.slice(0, 7);",
+    ].map(typed),
+    invalid: [
+      `${calendarDeclaration} const month = day.slice(0, 7);`,
+      `${calendarDeclaration} const first = \`\${day}-01\`;`,
+      `${calendarDeclaration} const later = day.localeCompare(day);`,
+    ].map((code) => ({ ...typed(code), errors: [{ messageId: "operation" }] })),
+  },
+);
+
 it("runs the same rule in the repository Oxlint configuration", () => {
   const directory = mkdtempSync(join(process.cwd(), "tools", "rule-test-"));
 

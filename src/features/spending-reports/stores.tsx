@@ -1,3 +1,4 @@
+import { CalendarDate } from "@/lib/domain/calendar";
 import { nonEmpty } from "@/lib/domain/collections";
 import { Ore } from "@/lib/domain/ore";
 import { useState } from "react";
@@ -17,7 +18,6 @@ import {
 } from "@/components/ui";
 import { StoreMap } from "@/components/store-map";
 import { useTheme } from "@/constants/theme";
-import { formatDate } from "@/lib/format-date";
 import {
   storeSpending,
   type StorePurchase,
@@ -97,7 +97,8 @@ function StoreReport({
           </Copy>
           <Copy muted>Vareforbruk · {selected.purchases.length} kjøp</Copy>
           <Copy size={14} muted>
-            Siste kjøp i perioden: {formatDate(selected.purchases[0]?.date)}
+            Siste kjøp i perioden:{" "}
+            {CalendarDate.format(selected.purchases[0]?.date)}
           </Copy>
         </Panel>
         {selected.unknownAmounts > 0 && (
@@ -116,7 +117,7 @@ function StoreReport({
           {selected.purchases.map((purchase) => (
             <Row
               key={purchase.receiptId}
-              title={formatDate(purchase.date)}
+              title={CalendarDate.format(purchase.date)}
               detail={[
                 purchase.branch?.name || purchase.retailer,
                 purchase.provisional ? "Til kontroll" : undefined,

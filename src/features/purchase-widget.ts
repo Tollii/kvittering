@@ -1,3 +1,4 @@
+import { CalendarMonth } from "@/lib/domain/calendar";
 import { Ore } from "@/lib/domain/ore";
 import { useEffect } from "react";
 import { useHousehold } from "./household-context";
@@ -13,7 +14,7 @@ export function usePurchaseWidget({
   provisional,
 }: Readonly<{
   ready: boolean;
-  month: string;
+  month: CalendarMonth;
   amountOre: Ore;
   provisional: number;
 }>) {

@@ -4,7 +4,13 @@ import { productReferenceValidator } from "./product-reference";
 import { parse as parseValue } from "convex-helpers/validators";
 import { receiptIssueText, type ReceiptIssue } from "./receipt-issues";
 import { v, type Infer } from "convex/values";
-import { categoryById } from "./categories";
+import {
+  isCategoryId,
+  parseCategoryId,
+  unclearCategoryId,
+  type CategoryId,
+} from "./categories";
+import { CalendarDate, calendarDateValidator } from "./calendar";
 import {
   catalogIdentityValidator,
   physicalStoreValidator,
@@ -73,7 +79,7 @@ export const receiptDataValidator = v.object({
   physicalStoreManual: v.boolean().optional(),
   store: nullableString,
   branch: nullableString,
-  purchaseDate: nullableString,
+  purchaseDate: v.union(calendarDateValidator, v.null()),
   purchaseTime: nullableString,
   receiptNumber: nullableString,
   currency: nullableString,
@@ -102,7 +108,7 @@ export function emptyLine(id: string = crypto.randomUUID()): ReceiptLine {
     brand: null,
     attributes: [],
     relatedLineId: null,
-    categoryId: "fallback.unclear",
+    categoryId: unclearCategoryId,
     confidence: null,
     tags: [],
     issues: [],
@@ -110,14 +116,6 @@ export function emptyLine(id: string = crypto.randomUUID()): ReceiptLine {
     productKey: null,
   };
 }
-
-export const osloDate = (time = Date.now()) =>
-  new Intl.DateTimeFormat("sv-SE", {
-    timeZone: "Europe/Oslo",
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-  }).format(time);
 
 export const normalizeAlias = (text: string) =>
   text.normalize("NFKC").trim().replace(/\s+/g, " ").toLocaleUpperCase("nb-NO");
@@ -145,33 +143,46 @@ export type ReceiptParseOutcome =
 
 // oxlint-disable-next-line anti-slop/no-unknown-parameters -- This boundary parser validates external input before returning a domain value.
 export function parseReceipt(input: unknown): ReceiptParseOutcome {
+  let data: ReceiptData;
+
   try {
-    const data = structuredClone(parseValue(receiptDataValidator, input));
-
-    // Older receipts use a separate category for energy drinks, now part of soft drinks.
-    for (const line of data.lines)
-      if (line.categoryId === "drinks.energy-drinks")
-        line.categoryId = "drinks.soft-drinks";
-
-    return { kind: "parsed", receipt: validateReceipt(data) };
+    data = structuredClone(parseValue(receiptDataValidator, input));
   } catch (cause) {
-    return {
-      kind: "rejected",
-      issue: {
-        code: "invalid_receipt",
-        message: cause instanceof Error ? cause.message : "Ugyldig kvittering.",
-      },
-    };
+    return rejectedReceipt(
+      cause instanceof Error ? cause.message : "Ugyldig kvittering.",
+    );
   }
+
+  // Older receipts may store category ids that have since been merged.
+  for (const line of data.lines)
+    line.categoryId = parseCategoryId(line.categoryId) ?? line.categoryId;
+
+  const checked = checkReceipt(data);
+
+  return checked.kind === "valid"
+    ? { kind: "parsed", receipt: checked.receipt }
+    : rejectedReceipt(checked.message);
 }
 
-export function validateReceipt(data: ReceiptData): ParsedReceipt {
+const rejectedReceipt = (message: string): ReceiptParseOutcome => ({
+  kind: "rejected",
+  issue: { code: "invalid_receipt", message },
+});
+
+export type ReceiptCheck =
+  | { kind: "valid"; receipt: ParsedReceipt }
+  | { kind: "invalid"; message: string };
+
+/** Check the domain invariants of well-formed receipt data. */
+export function checkReceipt(data: ReceiptData): ReceiptCheck {
+  const invalid = (message: string) => ({ kind: "invalid", message }) as const;
+
   if (data.lines.length > 300 || data.originalText.length > 60000)
-    throw new Error("Kvitteringen er for stor. Del den opp.");
+    return invalid("Kvitteringen er for stor. Del den opp.");
   const ids = new Set<string>();
 
   for (const line of data.lines) {
-    if (ids.has(line.id)) throw new Error("Varelinjene må ha ulike ID-er.");
+    if (ids.has(line.id)) return invalid("Varelinjene må ha ulike ID-er.");
     ids.add(line.id);
 
     for (const value of [line.amountOre, line.unitPriceOre])
@@ -179,21 +190,21 @@ export function validateReceipt(data: ReceiptData): ParsedReceipt {
         value !== null &&
         (!Number.isSafeInteger(value) || Math.abs(value) > 100_000_000)
       )
-        throw new Error("Beløp må være hele øre.");
+        return invalid("Beløp må være hele øre.");
 
     for (const value of [line.quantity, line.packageSize])
       if (value !== null && (!Number.isFinite(value) || value <= 0))
-        throw new Error("Mengde må være større enn null.");
+        return invalid("Mengde må være større enn null.");
 
-    if (line.categoryId && !categoryById.has(line.categoryId))
-      throw new Error("Ukjent kategori.");
+    if (line.categoryId && !isCategoryId(line.categoryId))
+      return invalid("Ukjent kategori.");
 
     if (
       line.name.length > 500 ||
       line.originalText.length > 1500 ||
       line.tags.length > 10
     )
-      throw new Error("Varelinjen er for lang.");
+      return invalid("Varelinjen er for lang.");
   }
 
   if (
@@ -201,18 +212,22 @@ export function validateReceipt(data: ReceiptData): ParsedReceipt {
     (!Number.isSafeInteger(data.totalOre) ||
       Math.abs(data.totalOre) > 100_000_000)
   )
-    throw new Error("Totalen må være hele øre.");
+    return invalid("Totalen må være hele øre.");
 
-  if (
-    data.purchaseDate &&
-    (!/^\d{4}-\d{2}-\d{2}$/.test(data.purchaseDate) ||
-      new Date(data.purchaseDate).toISOString().slice(0, 10) !==
-        data.purchaseDate)
-  )
-    throw new Error("Ugyldig dato.");
+  if (data.purchaseDate && !CalendarDate.parse(data.purchaseDate))
+    return invalid("Ugyldig dato.");
 
   // SAFETY: The checks above establish all ParsedReceipt domain invariants.
-  return data as ParsedReceipt;
+  return { kind: "valid", receipt: data as ParsedReceipt };
+}
+
+/** For background steps where invalid data is a failure of that step. */
+export function validateReceipt(data: ReceiptData): ParsedReceipt {
+  const checked = checkReceipt(data);
+
+  if (checked.kind === "invalid") throw new Error(checked.message);
+
+  return checked.receipt;
 }
 
 export function reconcile(data: ReceiptData) {
@@ -369,7 +384,7 @@ export function batteryFixture(): ReceiptData {
   return {
     store: "Eksempelbutikk",
     branch: null,
-    purchaseDate: "2026-09-17",
+    purchaseDate: CalendarDate.of(2026, 9, 17),
     purchaseTime: null,
     receiptNumber: null,
     currency: "NOK",
@@ -411,7 +426,7 @@ export function weeklyShopFixture(): ReceiptData {
     id: string,
     name: string,
     amountOre: Ore | null,
-    categoryId: string,
+    categoryId: CategoryId,
     extra: Partial<ReceiptLine> = {},
   ): ReceiptLine => ({
     ...emptyLine(id),
@@ -427,7 +442,7 @@ export function weeklyShopFixture(): ReceiptData {
   return {
     store: "REMA 1000",
     branch: "Kanalveien",
-    purchaseDate: "2026-09-12",
+    purchaseDate: CalendarDate.of(2026, 9, 12),
     purchaseTime: "17:42",
     receiptNumber: "4711",
     currency: "NOK",

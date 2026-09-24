@@ -1,3 +1,4 @@
+import { CalendarDate } from "@/lib/domain/calendar";
 import { FormSection, NativeForm } from "@/components/ui/native-form";
 import { useState } from "react";
 import { Alert, Platform, View } from "react-native";
@@ -5,7 +6,6 @@ import DateTimePicker from "@react-native-community/datetimepicker";
 import { Button, Field, Notice, Row, Sheet } from "@/components/ui";
 import { MoneyField } from "@/components/money-field";
 import type { ReceiptData } from "@/lib/domain/receipt";
-import { formatDate } from "@/lib/format-date";
 import { CatalogStorePicker } from "./catalog-store-picker";
 import type { Id } from "../../convex/_generated/dataModel";
 import type { PhysicalStore } from "@/lib/catalog/model";
@@ -97,17 +97,15 @@ export function ReceiptFields({
           />
           <Row
             title="Kjøpsdato"
-            value={formatDate(data.purchaseDate)}
+            value={CalendarDate.format(data.purchaseDate)}
             icon="calendar"
             onPress={() => setShowDate(!showDate)}
           />
           {showDate && (
             <DateTimePicker
-              value={
-                new Date(
-                  `${data.purchaseDate || new Date().toISOString().slice(0, 10)}T12:00:00`,
-                )
-              }
+              value={CalendarDate.toNoon(
+                data.purchaseDate ?? CalendarDate.today(),
+              )}
               mode="date"
               display={Platform.OS === "ios" ? "inline" : "default"}
               locale="nb-NO"
@@ -118,7 +116,7 @@ export function ReceiptFields({
 
                 onChange({
                   ...data,
-                  purchaseDate: `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`,
+                  purchaseDate: CalendarDate.fromLocal(date),
                 });
               }}
             />

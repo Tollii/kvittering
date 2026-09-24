@@ -1,3 +1,5 @@
+import type { CalendarDate } from "./calendar";
+import { month } from "../testing/calendar";
 import { present, receiptFixture } from "../testing/receipts";
 import { Ore } from "./ore";
 import { describe, it, expect } from "vitest";
@@ -7,6 +9,7 @@ import {
   emptyLine,
   spendingLines,
   validateReceipt,
+  checkReceipt,
   parseReceipt,
   aliasKey,
   classificationInputs,
@@ -94,11 +97,27 @@ describe("receipt accounting", () => {
     const receipt = batteryFixture();
     // SAFETY: A fractional amount is built deliberately to test the receipt boundary.
     present(receipt.lines[0]).amountOre = 1.1 as Ore;
-    expect(() => validateReceipt(receipt)).toThrow(/hele øre|ulike ID-er/);
+    expect(checkReceipt(receipt)).toEqual({
+      kind: "invalid",
+      message: "Beløp må være hele øre.",
+    });
     present(receipt.lines[0]).amountOre = Ore.of(2590);
     receipt.lines.push(present(receipt.lines[0]));
-    expect(() => validateReceipt(receipt)).toThrow(/hele øre|ulike ID-er/);
+    expect(() => validateReceipt(receipt)).toThrow(
+      "Varelinjene må ha ulike ID-er.",
+    );
   });
+  it.each(["2026-02-30", "2026-13-01", "26-01-01"])(
+    "rejects the impossible purchase date %s with a readable reason",
+    (text) => {
+      // SAFETY: Unparsed input can hold any string; the check must reject it.
+      const purchaseDate = text as CalendarDate;
+      expect(checkReceipt({ ...batteryFixture(), purchaseDate })).toEqual({
+        kind: "invalid",
+        message: "Ugyldig dato.",
+      });
+    },
+  );
   it("accepts the retired energy-drink category without changing the source receipt", () => {
     const receipt = batteryFixture();
     present(receipt.lines[0]).categoryId = "drinks.energy-drinks";
@@ -135,7 +154,7 @@ describe("receipt accounting", () => {
       excluded: true,
     });
 
-    const totals = monthlyInsights([base, undated, excluded], "2026-09");
+    const totals = monthlyInsights([base, undated, excluded], month("2026-09"));
     expect(totals.products).toBe(2331);
     expect(totals.undated).toHaveLength(1);
     expect(totals.provisional).toBe(1);
@@ -169,7 +188,7 @@ it("keeps unknown and foreign currencies out of NOK totals", () => {
     excluded: false,
   });
 
-  const totals = monthlyInsights([receipt], "2026-09");
+  const totals = monthlyInsights([receipt], month("2026-09"));
   expect(totals.paid).toBe(0);
   expect(totals.products).toBe(0);
   expect(totals.unconverted).toEqual([receipt]);

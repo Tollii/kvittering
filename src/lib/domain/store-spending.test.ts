@@ -1,3 +1,4 @@
+import { date, month } from "../testing/calendar";
 import { present, receiptFixture, testId } from "../testing/receipts";
 import { Ore } from "./ore";
 import { expect, it } from "vitest";
@@ -21,7 +22,7 @@ function purchase(
 ): StorePurchase {
   return {
     receiptId: testId<"receipts">(id),
-    date: "2026-09-01",
+    date: date("2026-09-01"),
     retailer: "KIWI",
     branch,
     amountOre: Ore.of(1000),
@@ -35,7 +36,7 @@ it("groups stable branch IDs, keeps branches separate, and includes unlocated pu
   const input = [
     purchase("a"),
     purchase("b", {
-      date: "2026-09-02",
+      date: date("2026-09-02"),
       branch: { ...branch, name: "Kiwi Storgata" },
     }),
     purchase("c", { branch: { ...branch, id: 20, name: "KIWI Sentrum" } }),
@@ -72,7 +73,7 @@ it("preserves known coordinates while refusing invalid or incomplete positions",
   const result = storeSpending([
     purchase("a"),
     purchase("b", {
-      date: "2026-09-02",
+      date: date("2026-09-02"),
       branch: { ...branch, latitude: undefined, longitude: undefined },
     }),
     purchase("c", { branch: { ...branch, id: 20, latitude: 91 } }),
@@ -119,7 +120,7 @@ it("retains refunds, unknown amounts and review state without inventing spending
 it("agrees with Forbruk accounting, period, currency, exclusion and review filters", () => {
   const data = {
     ...batteryFixture(),
-    purchaseDate: "2026-09-07",
+    purchaseDate: date("2026-09-07"),
     physicalStore: branch,
   };
 
@@ -153,7 +154,7 @@ it("agrees with Forbruk accounting, period, currency, exclusion and review filte
     {
       ...receipt,
       _id: testId<"receipts">("e"),
-      data: { ...data, purchaseDate: "2026-08-01" },
+      data: { ...data, purchaseDate: date("2026-08-01") },
     },
     {
       ...receipt,
@@ -162,7 +163,7 @@ it("agrees with Forbruk accounting, period, currency, exclusion and review filte
     },
   ];
 
-  const totals = monthlyInsights(receipts, "2026-09");
+  const totals = monthlyInsights(receipts, month("2026-09"));
   const result = storeSpending(totals.storePurchases);
   expect(totals.products).toBe(3331);
   expect(Ore.sum(result.stores.map((store) => store.amountOre))).toBe(
@@ -177,7 +178,7 @@ it("agrees with Forbruk accounting, period, currency, exclusion and review filte
   expect(result.stores.flatMap((store) => store.purchases)).toHaveLength(2);
 
   const reviewed = storeSpending(
-    monthlyInsights(receipts, "2026-09", true).storePurchases,
+    monthlyInsights(receipts, month("2026-09"), true).storePurchases,
   );
 
   expect(reviewed.stores).toHaveLength(1);

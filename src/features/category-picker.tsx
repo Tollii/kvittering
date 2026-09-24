@@ -12,8 +12,11 @@ import {
 } from "@/components/ui";
 import {
   categories,
-  categoryById,
+  category,
   categoryGroups,
+  isDecidedCategory,
+  parseCategoryId,
+  type CategoryId,
 } from "@/lib/domain/categories";
 import { useTheme } from "@/constants/theme";
 
@@ -57,14 +60,14 @@ export function CategoryPicker({
   recent: string[];
   remember: boolean;
   onRemember: (value: boolean) => void;
-  onSelect: (value: string) => void;
+  onSelect: (value: CategoryId) => void;
   onClose: () => void;
 }>) {
   const colors = useTheme();
   const [search, setSearch] = useState("");
   const [group, setGroup] = useState<string | null>(null);
   const query = search.trim().toLocaleLowerCase("nb-NO");
-  const current = categoryById.get(value ?? "");
+  const currentId = parseCategoryId(value);
 
   const results = categories.filter((category) =>
     query
@@ -75,38 +78,38 @@ export function CategoryPicker({
   );
 
   // Most-used first: the household's own habits are the best predictor.
-  const usage = new Map<string, number>();
+  const usage = new Map<CategoryId, number>();
 
-  for (const id of recent) usage.set(id, (usage.get(id) ?? 0) + 1);
+  for (const id of recent.map(parseCategoryId))
+    if (id && category(id).group !== "fallback")
+      usage.set(id, (usage.get(id) ?? 0) + 1);
 
   const recentCategories = [...usage.entries()]
-    .filter(([id]) => id !== value && !id.startsWith("fallback."))
+    .filter(([id]) => id !== currentId)
     .sort((a, b) => b[1] - a[1])
     .slice(0, 6)
     .map(([id]) => id);
 
-  const choose = (id: string) => {
+  const choose = (id: CategoryId) => {
     onSelect(id);
     onClose();
   };
 
-  const categoryRow = (id: string, showGroup = false) => {
-    const category = categoryById.get(id);
-
-    if (!category) return null;
+  const categoryRow = (id: CategoryId, showGroup = false) => {
+    const { name, groupName } = category(id);
 
     return (
       <Row
         key={id}
-        title={category.name}
-        detail={showGroup ? category.groupName : undefined}
-        selected={id === value}
+        title={name}
+        detail={showGroup ? groupName : undefined}
+        selected={id === currentId}
         onPress={() => choose(id)}
       />
     );
   };
 
-  const list = (ids: string[], showGroup: boolean) => (
+  const list = (ids: CategoryId[], showGroup: boolean) => (
     <Panel style={{ gap: 0, paddingVertical: 4 }}>
       {ids.map((id, index) => (
         <View
@@ -157,7 +160,7 @@ export function CategoryPicker({
               if (text) setGroup(null);
             }}
             autoCorrect={false}
-            autoFocus={!current || current.id === "fallback.unclear"}
+            autoFocus={!isDecidedCategory(currentId)}
             clearButtonMode="while-editing"
           />
         </>
@@ -208,14 +211,14 @@ export function CategoryPicker({
         </>
       ) : (
         <>
-          {current && current.id !== "fallback.unclear" && (
+          {isDecidedCategory(currentId) && (
             <>
               <Copy size={13} weight="600" muted>
                 {confidence != null && confidence < 1
                   ? `Forslag · ${Math.round(confidence * 100)} %`
                   : "Valgt"}
               </Copy>
-              {list([current.id], true)}
+              {list([currentId], true)}
             </>
           )}
           {recentCategories.length > 0 && (

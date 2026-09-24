@@ -1,3 +1,4 @@
+import { userError } from "./userErrors";
 import {
   withProductReference,
   type ProductSelection,
@@ -109,7 +110,7 @@ export async function resolveProductSelections(
     new Set(selections.map((selection) => selection.lineId)).size !==
     selections.length
   )
-    throw new Error("Velg ett produkt per varelinje.");
+    throw userError("Velg ett produkt per varelinje.");
   const data = structuredClone(source);
   const retailer = matchingKey(data.store ?? "");
 
@@ -121,7 +122,7 @@ export async function resolveProductSelections(
     const line = data.lines[index];
 
     if (!line || !retailer || !matchingKey(line.receiptName ?? line.name))
-      throw new Error("Butikk og varenavn kreves for produktkobling.");
+      throw userError("Butikk og varenavn kreves for produktkobling.");
 
     if (selection.kind === "catalog") {
       const record = await ctx.db
@@ -130,7 +131,7 @@ export async function resolveProductSelections(
         .unique();
 
       if (!record)
-        throw new Error("Produktet finnes ikke i katalogen. Søk på nytt.");
+        throw userError("Produktet finnes ikke i katalogen. Søk på nytt.");
       data.lines[index] = await linkCatalogProduct(
         ctx,
         householdId,
@@ -181,7 +182,7 @@ export async function resolveProductSelections(
             .unique();
 
     if (physicalStoreId !== null && !record)
-      throw new Error("Butikken finnes ikke i katalogen.");
+      throw userError("Butikken finnes ikke i katalogen.");
     data.physicalStore = record?.store ?? null;
     data.physicalStoreManual = true;
   }

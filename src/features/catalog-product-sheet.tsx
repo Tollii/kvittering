@@ -1,3 +1,4 @@
+import { CalendarDate } from "@/lib/domain/calendar";
 import { Ore } from "@/lib/domain/ore";
 import { useFeatureFlag } from "@/features/featureFlags";
 import { useCompleteReceipts } from "./receipt-queries";
@@ -21,7 +22,6 @@ import {
   useCatalogSearch,
 } from "./catalog-queries";
 import type { CatalogIdentity, CatalogProduct } from "@/lib/catalog/model";
-import { formatDate } from "@/lib/format-date";
 import { catalogInsights } from "@/lib/catalog/insights";
 import { productSearch, rankCatalogProducts } from "@/lib/catalog/matching";
 import { catalogImageSources } from "@/lib/catalog/images";
@@ -310,7 +310,9 @@ export function CatalogProductSheet({
                 title={price.store}
                 detail={
                   price.checkedAt
-                    ? formatDate(price.checkedAt.slice(0, 10))
+                    ? CalendarDate.format(
+                        CalendarDate.ofInstant(price.checkedAt),
+                      )
                     : "Dato ukjent"
                 }
                 value={Ore.format(price.priceOre)}
@@ -324,7 +326,7 @@ export function CatalogProductSheet({
       <Copy size={12} muted>
         Produktdata fra Kassalapp
         {query.data?.fetchedAt
-          ? ` · hentet ${formatDate(new Date(query.data.fetchedAt).toISOString().slice(0, 10))}`
+          ? ` · hentet ${CalendarDate.format(CalendarDate.ofInstant(query.data.fetchedAt))}`
           : ""}
       </Copy>
     </Sheet>

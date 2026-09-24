@@ -202,32 +202,37 @@ function HouseholdProvider({
       setQueueError("Kunne ikke lese kvitteringene på denne enheten.");
   }, []);
 
-  const synchronize = useCallback(async () => {
-    if (!householdId) return;
+  const synchronize = useCallback(
+    async ({ retryFailed = false }: { retryFailed?: boolean } = {}) => {
+      if (!householdId) return;
 
-    try {
-      if (!canUpload.current) return;
+      try {
+        if (!canUpload.current) return;
 
-      await drainQueue(
-        owner,
-        householdId,
-        receiptUploadTransport(
-          convex,
+        await drainQueue(
+          owner,
           householdId,
-          () => active.current && canUpload.current,
-          `${storageSuffix}:${owner}:${householdId}`,
-        ),
-        () =>
-          active.current &&
-          canUpload.current &&
-          AppState.currentState === "active",
-      );
-      setQueueError("");
-    } catch (error) {
-      reportError(error, "receipt.queue_read");
-      showQueueReadError();
-    }
-  }, [convex, householdId, owner, showQueueReadError]);
+          receiptUploadTransport(
+            convex,
+            householdId,
+            () => active.current && canUpload.current,
+            `${storageSuffix}:${owner}:${householdId}`,
+          ),
+          () =>
+            active.current &&
+            canUpload.current &&
+            AppState.currentState === "active",
+          // A manual retry also lifts this app session's automatic retry limits.
+          { retryFailed },
+        );
+        setQueueError("");
+      } catch (error) {
+        reportError(error, "receipt.queue_read");
+        showQueueReadError();
+      }
+    },
+    [convex, householdId, owner, showQueueReadError],
+  );
 
   const retryFailedUploads = useCallback(async () => {
     if (!householdId || !canUpload.current) return;
@@ -242,7 +247,7 @@ function HouseholdProvider({
       return;
     }
 
-    await synchronize();
+    await synchronize({ retryFailed: true });
   }, [householdId, owner, synchronize, showQueueReadError]);
 
   useEffect(() => {

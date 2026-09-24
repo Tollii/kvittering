@@ -1,7 +1,9 @@
 import { present, testId } from "./testing/receipts";
 import { describe, expect, it } from "vitest";
+import { userError } from "../../convex/userErrors";
 import {
   createQueueRunner,
+  retryPolicy,
   type LocalReceipt,
   type QueueStore,
   type UploadTransport,
@@ -39,12 +41,36 @@ function fixture() {
     },
   };
 
-  return { store, rows: () => rows, run: createQueueRunner(store) };
+  const clock = { now: 0 };
+
+  return {
+    store,
+    rows: () => rows,
+    clock,
+    run: createQueueRunner(store, undefined, () => clock.now),
+    // Another app start: the durable queue remains, in-memory retry limits do not.
+    restart: () => createQueueRunner(store, undefined, () => clock.now),
+  };
 }
+
+const failingTransport = (failure: () => Error) => {
+  const attempts = { count: 0 };
+
+  const transport: UploadTransport = {
+    reserve: async () => {
+      attempts.count++;
+      throw failure();
+    },
+    upload: async () => {},
+    complete: async () => {},
+  };
+
+  return { attempts, transport };
+};
 
 describe("durable receipt upload", () => {
   it("resumes after a failed image without reserving or uploading completed images again", async () => {
-    const { run, rows } = fixture();
+    const { run, rows, clock } = fixture();
 
     let reservations = 0,
       completions = 0,
@@ -71,6 +97,7 @@ describe("durable receipt upload", () => {
     expect(present(rows()[0]).uploaded).toEqual([true, false]);
     expect(present(rows()[0]).error).toBe("Connection lost");
     fail = false;
+    clock.now += retryPolicy.firstDelayMs;
     await run("user", household, transport, () => true);
     expect(uploaded).toEqual([0, 1]);
     expect(reservations).toBe(1);
@@ -78,7 +105,7 @@ describe("durable receipt upload", () => {
     expect(rows()).toEqual([]);
   });
   it("keeps images when the final commit fails and retries only that commit", async () => {
-    const { run, rows } = fixture();
+    const { run, rows, clock } = fixture();
 
     let uploads = 0,
       fail = true;
@@ -96,6 +123,7 @@ describe("durable receipt upload", () => {
     await run("user", household, transport, () => true);
     expect(rows()).toHaveLength(1);
     fail = false;
+    clock.now += retryPolicy.firstDelayMs;
     await run("user", household, transport, () => true);
     expect(uploads).toBe(2);
     expect(rows()).toHaveLength(0);
@@ -156,4 +184,54 @@ it("schedules every background image before waiting and retains each successful 
   await running;
   expect(present(rows()[0]).uploaded).toEqual([false, true]);
   expect(committed).toBe(false);
+});
+
+describe("automatic upload retries", () => {
+  it("backs off after each failure and stops at the attempt cap", async () => {
+    const { run, clock } = fixture();
+
+    const { attempts, transport } = failingTransport(
+      () => new Error("Offline"),
+    );
+
+    const drain = () => run("user", household, transport, () => true);
+
+    await drain();
+    await drain();
+    expect(attempts.count).toBe(1);
+
+    for (let failure = 1; failure < retryPolicy.maxAttempts; failure++) {
+      clock.now += retryPolicy.firstDelayMs * 2 ** (failure - 1) - 1;
+      await drain();
+      expect(attempts.count).toBe(failure);
+      clock.now += 1;
+      await drain();
+      expect(attempts.count).toBe(failure + 1);
+    }
+
+    clock.now += 24 * 60 * 60 * 1000;
+    await drain();
+    expect(attempts.count).toBe(retryPolicy.maxAttempts);
+  });
+
+  it("waits for the person after a rejection, then tries again on request or app start", async () => {
+    const { run, restart, rows, clock } = fixture();
+
+    const { attempts, transport } = failingTransport(() =>
+      userError("Husstanden er endret. Logg inn på nytt."),
+    );
+
+    await run("user", household, transport, () => true);
+    clock.now += 24 * 60 * 60 * 1000;
+    await run("user", household, transport, () => true);
+    expect(attempts.count).toBe(1);
+    expect(present(rows()[0]).error).toContain("Husstanden er endret.");
+
+    await run("user", household, transport, () => true, { retryFailed: true });
+    expect(attempts.count).toBe(2);
+
+    await restart()("user", household, transport, () => true);
+    expect(attempts.count).toBe(3);
+    expect(rows()).toHaveLength(1);
+  });
 });

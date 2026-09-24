@@ -1,5 +1,7 @@
 "use node";
 
+import { userError } from "./userErrors";
+
 import { clientValidator } from "../src/lib/releases/policy";
 import { v } from "convex/values";
 import { TypeSafeClient } from "@typesafe-ai/sdk";
@@ -10,7 +12,7 @@ import {
   classificationQuestion,
   parseLegacyClassification,
 } from "../src/lib/domain/classification";
-import { categoryById } from "../src/lib/domain/categories";
+import { isCategoryId } from "../src/lib/domain/categories";
 import { categoryMemoryKey } from "../src/lib/domain/category-memory";
 
 export type EvaluationResult = {
@@ -51,17 +53,13 @@ export const evaluate = action({
       await ctx.runQuery(api.corrections.list, {});
 
     if (!env.TYPESAFE_API_KEY)
-      throw new Error("Kategoritesten er ikke tilgjengelig.");
+      throw userError("Kategoritesten er ikke tilgjengelig.");
     const seen = new Set<string>();
 
     const examples = history.entries.flatMap((entry) => {
       const { expected } = entry;
 
-      if (
-        entry.field !== "category" ||
-        !expected ||
-        !categoryById.has(expected)
-      )
+      if (entry.field !== "category" || !expected || !isCategoryId(expected))
         return [];
       const key = categoryMemoryKey(entry.store, entry.name) ?? entry._id;
 
@@ -104,7 +102,7 @@ export const evaluate = action({
     const results = examples.map((entry, index) => {
       const answer = response.answers[`category_${index}`];
 
-      if (answer?.type !== "choice" || !categoryById.has(answer.choice))
+      if (answer?.type !== "choice" || !isCategoryId(answer.choice))
         throw new Error("Kategoritesten ga et ugyldig svar.");
 
       return {

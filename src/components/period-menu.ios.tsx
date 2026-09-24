@@ -1,3 +1,4 @@
+import { CalendarMonth } from "@/lib/domain/calendar";
 import { Host, Menu, Picker, Text } from "@expo/ui/swift-ui";
 import {
   accessibilityLabel,
@@ -6,29 +7,23 @@ import {
   tag,
 } from "@expo/ui/swift-ui/modifiers";
 import { useTheme } from "@/constants/theme";
-import { monthBefore } from "@/lib/domain/insights";
 
 export function PeriodMenu({
   value,
   latest,
   onChange,
 }: Readonly<{
-  value: string;
-  latest: string;
-  onChange: (month: string) => void;
+  value: CalendarMonth;
+  latest: CalendarMonth;
+  onChange: (month: CalendarMonth) => void;
 }>) {
   const colors = useTheme();
-
-  const label = (month: string) =>
-    new Intl.DateTimeFormat("nb-NO", { month: "long", year: "numeric" }).format(
-      new Date(`${month}-01T12:00:00Z`),
-    );
 
   const months = [latest];
   let previous = latest;
 
   for (let index = 1; index < 12; index++) {
-    previous = monthBefore(previous);
+    previous = CalendarMonth.before(previous);
     months.push(previous);
   }
 
@@ -41,7 +36,7 @@ export function PeriodMenu({
       seedColor={colors.onHero}
     >
       <Menu
-        label={label(value)}
+        label={CalendarMonth.format(value)}
         systemImage="calendar"
         modifiers={[
           foregroundStyle(colors.onHero),
@@ -56,7 +51,7 @@ export function PeriodMenu({
         >
           {months.map((month) => (
             <Text key={month} modifiers={[tag(month)]}>
-              {label(month)}
+              {CalendarMonth.format(month)}
             </Text>
           ))}
         </Picker>

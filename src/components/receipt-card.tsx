@@ -1,3 +1,4 @@
+import { CalendarDate } from "@/lib/domain/calendar";
 import { Ore } from "@/lib/domain/ore";
 import { isReceiptProcessing } from "@/lib/domain/receipt-state";
 import { router } from "expo-router";
@@ -9,7 +10,6 @@ import {
 } from "react-native";
 import { Copy, Icon, pressed } from "./ui";
 import { radius, useTheme } from "@/constants/theme";
-import { formatDate } from "@/lib/format-date";
 import { reviewSummary } from "@/lib/domain/receipt-review";
 import type { Receipt } from "@/lib/domain/insights";
 
@@ -87,7 +87,7 @@ export function ReceiptCard({
               {receipt.data?.store || "Ny kvittering"}
             </Copy>
             <Copy size={13} muted>
-              {formatDate(receipt.data?.purchaseDate)}
+              {CalendarDate.format(receipt.data?.purchaseDate)}
               {receipt.data?.branch ? ` · ${receipt.data.branch}` : ""}
             </Copy>
             {stacked && !busy && receipt.data && (

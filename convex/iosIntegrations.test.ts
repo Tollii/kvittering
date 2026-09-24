@@ -219,3 +219,21 @@ it("publishes expiry without a receipt change and rejects stale cleanup", async 
     }),
   ).not.toBeNull();
 });
+
+it("keeps rejected image uploads on the plain-text contract that installed clients read", async () => {
+  const { outsider, ids } = await setup();
+
+  const response = await outsider.fetch(
+    `/receipt-image?receipt=${ids[0]}&position=0`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "image/jpeg" },
+      body: new Blob(["1"], { type: "image/jpeg" }),
+    },
+  );
+
+  expect(response.status).toBe(403);
+  expect(await response.text()).toBe(
+    "Bildet kunne ikke lagres. Kontroller innloggingen.",
+  );
+});

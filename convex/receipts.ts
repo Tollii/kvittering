@@ -1,3 +1,8 @@
+import {
+  CalendarDate,
+  calendarDateValidator,
+} from "../src/lib/domain/calendar";
+import { userError } from "./userErrors";
 import { Ore, oreValidator } from "../src/lib/domain/ore";
 import {
   attentionStatuses,
@@ -40,7 +45,7 @@ import { requireMember, requireReceipt } from "./access";
 import {
   reconcile,
   receiptDataValidator,
-  validateReceipt,
+  checkReceipt,
   aliasKey,
 } from "../src/lib/domain/receipt";
 import { canAcceptReceipt } from "../src/lib/domain/receipt-review";
@@ -105,7 +110,7 @@ export const reserve = mutation({
     const member = await requireMember(ctx);
 
     if (member.householdId !== args.householdId)
-      throw new Error("Husstanden er endret. Logg inn på nytt.");
+      throw userError("Husstanden er endret. Logg inn på nytt.");
 
     if (
       !/^[\w-]{16,80}$/.test(args.clientId) ||
@@ -113,7 +118,7 @@ export const reserve = mutation({
       args.imageCount < 1 ||
       args.imageCount > 8
     )
-      throw new Error("Ugyldig opplasting.");
+      throw userError("Ugyldig opplasting.");
 
     const existing = await ctx.db
       .query("receipts")
@@ -179,7 +184,7 @@ export const completeUpload = mutation({
       .take(8);
 
     if (images.length !== receipt.imageCount)
-      throw new Error("Noen bilder er ikke lastet opp.");
+      throw userError("Noen bilder er ikke lastet opp.");
     await beginUploadedReceipt(ctx, id, images.length);
 
     return null;
@@ -194,7 +199,7 @@ export const retry = mutation({
     const { receipt } = await requireReceipt(ctx, id);
 
     if (isReceiptProcessing(receipt.status))
-      throw new Error("Kvitteringen behandles allerede.");
+      throw userError("Kvitteringen behandles allerede.");
     const generation = receipt.generation + 1;
     await ctx.db.patch("receipts", id, {
       status: "uploaded",
@@ -231,12 +236,17 @@ export const save = mutation({
     const { member, receipt } = await requireReceipt(ctx, args.id);
 
     if (receipt.revision !== args.revision)
-      throw new Error("Kvitteringen ble endret av en annen. Åpne den på nytt.");
+      throw userError(
+        "Kvitteringen ble endret av en annen. Åpne den på nytt.",
+        "RECEIPT_CHANGED",
+      );
 
     if (isReceiptProcessing(receipt.status))
-      throw new Error("Vent til behandlingen er ferdig.");
+      throw userError("Vent til behandlingen er ferdig.");
     args = { ...args, data: structuredClone(args.data) };
-    validateReceipt(args.data);
+    const checked = checkReceipt(args.data);
+
+    if (checked.kind === "invalid") throw userError(checked.message);
 
     const acceptable = canAcceptReceipt(
       args.data,
@@ -244,7 +254,7 @@ export const save = mutation({
     );
 
     if (args.reviewed && !acceptable)
-      throw new Error("Kontroller avvik og uklare felt før godkjenning.");
+      throw userError("Kontroller avvik og uklare felt før godkjenning.");
 
     for (const line of args.data.lines) {
       const previous = receipt.data?.lines.find((old) => old.id === line.id);
@@ -294,11 +304,11 @@ export const save = mutation({
       args.selections &&
       (args.productChanges?.length || args.catalogChanges?.length)
     )
-      throw new Error("Velg én kommandoform.");
+      throw userError("Velg én kommandoform.");
 
     for (const change of args.productChanges ?? []) {
       if (selections.has(change.lineId))
-        throw new Error("Velg ett produkt per varelinje.");
+        throw userError("Velg ett produkt per varelinje.");
       selections.set(
         change.lineId,
         change.createNew
@@ -317,7 +327,7 @@ export const save = mutation({
       const previous = selections.get(change.lineId);
 
       if (previous && (previous.kind !== "separate" || change.key !== null))
-        throw new Error("Velg ett produkt per varelinje.");
+        throw userError("Velg ett produkt per varelinje.");
       selections.set(
         change.lineId,
         change.key
@@ -353,7 +363,7 @@ export const save = mutation({
         const key = aliasKey(args.data, line);
 
         if (!key)
-          throw new Error(
+          throw userError(
             "Butikk og originaltekst kreves for å huske en vare.",
           );
 
@@ -533,14 +543,15 @@ export const remove = mutation({
     if (!receipt) return null;
 
     if (receipt.householdId !== member.householdId)
-      throw new Error("Kvitteringen er ikke tilgjengelig.");
+      throw userError("Kvitteringen er ikke tilgjengelig.");
 
     if (receipt.status === "uploading")
-      throw new Error("Vent til bildene er lastet opp.");
+      throw userError("Vent til bildene er lastet opp.");
 
     if (receipt.revision !== revision)
-      throw new Error(
+      throw userError(
         "Kvitteringen er endret. Hent siste versjon før du sletter.",
+        "RECEIPT_CHANGED",
       );
     await ctx.db.delete("receipts", id);
     await notifyReceiptActivities(ctx, receipt.householdId);
@@ -604,7 +615,7 @@ export const history = query({
       _creationTime: v.number(),
       status: receiptStatusValidator,
       store: v.union(v.string(), v.null()),
-      purchaseDate: v.union(v.string(), v.null()),
+      purchaseDate: v.union(calendarDateValidator, v.null()),
       totalOre: v.union(oreValidator, v.null()),
       spendingOre: oreValidator,
       excluded: v.boolean(),
@@ -686,20 +697,13 @@ export const readPage = query({
         .paginate(options);
 
     if (scope.kind === "period") {
-      if (
-        !/^\d{4}-\d{2}-\d{2}$/.test(scope.start) ||
-        !/^\d{4}-\d{2}-\d{2}$/.test(scope.end) ||
-        scope.start > scope.end
-      )
+      const start = CalendarDate.parseBound(scope.start);
+      const end = CalendarDate.parseBound(scope.end);
+
+      if (!start || !end || CalendarDate.compare(start, end) > 0)
         throw new Error("Invalid report period.");
 
-      return receiptPeriodPage(
-        ctx,
-        member.householdId,
-        scope.start,
-        scope.end,
-        options,
-      );
+      return receiptPeriodPage(ctx, member.householdId, start, end, options);
     }
 
     const keys = new Set<string>();
@@ -827,8 +831,8 @@ export const attentionCount = query({
 export function receiptPeriodPage(
   ctx: QueryCtx,
   householdId: Id<"households">,
-  start: string,
-  end: string,
+  start: CalendarDate,
+  end: CalendarDate,
   paginationOpts: PaginationOptions,
 ) {
   return ctx.db

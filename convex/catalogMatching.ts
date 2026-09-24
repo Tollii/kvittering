@@ -1,3 +1,4 @@
+import { userError } from "./userErrors";
 import { isReceiptProcessing } from "../src/lib/domain/receipt-state";
 import { commitReceiptChange } from "./receiptChanges";
 import { isCategoryUncertain } from "../src/lib/domain/receipt-issues";
@@ -28,7 +29,7 @@ import {
 } from "../src/lib/catalog/matching";
 import { normalizeSearch } from "../src/lib/catalog/policy";
 import { matchingKey } from "../src/lib/domain/product-matching";
-import { categoryById } from "../src/lib/domain/categories";
+import { isDecidedCategory } from "../src/lib/domain/categories";
 import { lineValidator } from "../src/lib/domain/receipt";
 import type { Id } from "./_generated/dataModel";
 
@@ -191,7 +192,7 @@ export const enrich = mutation({
     if (onlyIfMissing && receipt.catalogStatus) return null;
 
     if (!receipt.data || isReceiptProcessing(receipt.status))
-      throw new Error("Vent til kvitteringen er lest.");
+      throw userError("Vent til kvitteringen er lest.");
 
     if (!env.KASSALAPP_API_KEY)
       throw new Error("Legg til KASSALAPP_API_KEY i Convex først.");
@@ -353,9 +354,7 @@ export const apply = internalMutation({
       if (
         !line.manual &&
         !(line.categoryAliasKey ?? line.productKey) &&
-        decision.categoryId &&
-        categoryById.has(decision.categoryId) &&
-        decision.categoryId !== "fallback.unclear" &&
+        isDecidedCategory(decision.categoryId) &&
         decision.categoryConfidence >= 0.85 &&
         (line.categoryId !== decision.categoryId ||
           line.issues.some(isCategoryUncertain))

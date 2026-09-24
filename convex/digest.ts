@@ -1,3 +1,4 @@
+import { CalendarDate } from "../src/lib/domain/calendar";
 import type { Ore } from "../src/lib/domain/ore";
 import { receiptPeriodPage } from "./receipts";
 import { featureEnabled } from "./featureFlags";
@@ -15,12 +16,20 @@ import { internal } from "./_generated/api";
 import type { Doc, Id } from "./_generated/dataModel";
 import schema from "./schema";
 import { weeklyDigest, digestPeriod } from "../src/lib/domain/budget";
-import { osloDate } from "../src/lib/domain/receipt";
 
 const device = v.object({
   householdId: v.id("households"),
   subscriptionId: v.id("deviceSubscriptions"),
 });
+
+/** Digest dates come from sendAll, which writes today's Oslo date. */
+function digestDate(text: string): CalendarDate {
+  const date = CalendarDate.parse(text);
+
+  if (!date) throw new Error(`Invalid digest date: ${text}`);
+
+  return date;
+}
 
 /** A fixed insertion boundary visits each existing device once during normal traversal. */
 export const sendAllArgs = v.object({
@@ -41,7 +50,7 @@ export const sendAll = internalMutation({
         ?._creationTime ??
       Date.now();
 
-    const today = args.today ?? osloDate();
+    const today = args.today ?? CalendarDate.today();
 
     const page = await ctx.db
       .query("deviceSubscriptions")
@@ -78,7 +87,7 @@ export const periodPage = internalQuery({
     receipts: paginationResultValidator(schema.doc("receipts")),
   }),
   handler: async (ctx, { householdId, today, paginationOpts }) => {
-    const period = digestPeriod(today);
+    const period = digestPeriod(digestDate(today));
 
     return {
       household: await ctx.db.get("households", householdId),
@@ -125,7 +134,7 @@ export const forHousehold = internalAction({
       cursor = result.receipts.continueCursor;
     }
 
-    const digest = weeklyDigest(receipts, budget, args.today);
+    const digest = weeklyDigest(receipts, budget, digestDate(args.today));
 
     return { title: digest.title, body: digest.body };
   },

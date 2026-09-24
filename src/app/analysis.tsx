@@ -1,3 +1,4 @@
+import { CalendarDate, CalendarMonth } from "@/lib/domain/calendar";
 import { Ore } from "@/lib/domain/ore";
 import { spendingExplanations } from "@/lib/domain/spending-explanations";
 import { useFeatureFlag } from "@/features/featureFlags";
@@ -24,27 +25,25 @@ import { SpendingDetails } from "@/components/spending-details";
 import {
   analysisPeriod,
   analysisSummary,
-  shiftDate,
   spendingAnalysis,
   type AnalysisFrequency,
 } from "@/lib/domain/spending-analysis";
-import { osloDate } from "@/lib/domain/receipt";
-import { formatDate } from "@/lib/format-date";
 
 export default function Analysis() {
   const spendingAnalysisEnabled = useFeatureFlag("spendingAnalysis");
   const { month } = useLocalSearchParams<{ month?: string }>();
   const [frequency, setFrequency] = useState<AnalysisFrequency>("month");
 
-  const [anchor, setAnchor] = useState(
-    month &&
-      /^\d{4}-(0[1-9]|1[0-2])$/.test(month) &&
-      month < osloDate().slice(0, 7)
-      ? `${month}-01`
-      : osloDate(),
-  );
+  const [anchor, setAnchor] = useState(() => {
+    const requested = month ? CalendarMonth.parse(month) : null;
 
-  const today = osloDate();
+    return requested &&
+      CalendarMonth.compare(requested, CalendarMonth.current()) < 0
+      ? CalendarMonth.first(requested)
+      : CalendarDate.today();
+  });
+
+  const today = CalendarDate.today();
   const [selection, setSelection] = useState<SpendingSelection | null>(null);
   const period = analysisPeriod(anchor, frequency, today);
 
@@ -75,22 +74,14 @@ export default function Analysis() {
   });
 
   function move(direction: number) {
-    if (frequency === "week") setAnchor(shiftDate(period.start, direction * 7));
-    else {
-      const date = new Date(`${anchor}T12:00:00Z`);
+    if (frequency === "week")
+      setAnchor(CalendarDate.shift(period.start, direction * 7));
+    else
       setAnchor(
-        new Date(
-          Date.UTC(
-            date.getUTCFullYear(),
-            date.getUTCMonth() + direction,
-            1,
-            12,
-          ),
-        )
-          .toISOString()
-          .slice(0, 10),
+        CalendarMonth.first(
+          CalendarMonth.shift(CalendarDate.month(anchor), direction),
+        ),
       );
-    }
   }
 
   if (!spendingAnalysisEnabled)
@@ -124,7 +115,8 @@ export default function Analysis() {
           onPress={() => move(-1)}
         />
         <Copy weight="600" style={{ flex: 1, textAlign: "center" }}>
-          {formatDate(period.start)} – {formatDate(period.end)}
+          {CalendarDate.format(period.start)} –{" "}
+          {CalendarDate.format(period.end)}
         </Copy>
         <IconButton
           name="chevron.right"
@@ -142,10 +134,10 @@ export default function Analysis() {
           </Copy>
           <Copy selectable>{analysisSummary(report)}</Copy>
           <Copy muted size={13}>
-            Sammenlignet med {formatDate(period.previousStart)} –{" "}
-            {formatDate(period.previousEnd)}. {report.currentReceipts} mot{" "}
-            {report.previousReceipts} kvitteringer. Gjelder registrerte kjøp,
-            ikke målt forbruk.
+            Sammenlignet med {CalendarDate.format(period.previousStart)} –{" "}
+            {CalendarDate.format(period.previousEnd)}. {report.currentReceipts}{" "}
+            mot {report.previousReceipts} kvitteringer. Gjelder registrerte
+            kjøp, ikke målt forbruk.
           </Copy>
           {(report.provisionalReceipts > 0 || report.missingAmounts > 0) && (
             <Notice tone="warning">

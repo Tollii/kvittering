@@ -73,9 +73,6 @@ it("resolves category uncertainty without dismissing other review requirements",
   expect(confirmLineCategory(line, "fallback.unclear").issues).toContain(
     "Kategorien er usikker.",
   );
-  expect(() => confirmLineCategory(line, "not-a-category")).toThrow(
-    "Velg en gyldig varekategori.",
-  );
 });
 
 it("lists nothing to do for an acceptable receipt", () => {
