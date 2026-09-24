@@ -1,0 +1,6 @@
+OpenAI Codex
+Copyright 2025 OpenAI
+
+This skill includes the PR watcher and tests from openai/codex, revision
+dbb875d23cfd1a327cf6b51d7b50dad4b4601268, under the Apache License 2.0.
+The instructions, references, and interface metadata are adapted for Kvitto.
