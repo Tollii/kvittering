@@ -1,0 +1,65 @@
+# yaml-language-server: $schema=https://coderabbit.ai/integrations/schema.v2.json
+# CodeRabbit reviews against the repository rules and skips generated files.
+language: en-US
+reviews:
+  profile: assertive
+  request_changes_workflow: false
+  high_level_summary: true
+  poem: false
+  auto_review:
+    enabled: true
+    drafts: false
+  path_filters:
+    - "!package-lock.json"
+    - "!convex/_generated/**"
+    - "!convex/kassalapp/generated/**"
+    - "!convex/contract.json"
+    - "!api/kassalapp.openapi.json"
+    - "!tools/oxlint/anti-slop/**"
+  path_instructions:
+    - path: "**/*"
+      instructions: >-
+        Review against AGENTS.md and docs/verification.md. CI already checks
+        lint, types, tests, and the backend contract; skip style the linters
+        own and focus on behavior.
+    - path: "convex/**"
+      instructions: >-
+        Every public query, mutation, and action must check household access
+        or state why it is public in an `// Access:` comment. Reads must be
+        bounded. Authorization, revision checks, and related writes belong in
+        one transaction. Argument and result changes must stay compatible with
+        installed apps and with work already scheduled.
+    - path: "src/**"
+      instructions: >-
+        Never lose unsaved drafts or queued images. Failures from native
+        modules, storage, or the network must degrade gracefully instead of
+        crashing the app. Parse external data at its boundary.
+    - path: "**/*.test.{ts,tsx}"
+      instructions: >-
+        A test must fail when the behavior it protects breaks. Flag tests
+        that assert implementation details, only restate the code, or would
+        still pass with the rule removed.
+    - path: "{.github/**,tools/e2e/**}"
+      instructions: >-
+        Actions stay pinned to full commit SHAs. Pull-request jobs must not
+        receive secrets or write permissions they do not need.
+  tools:
+    # CI runs these with the repository's own configuration.
+    eslint:
+      enabled: false
+    biome:
+      enabled: false
+    markdownlint:
+      enabled: false
+    actionlint:
+      enabled: false
+    shellcheck:
+      enabled: false
+    gitleaks:
+      enabled: false
+knowledge_base:
+  code_guidelines:
+    filePatterns:
+      - AGENTS.md
+      - docs/principles.md
+      - docs/quality.md
