@@ -49,3 +49,9 @@ affect installed apps with the [release policy](docs/releases.md).
 [Native iOS](docs/native-ios.md) · [Releases](docs/releases.md) ·
 [Backend operations](docs/backend-operations.md) ·
 [Observability](docs/observability.md)
+
+## License
+
+[FSL-1.1-ALv2](LICENSE.md): use, modify, and self-host freely, but not to offer
+a competing product. Each release becomes Apache 2.0 two years after
+publication.

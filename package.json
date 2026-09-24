@@ -2,6 +2,7 @@
   "name": "kvitto",
   "main": "expo-router/entry",
   "version": "1.0.0",
+  "license": "FSL-1.1-ALv2",
   "dependencies": {
     "@better-auth/core": "1.6.33",
     "@better-auth/expo": "1.6.33",
