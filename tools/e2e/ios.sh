@@ -29,6 +29,12 @@ CONVEX_AGENT_MODE=anonymous npx convex dev --typecheck disable >"$out/convex.log
 convex_pid=$!
 trap 'kill "$convex_pid" 2>/dev/null || true' EXIT
 
+# The first boot of a fresh simulator takes minutes; let it run meanwhile.
+# E2E_DEVICE: a simulator the caller already started booting.
+device="${E2E_DEVICE:-$(tools/e2e/simulator.sh)}"
+echo "▸ Booting simulator $device in the background"
+xcrun simctl boot "$device" 2>/dev/null || true
+
 for _ in $(seq 1 150); do
   if grep -q "Convex functions ready" "$out/convex.log"; then break; fi
   if ! kill -0 "$convex_pid" 2>/dev/null; then
@@ -80,12 +86,13 @@ else
   cp -R build/derived/Build/Products/Release-iphonesimulator/kvitto.app "$app"
 fi
 
-echo "▸ Booting a simulator"
-device="$(xcrun simctl list devices available --json |
-  jq -r '[.devices | to_entries[] | select(.key | contains("iOS")) | .value[] | select(.name | startswith("iPhone"))] | last | .udid')"
-xcrun simctl boot "$device" 2>/dev/null || true
-xcrun simctl bootstatus "$device" -b
+echo "▸ Waiting for the simulator"
+xcrun simctl bootstatus "$device" -b >/dev/null
+# Maestro installs its driver on first use; do that while the app installs.
+maestro --device "$device" hierarchy >/dev/null 2>&1 &
+driver_pid=$!
 xcrun simctl install "$device" "$app"
+wait "$driver_pid" || true
 
 echo "▸ Running Maestro flows"
 if ! maestro --device "$device" test .maestro \

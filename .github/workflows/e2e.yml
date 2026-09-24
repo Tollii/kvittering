@@ -76,6 +76,13 @@ jobs:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
         with:
           persist-credentials: false
+      # A fresh simulator's first boot takes minutes; start it before setup.
+      - name: Start booting the simulator
+        id: simulator
+        run: |
+          device="$(tools/e2e/simulator.sh)"
+          xcrun simctl boot "$device" || true
+          echo "device=$device" >> "$GITHUB_OUTPUT"
       - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6.5.0
         with:
           node-version: 24
@@ -91,6 +98,16 @@ jobs:
         with:
           path: build/cache/kvitto.app
           key: e2e-ios-app-signed-${{ steps.fingerprint.outputs.hash }}
+      # The Convex CLI downloads the latest local backend; reuse it within a week.
+      - name: Choose the backend cache week
+        id: week
+        run: echo "week=$(date -u +%G-%V)" >> "$GITHUB_OUTPUT"
+      - name: Restore the local backend
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/.cache/convex/binaries
+          key: convex-backend-${{ runner.os }}-${{ steps.week.outputs.week }}
+          restore-keys: convex-backend-${{ runner.os }}-
       - name: Install Maestro
         run: |
           curl -fsSL "https://get.maestro.mobile.dev" | bash
@@ -98,6 +115,7 @@ jobs:
       - name: Run flows
         env:
           E2E_APP_CACHE: ${{ steps.app.outputs.cache-hit == 'true' && 'build/cache/kvitto.app' || '' }}
+          E2E_DEVICE: ${{ steps.simulator.outputs.device }}
         run: tools/e2e/ios.sh
       # A finished build is reusable even when a flow fails.
       - name: Save the simulator build
