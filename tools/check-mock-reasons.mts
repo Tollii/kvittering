@@ -4,7 +4,7 @@
  * describing none of the mocks, so reviewers stop checking what is mocked.
  */
 import { execFileSync } from "node:child_process";
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 
 const marker = "anti-slop/no-module-mocking -- ";
 
@@ -13,7 +13,11 @@ const sources = execFileSync("git", ["ls-files", "*.ts", "*.tsx"], {
   encoding: "utf8",
 })
   .split("\n")
-  .filter((path) => path && !path.startsWith("tools/oxlint/anti-slop/"));
+  // Unstaged deletions are still listed; check:changed must tolerate them.
+  .filter(
+    (path) =>
+      path && !path.startsWith("tools/oxlint/anti-slop/") && existsSync(path),
+  );
 
 const filesByReason = new Map<string, Set<string>>();
 
