@@ -149,9 +149,10 @@ export const deliver = internalAction({
         JSON.stringify({ aps }),
         activity.environment,
       );
-    } catch {
+    } catch (error) {
       console.warn("receipt.activity_delivery_failed", {
         attempt: args.attempt,
+        error: String(error),
       });
     }
 

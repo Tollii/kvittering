@@ -209,7 +209,7 @@ async function classifyCatalogBatch(
       }
     });
   } catch {
-    // Keep exact matches usable, and distinguish provider failures from negative decisions.
+    // Handled: keep exact matches usable, and distinguish provider failures from negative decisions.
     for (const { item, result } of entries)
       if (!item.match && item.candidates.length)
         result.reason = "provider_error";

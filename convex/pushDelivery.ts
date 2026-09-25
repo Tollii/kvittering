@@ -2,6 +2,8 @@ import { receiptReviewCategory } from "../src/lib/receipt-notifications";
 import { z } from "zod";
 import { v } from "convex/values";
 import { internalAction, env } from "./_generated/server";
+import type { ActionCtx } from "./_generated/server";
+import type { Id } from "./_generated/dataModel";
 import { internal } from "./_generated/api";
 
 const pushResultSchema = z.object({
@@ -17,6 +19,103 @@ function headers() {
     result.set("Authorization", `Bearer ${env.EXPO_ACCESS_TOKEN}`);
 
   return result;
+}
+
+type PushMessage = {
+  title: string;
+  body: string;
+  categoryId?: string;
+  data: Record<string, string>;
+};
+
+/** What happened to one push request; only `delivered` and `unregistered` are final. */
+type PushOutcome =
+  | { kind: "delivered"; ticketId: string }
+  | { kind: "unregistered" }
+  | { kind: "rejected"; status: number; reason: string | null }
+  | { kind: "failed"; error: unknown };
+
+const retryDelays = [10_000, 60_000];
+
+async function request(
+  token: string,
+  message: PushMessage,
+): Promise<PushOutcome> {
+  try {
+    const response = await fetch("https://exp.host/--/api/v2/push/send", {
+      method: "POST",
+      headers: headers(),
+      body: JSON.stringify({ to: token, sound: "default", ...message }),
+    });
+
+    if (!response.ok)
+      return {
+        kind: "rejected",
+        status: response.status,
+        reason: null,
+      };
+
+    const ticket = z
+      .object({ data: pushResultSchema.optional() })
+      .parse(await response.json()).data;
+
+    if (ticket?.details?.error === "DeviceNotRegistered")
+      return { kind: "unregistered" };
+
+    return ticket?.status === "ok" && ticket.id
+      ? { kind: "delivered", ticketId: ticket.id }
+      : {
+          kind: "rejected",
+          status: response.status,
+          reason: ticket?.details?.error ?? ticket?.status ?? null,
+        };
+  } catch (error) {
+    return { kind: "failed", error };
+  }
+}
+
+/**
+ * Sends one push message and applies its outcome: an accepted ticket is checked
+ * later, an unregistered device is removed, and any other outcome is logged and
+ * retried through `retry` until the attempts run out.
+ */
+async function deliverPush(
+  ctx: ActionCtx,
+  delivery: {
+    subscriptionId: Id<"deviceSubscriptions">;
+    token: string;
+    attempt: number;
+    retry: (delay: number) => Promise<Id<"_scheduled_functions">>;
+  },
+  message: PushMessage,
+) {
+  const outcome = await request(delivery.token, message);
+
+  if (outcome.kind === "delivered")
+    await ctx.scheduler.runAfter(
+      15 * 60 * 1000,
+      internal.pushDelivery.checkReceipt,
+      { ticketId: outcome.ticketId, subscriptionId: delivery.subscriptionId },
+    );
+  else if (outcome.kind === "unregistered")
+    await ctx.runMutation(internal.notifications.removeExpired, {
+      id: delivery.subscriptionId,
+    });
+  else {
+    const delay = retryDelays[delivery.attempt];
+
+    console.warn("push.delivery_failed", {
+      subscriptionId: delivery.subscriptionId,
+      attempt: delivery.attempt,
+      kind: outcome.kind,
+      ...(outcome.kind === "rejected"
+        ? { status: outcome.status, reason: outcome.reason }
+        : { error: String(outcome.error) }),
+      retrying: delay !== undefined,
+    });
+
+    if (delay !== undefined) await delivery.retry(delay);
+  }
 }
 
 export const sendArgs = v.object({
@@ -37,95 +136,67 @@ export const send = internalAction({
 
     if (!target || (args.reviewOnly && target.autoAccepted)) return null;
 
-    try {
-      const response = await fetch("https://exp.host/--/api/v2/push/send", {
-        method: "POST",
-        headers: headers(),
-        body: JSON.stringify({
-          to: target.subscription.token,
-          sound: "default",
-          title: target.title,
-          body: target.body,
-          categoryId: target.autoAccepted ? undefined : receiptReviewCategory,
-          data: { receiptId: args.receiptId },
-        }),
-      });
-
-      if (!response.ok) throw new Error(`Push service: ${response.status}`);
-
-      const result = z
-        .object({ data: pushResultSchema.optional() })
-        .parse(await response.json());
-
-      if (result.data?.details?.error === "DeviceNotRegistered")
-        await ctx.runMutation(internal.notifications.removeExpired, {
-          id: args.subscriptionId,
-        });
-      else if (result.data?.status === "ok" && result.data.id)
-        await ctx.scheduler.runAfter(
-          15 * 60 * 1000,
-          internal.pushDelivery.checkReceipt,
-          { ticketId: result.data.id, subscriptionId: args.subscriptionId },
-        );
-      else throw new Error("Push service rejected the notification.");
-    } catch {
-      if (args.attempt < 2)
-        await ctx.scheduler.runAfter(
-          args.attempt === 0 ? 10000 : 60000,
-          internal.pushDelivery.send,
-          { ...args, attempt: args.attempt + 1 },
-        );
-      else console.warn("Receipt notification delivery failed.");
-    }
+    await deliverPush(
+      ctx,
+      {
+        subscriptionId: args.subscriptionId,
+        token: target.subscription.token,
+        attempt: args.attempt,
+        retry: (delay) =>
+          ctx.scheduler.runAfter(delay, internal.pushDelivery.send, {
+            ...args,
+            attempt: args.attempt + 1,
+          }),
+      },
+      {
+        title: target.title,
+        body: target.body,
+        categoryId: target.autoAccepted ? undefined : receiptReviewCategory,
+        data: { receiptId: args.receiptId },
+      },
+    );
 
     return null;
   },
 });
 
-/** A plain notification that is not about one receipt, such as the weekly digest. */
+/**
+ * A plain notification that is not about one receipt, such as the weekly digest.
+ * It retries like `send`: a digest is sent once a week, so a transient failure
+ * would otherwise drop it. `attempt` is optional for jobs scheduled before it existed.
+ */
 export const sendMessage = internalAction({
   args: {
     subscriptionId: v.id("deviceSubscriptions"),
     title: v.string(),
     body: v.string(),
+    attempt: v.optional(v.number()),
   },
   returns: v.null(),
   handler: async (ctx, args) => {
     const subscription = await ctx.runQuery(
       internal.notifications.subscription,
-      {
-        id: args.subscriptionId,
-      },
+      { id: args.subscriptionId },
     );
 
     if (!subscription) return null;
 
-    try {
-      const response = await fetch("https://exp.host/--/api/v2/push/send", {
-        method: "POST",
-        headers: headers(),
-        body: JSON.stringify({
-          to: subscription.token,
-          sound: "default",
-          title: args.title,
-          body: args.body,
-          data: { route: "/spending" },
-        }),
-      });
+    const attempt = args.attempt ?? 0;
 
-      if (!response.ok) throw new Error(`Push service: ${response.status}`);
-
-      const result = z
-        .object({ data: pushResultSchema.optional() })
-        .parse(await response.json());
-
-      if (result.data?.details?.error === "DeviceNotRegistered")
-        await ctx.runMutation(internal.notifications.removeExpired, {
-          id: args.subscriptionId,
-        });
-    } catch {
-      console.warn("Digest notification delivery failed.");
-    }
+    await deliverPush(
+      ctx,
+      {
+        subscriptionId: args.subscriptionId,
+        token: subscription.token,
+        attempt,
+        retry: (delay) =>
+          ctx.scheduler.runAfter(delay, internal.pushDelivery.sendMessage, {
+            ...args,
+            attempt: attempt + 1,
+          }),
+      },
+      { title: args.title, body: args.body, data: { route: "/spending" } },
+    );
 
     return null;
   },

@@ -129,6 +129,7 @@ export const process = workflow
         requestIds: entries.map((entry) => entry.id),
       });
     } catch {
+      // Handled: `failed` records the failed run and logs `catalog.matching_failed`.
       await step.runMutation(internal.catalogMatching.failed, {
         ...args,
         workflowId: step.workflowId,
