@@ -1,7 +1,34 @@
 import { useColorScheme } from "react-native";
 
+/** The camera stays dark in both colour schemes so the viewfinder reads as a photo. */
+const camera = {
+  cameraBackground: "#101C51",
+  onCamera: "#F6F3EA",
+  onCameraMuted: "#E3E7FF",
+  cameraOverlay: "#101C51B3",
+  cameraOverlayStrong: "#101C51CC",
+  cameraGuide: "#FFFFFFCC",
+};
+
+/** Translucent layers over the cobalt hero, which is dark in both colour schemes. */
+const heroLayers = {
+  heroControl: "#FFFFFF22",
+  heroTrack: "#FFFFFF33",
+  heroMarker: "#FFFFFFAA",
+  heroWarning: "#FFE3A1",
+};
+
+/** Catalogue product photos have white backgrounds in both colour schemes. */
+const productImage = {
+  productImageBackground: "#FFFFFF",
+  productImagePlaceholder: "#777777",
+};
+
 /** Cobalt ink and warm paper. Artwork carries texture; controls stay plain. */
 const light = {
+  ...camera,
+  ...heroLayers,
+  ...productImage,
   background: "#F6F3EA",
   surface: "#FFFFFF",
   surfaceRaised: "#F0EDE3",
@@ -33,6 +60,9 @@ const light = {
 };
 
 const dark: typeof light = {
+  ...camera,
+  ...heroLayers,
+  ...productImage,
   background: "#10162D",
   surface: "#18203A",
   surfaceRaised: "#202A46",

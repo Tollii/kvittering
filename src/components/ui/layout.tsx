@@ -82,7 +82,7 @@ export function Screen({
           style={(state) => [
             styles.iconButton,
             {
-              backgroundColor: "#FFFFFF22",
+              backgroundColor: colors.heroControl,
               borderRadius: 20,
               minWidth: 44,
               minHeight: 44,

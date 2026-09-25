@@ -13,8 +13,6 @@ import {
 import { useTheme } from "@/constants/theme";
 import { maxReceiptImages } from "@/lib/receipt-import";
 
-const onCamera = "#F6F3EA";
-
 /** Review prepared images before saving them to the upload queue. */
 export function CaptureReview({
   photos,
@@ -105,12 +103,12 @@ export function CaptureReview({
                 width: 24,
                 height: 24,
                 borderRadius: 12,
-                backgroundColor: "#101C51CC",
+                backgroundColor: colors.cameraOverlayStrong,
                 alignItems: "center",
                 justifyContent: "center",
               }}
             >
-              <Copy size={12} weight="700" style={{ color: onCamera }}>
+              <Copy size={12} weight="700" style={{ color: colors.onCamera }}>
                 {index + 1}
               </Copy>
             </View>
@@ -128,14 +126,14 @@ export function CaptureReview({
                   width: 44,
                   height: 44,
                   borderRadius: 22,
-                  backgroundColor: "#101C51CC",
+                  backgroundColor: colors.cameraOverlayStrong,
                   alignItems: "center",
                   justifyContent: "center",
                 },
                 pressed(state),
               ]}
             >
-              <Icon name="xmark" size={12} color={onCamera} />
+              <Icon name="xmark" size={12} color={colors.onCamera} />
             </Pressable>
           </View>
         ))}

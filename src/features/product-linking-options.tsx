@@ -31,7 +31,7 @@ function ProductImage({ product }: Readonly<{ product: CatalogProduct }>) {
         width: 68,
         alignItems: "center",
         justifyContent: "center",
-        backgroundColor: "#FFFFFF",
+        backgroundColor: colors.productImageBackground,
         borderRadius: radius.inner,
         borderWidth: 1,
         borderColor: colors.imageOutline,
@@ -48,7 +48,7 @@ function ProductImage({ product }: Readonly<{ product: CatalogProduct }>) {
           accessible={false}
         />
       ) : (
-        <Icon name="photo" size={34} color="#777777" />
+        <Icon name="photo" size={34} color={colors.productImagePlaceholder} />
       )}
     </View>
   );
