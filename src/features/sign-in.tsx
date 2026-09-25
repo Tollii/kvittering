@@ -17,12 +17,30 @@ import {
 } from "./apple-authentication";
 import {
   appleAuthenticationError,
+  isAppleRejection,
   requestAppleIdentity,
 } from "@/lib/apple-authentication";
 
 import { useFeatureFlag } from "./featureFlags";
 import { failureMessage } from "@/lib/failure-message";
 import { UserError } from "@/lib/user-errors";
+import { reportError } from "@/lib/observability";
+
+// Better Auth sends English text; show these rejections in Norwegian.
+const emailAuthenticationErrors = new Map([
+  ["INVALID_EMAIL_OR_PASSWORD", "Feil e-postadresse eller passord."],
+  ["INVALID_EMAIL", "Skriv inn en gyldig e-postadresse."],
+  [
+    "USER_ALREADY_EXISTS",
+    "Det finnes allerede en konto med denne e-postadressen.",
+  ],
+  [
+    "USER_ALREADY_EXISTS_USE_ANOTHER_EMAIL",
+    "Det finnes allerede en konto med denne e-postadressen.",
+  ],
+  ["PASSWORD_TOO_SHORT", "Passordet må ha minst 12 tegn."],
+  ["PASSWORD_TOO_LONG", "Passordet er for langt."],
+]);
 
 export function SignIn() {
   const emailSignUp = useFeatureFlag("emailSignUp");
@@ -57,6 +75,9 @@ export function SignIn() {
 
       if (result.error) {
         if (result.error.code === "OAUTH_LINK_ERROR") setEmailMode("login");
+
+        if (!isAppleRejection(result.error.code))
+          reportError(result.error, "auth.apple_sign_in");
         throw new UserError({
           code: "REJECTED",
           message: appleAuthenticationError(result.error.code),
@@ -96,11 +117,13 @@ export function SignIn() {
           })
         : await authClient.signIn.email({ email: email.trim(), password });
 
-      if (result.error)
-        throw new UserError({
-          code: "REJECTED",
-          message: result.error.message ?? "Innlogging mislyktes.",
-        });
+      if (result.error) {
+        const message = emailAuthenticationErrors.get(result.error.code ?? "");
+
+        if (message) throw new UserError({ code: "REJECTED", message });
+        // Other responses are English service text; failureMessage reports them.
+        throw Object.assign(new Error(result.error.message), result.error);
+      }
       setPassword("");
     } catch (cause) {
       setError(

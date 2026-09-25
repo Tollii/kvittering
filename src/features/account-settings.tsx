@@ -7,6 +7,7 @@ import { authClient } from "@/lib/auth-client";
 import { reportError } from "@/lib/observability";
 import {
   appleAuthenticationError,
+  isAppleRejection,
   requestAppleIdentity,
 } from "@/lib/apple-authentication";
 import {
@@ -46,7 +47,8 @@ export function AccountSettings({ disabled }: Readonly<{ disabled: boolean }>) {
         });
 
         if (result.error) {
-          reportError(result.error, "auth.apple_link");
+          if (!isAppleRejection(result.error.code))
+            reportError(result.error, "auth.apple_link");
           throw new UserError({
             code: "REJECTED",
             message: appleAuthenticationError(result.error.code),
