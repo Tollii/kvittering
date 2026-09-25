@@ -1,6 +1,7 @@
 # Verification
 
-A merge requires `CI result`, `E2E result`, and an independent approving review.
+A merge requires `CI result`, `E2E result`, and resolution of all review conversations.
+Approving reviews are optional for this single-maintainer repository.
 This guide describes the checks behind those results, how to run them yourself, and how to add a check
 when you add behavior. It applies to people and agents alike.
 
@@ -171,32 +172,25 @@ job failed or was cancelled. Unrelated changes pass without running the simulato
 Both workflows support merge groups as well as pull requests. GitHub associates
 results with their commit; preserve strict up-to-date branch protection.
 
-Also require one independent approving review, dismiss stale approvals after
-new commits, and require conversation resolution. Enable CodeRabbit's
-`request_changes_workflow` so it requests changes for findings and approves only
-after the latest commit has been reviewed, required threads are resolved, and
-its pre-merge checks pass. A rate-limited or incomplete review cannot produce
-this automatic approval. An authorized independent human review can also meet
-GitHub's review requirement.
+Require resolution of all review conversations, but set the required approving
+review count to zero. This repository has one maintainer; a separate approval
+is redundant. Published AI review findings still need a disposition before merge.
+Address each valid finding and resolve its thread after verification. Explain
+why an invalid finding does not apply before resolving it.
+
+Keep CodeRabbit's `request_changes_workflow` disabled. Its findings remain useful,
+but an approving review or completed bot review is not a merge requirement.
+Dependabot PRs do not require CodeRabbit review. Do not use bulk approval or
+conversation-resolution commands to bypass individual findings.
 
 Keep GitHub Actions approval disabled (`can_approve_pull_request_reviews: false`)
 and default workflow permissions read-only. Binding a status name to the GitHub
 Actions app does not identify the workflow that produced it: a same-repository
-PR workflow can request check-write permission. GitHub's separate review
-requirement prevents that workflow from supplying its own approval. Repository
-administrators and independently authorized reviewers remain trusted actors.
+PR workflow can request check-write permission. The maintainer must assess
+workflow changes before merging them.
 
-Never use `@coderabbitai approve` or top-level `@coderabbitai resolve` to complete
-agent work. Those commands are explicit overrides and can bypass CodeRabbit's
-review-completion requirements. Reply to individual findings with evidence,
-resolve their threads after addressing them, and request `@coderabbitai review`
-when capacity is available. Do not weaken review filters to obtain approval.
-See [CodeRabbit's approval rules](https://docs.coderabbit.ai/pr-reviews/request-changes-workflow)
-and [GitHub's workflow approval policy](https://github.blog/changelog/2022-01-14-github-actions-prevent-github-actions-from-approving-pull-requests/).
-
-Activate these repository settings after the new checks and CodeRabbit approval
-are verified. Require `CI result` and `E2E result` from the GitHub Actions app
-(ID 15368), retain strict up-to-date checks and administrator enforcement, and
-set the required approving review count to one. These settings are external to
-the repository. The `breaking-contract` and `e2e` labels remain available;
-neither label bypasses approval or permits release operations.
+Require `CI result` and `E2E result` from the GitHub Actions app (ID 15368), retain
+strict up-to-date checks and administrator enforcement, and require conversation
+resolution. These settings are external to the repository. The `breaking-contract`
+and `e2e` labels remain available; neither label bypasses checks or permits release
+operations.
