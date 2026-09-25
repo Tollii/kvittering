@@ -10,4 +10,5 @@ name: Open a reviewed receipt from history
 - tapOn: "REMA 1000.*"
 - assertVisible: "REMA 1000"
 - assertVisible: ".*63,80.*"
-- assertVisible: "Rediger TINE LETTMELK 1L,.*"
+- assertVisible: "Kategorier"
+- assertVisible: "Brød og bakst,.*39,90.*"
