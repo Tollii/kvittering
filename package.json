@@ -135,7 +135,8 @@
   "overrides": {
     "better-auth": {
       "vitest": "$vitest"
-    }
+    },
+    "uuid": "^11.1.1"
   },
   "expo": {
     "install": {
