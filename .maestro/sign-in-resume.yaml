@@ -1,0 +1,21 @@
+appId: no.tolnes.kvitto
+name: Keep sign-in input when returning to the app
+---
+- launchApp:
+    clearState: true
+    clearKeychain: true
+- extendedWaitUntil:
+    visible: "Logg inn med e-post"
+    timeout: 60000
+- tapOn: "Logg inn med e-post"
+- tapOn:
+    id: sign-in-email
+- inputText: "resume@example.com"
+- pressKey: Home
+- launchApp:
+    stopApp: false
+- assertVisible:
+    id: sign-in-email
+    text: "resume@example.com"
+- assertVisible:
+    id: sign-in-password
