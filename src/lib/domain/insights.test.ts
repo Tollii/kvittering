@@ -2,7 +2,8 @@ import { date, month } from "../testing/calendar";
 import { present, receiptFixture, testId } from "../testing/receipts";
 import { Ore } from "./ore";
 import { expect, it } from "vitest";
-import { batteryFixture, emptyLine } from "./receipt";
+import { emptyLine } from "./receipt";
+import { batteryFixture } from "../mock-receipts";
 import {
   comparisonInsights,
   spendingCalendar,

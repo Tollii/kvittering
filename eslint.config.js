@@ -189,6 +189,11 @@ module.exports = defineConfig([
               target: ["./src/lib", "./convex"],
               from: ["./src/app", "./src/features", "./src/components"],
             },
+            {
+              target: ["./src/lib", "./convex"],
+              from: ["./src/lib/testing"],
+              message: "Test helpers are for tests only.",
+            },
           ],
         },
       ],
@@ -225,6 +230,23 @@ module.exports = defineConfig([
             },
           ],
         },
+      ],
+    },
+  },
+  {
+    files: ["convex/**/*.ts"],
+    ignores: ["**/*.test.ts", "convex/providerConfig.ts"],
+    rules: {
+      "no-restricted-properties": [
+        "error",
+        ...["RECEIPT_PROVIDER", "OPENAI_API_KEY", "OPENAI_RECEIPT_MODEL"].map(
+          (property) => ({
+            object: "env",
+            property,
+            message:
+              "Use providerConfig so a missing receipt reader key fails instead of changing receipt data.",
+          }),
+        ),
       ],
     },
   },

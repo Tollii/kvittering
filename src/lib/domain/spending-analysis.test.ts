@@ -3,7 +3,8 @@ import { present, testId } from "../testing/receipts";
 import { Ore } from "./ore";
 import { spendingExplanations } from "./spending-explanations";
 import { expect, it } from "vitest";
-import { batteryFixture, emptyLine } from "./receipt";
+import { emptyLine } from "./receipt";
+import { batteryFixture } from "../mock-receipts";
 import type { Receipt } from "./insights";
 import {
   productAnalysisVersion,

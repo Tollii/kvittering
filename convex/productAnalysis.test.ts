@@ -10,7 +10,7 @@ import { convexTest } from "convex-test";
 import { expect, it, vi, afterEach } from "vitest";
 import schema from "./schema";
 import { api, components, internal } from "./_generated/api";
-import { batteryFixture } from "../src/lib/domain/receipt";
+import { batteryFixture } from "../src/lib/mock-receipts";
 import { readAttributes } from "../src/lib/domain/product-attributes";
 import {
   purchaseEvidenceKey,

@@ -1,6 +1,6 @@
 import { present } from "../testing/receipts";
 import { expect, it } from "vitest";
-import { weeklyShopFixture } from "./receipt";
+import { weeklyShopFixture } from "../mock-receipts";
 import {
   applyCategoryMemory,
   categoryMemoryKey,

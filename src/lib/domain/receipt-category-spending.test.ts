@@ -3,7 +3,8 @@ import { month } from "../testing/calendar";
 import { Ore } from "./ore";
 import { present, receiptFixture } from "../testing/receipts";
 import { monthlyInsights } from "./insights";
-import { batteryFixture, emptyLine } from "./receipt";
+import { emptyLine } from "./receipt";
+import { batteryFixture } from "../mock-receipts";
 import { receiptCategorySpending } from "./receipt-category-spending";
 
 it("groups drinks after item and receipt discounts, with the same totals as the overview", () => {

@@ -8,7 +8,8 @@ import { register as registerRateLimiter } from "@convex-dev/rate-limiter/test";
 import { expect, it } from "vitest";
 import { api, internal } from "./_generated/api";
 import schema from "./schema";
-import { weeklyShopFixture, parseReceipt } from "../src/lib/domain/receipt";
+import { parseReceipt } from "../src/lib/domain/receipt";
+import { weeklyShopFixture } from "../src/lib/mock-receipts";
 import { weeklyDigest } from "../src/lib/domain/budget";
 import { updateReceiptReadModel } from "./receiptReadModel";
 

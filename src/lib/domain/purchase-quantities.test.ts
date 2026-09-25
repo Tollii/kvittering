@@ -1,6 +1,6 @@
 import { present } from "../testing/receipts";
 import { describe, expect, it } from "vitest";
-import { batteryFixture } from "./receipt";
+import { batteryFixture } from "../mock-receipts";
 import {
   familyName,
   productProfileKey,

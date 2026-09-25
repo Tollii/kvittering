@@ -7,7 +7,7 @@ import { register as registerWorkpool } from "@convex-dev/workpool/test";
 import { afterEach, expect, it, vi } from "vitest";
 import { api, internal } from "./_generated/api";
 import schema from "./schema";
-import { batteryFixture } from "../src/lib/domain/receipt";
+import { batteryFixture } from "../src/lib/mock-receipts";
 import { emptyCatalogResult } from "../src/lib/catalog/model";
 import { normalizeProducts } from "./kassalapp/normalize";
 import { lineEvidenceKey } from "../src/lib/catalog/matching";

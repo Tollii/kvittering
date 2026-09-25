@@ -1,7 +1,8 @@
 import { present } from "../testing/receipts";
 import { Ore } from "./ore";
 import { expect, it } from "vitest";
-import { batteryFixture, reconcile, weeklyShopFixture } from "./receipt";
+import { reconcile } from "./receipt";
+import { batteryFixture, weeklyShopFixture } from "../mock-receipts";
 import {
   balanceWithAdjustment,
   canAcceptReceipt,

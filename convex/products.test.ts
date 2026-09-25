@@ -5,7 +5,7 @@ import { convexTest } from "convex-test";
 import { expect, it, vi } from "vitest";
 import { api, internal } from "./_generated/api";
 import schema from "./schema";
-import { batteryFixture } from "../src/lib/domain/receipt";
+import { batteryFixture } from "../src/lib/mock-receipts";
 
 const modules = import.meta.glob("./**/*.ts");
 

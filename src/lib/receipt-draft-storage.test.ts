@@ -4,7 +4,7 @@ import { expect, it } from "vitest";
 import { ReceiptDraftStorage } from "./receipt-draft-storage";
 import { ReceiptDraftController } from "./receipt-draft-controller";
 import type { ReceiptCacheDatabase } from "./receipt-cache";
-import { batteryFixture } from "./domain/receipt";
+import { batteryFixture } from "./mock-receipts";
 
 function fixture() {
   const db = new DatabaseSync(":memory:");

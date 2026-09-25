@@ -4,7 +4,8 @@ import {
   parseLegacyClassification,
   classificationEvidence,
 } from "./classification";
-import { classificationInputs, batteryFixture } from "./receipt";
+import { classificationInputs } from "./receipt";
+import { batteryFixture } from "../mock-receipts";
 
 it("reads legacy evidence into the same checked object used by current classification", () => {
   const product = present(classificationInputs(batteryFixture())[0]);

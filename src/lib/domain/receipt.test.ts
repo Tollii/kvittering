@@ -4,7 +4,6 @@ import { present, receiptFixture } from "../testing/receipts";
 import { Ore } from "./ore";
 import { describe, it, expect } from "vitest";
 import {
-  batteryFixture,
   reconcile,
   emptyLine,
   spendingLines,
@@ -14,6 +13,7 @@ import {
   aliasKey,
   classificationInputs,
 } from "./receipt";
+import { batteryFixture } from "../mock-receipts";
 import { monthlyInsights } from "./insights";
 
 describe("receipt accounting", () => {

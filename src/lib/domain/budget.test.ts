@@ -4,7 +4,7 @@ import { Ore } from "./ore";
 import { receiptFixture } from "../testing/receipts";
 import { expect, it } from "vitest";
 import { budgetPace, paceLabel, weeklyDigest } from "./budget";
-import { weeklyShopFixture } from "./receipt";
+import { weeklyShopFixture } from "../mock-receipts";
 
 // Intl formats money with non-breaking spaces.
 const plain = (text: string) => text.replace(/\s/g, " ");
