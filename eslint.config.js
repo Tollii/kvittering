@@ -31,6 +31,8 @@ module.exports = defineConfig([
     rules: {
       "kvitto/no-undefined-record": "error",
       "kvitto/no-effect-fetch": "error",
+      // Tools resolve imports to the base file, not the shipped platform variant.
+      "kvitto/platform-variant-contract": "error",
       // A file past this size holds several responsibilities; split it along them.
       "max-lines": [
         "error",

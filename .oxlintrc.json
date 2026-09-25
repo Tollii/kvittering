@@ -6,6 +6,7 @@
   "rules": {
     "kvitto/no-undefined-record": "error",
     "kvitto/no-effect-fetch": "error",
+    "kvitto/platform-variant-contract": "error",
     "vitest/no-focused-tests": "error",
     "oxc/no-accumulating-spread": "error"
   },

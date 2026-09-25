@@ -177,6 +177,49 @@ typedTester.run(
   },
 );
 
+const fixtures = join(process.cwd(), "tools", "eslint", "fixtures");
+
+const variant = join(fixtures, "file.ios.tsx");
+
+tester.run(
+  "platform-variant-contract",
+  plugin.rules["platform-variant-contract"],
+  {
+    valid: [
+      {
+        code: "import type { MenuProps } from './file'; export function Menu({ value }: MenuProps) { return value; }",
+        filename: variant,
+      },
+      {
+        code: "import { type MenuProps } from './file'; export const Menu = (props: Readonly<MenuProps>) => props.value;",
+        filename: variant,
+      },
+      {
+        code: "export function Menu({ value }: { value: string }) { return value; }",
+        filename: join(fixtures, "unpaired.ios.tsx"),
+      },
+      {
+        code: "export function Menu({ value }: { value: string }) { return value; }",
+        filename: join(fixtures, "file.test.tsx"),
+      },
+    ],
+    invalid: [
+      "export function Menu({ value }: Readonly<{ value: string }>) { return value; }",
+      "import type { MenuProps } from './other'; export function Menu(props: MenuProps) { return props; }",
+      "import type { MenuProps } from './file'; type Local = MenuProps; export const Menu = (props: Local) => props;",
+      "import type { MenuProps } from './file'; export function Menu(props) { return props; }",
+      "export const Menu = memo(forwardRef(function Menu(props: { value: string }, ref) { return props; }));",
+      "export default function Menu(props: { value: string }) { return props; }",
+      "function Menu(props: { value: string }) { return props; } export { Menu };",
+      "const Menu = (props: { value: string }) => props; export default Menu;",
+    ].map((code) => ({
+      code,
+      filename: variant,
+      errors: [{ messageId: "props" }],
+    })),
+  },
+);
+
 it("runs the same rule in the repository Oxlint configuration", () => {
   const directory = mkdtempSync(join(process.cwd(), "tools", "rule-test-"));
 

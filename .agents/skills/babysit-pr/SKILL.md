@@ -13,12 +13,12 @@ metadata:
 
 Accept a PR number, URL, or the current branch (`--pr auto`). Confirm the repository, head branch, head commit, and requested outcome. Reuse any merge authorization already given by the user.
 
-- By default, finish when CI passes for the current head, published review findings are addressed, required approvals are present, and GitHub reports the PR as mergeable.
+- By default, finish when CI passes for the current head, published review findings are addressed, all review conversations are resolved, and GitHub reports the PR as mergeable.
 - If the user requests a merge, merge when these conditions hold and confirm that GitHub reports the PR as merged.
 - If the user explicitly requests continued monitoring while the PR remains open, continue until it is merged, closed, or the user stops the task.
 - Stop and report a blocker when permissions, persistent infrastructure failures, or a required product decision prevent further progress.
 
-A push, an `idle` snapshot, or passing checks with pending reviews does not complete the task. A request to file or monitor a PR does not authorize a merge or a release.
+A push, an `idle` snapshot, or passing checks with unresolved review conversations does not complete the task. A request to file or monitor a PR does not authorize a merge or a release.
 
 ## Monitor state
 
@@ -90,7 +90,7 @@ gh pr view <number-or-url> --json url,state,isDraft,headRefOid,mergeable,mergeSt
 gh pr checks <number-or-url>
 ```
 
-Confirm that the expected quality workflow actually ran and passed for the current PR head. Missing checks, cancelled checks, or skipped required checks are not a pass. Wait for pending checks, expected bot reviews, required approvals, and unresolved mergeability calculations. Inspect unresolved review threads directly; previously seen comments still need a disposition.
+Confirm that the expected quality workflow actually ran and passed for the current PR head. Missing checks, cancelled checks, or skipped required checks are not a pass. Wait for pending checks and unresolved mergeability calculations. Inspect unresolved review threads directly; previously seen comments still need a disposition. Approving reviews and bot review completion are not required. Do not request CodeRabbit reviews for Dependabot PRs.
 
 If merge was requested, use a merge method supported by the repository and consistent with recent PR history. Pass `--match-head-commit <verified-sha>` to `gh pr merge` so a new commit cannot bypass verification. Do not bypass branch protection with `--admin`. If the repository queues the merge, keep monitoring until GitHub reports it as merged. Do not delete branches unless requested.
 
