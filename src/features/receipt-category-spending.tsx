@@ -15,6 +15,10 @@ export function ReceiptCategorySpending({
   const selected = groups.find((group) => group.id === selectedId);
   const totals = reconcile(data);
 
+  const hasOpposingSigns =
+    groups.some((group) => group.amountOre > 0) &&
+    groups.some((group) => group.amountOre < 0);
+
   if (!groups.length) return null;
 
   return (
@@ -34,7 +38,7 @@ export function ReceiptCategorySpending({
           )}
           <SpendingBars
             rows={showAll ? groups : groups.slice(0, 5)}
-            total={totals.productSpending}
+            total={hasOpposingSigns ? undefined : totals.productSpending}
             onSelect={(group) => setSelectedId(group.id)}
           />
           {groups.length > 5 && (
@@ -50,7 +54,7 @@ export function ReceiptCategorySpending({
           >
             {selected && (
               <>
-                <Copy size={34} weight="800">
+                <Copy testID="receipt-category-total" size={34} weight="800">
                   {Ore.format(selected.amountOre)}
                 </Copy>
                 <Copy size={13} muted>
