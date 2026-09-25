@@ -1,4 +1,5 @@
 import { NotificationRouting } from "@/features/notifications";
+import { NavigationDiagnostics } from "@/features/navigation-diagnostics";
 import { sentryEnabled } from "@/lib/sentry";
 import { reportError } from "@/lib/observability";
 import { ReceiptMigrationError } from "@/lib/receipt-migrations";
@@ -68,6 +69,7 @@ function RootLayout() {
             <StatusBar style="light" />
             <ShareIntentRouting />
             <QueryLifecycleProvider>
+              <NavigationDiagnostics />
               <SessionProvider>
                 <NotificationRouting />
                 <Stack
