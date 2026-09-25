@@ -12,6 +12,10 @@ module.exports = {
   coverageDirectory: "coverage/components",
   coveragePathIgnorePatterns: ["/node_modules/", "\\.test\\.tsx?$"],
   coverageReporters: ["text-summary", "lcov", "json-summary"],
+  // Receipt calculations use this package's ES module validators.
+  transformIgnorePatterns: expoPreset.transformIgnorePatterns.map((pattern) =>
+    pattern.replace("(?!(", "(?!(convex-helpers|"),
+  ),
   // Metro applies babel-preset-expo without a project Babel file; Jest needs it named.
   transform: {
     ...expoPreset.transform,

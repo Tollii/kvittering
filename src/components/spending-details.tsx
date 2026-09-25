@@ -6,15 +6,17 @@ import { Copy, Panel, Row, Sheet } from "./ui";
 import { openReceipt, receiptStatusLabel } from "./receipt-card";
 import { contributionKey, type SpendingGroup } from "@/lib/domain/insights";
 
-export function SpendingBars({
+export function SpendingBars<
+  Group extends Pick<SpendingGroup, "id" | "name" | "amountOre">,
+>({
   rows,
   total,
   onSelect,
 }: Readonly<{
-  rows: SpendingGroup[];
+  rows: Group[];
   /** When given, each row shows its share of this amount. */
   total?: number;
-  onSelect: (row: SpendingGroup) => void;
+  onSelect: (row: Group) => void;
 }>) {
   const colors = useTheme();
   const { fontScale } = useWindowDimensions();

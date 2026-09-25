@@ -22,5 +22,6 @@ name: Delete one receipt and retain the other household receipts
 - assertVisible: "Coop Extra.*"
 - assertNotVisible: "REMA 1000.*"
 - tapOn: "KIWI.*"
-- assertVisible: "Rediger EVERGOOD KAFFE,.*"
+- scrollUntilVisible:
+    element: "Rediger EVERGOOD KAFFE,.*"
 - assertVisible: ".*69,90.*"

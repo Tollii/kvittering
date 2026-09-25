@@ -1,0 +1,20 @@
+appId: no.tolnes.kvitto
+name: Inspect spending on drinks in one receipt
+---
+- runFlow: ../shared/sign-in.yml
+- tapOn: "Historikk"
+- extendedWaitUntil:
+    visible: "KIWI.*"
+    timeout: 30000
+- tapOn: "KIWI.*"
+- assertVisible: "Kategorier"
+- assertVisible: "Etter rabatt, uten pant og pantretur."
+- tapOn: "Drikke,.*69,90.*100 prosent"
+- assertVisible: "Drikke"
+- assertVisible: "EVERGOOD KAFFE,.*69,90.*"
+- assertVisible: ".*69,90.*"
+- takeScreenshot: receipt-drinks-details
+- tapOn: "Lukk"
+- assertVisible: "Kategorier"
+- assertVisible: "Drikke,.*69,90.*100 prosent"
+- takeScreenshot: receipt-categories
