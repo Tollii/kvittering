@@ -6,7 +6,7 @@ import { errorDetails } from "./diagnostics";
 import { defaultStackParser, exceptionFromError } from "@sentry/browser";
 import { prepareErrorEvent } from "./sentry-event";
 
-// oxlint-disable-next-line anti-slop/no-module-mocking -- Replace the native SDK or environment boundary; application behavior remains under test.
+// oxlint-disable-next-line anti-slop/no-module-mocking -- Capture calls to the native Sentry SDK instead of sending events.
 vi.mock("@sentry/react-native", () => ({
   addBreadcrumb: vi.fn<typeof Sentry.addBreadcrumb>(),
   logger: {
