@@ -5,6 +5,7 @@ import type { FunctionArgs } from "convex/server";
 import { api } from "../../convex/_generated/api";
 import { useCachedReceipts } from "./receipt-cache-context";
 import { useQueryLifecycle } from "./query-lifecycle-context";
+import { recordEvent } from "@/lib/observability";
 import {
   createReceiptSelector,
   selectReceiptHistory,
@@ -121,6 +122,15 @@ export function useReceiptDetail(id: string) {
       : (detail?.receipt ?? (!online && cache.complete ? null : undefined)));
 
   const [retained, setRetained] = useState(receipt);
+
+  const source = cached ? "cache" : detail?.receipt ? "server" : "unavailable";
+  const revision = receipt?.revision;
+  useEffect(() => {
+    recordEvent("receipt.loaded", {
+      outcome: source,
+      incomingRevision: revision,
+    });
+  }, [id, source, revision]);
 
   if (receipt !== undefined && receipt !== retained) setRetained(receipt);
 
