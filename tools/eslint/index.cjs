@@ -1,4 +1,8 @@
 /** Repository rules shared by ESLint and Oxlint. */
+const { existsSync } = require("node:fs");
+
+const path = require("node:path");
+
 const readsDatabase = require("./reads-database.cjs");
 
 const quoted = /^["'`]/;
@@ -406,6 +410,86 @@ module.exports = {
               insideEffect(node)
             )
               context.report({ node, messageId: "subscription" });
+          },
+        };
+      },
+    },
+    "platform-variant-contract": {
+      meta: {
+        type: "problem",
+        schema: [],
+        messages: {
+          props:
+            "Type the props of this platform variant with a type imported from {{base}}. Type checking, knip, and callers use the base file, so props declared here can drift unnoticed.",
+        },
+      },
+      create(context) {
+        const match = /^(.+)\.(ios|android)\.tsx?$/.exec(
+          path.basename(context.filename),
+        );
+
+        if (!match) return {};
+        const directory = path.dirname(context.filename);
+
+        if (
+          ![".tsx", ".ts"].some((extension) =>
+            existsSync(path.join(directory, match[1] + extension)),
+          )
+        )
+          return {};
+        const base = `./${match[1]}`;
+        const baseTypes = new Set();
+
+        function isBaseType(annotation) {
+          if (
+            annotation?.type !== "TSTypeReference" ||
+            annotation.typeName.type !== "Identifier"
+          )
+            return false;
+
+          const argument = (
+            annotation.typeArguments ?? annotation.typeParameters
+          )?.params[0];
+
+          if (annotation.typeName.name === "Readonly" && argument)
+            return isBaseType(argument);
+
+          return baseTypes.has(annotation.typeName.name);
+        }
+
+        function check(node) {
+          const props = node?.params?.[0];
+
+          if (props && !isBaseType(props.typeAnnotation?.typeAnnotation))
+            context.report({
+              node: props,
+              messageId: "props",
+              data: { base },
+            });
+        }
+
+        return {
+          ImportDeclaration(node) {
+            if (node.source.value !== base) return;
+
+            for (const specifier of node.specifiers)
+              if (specifier.type === "ImportSpecifier")
+                baseTypes.add(specifier.local.name);
+          },
+          "Program:exit"(program) {
+            for (const statement of program.body) {
+              const declaration =
+                statement.type === "ExportNamedDeclaration"
+                  ? statement.declaration
+                  : null;
+
+              if (declaration?.type === "FunctionDeclaration")
+                check(declaration);
+
+              if (declaration?.type === "VariableDeclaration")
+                for (const variable of declaration.declarations)
+                  check(variable.init);
+            }
           },
         };
       },
