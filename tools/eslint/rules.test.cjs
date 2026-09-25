@@ -208,6 +208,10 @@ tester.run(
       "import type { MenuProps } from './other'; export function Menu(props: MenuProps) { return props; }",
       "import type { MenuProps } from './file'; type Local = MenuProps; export const Menu = (props: Local) => props;",
       "import type { MenuProps } from './file'; export function Menu(props) { return props; }",
+      "export const Menu = memo(forwardRef(function Menu(props: { value: string }, ref) { return props; }));",
+      "export default function Menu(props: { value: string }) { return props; }",
+      "function Menu(props: { value: string }) { return props; } export { Menu };",
+      "const Menu = (props: { value: string }) => props; export default Menu;",
     ].map((code) => ({
       code,
       filename: variant,

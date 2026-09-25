@@ -457,8 +457,20 @@ module.exports = {
           return baseTypes.has(annotation.typeName.name);
         }
 
+        const locals = new Map();
+
+        // Components may be wrapped, as in memo(forwardRef(function ...)).
+        function component(node) {
+          if (node?.type === "CallExpression")
+            return component(node.arguments[0]);
+
+          if (node?.type === "Identifier") return locals.get(node.name);
+
+          return node;
+        }
+
         function check(node) {
-          const props = node?.params?.[0];
+          const props = component(node)?.params?.[0];
 
           if (props && !isBaseType(props.typeAnnotation?.typeAnnotation))
             context.report({
@@ -466,6 +478,15 @@ module.exports = {
               messageId: "props",
               data: { base },
             });
+        }
+
+        function declared(declaration) {
+          if (declaration?.type === "FunctionDeclaration") return [declaration];
+
+          if (declaration?.type === "VariableDeclaration")
+            return declaration.declarations.map((variable) => variable.init);
+
+          return [];
         }
 
         return {
@@ -481,14 +502,32 @@ module.exports = {
               const declaration =
                 statement.type === "ExportNamedDeclaration"
                   ? statement.declaration
-                  : null;
+                  : statement;
 
-              if (declaration?.type === "FunctionDeclaration")
-                check(declaration);
+              if (declaration?.type === "FunctionDeclaration" && declaration.id)
+                locals.set(declaration.id.name, declaration);
 
               if (declaration?.type === "VariableDeclaration")
                 for (const variable of declaration.declarations)
-                  check(variable.init);
+                  if (variable.id.type === "Identifier")
+                    locals.set(variable.id.name, variable.init);
+            }
+
+            for (const statement of program.body) {
+              if (statement.type === "ExportDefaultDeclaration")
+                check(statement.declaration);
+
+              if (
+                statement.type !== "ExportNamedDeclaration" ||
+                statement.source
+              )
+                continue;
+
+              declared(statement.declaration).forEach(check);
+
+              for (const specifier of statement.specifiers)
+                if (specifier.local.type === "Identifier")
+                  check(specifier.local);
             }
           },
         };
