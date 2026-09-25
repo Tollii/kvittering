@@ -208,6 +208,20 @@ module.exports = defineConfig([
     },
   },
   {
+    files: ["src/app/**/*.{ts,tsx}", "src/features/**/*.{ts,tsx}"],
+    rules: {
+      "no-restricted-syntax": [
+        "error",
+        {
+          // Convex puts its request trace in Error.message; the user message is in the error data.
+          selector: 'CatchClause MemberExpression[property.name="message"]',
+          message:
+            "Show failureMessage(cause, operation, fallback) instead of a caught error's message.",
+        },
+      ],
+    },
+  },
+  {
     files: ["src/lib/domain/**/*.ts", "src/lib/catalog/**/*.ts"],
     rules: {
       // Domain rules stay pure so tests and the backend can run them.

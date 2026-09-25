@@ -15,6 +15,8 @@ import {
 } from "./apple-authentication";
 import { disableNotifications } from "./notifications";
 import { useHousehold } from "./household-context";
+import { failureMessage } from "@/lib/failure-message";
+import { UserError } from "@/lib/user-errors";
 
 export function AccountSettings({ disabled }: Readonly<{ disabled: boolean }>) {
   const available = useAppleAuthentication();
@@ -43,11 +45,13 @@ export function AccountSettings({ disabled }: Readonly<{ disabled: boolean }>) {
           idToken,
         });
 
-        if (result.error)
-          throw Object.assign(
-            new Error(appleAuthenticationError(result.error.code)),
-            { code: result.error.code, status: result.error.status },
-          );
+        if (result.error) {
+          reportError(result.error, "auth.apple_link");
+          throw new UserError({
+            code: "REJECTED",
+            message: appleAuthenticationError(result.error.code),
+          });
+        }
       } else {
         await disableNotifications(client);
         const result = await authClient.signOut();
@@ -55,11 +59,13 @@ export function AccountSettings({ disabled }: Readonly<{ disabled: boolean }>) {
         if (result.error) throw new Error(result.error.message);
       }
     } catch (cause) {
-      reportError(
-        cause,
-        operation === "apple" ? "auth.apple_link" : "auth.sign_out",
+      setError(
+        failureMessage(
+          cause,
+          operation === "apple" ? "auth.apple_link" : "auth.sign_out",
+          "Kunne ikke fullføre.",
+        ),
       );
-      setError(cause instanceof Error ? cause.message : "Kunne ikke fullføre.");
     } finally {
       submitting.current = false;
       setPending(null);

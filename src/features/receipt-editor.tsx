@@ -68,6 +68,7 @@ import { receiptStatusLabel } from "@/components/receipt-card";
 import { useTheme } from "@/constants/theme";
 import { priceSignals } from "@/lib/domain/price-signals";
 import { errorFeedback, successFeedback, tapFeedback } from "@/lib/haptics";
+import { failureMessage } from "@/lib/failure-message";
 
 export function ReceiptEditor({
   receipt,
@@ -213,7 +214,7 @@ export function ReceiptEditor({
       errorFeedback();
       dispatch({
         type: "failed",
-        error: cause instanceof Error ? cause.message : "Kunne ikke lagre.",
+        error: failureMessage(cause, "receipt.edit", "Kunne ikke lagre."),
       });
     } finally {
       operationActive.current = false;

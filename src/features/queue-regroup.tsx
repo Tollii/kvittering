@@ -8,6 +8,7 @@ import {
 import { imageFile } from "@/lib/receipt-storage";
 import type { LocalReceipt } from "@/lib/upload-queue";
 import { useHousehold } from "./household-context";
+import { failureMessage } from "@/lib/failure-message";
 
 /** Older unreserved queues keep every image until the person selects two receipt groups. */
 export function QueueRegroup({ entry }: Readonly<{ entry: LocalReceipt }>) {
@@ -52,9 +53,11 @@ export function QueueRegroup({ entry }: Readonly<{ entry: LocalReceipt }>) {
                   setVisible(false);
                 } catch (cause) {
                   setError(
-                    cause instanceof Error
-                      ? cause.message
-                      : "Kunne ikke dele opp bildene.",
+                    failureMessage(
+                      cause,
+                      "receipt.regroup",
+                      "Kunne ikke dele opp bildene.",
+                    ),
                   );
                 }
               }}

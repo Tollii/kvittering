@@ -21,6 +21,8 @@ import {
 } from "@/lib/apple-authentication";
 
 import { useFeatureFlag } from "./featureFlags";
+import { failureMessage } from "@/lib/failure-message";
+import { UserError } from "@/lib/user-errors";
 
 export function SignIn() {
   const emailSignUp = useFeatureFlag("emailSignUp");
@@ -55,11 +57,18 @@ export function SignIn() {
 
       if (result.error) {
         if (result.error.code === "OAUTH_LINK_ERROR") setEmailMode("login");
-        throw new Error(appleAuthenticationError(result.error.code));
+        throw new UserError({
+          code: "REJECTED",
+          message: appleAuthenticationError(result.error.code),
+        });
       }
     } catch (cause) {
       setError(
-        cause instanceof Error ? cause.message : "Innlogging mislyktes.",
+        failureMessage(
+          cause,
+          "auth.apple_sign_in",
+          "Kunne ikke logge inn med Apple. Prøv igjen.",
+        ),
       );
     } finally {
       submitting.current = false;
@@ -88,11 +97,14 @@ export function SignIn() {
         : await authClient.signIn.email({ email: email.trim(), password });
 
       if (result.error)
-        throw new Error(result.error.message ?? "Innlogging mislyktes.");
+        throw new UserError({
+          code: "REJECTED",
+          message: result.error.message ?? "Innlogging mislyktes.",
+        });
       setPassword("");
     } catch (cause) {
       setError(
-        cause instanceof Error ? cause.message : "Innlogging mislyktes.",
+        failureMessage(cause, "auth.email_sign_in", "Innlogging mislyktes."),
       );
     } finally {
       submitting.current = false;
@@ -282,7 +294,7 @@ export function HouseholdSetup() {
         });
     } catch (cause) {
       setError(
-        cause instanceof Error ? cause.message : "Kunne ikke lagre husstanden.",
+        failureMessage(cause, "household.join", "Kunne ikke lagre husstanden."),
       );
     } finally {
       setBusy(false);

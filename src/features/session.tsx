@@ -50,6 +50,7 @@ import { CatalogQueryProvider } from "./catalog-query-provider";
 import { NavigationQueryProvider } from "./navigation-query-provider";
 import { SignIn, HouseholdSetup } from "./sign-in";
 import { SessionContext } from "./household-context";
+import { UserError } from "@/lib/user-errors";
 
 const emptyQueue: LocalReceipt[] = [];
 
@@ -307,7 +308,10 @@ function HouseholdProvider({
         retryFailedUploads,
         regroup: (id, selected) => {
           if (drainQueue.isRunning())
-            throw new Error("Vent til opplastingsforsøket er ferdig.");
+            throw new UserError({
+              code: "REJECTED",
+              message: "Vent til opplastingsforsøket er ferdig.",
+            });
           regroupQueuedReceipt(owner, household.id, id, selected);
         },
       }}

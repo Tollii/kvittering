@@ -18,6 +18,8 @@ import { useConvex, useQuery, type ConvexReactClient } from "convex/react";
 import { api } from "../../convex/_generated/api";
 import { Button, Copy, Notice } from "@/components/ui";
 import { useHousehold } from "./household-context";
+import { failureMessage } from "@/lib/failure-message";
+import { UserError } from "@/lib/user-errors";
 
 const tokenKey = "kvitto.push-token";
 
@@ -95,7 +97,10 @@ export function NotificationSettings() {
         setGranted(permission.granted);
 
         if (!permission.granted)
-          throw new Error("Tillat varsler i iPhone-innstillingene.");
+          throw new UserError({
+            code: "REJECTED",
+            message: "Tillat varsler i iPhone-innstillingene.",
+          });
 
         if (Platform.OS === "android")
           await Notifications.setNotificationChannelAsync("default", {
@@ -112,7 +117,11 @@ export function NotificationSettings() {
       }
     } catch (cause) {
       setError(
-        cause instanceof Error ? cause.message : "Kunne ikke endre varsler.",
+        failureMessage(
+          cause,
+          "notifications.toggle",
+          "Kunne ikke endre varsler.",
+        ),
       );
     } finally {
       setBusy(false);

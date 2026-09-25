@@ -7,6 +7,7 @@ import { api } from "../../convex/_generated/api";
 import { Button, Copy, Notice } from "@/components/ui";
 import { MoneyField } from "@/components/money-field";
 import { useHousehold } from "./household-context";
+import { failureMessage } from "@/lib/failure-message";
 
 /** A single monthly number. Forbruk shows pace against it; Sunday's push reports it. */
 export function BudgetSettings() {
@@ -45,7 +46,7 @@ export function BudgetSettings() {
       setGeneration((value) => value + 1);
       setSaved(true);
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "Kunne ikke lagre.");
+      setError(failureMessage(cause, "budget.save", "Kunne ikke lagre."));
     } finally {
       setBusy(false);
     }
