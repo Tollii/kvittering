@@ -1,11 +1,10 @@
-import { DatabaseSync } from "node:sqlite";
 import { expect, it } from "vitest";
 import {
   migrateReceipt,
   ReceiptMigrationError,
   migrateReceiptDatabase,
-  type ReceiptDatabase,
 } from "./receipt-migrations";
+import { sqliteDatabase } from "./testing/sqlite";
 
 const legacy = {
   id: "capture",
@@ -19,31 +18,10 @@ const legacy = {
 };
 
 function database() {
-  const db = new DatabaseSync(":memory:");
+  const { db, adapter } = sqliteDatabase();
   db.exec(
     "CREATE TABLE receipt_queue(id TEXT PRIMARY KEY, data TEXT NOT NULL)",
   );
-
-  const adapter: ReceiptDatabase = {
-    execSync: (sql) => db.exec(sql),
-    // SAFETY: This adapter implements the SQLite generic row contract; each caller owns its SELECT columns.
-    getFirstSync: <T>(sql: string) =>
-      (db.prepare(sql).get() as T | undefined) ?? null,
-    // SAFETY: Each test query selects the fields declared by its row type.
-    getAllSync: <T>(sql: string) => db.prepare(sql).all() as T[],
-    runSync: (sql, ...values) => db.prepare(sql).run(...values),
-    withTransactionSync: (operation) => {
-      db.exec("BEGIN");
-
-      try {
-        operation();
-        db.exec("COMMIT");
-      } catch (error) {
-        db.exec("ROLLBACK");
-        throw error;
-      }
-    },
-  };
 
   return { db, adapter };
 }
