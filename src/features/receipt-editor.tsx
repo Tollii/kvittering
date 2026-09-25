@@ -1,7 +1,6 @@
 import { isDecidedCategory } from "@/lib/domain/categories";
 import { isReceiptProcessing } from "@/lib/domain/receipt-state";
 import { releaseMutation } from "@/lib/releases/requests";
-import { useDraftNavigation } from "./receipt-draft-navigation";
 import { useRef, useState, type ReactNode, type ComponentProps } from "react";
 import {
   ActivityIndicator,
@@ -128,7 +127,6 @@ export function ReceiptEditor({
 
   const [summaryLines, setSummaryLines] = useState(false);
   const [sheet, setSheet] = useState<"fields" | "actions" | null>(null);
-  useDraftNavigation(draft, () => dispatch({ type: "discard" }));
 
   const processing = isReceiptProcessing(receipt.status);
 

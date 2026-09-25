@@ -11,7 +11,7 @@ import { ReceiptDraftController } from "@/lib/receipt-draft-controller";
 import { Notice, Screen } from "@/components/ui";
 import { useHousehold } from "./household-context";
 import { ReceiptEditor } from "./receipt-editor";
-import { ReceiptRenderBoundary } from "./receipt-render-boundary";
+import { ReceiptDraftBoundary } from "./receipt-draft-boundary";
 import { receiptDraftDiagnostics } from "@/lib/receipt-diagnostics";
 import { recordEvent } from "@/lib/observability";
 
@@ -79,11 +79,10 @@ function ScopedReceiptEditor({
     );
 
   return (
-    <ReceiptRenderBoundary
-      diagnostics={receiptDraftDiagnostics(
-        props.receipt.revision,
-        snapshot.draft,
-      )}
+    <ReceiptDraftBoundary
+      incomingRevision={props.receipt.revision}
+      draft={snapshot.draft}
+      dispatch={controller.dispatch}
     >
       <ReceiptEditor
         {...props}
@@ -91,6 +90,6 @@ function ScopedReceiptEditor({
         dispatch={controller.dispatch}
         storageError={snapshot.storageError}
       />
-    </ReceiptRenderBoundary>
+    </ReceiptDraftBoundary>
   );
 }
