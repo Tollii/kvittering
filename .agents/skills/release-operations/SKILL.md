@@ -15,6 +15,8 @@ Confirm the effective Convex target from command selectors, environment-file sel
 
 Identify the exact source revision and included uncommitted changes. A GitHub workflow builds its selected remote ref, not local edits. For an existing build, inspect that build's revision, profile, platform, and completion state. Prepare the selected operation and required checks before seeking any missing authorization; do not ask again for an already authorized target and scope.
 
+Always build TestFlight from `main`. Merge the approved PR after its required checks pass, fetch `origin/main`, and use a clean checkout of that exact commit. Verify that the checkout matches `origin/main` before running `npm run testflight`. Do not build TestFlight from a feature branch or an unmerged revision.
+
 ## Publish and verify
 
 1. Use the repository checks described in [README](../../../README.md#checks). Follow the reviewed migration sequence when persisted data changes; use [migration rehearsal](../convex-migrate-rehearse/SKILL.md) if the sequence is not yet verified.
