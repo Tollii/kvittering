@@ -163,11 +163,13 @@ export const send = internalAction({
 /**
  * A plain notification that is not about one receipt, such as the weekly digest.
  * It retries like `send`: a digest is sent once a week, so a transient failure
- * would otherwise drop it. `attempt` is optional for jobs scheduled before it existed.
+ * would otherwise drop it. A retry is skipped once the device has moved to another
+ * household. `householdId` and `attempt` are optional for jobs scheduled before they existed.
  */
 export const sendMessage = internalAction({
   args: {
     subscriptionId: v.id("deviceSubscriptions"),
+    householdId: v.optional(v.id("households")),
     title: v.string(),
     body: v.string(),
     attempt: v.optional(v.number()),
@@ -179,7 +181,11 @@ export const sendMessage = internalAction({
       { id: args.subscriptionId },
     );
 
-    if (!subscription) return null;
+    if (
+      !subscription ||
+      (args.householdId && subscription.householdId !== args.householdId)
+    )
+      return null;
 
     const attempt = args.attempt ?? 0;
 

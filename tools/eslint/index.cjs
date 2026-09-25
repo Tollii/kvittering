@@ -209,7 +209,9 @@ module.exports = {
           CatchClause(node) {
             const used = sourceCode
               .getDeclaredVariables(node)
-              .some((variable) => variable.references.length > 0);
+              .some((variable) =>
+                variable.references.some((reference) => reference.isRead()),
+              );
 
             const explained = sourceCode
               .getCommentsInside(node.body)
@@ -217,7 +219,10 @@ module.exports = {
                 (comment) =>
                   comment.range[0] <
                     (node.body.body[0]?.range[0] ?? Infinity) &&
-                  comment.value.trim().startsWith("Handled:"),
+                  comment.value
+                    .replace(/^\*+/, "")
+                    .trim()
+                    .startsWith("Handled:"),
               );
 
             if (!used && !explained)
@@ -255,10 +260,14 @@ module.exports = {
 
             const [first] = node.arguments;
 
-            if (
-              first?.type !== "Literal" ||
-              !eventName.test(String(first.value))
-            )
+            const name =
+              first?.type === "TemplateLiteral" && !first.expressions.length
+                ? first.quasis[0].value.cooked
+                : first?.type === "Literal"
+                  ? String(first.value)
+                  : null;
+
+            if (name === null || !eventName.test(name))
               context.report({ node: first ?? node, messageId: "event" });
           },
         };
