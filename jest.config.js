@@ -13,8 +13,12 @@ module.exports = {
   coveragePathIgnorePatterns: ["/node_modules/", "\\.test\\.tsx?$"],
   coverageReporters: ["text-summary", "lcov", "json-summary"],
   // Exercise the real receipt validators and Sentry React capture pipeline.
+  // expo-router reaches the ESM-only decode-uri-component through query-string.
   transformIgnorePatterns: expoPreset.transformIgnorePatterns.map((pattern) =>
-    pattern.replace("(?!(", "(?!(convex-helpers|@sentry/|"),
+    pattern.replace(
+      "(?!(",
+      "(?!(convex-helpers|@sentry/|decode-uri-component|",
+    ),
   ),
   // Metro applies babel-preset-expo without a project Babel file; Jest needs it named.
   transform: {

@@ -88,6 +88,7 @@
     "knip": "^6.38.0",
     "orval": "^8.36.0",
     "oxlint": "1.85.0",
+    "patch-package": "^8.0.1",
     "prettier": "^3.9.8",
     "react-dom": "19.2.3",
     "react-test-renderer": "19.2.3",
@@ -97,6 +98,7 @@
     "vitest": "^5.0.1"
   },
   "scripts": {
+    "postinstall": "patch-package",
     "start": "expo start",
     "android": "expo run:android",
     "ios": "expo run:ios",
@@ -135,7 +137,8 @@
   "overrides": {
     "better-auth": {
       "vitest": "$vitest"
-    }
+    },
+    "decode-uri-component": "^0.5.0"
   },
   "expo": {
     "install": {
