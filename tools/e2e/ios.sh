@@ -29,7 +29,14 @@ echo "▸ Starting a local Convex backend"
 # cores leave the app's first queries short of that, so allow ten locally.
 DATABASE_UDF_USER_TIMEOUT_SECONDS=10 CONVEX_AGENT_MODE=anonymous npx convex dev --typecheck disable >"$out/convex.log" 2>&1 &
 convex_pid=$!
-trap 'kill "$convex_pid" 2>/dev/null || true' EXIT
+push_service_plist=""
+cleanup() {
+  kill "$convex_pid" 2>/dev/null || true
+  if [[ -n "$push_service_plist" ]]; then
+    xcrun simctl spawn "$device" launchctl bootstrap user/foreground "$push_service_plist"
+  fi
+}
+trap cleanup EXIT
 
 # The first boot of a fresh simulator takes minutes; let it run meanwhile.
 # E2E_DEVICE: a simulator the caller already started booting.
@@ -95,6 +102,16 @@ fi
 
 echo "▸ Waiting for the simulator"
 xcrun simctl bootstatus "$device" -b >/dev/null
+# APNs can reconnect continuously in CI, adding unrelated background work.
+# These flows test receipt UI, not remote push delivery. Unload
+# the service only for this run; cleanup restores its original registration.
+if xcrun simctl spawn "$device" launchctl print user/foreground/com.apple.apsd >/dev/null 2>&1; then
+  runtime_root="$(xcrun simctl getenv "$device" SIMULATOR_ROOT)"
+  service_plist="$runtime_root/System/Library/LaunchDaemons/com.apple.apsd.plist"
+  test -f "$service_plist"
+  xcrun simctl spawn "$device" launchctl bootout user/foreground/com.apple.apsd
+  push_service_plist="$service_plist"
+fi
 # The system's strong-password sheet can intercept test input. Keep this
 # preference on the test simulator; the app retains password autofill support.
 xcrun simctl spawn "$device" defaults write com.apple.WebUI AutoFillPasswords -int 0
