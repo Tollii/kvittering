@@ -36,6 +36,7 @@ import {
   pressed,
 } from "@/components/ui";
 import { ReceiptLineEditor } from "@/features/receipt-line-editor";
+import { ReceiptCategorySpending } from "@/features/receipt-category-spending";
 import { ReceiptFields } from "@/features/receipt-fields";
 import {
   PurchaseTotals,
@@ -511,6 +512,7 @@ export function ReceiptEditor({
             style={{ gap: 12 }}
           >
             <PurchaseTotals data={data} totals={totals} />
+            <ReceiptCategorySpending data={data} />
             {receipt.status !== "reviewed" && productLines.length > 0 && (
               <Segments
                 value={allLines ? "all" : "review"}
