@@ -13,6 +13,8 @@ module.exports = {
         messages: {
           operation:
             "Use the CalendarDate and CalendarMonth operations instead of string methods or interpolation; they parse, clamp, and shift dates correctly.",
+          construction:
+            'Use CalendarDate.today() or CalendarDate.ofInstant() instead of formatting a date as "sv-SE"; that format is the ISO-date trick CalendarDate owns.',
         },
       },
       create(context) {
@@ -34,7 +36,32 @@ module.exports = {
           );
         }
 
+        // "sv-SE" writes dates as "YYYY-MM-DD", so it only ever builds a date string.
+        function isSwedishFormat(node) {
+          const [locale] = node.arguments;
+
+          return locale?.type === "Literal" && locale.value === "sv-SE";
+        }
+
         return {
+          CallExpression(node) {
+            if (
+              node.callee.type === "MemberExpression" &&
+              node.callee.property.type === "Identifier" &&
+              node.callee.property.name === "toLocaleDateString" &&
+              isSwedishFormat(node)
+            )
+              context.report({ node, messageId: "construction" });
+          },
+          NewExpression(node) {
+            if (
+              node.callee.type === "MemberExpression" &&
+              node.callee.property.type === "Identifier" &&
+              node.callee.property.name === "DateTimeFormat" &&
+              isSwedishFormat(node)
+            )
+              context.report({ node, messageId: "construction" });
+          },
           MemberExpression(node) {
             if (
               node.property.type === "Identifier" &&
