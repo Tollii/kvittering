@@ -19,6 +19,12 @@ For example, prefer `Preserve receipt drafts when the app restarts` to `Refactor
 
 Open the description with a simple explanation of the problem from the user's original request. Then explain the solution briefly. Include relevant validation and material limitations. Describe the final change; omit abandoned approaches and an inventory of implementation details.
 
+For an interface feature or visual fix, include screenshots from the running app in the PR description. Use a short screen recording when navigation, gestures, or state changes are needed to show the result. Choose the smallest set that lets a reviewer understand and check the changed behavior. Use before-and-after views when the comparison is useful; do not recreate a before view from memory.
+
+Capture the final tested revision with synthetic or approved demonstration data. Add short captions that state what each image or recording proves, including the simulator or device and relevant appearance or text-size settings. Attach the files to GitHub, embed the returned asset links in the description, and verify that they render or play. Local file paths do not work for other reviewers. If upload is unavailable, link to accessible test artifacts and state the limitation; do not report a local capture as attached evidence.
+
+For changes that have no useful visual result, give concise execution evidence instead. Add a small diagram or code sketch only when it explains a non-obvious behavior or data flow. Describe material release, compatibility, or recovery risks in plain language. Keep the description proportional to the change rather than filling a fixed template. This evidence guidance is inspired by [Matt Pocock's PR skill](https://github.com/mattpocock/skills/blob/main/skills/in-progress/pr/SKILL.md).
+
 End the description with the actual model and harness used for the change, for example `Created with <model> in <harness>.` Do not invent a model identifier if it is unavailable.
 
 Use a structured tool argument for the description, or write it to a temporary file and pass `gh pr create --body-file <path>`. Open a real PR, not a draft, so review bots run. In Codex, attach the created or updated PR to the task with the artifact tool when available.
