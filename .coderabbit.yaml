@@ -62,4 +62,4 @@ knowledge_base:
     filePatterns:
       - AGENTS.md
       - docs/principles.md
-      - docs/quality.md
+      - docs/architecture.md
