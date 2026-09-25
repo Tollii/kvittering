@@ -73,16 +73,10 @@ jobs:
         if: inputs.operation == 'build-and-submit'
         run: npm run check
 
-      - name: Deploy staging backend
-        if: inputs.operation == 'build-and-submit'
+      - name: Check staging release readiness
         env:
           CONVEX_DEPLOY_KEY: ${{ secrets.CONVEX_STAGING_DEPLOY_KEY }}
-        run: |
-          if [[ "$CONVEX_DEPLOY_KEY" != 'prod:courteous-jay-215|'* ]]; then
-            echo "::error::Set CONVEX_STAGING_DEPLOY_KEY to a deploy key for staging (courteous-jay-215)."
-            exit 1
-          fi
-          npx convex deploy
+        run: npm run release:check
 
       - name: Build iOS app
         id: build

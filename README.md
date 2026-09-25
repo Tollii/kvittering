@@ -59,6 +59,11 @@ The simulator has no receipt camera. Import an image into its photo library, the
 
 The local staging command uses `.env.staging.local`, which is ignored by Git. To set up another development machine, create a staging deploy key for the deployment selected from `eas.json`, using the installed Convex CLI's `deployment token create --help`. Save it to that file; leave `.env.local` for personal development. GitHub Actions needs its own key in `CONVEX_STAGING_DEPLOY_KEY`.
 
+Deploy the backend separately using an explicit stage and reviewed revision in
+[release operations](.agents/skills/release-operations/SKILL.md#enforced-release-checks).
+TestFlight and OTA commands check staging readiness before publishing the client;
+they do not deploy the backend.
+
 Configure provider credentials in the selected Convex deployment. Required names and model defaults are read by [providers](convex/providers.ts), [authentication](convex/auth.ts), and the affected integration. Keep them out of `EXPO_PUBLIC_*` variables. Use separate provider accounts/projects and keys for development and staging where possible; separate keys in one account can still share billing or quota.
 
 For push, configure Apple credentials and use a signed physical iPhone. For Apple sign-in, widgets, or ActivityKit setup, follow the native capability checks in [release operations](.agents/skills/release-operations/SKILL.md#native-capabilities). Expo Go cannot verify these integrations.
@@ -75,6 +80,9 @@ For push, configure Apple credentials and use a signed physical iPhone. For Appl
 Do not copy constants, enabled rules, event catalogs, or feature inventories into documentation. Explain a constraint or procedure only when the code does not make it clear.
 
 ## Checks
+
+Merging requires `CI result`, `E2E result`, and an independent approving review.
+See [merge requirements](docs/verification.md#merge-requirements-and-repository-settings).
 
 Use `npm run check:changed` during code development, `npm run check` before committing code, and `npm run check:ci` when tests or coverage configuration change. Fix findings without baselines or broad suppressions. Use `npm run lint:docs` for documentation references. See [verification](docs/verification.md) for the current CI and native-test procedures. After a Convex signature change, run `npm run contract:update` and review the resulting contract diff. Commands and tool configuration remain the source of truth for what each check runs.
 

@@ -1,7 +1,7 @@
 # Verification
 
-A green `CI result` should mean the change can merge. This guide describes the
-checks behind that result, how to run them yourself, and how to add a check
+A merge requires `CI result`, `E2E result`, and an independent approving review.
+This guide describes the checks behind those results, how to run them yourself, and how to add a check
 when you add behavior. It applies to people and agents alike.
 
 ## Run the checks
@@ -57,9 +57,11 @@ uses iOS 27.0 and Xcode 27.0 on GitHub's `xcode-27` preview runner. The build
 cache includes the native fingerprint, Xcode build, architecture, and simulator
 runtime; a JavaScript-only change reuses it. The script creates or reuses the
 dedicated `Kvitto End-to-End` simulator and fails if the requested runtime is
-unavailable. While
-the repository is private, it runs for changed flows, the `e2e` label, or a
-manual dispatch. Once public, it also runs for native changes and nightly.
+unavailable. It runs for native configuration, authentication, receipt data,
+drafts, queues, migrations, release controls, and changed flows, including
+deletions. A required aggregate job verifies that the selected native flows actually passed.
+The `e2e` label and manual dispatch select it for other changes. Public
+repositories also run nightly. Removing the label cannot skip a required flow.
 
 The test script disables password autofill on its selected simulator before
 launching the app. The system's strong-password sheet can otherwise intercept
@@ -161,13 +163,40 @@ to confirm that code was deleted.
 - Keep documentation references current; `npm run lint:docs` rejects links to
   missing files and headings and unknown `npm run` scripts.
 
-## Repository settings
+## Merge requirements and repository settings
 
-These GitHub settings make the checks binding. They are not stored in the
-repository:
+Require both `CI result` and `E2E result`. The latter runs after native verification
+and fails if selection failed, a required native job was skipped, or the native
+job failed or was cancelled. Unrelated changes pass without running the simulator.
+Both workflows support merge groups as well as pull requests. GitHub associates
+results with their commit; preserve strict up-to-date branch protection.
 
-- A branch ruleset for `main` that requires the `CI result` status check and
-  pull requests before merging.
-- The merge queue for `main`, so each change is tested with the changes merged
-  before it. The quality workflow already runs on `merge_group`.
-- The `breaking-contract` and `e2e` labels.
+Also require one independent approving review, dismiss stale approvals after
+new commits, and require conversation resolution. Enable CodeRabbit's
+`request_changes_workflow` so it requests changes for findings and approves only
+after the latest commit has been reviewed, required threads are resolved, and
+its pre-merge checks pass. A rate-limited or incomplete review cannot produce
+this automatic approval. An authorized independent human review can also meet
+GitHub's review requirement.
+
+Keep GitHub Actions approval disabled (`can_approve_pull_request_reviews: false`)
+and default workflow permissions read-only. Binding a status name to the GitHub
+Actions app does not identify the workflow that produced it: a same-repository
+PR workflow can request check-write permission. GitHub's separate review
+requirement prevents that workflow from supplying its own approval. Repository
+administrators and independently authorized reviewers remain trusted actors.
+
+Never use `@coderabbitai approve` or top-level `@coderabbitai resolve` to complete
+agent work. Those commands are explicit overrides and can bypass CodeRabbit's
+review-completion requirements. Reply to individual findings with evidence,
+resolve their threads after addressing them, and request `@coderabbitai review`
+when capacity is available. Do not weaken review filters to obtain approval.
+See [CodeRabbit's approval rules](https://docs.coderabbit.ai/pr-reviews/request-changes-workflow)
+and [GitHub's workflow approval policy](https://github.blog/changelog/2022-01-14-github-actions-prevent-github-actions-from-approving-pull-requests/).
+
+Activate these repository settings after the new checks and CodeRabbit approval
+are verified. Require `CI result` and `E2E result` from the GitHub Actions app
+(ID 15368), retain strict up-to-date checks and administrator enforcement, and
+set the required approving review count to one. These settings are external to
+the repository. The `breaking-contract` and `e2e` labels remain available;
+neither label bypasses approval or permits release operations.

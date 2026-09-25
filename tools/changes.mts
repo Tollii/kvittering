@@ -27,7 +27,7 @@ export function mergeBase(): string {
 /** Paths changed since `base`, including deletions, uncommitted and untracked files. */
 export function changedFiles(base: string): string[] {
   return [
-    ...git(["diff", "--name-only", base]),
+    ...git(["diff", "--no-renames", "--name-only", base]),
     ...git(["ls-files", "--others", "--exclude-standard"]),
   ].filter((path, index, all) => all.indexOf(path) === index);
 }

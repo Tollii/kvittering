@@ -4,13 +4,14 @@ name: End-to-end
 # simulator app is cached by native fingerprint, so a JavaScript-only change
 # reuses the build and only re-embeds its bundle.
 #
-# While the repository is private, macOS minutes are billed, so the job runs
-# automatically only for changes to the flows themselves or with the `e2e`
-# label. Once public, it also runs for native changes and nightly on main.
+# Native, authentication, durable-data, and release changes require these flows.
+# Other changes can select them with the `e2e` label. Public repositories also
+# run nightly on main.
 # Agents and people can start it for any branch with workflow_dispatch.
 on:
   pull_request:
-    types: [opened, synchronize, reopened, labeled]
+    types: [opened, synchronize, reopened, labeled, unlabeled]
+  merge_group:
   schedule:
     - cron: "0 3 * * *"
   workflow_dispatch:
@@ -37,32 +38,14 @@ jobs:
       - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6.5.0
         with:
           node-version: 24
-      - name: List change areas
-        id: areas
-        if: github.event_name == 'pull_request'
-        env:
-          BASE: ${{ github.event.pull_request.base.sha }}
-        run: node tools/presubmit.mts "$BASE"
-      - name: Decide
+      - name: Select required flows
         id: decide
         env:
           EVENT: ${{ github.event_name }}
           PRIVATE: ${{ github.event.repository.private }}
           LABELLED: ${{ contains(github.event.pull_request.labels.*.name, 'e2e') }}
-          NATIVE: ${{ steps.areas.outputs.native }}
-          FLOWS: ${{ steps.areas.outputs.e2e }}
-        run: |
-          run=false
-          case "$EVENT" in
-            workflow_dispatch) run=true ;;
-            schedule) [[ "$PRIVATE" == "false" ]] && run=true ;;
-            pull_request)
-              if [[ "$LABELLED" == "true" || "$FLOWS" == "true" ]]; then run=true; fi
-              if [[ "$PRIVATE" == "false" && "$NATIVE" == "true" ]]; then run=true; fi
-              ;;
-          esac
-          echo "run=$run" >> "$GITHUB_OUTPUT"
-          echo "End-to-end run: $run ($EVENT)" >> "$GITHUB_STEP_SUMMARY"
+          BASE: ${{ github.event.pull_request.base.sha || github.event.merge_group.base_sha }}
+        run: node tools/select-e2e.mts
 
   ios:
     name: iOS Simulator flows
@@ -163,3 +146,23 @@ jobs:
           path: build/e2e/
           if-no-files-found: ignore
           retention-days: 14
+
+  result:
+    name: E2E result
+    if: always()
+    needs: [scope, ios]
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6.5.0
+        with:
+          node-version: 24
+      - name: Require the selected native verification
+        env:
+          SCOPE_RESULT: ${{ needs.scope.result }}
+          NATIVE_REQUIRED: ${{ needs.scope.outputs.run }}
+          NATIVE_RESULT: ${{ needs.ios.result }}
+        run: node tools/check-native-result.mts

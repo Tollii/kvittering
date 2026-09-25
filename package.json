@@ -104,11 +104,11 @@
     "typecheck": "tsc --noEmit && tsc --noEmit -p convex && tsc --noEmit -p tools/tsconfig.json",
     "test": "vitest run",
     "backend": "convex dev",
-    "backend:staging": "convex deploy --env-file .env.staging.local",
+    "backend:staging": "node tools/release.mts backend",
     "ios:build": "expo run:ios",
-    "testflight": "npm run backend:staging && npx eas-cli@latest build --platform ios --profile testflight --auto-submit",
+    "testflight": "npm run release:check && npx eas-cli@24.7.0 build --platform ios --profile testflight --auto-submit",
     "generate:catalog": "orval",
-    "update:testflight": "npm run backend:staging && npx eas-cli@24.7.0 update --channel testflight --environment preview --platform ios",
+    "update:testflight": "npm run release:check && npx eas-cli@24.7.0 update --channel testflight --environment preview --platform ios",
     "postupdate:testflight": "npm run sentry:sourcemaps",
     "sentry:sourcemaps": "sentry-expo-upload-sourcemaps dist",
     "lint:oxlint": "oxlint --deny-warnings",
@@ -128,7 +128,8 @@
     "format": "prettier --write . && oxlint --config oxlint.policy.config.mjs --allow all --deny anti-slop/require-readable-spacing --fix",
     "format:check": "prettier --check .",
     "lint:docs": "node tools/check-docs.mts",
-    "test:components": "jest"
+    "test:components": "jest",
+    "release:check": "node tools/release.mts client"
   },
   "private": true,
   "overrides": {

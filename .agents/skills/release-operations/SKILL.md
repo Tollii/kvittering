@@ -49,4 +49,38 @@ When a release introduces the receipt read model to an existing deployment, depl
 
 For the initial rollout, deploy the additive read model while retaining eight-image admission, run its backfill, and distribute the client that can recover rejected six-to-eight-image queues. Enforce five-image admission only after that recovery client is available. Existing server reservations keep their persisted capacity; unreserved older queues require explicit user regrouping without loss of images.
 
-The combined source revision needs staged backend deployment. The ordinary TestFlight and OTA commands deploy their selected backend before publishing the client, so do not run them on the combined revision for this initial transition. Select the reviewed compatible revisions and verify pending uploads on installed binaries. See the [implementation record](../../../plans/application-risk-review/implementation.md) for the outstanding release checks and correction-history cleanup.
+The combined source revision needs staged backend deployment. TestFlight and OTA commands check staging readiness but do not deploy a backend. Use the explicit backend stages below. Select the reviewed compatible revisions and verify pending uploads on installed binaries. See the [implementation record](../../../plans/application-risk-review/implementation.md) for the outstanding release checks and correction-history cleanup.
+
+
+## Enforced release checks
+
+Local and GitHub release commands run `npm run release:check` before building,
+publishing an OTA, or submitting an existing build. It reads only the receipt
+read-model readiness flag on staging and fails if the backfill is incomplete,
+missing, or cannot be read. Release from a clean, committed checkout. This check
+does not establish native runtime compatibility or authorize publication.
+
+Backend deployment is separate:
+
+- `npm run backend:staging -- --stage additive` accepts only source retaining
+  eight-image admission. Prepare the reviewed additive revision before initial
+  deployment; the combined five-image source is refused.
+- `npm run backend:staging -- --stage enforcement` accepts five-image source
+  only after a live backfill check and a reviewed recovery-client record in
+  [staging release evidence](../../../releases/staging.json).
+
+The record starts without a recovery client, so enforcement is blocked. Once
+Apple makes the recovery build available, record its native `build`, full
+`sourceCommit`, UTC `verifiedAt`, `verifiedBy`, and App Store Connect `evidence`
+URL inside `recoveryClient`. Set `availableToTesters` and
+`pendingUploadUpgradePassed` only after checking tester access and upgrading an
+old installation with pending uploads. Keep the deployment identifier. Review
+and commit this evidence; clear it if access is withdrawn. Build completion,
+upload success, CI, and a source review do not prove availability.
+
+[The release command](../../../tools/release.mts) validates the selected staging
+key and rejects conflicting selectors or credential sources. The installed CLI
+gives a deployment-specific key precedence over `.env.local`; the command passes
+it only through the child environment. Do not print credentials. Raw provider
+CLIs remain operator tools, so these checks do not replace credential access
+controls. Ordinary code work must not require deployment credentials.
