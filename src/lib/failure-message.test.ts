@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import * as Sentry from "@sentry/react-native";
+import { ConvexError } from "convex/values";
 import { userError } from "../../convex/userErrors";
 import { failureMessage } from "./failure-message";
 
@@ -50,5 +51,14 @@ describe("failure message", () => {
         fallback,
       ),
     ).toBe(fallback);
+  });
+
+  it("shows a quota message the backend sends as plain error data", () => {
+    const message = "Tjenestens bruksgrense er nådd. Prøv igjen senere.";
+
+    expect(
+      failureMessage(new ConvexError(message), "receipt.retry", fallback),
+    ).toBe(message);
+    expect(Sentry.captureException).not.toHaveBeenCalled();
   });
 });
