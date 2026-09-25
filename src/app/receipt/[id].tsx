@@ -5,11 +5,16 @@ import { useReceiptDetail } from "@/features/receipt-queries";
 import { Button, Copy, Icon, Loading, Screen } from "@/components/ui";
 import { useHousehold } from "@/features/household-context";
 import { ReceiptEditorSession } from "@/features/receipt-editor-session";
+import { ReceiptRenderBoundary } from "@/features/receipt-render-boundary";
 
 export default function ReceiptPage() {
   const { id } = useLocalSearchParams<{ id: string }>();
 
-  return <ReceiptDetail key={id} id={id} />;
+  return (
+    <ReceiptRenderBoundary key={id}>
+      <ReceiptDetail id={id} />
+    </ReceiptRenderBoundary>
+  );
 }
 
 function ReceiptDetail({ id }: Readonly<{ id: string }>) {

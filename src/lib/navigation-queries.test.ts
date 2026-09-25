@@ -18,6 +18,16 @@ import {
   useReceiptDetail,
 } from "../features/receipt-queries";
 import { useProductLinkingQueue } from "../features/product-linking-queue";
+import * as Sentry from "@sentry/react-native";
+
+// oxlint-disable-next-line anti-slop/no-module-mocking -- Replace the native telemetry transport while exercising the real query hooks.
+vi.mock("@sentry/react-native", () => ({
+  addBreadcrumb: vi.fn<typeof Sentry.addBreadcrumb>(),
+  logger: {
+    info: vi.fn<typeof Sentry.logger.info>(),
+    warn: vi.fn<typeof Sentry.logger.warn>(),
+  },
+}));
 
 const navigation = vi.hoisted(() => ({ focused: true, authenticated: true }));
 

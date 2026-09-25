@@ -11,6 +11,9 @@ import { ReceiptDraftController } from "@/lib/receipt-draft-controller";
 import { Notice, Screen } from "@/components/ui";
 import { useHousehold } from "./household-context";
 import { ReceiptEditor } from "./receipt-editor";
+import { ReceiptRenderBoundary } from "./receipt-render-boundary";
+import { receiptDraftDiagnostics } from "@/lib/receipt-diagnostics";
+import { recordEvent } from "@/lib/observability";
 
 let draftDatabase: ReturnType<typeof openDatabaseSync> | undefined;
 
@@ -59,8 +62,13 @@ function ScopedReceiptEditor({
   useEffect(() => {
     const current = controller.read();
 
-    if (current.kind === "ready" && current.draft.remote !== props.receipt)
+    if (current.kind === "ready" && current.draft.remote !== props.receipt) {
+      recordEvent(
+        "receipt.snapshot_received",
+        receiptDraftDiagnostics(props.receipt.revision, current.draft),
+      );
       controller.dispatch({ type: "remote", receipt: props.receipt });
+    }
   }, [controller, props.receipt]);
 
   if (snapshot.kind === "blocked")
@@ -71,11 +79,18 @@ function ScopedReceiptEditor({
     );
 
   return (
-    <ReceiptEditor
-      {...props}
-      draft={snapshot.draft}
-      dispatch={controller.dispatch}
-      storageError={snapshot.storageError}
-    />
+    <ReceiptRenderBoundary
+      diagnostics={receiptDraftDiagnostics(
+        props.receipt.revision,
+        snapshot.draft,
+      )}
+    >
+      <ReceiptEditor
+        {...props}
+        draft={snapshot.draft}
+        dispatch={controller.dispatch}
+        storageError={snapshot.storageError}
+      />
+    </ReceiptRenderBoundary>
   );
 }

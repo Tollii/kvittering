@@ -19,6 +19,13 @@ export type DiagnosticFields = {
   phase?: string;
   updatesEnabled?: boolean;
   development?: boolean;
+  screen?: string;
+  active?: boolean;
+  online?: boolean;
+  incomingRevision?: number;
+  remoteRevision?: number;
+  baselineRevision?: number;
+  dirty?: boolean;
 };
 
 const errorCodeSchema = z
