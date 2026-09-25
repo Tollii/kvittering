@@ -3,7 +3,6 @@
   "include": ["**/*.ts", "**/*.tsx", "**/*.mts", "expo-env.d.ts"],
   "exclude": [
     "node_modules",
-    "sveltemo",
     "tools/oxlint/anti-slop",
     ".agents",
     ".codex",

@@ -12,7 +12,6 @@ module.exports = defineConfig([
   expo,
   {
     ignores: [
-      "sveltemo/**",
       "convex/_generated/**",
       "convex/kassalapp/generated/**",
       "tools/oxlint/anti-slop/**",

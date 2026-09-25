@@ -11,7 +11,6 @@ import { z } from "zod";
 // Vendored, archived, and generated documents are not maintained here.
 const excluded = [
   "tools/oxlint/anti-slop/",
-  "sveltemo/",
   "plans/simplification-review/",
   "convex/_generated/",
 ];

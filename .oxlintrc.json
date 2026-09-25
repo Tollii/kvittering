@@ -21,7 +21,6 @@
     ".expo/**",
     "dist/**",
     "coverage/**",
-    "sveltemo/**",
     "plans/**"
   ]
 }
