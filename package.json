@@ -79,7 +79,7 @@
     "@vitest/coverage-v8": "5.0.1",
     "babel-jest": "^29.7.0",
     "convex-test": "^0.0.59",
-    "eslint": "^9.39.5",
+    "eslint": "^10.11.0",
     "eslint-config-expo": "^57.0.2",
     "eslint-plugin-sonarjs": "4.2.1",
     "happy-dom": "^20.14.5",
