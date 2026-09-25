@@ -2,7 +2,7 @@ name: Code quality
 
 # Every job below is required through `CI result`, except the advisory reports
 # (mutation and changed-line coverage). Require both `CI result` and the
-# separate `E2E result` check plus an approving review; see docs/verification.md.
+# separate `E2E result` check plus resolved conversations; see docs/verification.md.
 on:
   pull_request:
     types: [opened, synchronize, reopened, labeled, unlabeled]
