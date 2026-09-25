@@ -38,24 +38,24 @@ vi.mock(
   }),
 );
 
-it("accepts five selected images and rejects six without losing the selected inputs", async () => {
-  const files = Array.from({ length: 5 }, (_, index) => ({
+it("accepts eight selected images and rejects nine without losing the selected inputs", async () => {
+  const files = Array.from({ length: 8 }, (_, index) => ({
     uri: `image-${index}`,
     width: 100,
     height: 100,
   }));
 
-  expect(maxReceiptImages).toBe(5);
-  expect((await importReceiptFiles(files)).uris).toHaveLength(5);
+  expect(maxReceiptImages).toBe(8);
+  expect((await importReceiptFiles(files)).uris).toHaveLength(8);
   const originals = structuredClone(files);
   await expect(
     importReceiptFiles(
-      [...files, { uri: "sixth", width: 100, height: 100 }],
+      [...files, { uri: "ninth", width: 100, height: 100 }],
       8,
     ),
-  ).rejects.toThrow("Maks 5");
+  ).rejects.toThrow("Maks 8");
   await expect(importReceiptFiles([present(files[0])], 0)).rejects.toThrow(
-    "Maks 5",
+    "Maks 8",
   );
   expect(files).toEqual(originals);
 });

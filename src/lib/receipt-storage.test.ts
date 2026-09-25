@@ -129,13 +129,13 @@ it("rejects malformed disposable household cache data", () => {
   });
 });
 
-it("rejects a sixth new image before copying files", () => {
+it("rejects a ninth new image before copying files", () => {
   const before = control.copies;
   expect(() =>
     saveLocalReceipts(
       "limit",
       testId<"households">("household"),
-      Array.from({ length: 6 }, (_, index) => `image-${index}`),
+      Array.from({ length: 9 }, (_, index) => `image-${index}`),
       true,
     ),
   ).toThrow("fem");

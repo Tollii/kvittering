@@ -102,22 +102,20 @@ describe("release command effects", () => {
     expect(result.status).toBe(0);
     expect(fixture.calls()).toBe("run\n");
   });
-  it("does not deploy five-image source as an additive release", () => {
-    const fixture = releaseFixture(true);
-    expect(fixture.run(["backend", "--stage", "additive"]).status).not.toBe(0);
-    expect(fixture.calls()).toBe("");
-  });
-  it("blocks deployment until live backfill readiness is true", () => {
+  it("deploys eight-image source as the additive release", () => {
     const fixture = releaseFixture(false);
-    const result = fixture.run(["backend", "--stage", "enforcement"]);
-    expect(result.status).not.toBe(0);
-    expect(result.stderr).toContain("backfill is not ready");
-    expect(fixture.calls()).toBe("run\n");
-  });
-  it("deploys only after evidence and the live readiness check pass", () => {
-    const fixture = releaseFixture(true);
-    const result = fixture.run(["backend", "--stage", "enforcement"]);
+    const result = fixture.run(["backend", "--stage", "additive"]);
     expect(result.status).toBe(0);
-    expect(fixture.calls()).toBe("run\ndeploy\n");
+    expect(fixture.calls()).toBe("deploy\n");
   });
+  it.each([false, true])(
+    "rejects enforcement from eight-image source when readiness is %s",
+    (ready) => {
+      const fixture = releaseFixture(ready);
+      const result = fixture.run(["backend", "--stage", "enforcement"]);
+      expect(result.status).not.toBe(0);
+      expect(result.stderr).toContain("Select --stage additive");
+      expect(fixture.calls()).toBe("");
+    },
+  );
 });

@@ -249,15 +249,14 @@ it("propagates changed aliases in one finite scan and skips unchanged decisions"
   }
 });
 
-it("accepts up to five new images and preserves an existing eight-image reservation", async () => {
+it("accepts up to eight new images and preserves an existing eight-image reservation", async () => {
   const { t, first, householdId } = await setup();
 
   for (const [imageCount, message] of [
     [0, /Ugyldig/],
     [1.5, /Ugyldig/],
     [100, /Ugyldig/],
-    [6, /Maks 5.*Bildene er beholdt/],
-    [8, /Maks 5.*Bildene er beholdt/],
+    [9, /Ugyldig/],
   ] as const)
     await expect(
       first.mutation(api.receipts.reserve, {
@@ -267,7 +266,7 @@ it("accepts up to five new images and preserves an existing eight-image reservat
       }),
     ).rejects.toThrow(message);
 
-  for (const imageCount of [1, 5]) {
+  for (const imageCount of [1, 5, 6, 8]) {
     const id = await first.mutation(api.receipts.reserve, {
       householdId,
       imageCount,
@@ -279,7 +278,7 @@ it("accepts up to five new images and preserves an existing eight-image reservat
     ).toBe(imageCount);
     await expect(
       first.query(internal.receipts.imageAccess, { id, position: imageCount }),
-    ).rejects.toThrow(/Ugyldig|Maks 5/);
+    ).rejects.toThrow(/Ugyldig|Maks 8/);
   }
 
   const id = await t.run((ctx) => {
