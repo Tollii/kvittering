@@ -124,6 +124,7 @@ export function SignIn() {
         // Other responses are English service text; failureMessage reports them.
         throw Object.assign(new Error(result.error.message), result.error);
       }
+
       setPassword("");
     } catch (cause) {
       setError(
