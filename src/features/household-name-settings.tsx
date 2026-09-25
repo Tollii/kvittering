@@ -3,6 +3,7 @@ import { api } from "../../convex/_generated/api";
 import { Button, Field, Notice, Row, Sheet } from "@/components/ui";
 import { useReleaseMutation } from "@/lib/releases/requests";
 import { useHousehold } from "./household-context";
+import { householdNameLimit } from "@/lib/domain/household";
 
 export function HouseholdNameSettings() {
   const { household, online } = useHousehold();
@@ -52,7 +53,7 @@ export function HouseholdNameSettings() {
         <Field
           label="Navn"
           value={draft?.name ?? ""}
-          maxLength={80}
+          maxLength={householdNameLimit}
           editable={!busy}
           onChangeText={(name) =>
             setDraft((current) => (current ? { ...current, name } : null))

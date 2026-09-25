@@ -22,6 +22,9 @@ const nullableNumber = v.union(v.number(), v.null());
 
 const nullableOre = v.union(oreValidator, v.null());
 
+/** Also the product name limit, so any valid receipt line can become a product. */
+export const receiptLineNameLimit = 500;
+
 export const lineKinds = [
   "product",
   "item_discount",
@@ -200,7 +203,7 @@ export function checkReceipt(data: ReceiptData): ReceiptCheck {
       return invalid("Ukjent kategori.");
 
     if (
-      line.name.length > 500 ||
+      line.name.length > receiptLineNameLimit ||
       line.originalText.length > 1500 ||
       line.tags.length > 10
     )

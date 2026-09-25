@@ -1,4 +1,5 @@
 import { userError } from "./userErrors";
+import { householdName, householdNameLimit } from "../src/lib/domain/household";
 import { oreValidator } from "../src/lib/domain/ore";
 import { clientMutation as mutation } from "./clientFunctions";
 import { query } from "./_generated/server";
@@ -63,15 +64,13 @@ export const create = mutation({
 
     if (existing) return existing.householdId;
 
-    if (
-      args.name.trim().length < 1 ||
-      args.name.length > 80 ||
-      !/^[a-f0-9]{32}$/.test(args.invitation)
-    )
+    const name = householdName(args.name);
+
+    if (!name || !/^[a-f0-9]{32}$/.test(args.invitation))
       throw userError("Ugyldig navn eller invitasjon.");
 
     const householdId = await ctx.db.insert("households", {
-      name: args.name.trim(),
+      name,
       invitation: args.invitation,
     });
 
@@ -155,9 +154,9 @@ export const rename = mutation({
   handler: async (ctx, args) => {
     const member = await requireMember(ctx);
     const household = await ctx.db.get("households", member.householdId);
-    const name = args.name.trim();
+    const name = householdName(args.name);
 
-    if (!name || name.length > 80) throw userError("Bruk 1–80 tegn i navnet.");
+    if (!name) throw userError(`Bruk 1–${householdNameLimit} tegn i navnet.`);
 
     if (!household || household.name !== args.previousName)
       throw userError("Navnet er endret. Lukk og åpne navnefeltet på nytt.");

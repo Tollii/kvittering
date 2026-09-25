@@ -5,7 +5,10 @@ import { convexTest } from "convex-test";
 import { expect, it, vi } from "vitest";
 import { api, internal } from "./_generated/api";
 import schema from "./schema";
-import { batteryFixture } from "../src/lib/domain/receipt";
+import {
+  batteryFixture,
+  receiptLineNameLimit,
+} from "../src/lib/domain/receipt";
 
 const modules = import.meta.glob("./**/*.ts");
 
@@ -105,6 +108,26 @@ it("saves a product correction, reuses the retailer mapping and preserves the or
       (await user.query(api.receipts.detail, { id }))!.receipt.data!.lines[0],
     ).productId,
   ).toBe(line.productId);
+});
+
+it("creates a product from any line name a receipt accepts", async () => {
+  const { user, receipt } = await setup();
+  const id = await receipt();
+  const data = batteryFixture();
+  present(data.lines[0]).name = "x".repeat(receiptLineNameLimit);
+  await user.mutation(api.receipts.save, {
+    id,
+    revision: 0,
+    data,
+    reviewed: false,
+    rememberLineIds: [],
+    duplicateResolved: false,
+    excluded: false,
+    productChanges: [{ lineId: "battery", productId: null, createNew: true }],
+  });
+
+  const saved = (await user.query(api.receipts.detail, { id }))!.receipt;
+  expect(present(saved.data!.lines[0]).productId).toBeTruthy();
 });
 
 it("keeps an explicit separation for future receipts and refuses foreign household products", async () => {

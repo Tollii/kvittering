@@ -1,3 +1,6 @@
+/** The most receipts one Live Activity follows. */
+export const liveActivityReceiptLimit = 30;
+
 export type ReceiptActivityProgress = {
   total: number;
   completed: number;
