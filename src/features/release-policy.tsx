@@ -33,12 +33,10 @@ import {
   subscribeServerPolicy,
   setReleaseDiagnostics,
 } from "@/lib/releases/client";
-import {
-  cachePolicy,
-  readCachedPolicy,
-  dismissedUntil,
-  dismissUpdate,
-} from "@/lib/releases/cache";
+import { releasePolicyCache } from "@/lib/releases/cache";
+
+const { cachePolicy, readCachedPolicy, dismissedUntil, dismissUpdate } =
+  releasePolicyCache(installedRelease);
 
 const fallback = parseVersionPolicy(
   defaultPolicy(installedRelease.platform, installedRelease.channel),

@@ -1,10 +1,10 @@
 import { expect, it, vi } from "vitest";
 import { observeForeground, removedAccount } from "../features/query-lifecycle";
 
-// oxlint-disable-next-line anti-slop/no-module-mocking -- Replace the native SDK or environment boundary; application behavior remains under test.
+// oxlint-disable-next-line anti-slop/no-module-mocking -- React Native AppState is native; the tests pass their own foreground source.
 vi.mock("react-native", () => ({ AppState: {} }));
 
-// oxlint-disable-next-line anti-slop/no-module-mocking -- Replace the native SDK or environment boundary; application behavior remains under test.
+// oxlint-disable-next-line anti-slop/no-module-mocking -- Native expo-network state is not read by the lifecycle functions under test.
 vi.mock("expo-network", () => ({
   useNetworkState: vi.fn<typeof import("expo-network").useNetworkState>(),
 }));

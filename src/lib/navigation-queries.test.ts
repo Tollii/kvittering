@@ -35,10 +35,10 @@ let cache: ReceiptCacheSnapshot & { available: boolean; synchronized: boolean };
 
 let lifecycle = { active: true, online: true };
 
-// oxlint-disable-next-line anti-slop/no-module-mocking -- Replace the native SDK or environment boundary; application behavior remains under test.
+// oxlint-disable-next-line anti-slop/no-module-mocking -- Control screen focus, which expo-router reads from the native navigator.
 vi.mock("expo-router", () => ({ useIsFocused: () => navigation.focused }));
 
-// oxlint-disable-next-line anti-slop/no-module-mocking -- Replace the native SDK or environment boundary; application behavior remains under test.
+// oxlint-disable-next-line anti-slop/no-module-mocking -- Control the Convex auth state while keeping the real client and query hooks.
 vi.mock("convex/react", async (original) => ({
   ...(await original<typeof import("convex/react")>()),
   useConvexAuth: () => ({ isAuthenticated: navigation.authenticated }),

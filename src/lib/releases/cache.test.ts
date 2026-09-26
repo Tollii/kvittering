@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { expect, it, vi } from "vitest";
-import { cachePolicy, readCachedPolicy } from "./cache";
+import { releasePolicyCache } from "./cache";
+import { storageSuffix } from "../deployment-storage";
 import { defaultFeatureFlags } from "../featureFlags";
 import {
   defaultPolicy,
@@ -11,7 +12,7 @@ import {
 
 const storage = vi.hoisted(() => new Map<string, string>());
 
-// oxlint-disable-next-line anti-slop/no-module-mocking -- Replace the native SDK or environment boundary; application behavior remains under test.
+// oxlint-disable-next-line anti-slop/no-module-mocking -- Replace the native expo-sqlite key-value store with an in-memory map.
 vi.mock("expo-sqlite/kv-store", () => ({
   default: {
     getItemSync: (key: string) => storage.get(key) ?? null,
@@ -19,13 +20,10 @@ vi.mock("expo-sqlite/kv-store", () => ({
   },
 }));
 
-// oxlint-disable-next-line anti-slop/no-module-mocking -- Replace the native SDK or environment boundary; application behavior remains under test.
-vi.mock("../deployment-storage", () => ({ storageSuffix: "-test" }));
-
-// oxlint-disable-next-line anti-slop/no-module-mocking -- Replace the native SDK or environment boundary; application behavior remains under test.
-vi.mock("./client", () => ({
-  installedRelease: { platform: "ios", channel: "testflight" },
-}));
+const { cachePolicy, readCachedPolicy } = releasePolicyCache({
+  platform: "ios",
+  channel: "testflight",
+});
 
 it("retains update requirements and disabled flags for an older client after rollback", () => {
   const policy = parseVersionPolicy({
@@ -39,7 +37,11 @@ it("retains update requirements and disabled flags for an older client after rol
 
   const saved = z
     .object({ policy: z.unknown() })
-    .parse(JSON.parse(storage.get("release-policy-v1-test:testflight:ios")!));
+    .parse(
+      JSON.parse(
+        storage.get(`release-policy-v1${storageSuffix}:testflight:ios`)!,
+      ),
+    );
 
   const legacy = parsePolicy(saved.policy);
   expect(updateRequirement(legacy)).toBe("required");
