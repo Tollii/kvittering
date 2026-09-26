@@ -7,16 +7,9 @@ import {
   tag,
 } from "@expo/ui/swift-ui/modifiers";
 import { useTheme } from "@/constants/theme";
+import type { PeriodMenuProps } from "./period-menu";
 
-export function PeriodMenu({
-  value,
-  latest,
-  onChange,
-}: Readonly<{
-  value: CalendarMonth;
-  latest: CalendarMonth;
-  onChange: (month: CalendarMonth) => void;
-}>) {
+export function PeriodMenu({ value, latest, onChange }: PeriodMenuProps) {
   const colors = useTheme();
 
   const months = [latest];

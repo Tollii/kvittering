@@ -1,15 +1,10 @@
 import { beginUploadedReceipt } from "./receiptUploadCompletion";
 import { receiptPeriodPage } from "./receiptPeriod";
-import {
-  CalendarDate,
-  calendarDateValidator,
-} from "../src/lib/domain/calendar";
+import { CalendarDate } from "../src/lib/domain/calendar";
 import { userError } from "./userErrors";
-import { Ore, oreValidator } from "../src/lib/domain/ore";
 import {
   attentionStatuses,
   isReceiptProcessing,
-  receiptStatusValidator,
 } from "../src/lib/domain/receipt-state";
 import {
   maxReceiptImages,
@@ -46,12 +41,16 @@ import { internal } from "./_generated/api";
 import schema from "./schema";
 import { requireMember, requireReceipt } from "./access";
 import {
-  reconcile,
   receiptDataValidator,
   checkReceipt,
   aliasKey,
 } from "../src/lib/domain/receipt";
 import { canAcceptReceipt } from "../src/lib/domain/receipt-review";
+import {
+  receiptListItem,
+  receiptListItemValidator,
+  receiptSearchText,
+} from "../src/lib/domain/receipt-summary";
 import { learnCategories } from "./aliases";
 import { start } from "@convex-dev/workflow";
 
@@ -637,18 +636,7 @@ export const cleanupDeleted = internalMutation({
 
 /** Summary pages omit OCR text, catalog decisions, and analysis payloads. */
 export const history = query({
-  returns: paginationResultValidator(
-    v.object({
-      _id: v.id("receipts"),
-      _creationTime: v.number(),
-      status: receiptStatusValidator,
-      store: v.union(v.string(), v.null()),
-      purchaseDate: v.union(calendarDateValidator, v.null()),
-      totalOre: v.union(oreValidator, v.null()),
-      spendingOre: oreValidator,
-      excluded: v.boolean(),
-    }),
-  ),
+  returns: paginationResultValidator(receiptListItemValidator),
   args: { search: v.string(), paginationOpts: paginationOptsValidator },
   handler: async (ctx, { search, paginationOpts }) => {
     const member = await requireMember(ctx);
@@ -670,33 +658,8 @@ export const history = query({
     return {
       ...page,
       page: page.page
-        .filter((receipt) =>
-          [
-            receipt.data?.store,
-            receipt.data?.purchaseDate,
-            ...(receipt.data?.lines.flatMap((line) => [
-              line.name,
-              line.originalText,
-              ...line.tags,
-            ]) ?? []),
-          ]
-            .join(" ")
-            .toLocaleLowerCase("nb-NO")
-            .includes(term),
-        )
-        .map((receipt) => ({
-          _id: receipt._id,
-          _creationTime: receipt._creationTime,
-          status: receipt.status,
-          store: receipt.data?.store ?? null,
-          purchaseDate: receipt.data?.purchaseDate ?? null,
-          totalOre: receipt.data?.totalOre ?? null,
-          spendingOre:
-            receipt.data && !receipt.excluded
-              ? reconcile(receipt.data).productSpending
-              : Ore.zero,
-          excluded: receipt.excluded,
-        })),
+        .filter((receipt) => receiptSearchText(receipt).includes(term))
+        .map(receiptListItem),
     };
   },
 });

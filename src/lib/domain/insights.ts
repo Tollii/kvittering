@@ -366,7 +366,7 @@ export function spendingCalendar(
   receipts: Receipt[],
   year: number,
   reviewedOnly = false,
-  today = new Date().toLocaleDateString("sv-SE", { timeZone: "Europe/Oslo" }),
+  today = CalendarDate.today(),
 ) {
   const days = new Map<
     string,
@@ -399,7 +399,7 @@ export function spendingCalendar(
   })) {
     const date = data.purchaseDate;
 
-    if (!date || date > today) continue;
+    if (!date || CalendarDate.compare(date, today) > 0) continue;
     const day = days.get(date);
 
     if (!day) continue;

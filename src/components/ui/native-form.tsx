@@ -3,7 +3,11 @@ import { ScrollView, View } from "react-native";
 import { Copy } from "./typography";
 import { Panel } from "./surfaces";
 
-export function NativeForm({ children }: Readonly<{ children: ReactNode }>) {
+export type NativeFormProps = Readonly<{ children: ReactNode }>;
+
+export type FormSectionProps = Readonly<{ title: string; children: ReactNode }>;
+
+export function NativeForm({ children }: NativeFormProps) {
   return (
     <ScrollView
       keyboardDismissMode="interactive"
@@ -15,10 +19,7 @@ export function NativeForm({ children }: Readonly<{ children: ReactNode }>) {
   );
 }
 
-export function FormSection({
-  title,
-  children,
-}: Readonly<{ title: string; children: ReactNode }>) {
+export function FormSection({ title, children }: FormSectionProps) {
   return (
     <View style={{ gap: 12 }}>
       <Copy accessibilityRole="header" weight="600">
