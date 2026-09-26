@@ -1,8 +1,5 @@
 import { Ore } from "@/lib/domain/ore";
-import {
-  isMissingLineField,
-  receiptIssueText,
-} from "@/lib/domain/receipt-issues";
+import { receiptIssueText } from "@/lib/domain/receipt-issues";
 import type { ProductChoice } from "@/lib/domain/product-reference";
 import { useDebouncedSearch } from "./catalog-queries";
 import { productSearch } from "@/lib/catalog/search";
@@ -204,9 +201,9 @@ export function ReceiptLineEditor({
           onChange={() => setCatalogScreen("search")}
         />
       )}
-      {otherIssues
-        .filter((issue) => !(showEditor && isMissingLineField(issue)))
-        .map((issue) => (
+      {/* The open editor shows missing fields in its inputs and reader issues in a notice. */}
+      {!showEditor &&
+        otherIssues.map((issue) => (
           <View
             key={receiptIssueText(issue)}
             style={{ flexDirection: "row", alignItems: "center", gap: 6 }}

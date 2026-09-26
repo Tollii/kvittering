@@ -115,13 +115,21 @@ export function ReceiptActionsSheet({
 }: Readonly<{ menu: ReceiptActionMenu; onClose: () => void }>) {
   return (
     <Sheet title="Flere handlinger" visible onClose={onClose}>
-      <Row title="Kvitteringsdetaljer" onPress={menu.onEditFields} />
+      {/* A row without onPress is disabled, as the toolbar's disabled actions are. */}
+      <Row
+        title="Kvitteringsdetaljer"
+        onPress={menu.fieldsDisabled ? undefined : menu.onEditFields}
+      />
       <Row
         title="Legg til linje"
-        onPress={() => {
-          onClose();
-          menu.onAddLine();
-        }}
+        onPress={
+          menu.addLineDisabled
+            ? undefined
+            : () => {
+                onClose();
+                menu.onAddLine();
+              }
+        }
       />
       <Toggle
         label="Vis MVA og oppsummering"
@@ -131,6 +139,7 @@ export function ReceiptActionsSheet({
       <Toggle
         label="Utelat fra forbruk"
         value={menu.excluded}
+        disabled={menu.busy}
         onChange={menu.onExcluded}
       />
       <Button
