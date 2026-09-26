@@ -135,7 +135,8 @@
   "overrides": {
     "better-auth": {
       "vitest": "$vitest"
-    }
+    },
+    "qs": "^6.16.0"
   },
   "expo": {
     "install": {
