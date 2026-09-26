@@ -218,12 +218,12 @@ export function ReceiptSummary({
               receipt={receipt}
               compact
               color={colors.onHero}
-              background="#FFFFFF22"
+              background={colors.heroControl}
             />
             <IconButton
               name="pencil"
               label="Rediger kvitteringsdetaljer"
-              filled="#FFFFFF22"
+              filled={colors.heroControl}
               size={17}
               color={colors.onHero}
               disabled={!data || busy}

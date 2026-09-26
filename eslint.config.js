@@ -177,6 +177,21 @@ module.exports = defineConfig([
     },
   },
   {
+    files: ["src/**/*.tsx"],
+    // expo-widgets serializes each "widget" function to a string, so widgets
+    // cannot read theme values from module scope and keep their literals.
+    ignores: ["src/widgets/**"],
+    rules: {
+      "no-restricted-syntax": [
+        "error",
+        {
+          selector: "Literal[value=/^#[0-9a-f]{3,8}$|^rgba?\\(/i]",
+          message: "Add a theme token in src/constants/theme.ts.",
+        },
+      ],
+    },
+  },
+  {
     files: ["src/lib/**/*.ts", "convex/**/*.ts"],
     ignores: ["**/*.test.ts"],
     rules: {
