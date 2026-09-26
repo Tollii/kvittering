@@ -4,8 +4,9 @@
 # Xcode and Maestro. Use a checkout without a personal .env.local, such as a
 # separate worktree, so the flows never reach a shared deployment.
 #
-# E2E_APP_CACHE: optional path of a previously built kvitto.app for the same
-# native fingerprint; its JavaScript bundle is replaced instead of rebuilding.
+# E2E_APP_CACHE: optional path of a kvitto.app for the same native fingerprint.
+# When it exists, its JavaScript bundle is replaced instead of rebuilding; when
+# it does not, the new build is saved there before the flows run.
 #
 # The app is signed ad hoc, as Xcode's "Sign to Run Locally" does: without
 # entitlements the Keychain refuses expo-secure-store and the app stops.
@@ -23,6 +24,16 @@ fi
 
 export SENTRY_DISABLE_AUTO_UPLOAD=true
 export EXPO_NO_TELEMETRY=1
+# CocoaPods stops with an encoding error in a shell without a UTF-8 locale,
+# such as a scheduled task.
+export LANG=en_US.UTF-8 LC_ALL=en_US.UTF-8
+
+# `npx convex dev` starts the backend as a separate process that survives it.
+# Stop the one this checkout started, also one left from an earlier run.
+stop_local_backend() {
+  pkill -f -- "--local-storage $PWD/.convex/local/" 2>/dev/null || true
+}
+stop_local_backend
 
 echo "▸ Starting a local Convex backend"
 # A query may run for one second. While the simulator starts, the runner's few
@@ -32,6 +43,7 @@ convex_pid=$!
 push_service_plist=""
 cleanup() {
   kill "$convex_pid" 2>/dev/null || true
+  stop_local_backend
   if [[ -n "$push_service_plist" ]]; then
     xcrun simctl spawn "$device" launchctl bootstrap user/foreground "$push_service_plist"
   fi
@@ -82,7 +94,14 @@ if [[ -n "${E2E_APP_CACHE:-}" && -d "$E2E_APP_CACHE" ]]; then
     --timestamp=none "$app"
 else
   echo "▸ Building the app for the iOS Simulator with $(xcodebuild -version | awk 'NR == 1')"
-  npx expo prebuild --platform ios --clean
+  # Install the pods separately: prebuild continues when the install fails.
+  # Retry with a spec repository update, as prebuild does.
+  npx expo prebuild --platform ios --clean --no-install
+  if ! (cd ios && { pod install || pod install --repo-update; }) >"$out/pod-install.log" 2>&1; then
+    tail -n 40 "$out/pod-install.log" >&2
+    echo "error: pod install failed; the full log is $out/pod-install.log." >&2
+    exit 1
+  fi
   # Installed updates would replace the JavaScript under test.
   plutil -replace EXUpdatesEnabled -bool NO ios/kvitto/Supporting/Expo.plist
   if ! xcodebuild -workspace ios/kvitto.xcworkspace -scheme kvitto \
@@ -98,6 +117,11 @@ else
   fi
   rm -rf "$app"
   cp -R build/derived/Build/Products/Release-iphonesimulator/kvitto.app "$app"
+  # Save the build before the flows run, so a failed flow does not cost a rebuild.
+  if [[ -n "${E2E_APP_CACHE:-}" ]]; then
+    mkdir -p "$(dirname "$E2E_APP_CACHE")"
+    cp -R "$app" "$E2E_APP_CACHE"
+  fi
 fi
 
 echo "▸ Waiting for the simulator"
