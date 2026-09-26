@@ -6,19 +6,58 @@ import { z } from "zod";
 import { loadFixture, resolveTables } from "./fixtures.mts";
 
 // This command clears the entire deployment, including components. Restrict
-// both the auth request and CLI selection to this worktree's anonymous backend.
-const local = parseEnv(readFileSync(".env.local", "utf8"));
+// both the auth request and CLI selection to a disposable target: this
+// worktree's anonymous backend, or, when SEED_PREVIEW_DEPLOYMENT is set, the
+// preview deployment that tools/device/create_backend.sh made. A preview
+// deploy key cannot select a development or production deployment.
+function selectTarget() {
+  const preview = process.env.SEED_PREVIEW_DEPLOYMENT;
 
-const deployment = z
-  .string()
-  .regex(/^anonymous:[a-zA-Z0-9_-]+$/)
-  .parse(local.CONVEX_DEPLOYMENT);
+  if (preview) {
+    const name = z
+      .string()
+      .regex(/^[a-z]+-[a-z]+-\d+$/)
+      .parse(preview);
 
-const site = z
-  .literal("http://127.0.0.1:3211")
-  .parse(local.EXPO_PUBLIC_CONVEX_SITE_URL);
+    const key = z
+      .string()
+      .startsWith("preview:")
+      .parse(process.env.CONVEX_DEPLOY_KEY);
 
-z.literal("http://127.0.0.1:3210").parse(local.EXPO_PUBLIC_CONVEX_URL);
+    const site = z
+      .string()
+      .regex(new RegExp(`^https://${name}\\.([a-z0-9-]+\\.)?convex\\.site$`))
+      .parse(process.env.SEED_SITE_URL);
+
+    // The key stays in the process environment, not in the env file on disk.
+    return {
+      site,
+      envFileContents: "",
+      variables: { CONVEX_DEPLOY_KEY: key },
+      cliArgs: ["--deployment", name],
+    };
+  }
+
+  const local = parseEnv(readFileSync(".env.local", "utf8"));
+
+  const deployment = z
+    .string()
+    .regex(/^anonymous:[a-zA-Z0-9_-]+$/)
+    .parse(local.CONVEX_DEPLOYMENT);
+
+  z.literal("http://127.0.0.1:3210").parse(local.EXPO_PUBLIC_CONVEX_URL);
+
+  return {
+    site: z
+      .literal("http://127.0.0.1:3211")
+      .parse(local.EXPO_PUBLIC_CONVEX_SITE_URL),
+    envFileContents: `CONVEX_DEPLOYMENT=${deployment}\n`,
+    variables: {},
+    cliArgs: [],
+  };
+}
+
+const { site, envFileContents, variables, cliArgs } = selectTarget();
 
 const output = resolve(process.argv[3] ?? "build/e2e/seed");
 
@@ -26,18 +65,27 @@ mkdirSync(output, { recursive: true });
 
 const envFile = resolve(output, "deployment.env");
 
-writeFileSync(envFile, `CONVEX_DEPLOYMENT=${deployment}\n`);
+writeFileSync(envFile, envFileContents);
 
-const environment = Object.fromEntries(
-  Object.entries(process.env).filter(([key]) => !key.startsWith("CONVEX_")),
-);
+const environment = {
+  ...Object.fromEntries(
+    Object.entries(process.env).filter(([key]) => !key.startsWith("CONVEX_")),
+  ),
+  ...variables,
+};
 
 const fixture = process.argv[2] ? loadFixture(process.argv[2]) : undefined;
 
 function convex(args: string[]) {
   return execFileSync(
     process.execPath,
-    ["node_modules/convex/bin/main.js", ...args, "--env-file", envFile],
+    [
+      "node_modules/convex/bin/main.js",
+      ...args,
+      ...cliArgs,
+      "--env-file",
+      envFile,
+    ],
     {
       encoding: "utf8",
       env: environment,

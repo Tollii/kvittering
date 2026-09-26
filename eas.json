@@ -25,6 +25,12 @@
         "EXPO_PUBLIC_RELEASE_CHANNEL": "development"
       },
       "channel": "development"
+    },
+    "revyl-build": {
+      "extends": "development",
+      "ios": {
+        "simulator": true
+      }
     }
   },
   "submit": {
