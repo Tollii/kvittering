@@ -30,12 +30,13 @@ import { recordCorrections } from "./corrections";
 import { lineEvidenceKey } from "../src/lib/catalog/matching";
 import { productChange } from "./products";
 import { resolveProductSelections } from "./catalogLinks";
-import { ConvexError, v } from "convex/values";
+import { ConvexError, v, type Infer } from "convex/values";
 import {
   paginationOptsValidator,
   paginationResultValidator,
 } from "convex/server";
-import { query, internalQuery } from "./_generated/server";
+import { query, internalQuery, type MutationCtx } from "./_generated/server";
+import type { Id } from "./_generated/dataModel";
 import { internalMutation } from "./serverFunctions";
 import { internal } from "./_generated/api";
 import schema from "./schema";
@@ -44,6 +45,7 @@ import {
   receiptDataValidator,
   checkReceipt,
   aliasKey,
+  type ReceiptData,
 } from "../src/lib/domain/receipt";
 import { canAcceptReceipt } from "../src/lib/domain/receipt-review";
 import {
@@ -222,6 +224,185 @@ export const retry = mutation({
   },
 });
 
+/**
+ * Keep the saved state that a client edit does not own: the original text,
+ * receipt name, product link, and physical store. Mark changed lines as manual.
+ */
+function keepSavedLineState(data: ReceiptData, saved: ReceiptData | null) {
+  for (const line of data.lines) {
+    const previous = saved?.lines.find((old) => old.id === line.id);
+
+    // Compatibility fields added below are not manual receipt edits.
+    if (!previous || JSON.stringify(previous) !== JSON.stringify(line))
+      line.manual = true;
+
+    if (previous) line.originalText = previous.originalText;
+    line.receiptName = previous?.receiptName ?? previous?.name ?? line.name;
+
+    const reference =
+      previous && line.kind === "product" && data.store === saved?.store
+        ? productReference(previous)
+        : { kind: "unresolved" as const };
+
+    const evidenceChanged =
+      previous && lineEvidenceKey(previous) !== lineEvidenceKey(line);
+
+    Object.assign(
+      line,
+      withProductReference(
+        line,
+        reference.kind === "catalog" && evidenceChanged
+          ? { kind: "unresolved" }
+          : reference,
+      ),
+    );
+  }
+
+  // Matching the saved store narrows the saved data to present.
+  const sameStore = data.store === saved?.store && data.branch === saved.branch;
+
+  data.physicalStore = sameStore ? (saved.physicalStore ?? null) : null;
+  data.physicalStoreManual = sameStore
+    ? (saved.physicalStoreManual ?? false)
+    : false;
+}
+
+/** Translate one installed-client product change to a product selection. */
+function productChangeSelection(
+  change: Infer<typeof productChange>,
+): ProductSelection {
+  if (change.createNew) return { kind: "new_household", lineId: change.lineId };
+
+  if (change.productId)
+    return {
+      kind: "household",
+      lineId: change.lineId,
+      productId: change.productId,
+    };
+
+  return { kind: "separate", lineId: change.lineId };
+}
+
+/**
+ * Get the product selections of a save. Installed clients send product and
+ * catalog changes instead of selections; translate them once, so the resolver
+ * consumes one selection union.
+ */
+function productSelections(args: {
+  selections?: ProductSelection[];
+  productChanges?: Infer<typeof productChange>[];
+  catalogChanges?: { lineId: string; key: string | null }[];
+}): ProductSelection[] {
+  const selections = new Map<string, ProductSelection>();
+
+  if (
+    args.selections &&
+    (args.productChanges?.length || args.catalogChanges?.length)
+  )
+    throw userError("Velg én kommandoform.");
+
+  for (const change of args.productChanges ?? []) {
+    if (selections.has(change.lineId))
+      throw userError("Velg ett produkt per varelinje.");
+    selections.set(change.lineId, productChangeSelection(change));
+  }
+
+  for (const change of args.catalogChanges ?? []) {
+    const previous = selections.get(change.lineId);
+
+    if (previous && (previous.kind !== "separate" || change.key !== null))
+      throw userError("Velg ett produkt per varelinje.");
+    selections.set(
+      change.lineId,
+      change.key
+        ? { kind: "catalog", lineId: change.lineId, key: change.key }
+        : { kind: "separate", lineId: change.lineId },
+    );
+  }
+
+  return args.selections ?? [...selections.values()];
+}
+
+/**
+ * Save the category of a remembered line as a household alias.
+ * Returns true when the alias is new or its category changed.
+ */
+async function saveCategoryAlias(
+  ctx: MutationCtx,
+  householdId: Id<"households">,
+  identity: string,
+  key: string,
+  categoryId: string,
+) {
+  const existing = await ctx.db
+    .query("aliases")
+    .withIndex("by_householdId_and_key", (q) =>
+      q.eq("householdId", householdId).eq("key", key),
+    )
+    .unique();
+
+  if (existing?.categoryId === categoryId) return false;
+
+  if (existing)
+    await ctx.db.patch("aliases", existing._id, {
+      categoryId,
+      confirmedBy: identity,
+    });
+  else
+    await ctx.db.insert("aliases", {
+      householdId,
+      key,
+      categoryId,
+      confirmedBy: identity,
+    });
+
+  return true;
+}
+
+/**
+ * Set the category alias keys of the lines and save the categories of the
+ * remembered lines. Returns the alias keys whose category changed.
+ */
+async function rememberCategories(
+  ctx: MutationCtx,
+  householdId: Id<"households">,
+  identity: string,
+  data: ReceiptData,
+  rememberLineIds: string[],
+) {
+  const changedAliases = new Set<string>();
+
+  for (const line of data.lines) {
+    line.categoryAliasKey = line.categoryAliasKey ?? line.productKey;
+
+    if (line.categoryAliasKey && line.categoryAliasKey !== aliasKey(data, line))
+      line.categoryAliasKey = null;
+    line.productKey = line.categoryAliasKey ?? null;
+
+    if (
+      !rememberLineIds.includes(line.id) ||
+      line.kind !== "product" ||
+      !line.categoryId
+    )
+      continue;
+
+    const key = aliasKey(data, line);
+
+    if (!key)
+      throw userError("Butikk og originaltekst kreves for å huske en vare.");
+
+    if (
+      await saveCategoryAlias(ctx, householdId, identity, key, line.categoryId)
+    )
+      changedAliases.add(key);
+
+    line.categoryAliasKey = key;
+    line.productKey = key;
+  }
+
+  return changedAliases;
+}
+
 export const save = mutation({
   args: {
     id: v.id("receipts"),
@@ -265,146 +446,24 @@ export const save = mutation({
     if (args.reviewed && !acceptable)
       throw userError("Kontroller avvik og uklare felt før godkjenning.");
 
-    for (const line of args.data.lines) {
-      const previous = receipt.data?.lines.find((old) => old.id === line.id);
-
-      // Compatibility fields added below are not manual receipt edits.
-      if (!previous || JSON.stringify(previous) !== JSON.stringify(line))
-        line.manual = true;
-
-      if (previous) line.originalText = previous.originalText;
-      line.receiptName = previous?.receiptName ?? previous?.name ?? line.name;
-
-      const reference =
-        previous &&
-        line.kind === "product" &&
-        args.data.store === receipt.data?.store
-          ? productReference(previous)
-          : { kind: "unresolved" as const };
-
-      Object.assign(
-        line,
-        withProductReference(
-          line,
-          reference.kind === "catalog" &&
-            previous &&
-            lineEvidenceKey(previous) !== lineEvidenceKey(line)
-            ? { kind: "unresolved" }
-            : reference,
-        ),
-      );
-    }
-
-    // Matching the saved store narrows the saved data to present.
-    args.data.physicalStore =
-      args.data.store === receipt.data?.store &&
-      args.data.branch === receipt.data.branch
-        ? (receipt.data.physicalStore ?? null)
-        : null;
-    args.data.physicalStoreManual =
-      args.data.store === receipt.data?.store &&
-      args.data.branch === receipt.data.branch
-        ? (receipt.data.physicalStoreManual ?? false)
-        : false;
-    // Translate installed-client commands once; the resolver consumes one selection union.
-    const selections = new Map<string, ProductSelection>();
-
-    if (
-      args.selections &&
-      (args.productChanges?.length || args.catalogChanges?.length)
-    )
-      throw userError("Velg én kommandoform.");
-
-    for (const change of args.productChanges ?? []) {
-      if (selections.has(change.lineId))
-        throw userError("Velg ett produkt per varelinje.");
-      selections.set(
-        change.lineId,
-        change.createNew
-          ? { kind: "new_household", lineId: change.lineId }
-          : change.productId
-            ? {
-                kind: "household",
-                lineId: change.lineId,
-                productId: change.productId,
-              }
-            : { kind: "separate", lineId: change.lineId },
-      );
-    }
-
-    for (const change of args.catalogChanges ?? []) {
-      const previous = selections.get(change.lineId);
-
-      if (previous && (previous.kind !== "separate" || change.key !== null))
-        throw userError("Velg ett produkt per varelinje.");
-      selections.set(
-        change.lineId,
-        change.key
-          ? { kind: "catalog", lineId: change.lineId, key: change.key }
-          : { kind: "separate", lineId: change.lineId },
-      );
-    }
+    keepSavedLineState(args.data, receipt.data);
 
     args.data = await resolveProductSelections(
       ctx,
       member.householdId,
       member.identity,
       args.data,
-      args.selections ?? [...selections.values()],
+      productSelections(args),
       args.physicalStoreId,
     );
 
-    const changedAliases = new Set<string>();
-
-    for (const line of args.data.lines) {
-      line.categoryAliasKey = line.categoryAliasKey ?? line.productKey;
-
-      if (
-        line.categoryAliasKey &&
-        line.categoryAliasKey !== aliasKey(args.data, line)
-      )
-        line.categoryAliasKey = null;
-      line.productKey = line.categoryAliasKey ?? null;
-
-      if (
-        args.rememberLineIds.includes(line.id) &&
-        line.kind === "product" &&
-        line.categoryId
-      ) {
-        const key = aliasKey(args.data, line);
-
-        if (!key)
-          throw userError(
-            "Butikk og originaltekst kreves for å huske en vare.",
-          );
-
-        const existing = await ctx.db
-          .query("aliases")
-          .withIndex("by_householdId_and_key", (q) =>
-            q.eq("householdId", member.householdId).eq("key", key),
-          )
-          .unique();
-
-        if (existing?.categoryId !== line.categoryId) {
-          if (existing)
-            await ctx.db.patch("aliases", existing._id, {
-              categoryId: line.categoryId,
-              confirmedBy: member.identity,
-            });
-          else
-            await ctx.db.insert("aliases", {
-              householdId: member.householdId,
-              key,
-              categoryId: line.categoryId,
-              confirmedBy: member.identity,
-            });
-          changedAliases.add(key);
-        }
-
-        line.categoryAliasKey = key;
-        line.productKey = key;
-      }
-    }
+    const changedAliases = await rememberCategories(
+      ctx,
+      member.householdId,
+      member.identity,
+      args.data,
+      args.rememberLineIds,
+    );
 
     if (changedAliases.size)
       await ctx.scheduler.runAfter(0, internal.aliases.applyChanges, {

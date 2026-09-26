@@ -16,6 +16,7 @@ import * as Device from "expo-device";
 import { router } from "expo-router";
 import { useConvex, useQuery, type ConvexReactClient } from "convex/react";
 import { api } from "../../convex/_generated/api";
+import type { Id } from "../../convex/_generated/dataModel";
 import { Button, Copy, Notice } from "@/components/ui";
 import { useHousehold } from "./household-context";
 import { failureMessage } from "@/lib/failure-message";
@@ -156,6 +157,61 @@ export function NotificationSettings() {
   );
 }
 
+/** Notification actions that open or change a receipt. Other actions are ignored. */
+const routedActions = [
+  Notifications.DEFAULT_ACTION_IDENTIFIER,
+  reviewReceiptAction,
+  remindReceiptAction,
+];
+
+/**
+ * Mark the response as handled. Returns false when there is no response, the
+ * response was already handled, or routing ignores its action.
+ */
+function acceptResponse(
+  response: Notifications.NotificationResponse | null,
+  handled: Set<string>,
+): response is Notifications.NotificationResponse {
+  if (!response) return false;
+  const identifier = `${response.notification.request.identifier}:${response.actionIdentifier}`;
+
+  if (handled.has(identifier)) return false;
+  handled.add(identifier);
+
+  return routedActions.includes(response.actionIdentifier);
+}
+
+/**
+ * Ask the server to send the review notification again this evening.
+ * Returns the reminder time, or null when routing stopped before the request.
+ */
+async function requestEveningReminder(
+  client: ConvexReactClient,
+  receiptId: Id<"receipts">,
+  stopped: () => boolean,
+) {
+  const token = await SecureStore.getItemAsync(tokenKey);
+
+  if (stopped()) return null;
+
+  if (!token) throw new Error("Notifications disabled");
+  const evening = nextReviewEvening(new Date());
+  await releaseMutation(client, api.notifications.remindLater, {
+    receiptId,
+    token,
+    at: evening.getTime(),
+  });
+
+  return evening;
+}
+
+/** The message that tells the person why a notification action failed. */
+function routingFailureMessage(actionIdentifier: string) {
+  return actionIdentifier === remindReceiptAction
+    ? "Kunne ikke sette påminnelsen. Kontroller nettet og at varsler er på og kvitteringen fortsatt trenger kontroll."
+    : "Kvitteringen i varselet er ikke tilgjengelig for denne kontoen.";
+}
+
 export function NotificationRouting() {
   const client = useConvex();
   const { household } = useHousehold();
@@ -180,20 +236,7 @@ export function NotificationRouting() {
     ]).catch((cause) => reportError(cause, "notifications.register_actions"));
 
     async function open(response: Notifications.NotificationResponse | null) {
-      if (!response) return;
-      const identifier = `${response.notification.request.identifier}:${response.actionIdentifier}`;
-
-      if (handled.has(identifier)) return;
-      handled.add(identifier);
-
-      if (
-        ![
-          Notifications.DEFAULT_ACTION_IDENTIFIER,
-          reviewReceiptAction,
-          remindReceiptAction,
-        ].includes(response.actionIdentifier)
-      )
-        return;
+      if (!acceptResponse(response, handled)) return;
       setError("");
       setConfirmation("");
       const data = response.notification.request.content.data ?? {};
@@ -222,19 +265,13 @@ export function NotificationRouting() {
           throw new Error("Receipt unavailable");
 
         if (response.actionIdentifier === remindReceiptAction) {
-          const token = await SecureStore.getItemAsync(tokenKey);
+          const evening = await requestEveningReminder(
+            client,
+            result.receipt._id,
+            stopped,
+          );
 
-          if (stopped()) return;
-
-          if (!token) throw new Error("Notifications disabled");
-          const evening = nextReviewEvening(new Date());
-          await releaseMutation(client, api.notifications.remindLater, {
-            receiptId: result.receipt._id,
-            token,
-            at: evening.getTime(),
-          });
-
-          if (!stopped())
+          if (evening && !stopped())
             setConfirmation(
               `Påminnelse satt til ${evening.toLocaleString("nb-NO", { day: "numeric", month: "long", hour: "2-digit", minute: "2-digit" })}.`,
             );
@@ -245,11 +282,7 @@ export function NotificationRouting() {
         reportError(cause, "notifications.response");
 
         if (!stopped())
-          setError(
-            response.actionIdentifier === remindReceiptAction
-              ? "Kunne ikke sette påminnelsen. Kontroller nettet og at varsler er på og kvitteringen fortsatt trenger kontroll."
-              : "Kvitteringen i varselet er ikke tilgjengelig for denne kontoen.",
-          );
+          setError(routingFailureMessage(response.actionIdentifier));
       } finally {
         Notifications.clearLastNotificationResponse();
       }

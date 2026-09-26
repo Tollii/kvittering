@@ -1,14 +1,8 @@
 import { isDecidedCategory } from "@/lib/domain/categories";
 import { isReceiptProcessing } from "@/lib/domain/receipt-state";
 import { releaseMutation } from "@/lib/releases/requests";
-import { useRef, useState, type ReactNode, type ComponentProps } from "react";
-import {
-  ActivityIndicator,
-  Alert,
-  Platform,
-  Pressable,
-  View,
-} from "react-native";
+import { useRef, useState, type ComponentProps } from "react";
+import { Alert, Platform, View } from "react-native";
 import { Stack } from "expo-router";
 import { useConvex } from "convex/react";
 
@@ -19,21 +13,7 @@ import {
   type ReceiptDraft,
   type ReceiptDraftAction,
 } from "@/lib/receipt-draft";
-import {
-  Button,
-  Copy,
-  Disclosure,
-  Icon,
-  IconButton,
-  Notice,
-  Panel,
-  Row,
-  Screen,
-  Segments,
-  Sheet,
-  Toggle,
-  pressed,
-} from "@/components/ui";
+import { Button, IconButton, Notice, Screen } from "@/components/ui";
 import { ReceiptLineEditor } from "@/features/receipt-line-editor";
 import { ReceiptCategorySpending } from "@/features/receipt-category-spending";
 import { ReceiptFields } from "@/features/receipt-fields";
@@ -45,12 +25,25 @@ import {
   ReviewTaskChips,
 } from "@/features/receipt-editor-sections";
 import {
+  ReceiptActionsSheet,
+  ReceiptEditorToolbar,
+  type ReceiptActionMenu,
+} from "@/features/receipt-editor-actions";
+import {
+  ReceiptDetails,
+  ReceiptLineControls,
+  ReceiptPlaceholder,
+  StaleRevisionNotice,
+} from "@/features/receipt-editor-panels";
+import {
   aliasKey,
   emptyLine,
   isTotalsLine,
   reconcile,
   type ReceiptData,
+  type ReceiptLine,
 } from "@/lib/domain/receipt";
+import type { ProductChoice } from "@/lib/domain/product-reference";
 import {
   canAcceptReceipt,
   canConfirmSuggestedCategory,
@@ -109,21 +102,15 @@ export function ReceiptEditor({
 
   const busy = isDraftBusy(draft);
 
-  const approved = draft.operation.kind === "saved" && draft.operation.approved;
-  const error = draft.operation.kind === "failed" ? draft.operation.error : "";
+  const { approved, error } = operationOutcome(draft.operation);
   const [message, setMessage] = useState("");
   const operationActive = useRef(false);
 
   const [allLinesSelected, setAllLines] = useState(false);
   const allLines = receipt.status === "reviewed" || allLinesSelected;
 
-  const [reviewLineIds, setReviewLineIds] = useState(
-    () =>
-      new Set(
-        receipt.data?.lines
-          .filter((line) => lineReviewIssues(line).length)
-          .map((line) => line.id),
-      ),
+  const [reviewLineIds, setReviewLineIds] = useState(() =>
+    linesForReview(receipt),
   );
 
   const [summaryLines, setSummaryLines] = useState(false);
@@ -131,23 +118,18 @@ export function ReceiptEditor({
 
   const processing = isReceiptProcessing(receipt.status);
 
-  const totals = data ? reconcile(data) : null;
   const unresolvedDuplicate = !!receipt.duplicateOf && !duplicateResolved;
-  const tasks = data ? reviewTasks(data, unresolvedDuplicate) : [];
 
-  const remaining =
-    data?.lines.filter((line) => lineReviewIssues(line).length).length ?? 0;
+  const { totals, tasks, remaining, confirmable, ready, productLineCount } =
+    lineReview(data, unresolvedDuplicate);
 
-  const confirmable =
-    data?.lines.filter(canConfirmSuggestedCategory).length ?? 0;
-
-  const ready = !!data && canAcceptReceipt(data, unresolvedDuplicate);
+  const stale = receipt.revision !== revision;
 
   const saveDisabled =
-    !online ||
-    processing ||
-    receipt.revision !== revision ||
-    !!Object.keys(moneyErrors).length;
+    !online || processing || stale || !!Object.keys(moneyErrors).length;
+
+  const requestBlocked = !online || busy || dirty;
+  const retryDisabled = processing || requestBlocked;
 
   const signals = priceSignals(
     history.completeReceipts ? history.receipts : [],
@@ -156,16 +138,9 @@ export function ReceiptEditor({
 
   const recentCategories = context?.recentCategories ?? [];
 
-  const productLines =
-    data?.lines.filter((line) => !isTotalsLine(line.kind)) ?? [];
-
   const visibleLines =
     data?.lines.filter((line) =>
-      allLines
-        ? summaryLines ||
-          !isTotalsLine(line.kind) ||
-          lineReviewIssues(line).length
-        : reviewLineIds.has(line.id) || lineReviewIssues(line).length,
+      isLineShown(line, { allLines, summaryLines, reviewLineIds }),
     ) ?? [];
 
   const nextPending = context?.nextPendingId
@@ -182,16 +157,17 @@ export function ReceiptEditor({
     setMessage("");
   }
 
+  function edit(
+    values: Extract<ReceiptDraftAction, { type: "edit" }>["values"],
+  ) {
+    dispatch({ type: "edit", values });
+    setMessage("");
+  }
+
   function reset(current: Receipt) {
     dispatch({ type: "remote", receipt: current });
     dispatch({ type: "discard" });
-    setReviewLineIds(
-      new Set(
-        current.data?.lines
-          .filter((line) => lineReviewIssues(line).length)
-          .map((line) => line.id),
-      ),
-    );
+    setReviewLineIds(linesForReview(current));
     setAllLines(current.status === "reviewed");
     setMessage("");
   }
@@ -230,22 +206,8 @@ export function ReceiptEditor({
         revision,
         data,
         reviewed: ready,
-        // The server needs a store and a name to build a memory key.
-        rememberLineIds: remember.filter((id) => {
-          const line = data.lines.find((item) => item.id === id);
-
-          return (
-            line &&
-            line.kind === "product" &&
-            isDecidedCategory(line.categoryId) &&
-            aliasKey(data, line) !== null
-          );
-        }),
-        selections: Object.entries(productChanges).map(([lineId, choice]) =>
-          choice.kind === "catalog"
-            ? { kind: "catalog" as const, lineId, key: choice.key }
-            : { ...choice, lineId },
-        ),
+        rememberLineIds: rememberableLineIds(data, remember),
+        selections: productSelections(productChanges),
         physicalStoreId,
         duplicateResolved,
         excluded,
@@ -267,6 +229,22 @@ export function ReceiptEditor({
     setAllLines(true);
   }
 
+  async function deleteReceipt() {
+    onDeletionChange("deleting");
+
+    try {
+      await releaseMutation(client, api.receipts.remove, {
+        id: receipt._id,
+        revision,
+      });
+      dispatch({ type: "deleted" });
+      onDeletionChange("deleted");
+    } catch (cause) {
+      onDeletionChange("idle");
+      throw cause;
+    }
+  }
+
   function removeReceipt() {
     Alert.alert(
       "Slett kvitteringen?",
@@ -276,22 +254,7 @@ export function ReceiptEditor({
         {
           text: "Slett",
           style: "destructive",
-          onPress: () =>
-            void run(async () => {
-              onDeletionChange("deleting");
-
-              try {
-                await releaseMutation(client, api.receipts.remove, {
-                  id: receipt._id,
-                  revision,
-                });
-                dispatch({ type: "deleted" });
-                onDeletionChange("deleted");
-              } catch (cause) {
-                onDeletionChange("idle");
-                throw cause;
-              }
-            }, "deleting"),
+          onPress: () => void run(deleteReceipt, "deleting"),
         },
       ],
     );
@@ -301,6 +264,21 @@ export function ReceiptEditor({
     void run(async () => {
       await releaseMutation(client, api.receipts.retry, { id: receipt._id });
       setMessage("Leser på nytt …");
+    });
+
+  const retryCatalog = () =>
+    void run(async () => {
+      await releaseMutation(client, api.catalogMatching.enrich, {
+        id: receipt._id,
+      });
+    });
+
+  const retryAnalysis = () =>
+    void run(async () => {
+      await releaseMutation(client, api.productAnalysis.ensure, {
+        ids: [receipt._id],
+      });
+      setMessage("Mengdene beregnes på nytt.");
     });
 
   function confirmAllCategories() {
@@ -315,105 +293,60 @@ export function ReceiptEditor({
     rememberLines(ids);
   }
 
-  const footerLabel = processing
-    ? receiptStatusLabel(receipt)
-    : approved
-      ? "Godkjent"
-      : ready
-        ? dirty
-          ? "Klar til godkjenning"
-          : receipt.status === "reviewed"
-            ? receiptStatusLabel(receipt)
-            : "Klar til godkjenning"
-        : tasks.length === 1
-          ? "Én ting igjen"
-          : `${tasks.length} ting igjen`;
+  function changeLine(
+    current: ReceiptData,
+    line: ReceiptLine,
+    next: ReceiptLine,
+  ) {
+    change({
+      ...current,
+      lines: current.lines.map((item) => (item.id === line.id ? next : item)),
+    });
 
-  const screenOptions: ComponentProps<typeof Stack.Screen>["options"] = {
-    title: data?.store || receipt.data?.store || "Kvittering",
-    headerStyle: { backgroundColor: colors.hero },
-    headerTintColor: colors.onHero,
-    headerTitleStyle: { color: colors.onHero, fontWeight: "600" },
+    if (isCategoryDecided(line, next)) rememberLines([line.id]);
+  }
+
+  const menu: ReceiptActionMenu = {
+    busy,
+    summaryLines,
+    excluded,
+    fieldsDisabled: !data || busy,
+    addLineDisabled: !data || busy || processing,
+    retryDisabled,
+    deleteDisabled: !online || busy || receipt.status === "uploading",
+    onEditFields: () => setSheet("fields"),
+    onAddLine: addLine,
+    onSummaryLines: (value) => {
+      setSummaryLines(value);
+      setAllLines(true);
+    },
+    onExcluded: (value) => edit({ excluded: value }),
+    onRetry: retry,
+    onDelete: removeReceipt,
   };
-
-  if (Platform.OS !== "ios")
-    screenOptions.headerRight = () => (
-      <IconButton
-        name="ellipsis"
-        label="Flere handlinger"
-        onPress={() => setSheet("actions")}
-      />
-    );
 
   return (
     <>
-      <Stack.Screen options={screenOptions} />
-      <ReceiptToolbar>
-        {data &&
+      <Stack.Screen
+        options={screenOptions({
+          title: data?.store || receipt.data?.store || "Kvittering",
+          colors,
+          onShowActions: () => setSheet("actions"),
+        })}
+      />
+      <ReceiptEditorToolbar
+        menu={menu}
+        saveOffered={
+          !!data &&
           !processing &&
           !approved &&
-          (dirty || receipt.status !== "reviewed") && (
-            <Stack.Toolbar.Button
-              icon="checkmark"
-              disabled={saveDisabled || busy || (!dirty && !ready)}
-              onPress={() => void save()}
-            >
-              {busy ? "Lagrer …" : dirty ? "Lagre" : "Godkjenn"}
-            </Stack.Toolbar.Button>
-          )}
-        <Stack.Toolbar.Menu icon="ellipsis" title="Flere handlinger">
-          <Stack.Toolbar.MenuAction
-            icon="pencil"
-            disabled={!data || busy}
-            onPress={() => setSheet("fields")}
-          >
-            Kvitteringsdetaljer
-          </Stack.Toolbar.MenuAction>
-          <Stack.Toolbar.MenuAction
-            icon="plus"
-            disabled={!data || busy || processing}
-            onPress={addLine}
-          >
-            Legg til linje
-          </Stack.Toolbar.MenuAction>
-          <Stack.Toolbar.MenuAction
-            icon="list.bullet"
-            isOn={summaryLines}
-            onPress={() => {
-              setSummaryLines(!summaryLines);
-              setAllLines(true);
-            }}
-          >
-            Vis MVA og oppsummering
-          </Stack.Toolbar.MenuAction>
-          <Stack.Toolbar.MenuAction
-            icon="eye.slash"
-            isOn={excluded}
-            disabled={busy}
-            onPress={() => {
-              dispatch({ type: "edit", values: { excluded: !excluded } });
-              setMessage("");
-            }}
-          >
-            Utelat fra forbruk
-          </Stack.Toolbar.MenuAction>
-          <Stack.Toolbar.MenuAction
-            icon="arrow.clockwise"
-            disabled={processing || !online || busy || dirty}
-            onPress={retry}
-          >
-            Les bildene på nytt
-          </Stack.Toolbar.MenuAction>
-          <Stack.Toolbar.MenuAction
-            icon="trash"
-            destructive
-            disabled={!online || busy || receipt.status === "uploading"}
-            onPress={removeReceipt}
-          >
-            Slett kvittering
-          </Stack.Toolbar.MenuAction>
-        </Stack.Toolbar.Menu>
-      </ReceiptToolbar>
+          (dirty || receipt.status !== "reviewed")
+        }
+        saveDisabled={saveDisabled}
+        dirty={dirty}
+        ready={ready}
+        onSave={() => void save()}
+      />
       <Screen
         summary={
           <ReceiptSummary
@@ -429,13 +362,7 @@ export function ReceiptEditor({
                 tasks={tasks}
                 data={data}
                 totals={totals}
-                onResolveDuplicate={() => {
-                  dispatch({
-                    type: "edit",
-                    values: { duplicateResolved: true },
-                  });
-                  setMessage("");
-                }}
+                onResolveDuplicate={() => edit({ duplicateResolved: true })}
                 onEditFields={() => setSheet("fields")}
                 onShowLines={(lines) => setAllLines(lines === "all")}
                 onAddLine={addLine}
@@ -453,14 +380,15 @@ export function ReceiptEditor({
               error={error}
               ready={ready}
               approved={approved}
-              label={
-                message ||
-                (draft.operation.kind === "saved"
-                  ? approved
-                    ? "Godkjent"
-                    : "Lagret"
-                  : footerLabel)
-              }
+              label={footerLabel({
+                receipt,
+                operation: draft.operation,
+                message,
+                processing,
+                ready,
+                dirty,
+                taskCount: tasks.length,
+              })}
               nextPending={nextPending}
               dirty={dirty}
               receipt={receipt}
@@ -473,26 +401,8 @@ export function ReceiptEditor({
       >
         {!online && <Notice icon="wifi.slash">Uten nett</Notice>}
         {!!storageError && <Notice tone="error">{storageError}</Notice>}
-        {receipt.revision !== revision && (
-          <Panel>
-            <Notice tone="warning">Endret på en annen enhet</Notice>
-            <Button
-              title="Hent siste versjon"
-              variant="secondary"
-              onPress={() => {
-                if (dirty)
-                  Alert.alert(
-                    "Hente siste versjon?",
-                    "Dine ulagrede endringer blir fjernet.",
-                    [
-                      { text: "Avbryt", style: "cancel" },
-                      { text: "Hent", onPress: () => reset(receipt) },
-                    ],
-                  );
-                else reset(receipt);
-              }}
-            />
-          </Panel>
+        {stale && (
+          <StaleRevisionNotice dirty={dirty} onReload={() => reset(receipt)} />
         )}
 
         {receipt.provider.includes("mock") && <Notice>Demodata</Notice>}
@@ -512,61 +422,19 @@ export function ReceiptEditor({
           >
             <PurchaseTotals data={data} totals={totals} />
             <ReceiptCategorySpending data={data} />
-            {receipt.status !== "reviewed" && productLines.length > 0 && (
-              <Segments
-                value={allLines ? "all" : "review"}
-                onChange={(value) => setAllLines(value === "all")}
-                options={[
-                  { value: "review", label: `Til kontroll (${remaining})` },
-                  {
-                    value: "all",
-                    label: `Alle linjer (${productLines.length})`,
-                  },
-                ]}
-              />
-            )}
-            {!allLines && confirmable > 1 && (
-              <Pressable
-                accessibilityRole="button"
-                onPress={confirmAllCategories}
-                style={(state) => [
-                  {
-                    flexDirection: "row",
-                    alignItems: "center",
-                    gap: 10,
-                    padding: 12,
-                    borderRadius: 14,
-                    borderCurve: "continuous",
-                    backgroundColor: colors.surface,
-                    borderWidth: 1.5,
-                    borderColor: colors.primary,
-                  },
-                  pressed(state),
-                ]}
-              >
-                <Icon name="checkmark.circle" size={20} />
-                <Copy weight="600" style={{ color: colors.primary, flex: 1 }}>
-                  Bekreft alle {confirmable} foreslåtte kategorier
-                </Copy>
-              </Pressable>
-            )}
-            {!allLines && visibleLines.length === 0 && (
-              <Panel style={{ alignItems: "center", paddingVertical: 24 }}>
-                <Icon
-                  name="checkmark.circle"
-                  size={28}
-                  color={colors.success}
-                />
-                <Copy weight="600">
-                  {tasks.length ? "Varene er avklart" : "Klar til godkjenning"}
-                </Copy>
-              </Panel>
-            )}
-            {allLines && (
-              <Copy accessibilityRole="header" size={19} weight="600">
-                Varelinjer
-              </Copy>
-            )}
+            <ReceiptLineControls
+              allLines={allLines}
+              showLineChoice={
+                receipt.status !== "reviewed" && productLineCount > 0
+              }
+              remaining={remaining}
+              productLineCount={productLineCount}
+              confirmable={confirmable}
+              reviewComplete={visibleLines.length === 0}
+              hasTasks={tasks.length > 0}
+              onShowLines={(lines) => setAllLines(lines === "all")}
+              onConfirmAll={confirmAllCategories}
+            />
             <ReceiptLineList
               lines={visibleLines}
               renderLine={(line) => (
@@ -581,22 +449,7 @@ export function ReceiptEditor({
                   productChoice={productChanges[line.id]}
                   priceSignal={signals.get(line.id)}
                   review={!allLines}
-                  onChange={(next) => {
-                    change({
-                      ...data,
-                      lines: data.lines.map((item) =>
-                        item.id === line.id ? next : item,
-                      ),
-                    });
-
-                    const categoryDecided =
-                      next.kind === "product" &&
-                      (next.categoryId !== line.categoryId ||
-                        (line.issues.some(isCategoryUncertain) &&
-                          !next.issues.some(isCategoryUncertain)));
-
-                    if (categoryDecided) rememberLines([line.id]);
-                  }}
+                  onChange={(next) => changeLine(data, line, next)}
                   onRemember={(value) => rememberLines([line.id], value)}
                   onProduct={(choice) => {
                     dispatch({ type: "product", lineId: line.id, choice });
@@ -615,57 +468,12 @@ export function ReceiptEditor({
                 {value}
               </Notice>
             ))}
-            <Disclosure title="Om kvitteringen" value={receipt.uploaderName}>
-              {receipt.catalogStatus === "pending" && (
-                <Row title="Henter produktinformasjon …" icon="barcode" />
-              )}
-              {receipt.catalogStatus === "complete" && (
-                <Row
-                  title="Produktkatalog"
-                  detail={`${data.lines.filter((line) => line.catalogProduct).length} av ${data.lines.filter((line) => line.kind === "product").length} varer koblet`}
-                  icon="barcode"
-                />
-              )}
-              {receipt.catalogStatus === "error" && (
-                <Row
-                  title="Prøv produktsøk igjen"
-                  icon="barcode"
-                  onPress={
-                    !online || busy || dirty
-                      ? undefined
-                      : () =>
-                          void run(async () => {
-                            await releaseMutation(
-                              client,
-                              api.catalogMatching.enrich,
-                              {
-                                id: receipt._id,
-                              },
-                            );
-                          })
-                  }
-                />
-              )}
-              {receipt.productAnalysis?.state === "error" && (
-                <Row
-                  title="Prøv mengdeberegning igjen"
-                  icon="arrow.clockwise"
-                  onPress={
-                    !online || busy || dirty || processing
-                      ? undefined
-                      : () =>
-                          void run(async () => {
-                            await releaseMutation(
-                              client,
-                              api.productAnalysis.ensure,
-                              { ids: [receipt._id] },
-                            );
-                            setMessage("Mengdene beregnes på nytt.");
-                          })
-                  }
-                />
-              )}
-            </Disclosure>
+            <ReceiptDetails
+              receipt={receipt}
+              data={data}
+              onRetryCatalog={requestBlocked ? undefined : retryCatalog}
+              onRetryAnalysis={retryDisabled ? undefined : retryAnalysis}
+            />
             <ReceiptFields
               key={`fields-${generation}`}
               visible={sheet === "fields"}
@@ -688,78 +496,175 @@ export function ReceiptEditor({
             />
           </View>
         ) : (
-          <Panel style={{ alignItems: "center", paddingVertical: 28, gap: 8 }}>
-            {processing && <ActivityIndicator color={colors.accent} />}
-            <Copy weight="600" size={18}>
-              {processing ? "Kvitteringen leses" : "Ingen resultater ennå"}
-            </Copy>
-            {receipt.data && (
-              <Button title="Vis resultatet" onPress={() => reset(receipt)} />
-            )}
-          </Panel>
+          <ReceiptPlaceholder
+            processing={processing}
+            hasResult={!!receipt.data}
+            onShowResult={() => reset(receipt)}
+          />
         )}
         {(!data || processing) && !!error && (
           <Notice tone="error">{error}</Notice>
         )}
         {sheet === "actions" && (
-          <Sheet
-            title="Flere handlinger"
-            visible
-            onClose={() => setSheet(null)}
-          >
-            <Row
-              title="Kvitteringsdetaljer"
-              onPress={() => {
-                setSheet("fields");
-              }}
-            />
-            <Row
-              title="Legg til linje"
-              onPress={() => {
-                setSheet(null);
-                addLine();
-              }}
-            />
-            <Toggle
-              label="Vis MVA og oppsummering"
-              value={summaryLines}
-              onChange={(value) => {
-                setSummaryLines(value);
-                setAllLines(true);
-              }}
-            />
-            <Toggle
-              label="Utelat fra forbruk"
-              value={excluded}
-              onChange={(value) => {
-                dispatch({ type: "edit", values: { excluded: value } });
-                setMessage("");
-              }}
-            />
-            <Button
-              title="Les bildene på nytt"
-              variant="secondary"
-              disabled={processing || !online || busy || dirty}
-              onPress={() => {
-                setSheet(null);
-                retry();
-              }}
-            />
-            <Button
-              title="Slett kvittering"
-              variant="danger"
-              disabled={!online || busy || receipt.status === "uploading"}
-              onPress={removeReceipt}
-            />
-          </Sheet>
+          <ReceiptActionsSheet menu={menu} onClose={() => setSheet(null)} />
         )}
       </Screen>
     </>
   );
 }
 
-function ReceiptToolbar({ children }: { children: ReactNode }) {
-  return Platform.OS === "ios" ? (
-    <Stack.Toolbar placement="right">{children}</Stack.Toolbar>
-  ) : null;
+/** The lines that have review issues when the editor opens or reloads a receipt. */
+function linesForReview(receipt: Receipt): Set<string> {
+  return new Set(
+    receipt.data?.lines
+      .filter((line) => lineReviewIssues(line).length)
+      .map((line) => line.id),
+  );
+}
+
+/** The review state that the editor derives from the draft data. */
+function lineReview(data: ReceiptData | null, unresolvedDuplicate: boolean) {
+  if (!data)
+    return {
+      totals: null,
+      tasks: [],
+      remaining: 0,
+      confirmable: 0,
+      ready: false,
+      productLineCount: 0,
+    };
+
+  return {
+    totals: reconcile(data),
+    tasks: reviewTasks(data, unresolvedDuplicate),
+    remaining: data.lines.filter((line) => lineReviewIssues(line).length)
+      .length,
+    confirmable: data.lines.filter(canConfirmSuggestedCategory).length,
+    ready: canAcceptReceipt(data, unresolvedDuplicate),
+    productLineCount: data.lines.filter((line) => !isTotalsLine(line.kind))
+      .length,
+  };
+}
+
+/**
+ * All-lines mode hides totals lines unless the person asks for them.
+ * Review mode keeps the lines that needed review when the receipt loaded.
+ * Both modes show every line with a review issue.
+ */
+function isLineShown(
+  line: ReceiptLine,
+  view: Readonly<{
+    allLines: boolean;
+    summaryLines: boolean;
+    reviewLineIds: Set<string>;
+  }>,
+): boolean {
+  const hasIssues = lineReviewIssues(line).length > 0;
+
+  if (view.allLines)
+    return view.summaryLines || !isTotalsLine(line.kind) || hasIssues;
+
+  return view.reviewLineIds.has(line.id) || hasIssues;
+}
+
+/** The person chose a category, or resolved an uncertain suggestion. */
+function isCategoryDecided(line: ReceiptLine, next: ReceiptLine): boolean {
+  return (
+    next.kind === "product" &&
+    (next.categoryId !== line.categoryId ||
+      (line.issues.some(isCategoryUncertain) &&
+        !next.issues.some(isCategoryUncertain)))
+  );
+}
+
+// The server needs a store and a name to build a memory key.
+function rememberableLineIds(data: ReceiptData, remember: string[]) {
+  return remember.filter((id) => {
+    const line = data.lines.find((item) => item.id === id);
+
+    return (
+      line &&
+      line.kind === "product" &&
+      isDecidedCategory(line.categoryId) &&
+      aliasKey(data, line) !== null
+    );
+  });
+}
+
+function productSelections(changes: Record<string, ProductChoice>) {
+  return Object.entries(changes).map(([lineId, choice]) =>
+    choice.kind === "catalog"
+      ? { kind: "catalog" as const, lineId, key: choice.key }
+      : { ...choice, lineId },
+  );
+}
+
+/** The footer status. A message from the last action comes first. */
+function footerLabel({
+  receipt,
+  operation,
+  message,
+  processing,
+  ready,
+  dirty,
+  taskCount,
+}: Readonly<{
+  receipt: Receipt;
+  operation: ReceiptDraft["operation"];
+  message: string;
+  processing: boolean;
+  ready: boolean;
+  dirty: boolean;
+  taskCount: number;
+}>): string {
+  if (message) return message;
+
+  if (operation.kind === "saved")
+    return operation.approved ? "Godkjent" : "Lagret";
+
+  if (processing) return receiptStatusLabel(receipt);
+
+  if (ready)
+    return !dirty && receipt.status === "reviewed"
+      ? receiptStatusLabel(receipt)
+      : "Klar til godkjenning";
+
+  return taskCount === 1 ? "Én ting igjen" : `${taskCount} ting igjen`;
+}
+
+/** Whether the last save approved the receipt, and the last request failure. */
+function operationOutcome(operation: ReceiptDraft["operation"]) {
+  return {
+    approved: operation.kind === "saved" && operation.approved,
+    error: operation.kind === "failed" ? operation.error : "",
+  };
+}
+
+/** The navigation bar. Platforms without the iOS toolbar get an actions button. */
+function screenOptions({
+  title,
+  colors,
+  onShowActions,
+}: Readonly<{
+  title: string;
+  colors: ReturnType<typeof useTheme>;
+  onShowActions: () => void;
+}>): ComponentProps<typeof Stack.Screen>["options"] {
+  const options: ComponentProps<typeof Stack.Screen>["options"] = {
+    title,
+    headerStyle: { backgroundColor: colors.hero },
+    headerTintColor: colors.onHero,
+    headerTitleStyle: { color: colors.onHero, fontWeight: "600" },
+  };
+
+  if (Platform.OS !== "ios")
+    options.headerRight = () => (
+      <IconButton
+        name="ellipsis"
+        label="Flere handlinger"
+        onPress={onShowActions}
+      />
+    );
+
+  return options;
 }

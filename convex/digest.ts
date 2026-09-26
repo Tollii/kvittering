@@ -106,6 +106,28 @@ export const periodPage = internalQuery({
   },
 });
 
+type DigestDay = Parameters<typeof dailyDigest>[0][number];
+
+/** Add the spending of a receipt to the day of its purchase date. Skip a receipt without a date. */
+function addReceiptToDay(
+  days: Map<string, DigestDay>,
+  receipt: Doc<"receipts">,
+) {
+  const date = receipt.data?.purchaseDate;
+
+  if (!date) return;
+  const previous = days.get(date);
+  const totals = receiptSpendingTotals(receipt);
+  const categories = receiptComparisonCategories(receipt);
+  days.set(date, {
+    date,
+    totals: previous ? addSpendingTotals(previous.totals, totals) : totals,
+    categories: previous
+      ? addCategoryTotals(previous.categories, categories)
+      : categories,
+  });
+}
+
 export const forHousehold = internalAction({
   args: { householdId: v.id("households"), today: v.string() },
   returns: v.union(v.object({ title: v.string(), body: v.string() }), v.null()),
@@ -116,7 +138,7 @@ export const forHousehold = internalAction({
     const summary = await ctx.runQuery(internal.digest.summary, args);
 
     if (summary) return summary;
-    const days = new Map<string, Parameters<typeof dailyDigest>[0][number]>();
+    const days = new Map<string, DigestDay>();
     let cursor: string | null = null;
     let budget: Ore | null = null;
 
@@ -136,23 +158,8 @@ export const forHousehold = internalAction({
       if (!result.household) return null;
       budget = result.household.monthlyBudgetOre ?? null;
 
-      for (const receipt of result.receipts.page) {
-        const date = receipt.data?.purchaseDate;
-
-        if (!date) continue;
-        const previous = days.get(date);
-        const totals = receiptSpendingTotals(receipt);
-        const categories = receiptComparisonCategories(receipt);
-        days.set(date, {
-          date,
-          totals: previous
-            ? addSpendingTotals(previous.totals, totals)
-            : totals,
-          categories: previous
-            ? addCategoryTotals(previous.categories, categories)
-            : categories,
-        });
-      }
+      for (const receipt of result.receipts.page)
+        addReceiptToDay(days, receipt);
 
       if (result.receipts.isDone) break;
       cursor = result.receipts.continueCursor;

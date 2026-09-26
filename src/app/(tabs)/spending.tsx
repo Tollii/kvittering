@@ -93,9 +93,7 @@ function Spending({ initialMonth }: Readonly<{ initialMonth: CalendarMonth }>) {
   const [report, setReport] = useState<ReportId | null>(null);
   const [showAllGroups, setShowAllGroups] = useState(false);
 
-  const [breakdown, setBreakdown] = useState<"category" | "store" | "type">(
-    "category",
-  );
+  const [breakdown, setBreakdown] = useState<Breakdown>("category");
 
   const [group, setGroup] = useState<string | null>(null);
   const [selection, setSelection] = useState<SpendingSelection | null>(null);
@@ -133,31 +131,15 @@ function Spending({ initialMonth }: Readonly<{ initialMonth: CalendarMonth }>) {
   const monthLabel = CalendarMonth.format(month);
 
   const coverage = receiptCoverage([...receipts, ...undated.receipts]);
-  const [firstPending] = coverage.pending;
   const catalog = catalogInsights(totals.selected);
 
-  const change =
-    (!loadingReceipts || initialPrevious) && previousProducts
-      ? Math.round(
-          Ore.ratio(
-            Ore.subtract(headline.products, previousProducts),
-            Ore.abs(previousProducts),
-          ) * 100,
-        )
-      : null;
+  const change = percentChange(
+    headline.products,
+    previousProducts,
+    !loadingReceipts || !!initialPrevious,
+  );
 
-  const rows =
-    breakdown === "store"
-      ? totals.stores
-      : breakdown === "type"
-        ? totals.purchaseTypes
-        : group
-          ? totals.categories.filter(
-              (category) =>
-                categoryOf(category.id).group === group ||
-                (group === "fallback" && category.id === "unallocated"),
-            )
-          : totals.groups;
+  const rows = breakdownRows(totals, breakdown, group);
 
   const showDetails = (
     value: SpendingGroup,
@@ -341,56 +323,12 @@ function Spending({ initialMonth }: Readonly<{ initialMonth: CalendarMonth }>) {
                   {headline.provisional
                     ? ` · ${headline.provisional} foreløpige`
                     : ""}
-                  {change !== null
-                    ? ` · ${Math.abs(change)} % ${change > 0 ? "mer" : "mindre"} enn ${comparison.partial ? "samme del av forrige måned" : "forrige måned"}`
-                    : ""}
+                  {changeText(change, comparison.partial)}
                 </Copy>
               </View>
               <MonumentArtwork scene="inbox" compact />
             </View>
-            {pace && (
-              <View style={{ gap: 6, paddingTop: 6 }}>
-                <View
-                  style={{
-                    height: 6,
-                    borderRadius: 3,
-                    backgroundColor: colors.heroTrack,
-                    overflow: "hidden",
-                  }}
-                >
-                  <View
-                    style={{
-                      height: 6,
-                      borderRadius: 3,
-                      width: `${Math.min(100, pace.spentShare * 100)}%`,
-                      backgroundColor:
-                        pace.status === "over"
-                          ? colors.heroWarning
-                          : colors.onHero,
-                    }}
-                  />
-                  {pace.elapsedShare > 0 && pace.elapsedShare < 1 && (
-                    <View
-                      style={{
-                        position: "absolute",
-                        left: `${pace.elapsedShare * 100}%`,
-                        top: -2,
-                        width: 2,
-                        height: 10,
-                        backgroundColor: colors.heroMarker,
-                      }}
-                    />
-                  )}
-                </View>
-                <Copy
-                  size={13}
-                  weight="600"
-                  style={{ color: colors.onHero, opacity: 0.9 }}
-                >
-                  {paceLabel(pace)}
-                </Copy>
-              </View>
-            )}
+            {pace && <BudgetPaceBar pace={pace} colors={colors} />}
           </Panel>
         )
       }
@@ -404,38 +342,7 @@ function Spending({ initialMonth }: Readonly<{ initialMonth: CalendarMonth }>) {
         <>
           {!completeReceipts && <Notice>Henter kvitteringer …</Notice>}
           {coverage.pending.length > 0 && (
-            <Pressable
-              accessibilityRole="button"
-              onPress={() => router.navigate("/inbox")}
-              style={(state) => [
-                {
-                  flexDirection: "row",
-                  alignItems: "center",
-                  gap: 12,
-                  padding: 12,
-                  paddingLeft: 14,
-                  borderRadius: 14,
-                  borderCurve: "continuous",
-                  backgroundColor: colors.primarySoft,
-                },
-                pressed(state),
-              ]}
-            >
-              <Icon name="tray.full" size={18} />
-              <View style={{ flex: 1, gap: 1 }}>
-                <Copy size={14} weight="600">
-                  {coverage.pending.length === 1
-                    ? "Én kvittering venter på kontroll"
-                    : `${coverage.pending.length} kvitteringer venter på kontroll`}
-                </Copy>
-                <Copy size={12} muted numberOfLines={1}>
-                  {(firstPending ? receiptNeeds(firstPending) : [])
-                    .slice(0, 2)
-                    .join(" · ") || "Summene er foreløpige."}
-                </Copy>
-              </View>
-              <Icon name="chevron.right" size={12} color={colors.secondary} />
-            </Pressable>
+            <PendingReceiptsNotice pending={coverage.pending} colors={colors} />
           )}
           <View style={{ gap: 4 }}>
             <SectionTitle title="Fordeling" />
@@ -482,17 +389,7 @@ function Spending({ initialMonth }: Readonly<{ initialMonth: CalendarMonth }>) {
                 if (breakdown === "category" && !group) {
                   setGroup(row.id);
                   setShowAllGroups(false);
-                } else
-                  showDetails(
-                    row,
-                    breakdown === "store"
-                      ? "store"
-                      : breakdown === "type"
-                        ? "type"
-                        : group
-                          ? "category"
-                          : "group",
-                  );
+                } else showDetails(row, selectionDimension(breakdown, group));
               }}
             />
             {rows.length > 5 && (
@@ -566,5 +463,163 @@ function Spending({ initialMonth }: Readonly<{ initialMonth: CalendarMonth }>) {
       </Sheet>
       <SpendingDetails selected={selected} onClose={() => setSelection(null)} />
     </Screen>
+  );
+}
+
+type Breakdown = "category" | "store" | "type";
+
+type MonthTotals = ReturnType<typeof comparisonInsights>["current"];
+
+type Colors = ReturnType<typeof useTheme>;
+
+/** The rows of the selected breakdown. A selected category group shows its categories. */
+function breakdownRows(
+  totals: MonthTotals,
+  breakdown: Breakdown,
+  group: string | null,
+): SpendingGroup[] {
+  if (breakdown === "store") return totals.stores;
+
+  if (breakdown === "type") return totals.purchaseTypes;
+
+  if (!group) return totals.groups;
+
+  return totals.categories.filter(
+    (category) =>
+      categoryOf(category.id).group === group ||
+      (group === "fallback" && category.id === "unallocated"),
+  );
+}
+
+/** The detail dimension of a row in the selected breakdown. */
+function selectionDimension(
+  breakdown: Breakdown,
+  group: string | null,
+): SpendingDimension {
+  if (breakdown === "store") return "store";
+
+  if (breakdown === "type") return "type";
+
+  return group ? "category" : "group";
+}
+
+/**
+ * The whole-percent change from the previous month, or null when the previous
+ * month is still loading or has no spending.
+ */
+function percentChange(
+  currentOre: Ore,
+  previousOre: Ore,
+  previousLoaded: boolean,
+): number | null {
+  if (!previousLoaded || !previousOre) return null;
+
+  return Math.round(
+    Ore.ratio(Ore.subtract(currentOre, previousOre), Ore.abs(previousOre)) *
+      100,
+  );
+}
+
+/** The change from the previous month as summary text, or empty text when it is not known. */
+function changeText(change: number | null, partial: boolean): string {
+  if (change === null) return "";
+  const direction = change > 0 ? "mer" : "mindre";
+  const previous = partial ? "samme del av forrige måned" : "forrige måned";
+
+  return ` · ${Math.abs(change)} % ${direction} enn ${previous}`;
+}
+
+function BudgetPaceBar({
+  pace,
+  colors,
+}: Readonly<{
+  pace: NonNullable<ReturnType<typeof budgetPace>>;
+  colors: Colors;
+}>) {
+  return (
+    <View style={{ gap: 6, paddingTop: 6 }}>
+      <View
+        style={{
+          height: 6,
+          borderRadius: 3,
+          backgroundColor: colors.heroTrack,
+          overflow: "hidden",
+        }}
+      >
+        <View
+          style={{
+            height: 6,
+            borderRadius: 3,
+            width: `${Math.min(100, pace.spentShare * 100)}%`,
+            backgroundColor:
+              pace.status === "over" ? colors.heroWarning : colors.onHero,
+          }}
+        />
+        {pace.elapsedShare > 0 && pace.elapsedShare < 1 && (
+          <View
+            style={{
+              position: "absolute",
+              left: `${pace.elapsedShare * 100}%`,
+              top: -2,
+              width: 2,
+              height: 10,
+              backgroundColor: colors.heroMarker,
+            }}
+          />
+        )}
+      </View>
+      <Copy
+        size={13}
+        weight="600"
+        style={{ color: colors.onHero, opacity: 0.9 }}
+      >
+        {paceLabel(pace)}
+      </Copy>
+    </View>
+  );
+}
+
+function PendingReceiptsNotice({
+  pending,
+  colors,
+}: Readonly<{
+  pending: ReturnType<typeof receiptCoverage>["pending"];
+  colors: Colors;
+}>) {
+  const [firstPending] = pending;
+
+  return (
+    <Pressable
+      accessibilityRole="button"
+      onPress={() => router.navigate("/inbox")}
+      style={(state) => [
+        {
+          flexDirection: "row",
+          alignItems: "center",
+          gap: 12,
+          padding: 12,
+          paddingLeft: 14,
+          borderRadius: 14,
+          borderCurve: "continuous",
+          backgroundColor: colors.primarySoft,
+        },
+        pressed(state),
+      ]}
+    >
+      <Icon name="tray.full" size={18} />
+      <View style={{ flex: 1, gap: 1 }}>
+        <Copy size={14} weight="600">
+          {pending.length === 1
+            ? "Én kvittering venter på kontroll"
+            : `${pending.length} kvitteringer venter på kontroll`}
+        </Copy>
+        <Copy size={12} muted numberOfLines={1}>
+          {(firstPending ? receiptNeeds(firstPending) : [])
+            .slice(0, 2)
+            .join(" · ") || "Summene er foreløpige."}
+        </Copy>
+      </View>
+      <Icon name="chevron.right" size={12} color={colors.secondary} />
+    </Pressable>
   );
 }

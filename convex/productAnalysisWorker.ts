@@ -10,7 +10,8 @@ import {
 import { attributeQuestions } from "../src/lib/domain/product-attribute-classification";
 import { v } from "convex/values";
 import { TypeSafeClient, choice } from "@typesafe-ai/sdk";
-import { env, internalAction } from "./_generated/server";
+import { env, internalAction, type ActionCtx } from "./_generated/server";
+import type { Id } from "./_generated/dataModel";
 import { internal } from "./_generated/api";
 import {
   emptyPurchaseQuantity,
@@ -202,6 +203,105 @@ export function profileDecision(
   };
 }
 
+/** The receipt state that product analysis read; saves apply only while it is current. */
+type AnalysisSnapshot = {
+  id: Id<"receipts">;
+  generation: number;
+  revision: number;
+  version: number;
+};
+
+/**
+ * Asks TypeSafe for each package profile that the batch lacks, once for each
+ * profile key, and saves the decisions. Returns the IDs of the saved profiles.
+ */
+async function classifyMissingProfiles(
+  ctx: ActionCtx,
+  client: TypeSafeClient,
+  args: AnalysisSnapshot,
+  contexts: PreparedProfile[],
+): Promise<Id<"productProfiles">[]> {
+  const missing = [
+    ...new Map(
+      contexts.flatMap((item) =>
+        item.profile ? [] : [[productProfileKey(item.line), item] as const],
+      ),
+    ).values(),
+  ];
+
+  const requests = missing.map((context, index) => ({
+    context,
+    ...profileQuestions(context, `items[${index}].`),
+  }));
+
+  if (!requests.length) return [];
+
+  const response = await client.systemOne({
+    model: env.TYPESAFE_MODEL ?? "jev-latest",
+    state: { items: requests.map((request) => request.state) },
+    questions: Object.fromEntries(
+      requests.flatMap((request, index) =>
+        Object.entries(request.questions).map(([key, question]) => [
+          `profile_${index}_${key}`,
+          question,
+        ]),
+      ),
+    ),
+  });
+
+  const decisions = requests.map((request, index) =>
+    profileDecision(
+      request.context,
+      request.candidates,
+      Object.fromEntries(
+        Object.keys(request.questions).map((key) => [
+          key,
+          response.answers[`profile_${index}_${key}`],
+        ]),
+      ),
+    ),
+  );
+
+  return ctx.runMutation(internal.productAnalysis.saveProfiles, {
+    ...args,
+    decisions,
+  });
+}
+
+/** A product line with its package profile, ready for quantity analysis. */
+type PreparedLine = {
+  line: ReceiptLine;
+  profile: PackageProfile;
+  attributes?: ProductAttributes;
+  family: ProductAnalysisResult["family"];
+};
+
+/**
+ * Converts the quantity answer for one line to its analysis result. Refunds
+ * and other negative amounts get an empty purchase quantity.
+ */
+function purchaseAnalysisResult(
+  item: PreparedLine & { candidates: ReturnType<typeof purchaseCandidates> },
+  answer: Answer | undefined,
+): ProductAnalysisResult {
+  // An omitted answer selects no candidate.
+  const selected = answer && /^candidate_(\d+)$/.exec(answer.choice);
+
+  return {
+    lineId: item.line.id,
+    evidenceKey: purchaseEvidenceKey(item.line),
+    family: item.family,
+    attributes: item.attributes,
+    quantity:
+      (item.line.amountOre ?? Ore.zero) < 0
+        ? emptyPurchaseQuantity()
+        : normalizePurchase(
+            item.profile,
+            selected ? (item.candidates[Number(selected[1])] ?? null) : null,
+          ),
+  };
+}
+
 export const analyze = internalAction({
   args: {
     id: v.id("receipts"),
@@ -225,12 +325,7 @@ export const analyze = internalAction({
       retry: { maxRetries: 0 },
     });
 
-    const prepared: {
-      line: ReceiptLine;
-      profile: PackageProfile;
-      attributes?: ProductAttributes;
-      family: ProductAnalysisResult["family"];
-    }[] = [];
+    const prepared: PreparedLine[] = [];
 
     const lines = receipt.data.lines.filter((line) => line.kind === "product");
 
@@ -245,57 +340,10 @@ export const analyze = internalAction({
 
       if (!contexts) return [];
 
-      const missing = [
-        ...new Map(
-          contexts
-            .filter((item) => !item.profile)
-            .map((item) => [productProfileKey(item.line), item]),
-        ).values(),
+      const ids = [
+        ...contexts.flatMap((item) => (item.profile ? [item.profile._id] : [])),
+        ...(await classifyMissingProfiles(ctx, client, args, contexts)),
       ];
-
-      const requests = missing.map((context, index) => ({
-        context,
-        ...profileQuestions(context, `items[${index}].`),
-      }));
-
-      let ids = contexts.flatMap((item) =>
-        item.profile ? [item.profile._id] : [],
-      );
-
-      if (requests.length) {
-        const response = await client.systemOne({
-          model: env.TYPESAFE_MODEL ?? "jev-latest",
-          state: { items: requests.map((request) => request.state) },
-          questions: Object.fromEntries(
-            requests.flatMap((request, index) =>
-              Object.entries(request.questions).map(([key, question]) => [
-                `profile_${index}_${key}`,
-                question,
-              ]),
-            ),
-          ),
-        });
-
-        const decisions = requests.map((request, index) =>
-          profileDecision(
-            request.context,
-            request.candidates,
-            Object.fromEntries(
-              Object.keys(request.questions).map((key) => [
-                key,
-                response.answers[`profile_${index}_${key}`],
-              ]),
-            ),
-          ),
-        );
-
-        ids = ids.concat(
-          await ctx.runMutation(internal.productAnalysis.saveProfiles, {
-            ...args,
-            decisions,
-          }),
-        );
-      }
 
       const profiles = await ctx.runQuery(
         internal.productAnalysis.readProfiles,
@@ -362,24 +410,9 @@ export const analyze = internalAction({
       });
 
       batch.forEach((item, index) => {
-        const answer = response.answers[`quantity_${index}`];
-        // An omitted answer selects no candidate.
-        const selected = answer && /^candidate_(\d+)$/.exec(answer.choice);
-        results.push({
-          lineId: item.line.id,
-          evidenceKey: purchaseEvidenceKey(item.line),
-          family: item.family,
-          attributes: item.attributes,
-          quantity:
-            (item.line.amountOre ?? Ore.zero) < 0
-              ? emptyPurchaseQuantity()
-              : normalizePurchase(
-                  item.profile,
-                  selected
-                    ? (item.candidates[Number(selected[1])] ?? null)
-                    : null,
-                ),
-        });
+        results.push(
+          purchaseAnalysisResult(item, response.answers[`quantity_${index}`]),
+        );
       });
     }
 

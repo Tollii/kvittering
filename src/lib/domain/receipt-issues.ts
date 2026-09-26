@@ -31,11 +31,6 @@ export function parseReceiptIssue(value: string): ReceiptIssue {
 export const isCategoryUncertain = (value: string) =>
   parseReceiptIssue(value).code === "category_uncertain";
 
-/** Issues about a line field that the line editor shows as an input to fill. */
-export function isMissingLineField(issue: ReceiptIssue): boolean {
-  return issue.code === "amount_missing" || issue.code === "name_missing";
-}
-
 /** Issues printed on the receipt as a whole rather than on one line. */
 export function isReceiptLevelIssue(issue: ReceiptIssue): boolean {
   switch (issue.code) {

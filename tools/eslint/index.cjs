@@ -596,6 +596,36 @@ module.exports = {
           return [];
         }
 
+        // Record top-level functions and variables so exported names resolve.
+        function recordLocals(statement) {
+          const declaration =
+            statement.type === "ExportNamedDeclaration"
+              ? statement.declaration
+              : statement;
+
+          if (declaration?.type === "FunctionDeclaration" && declaration.id)
+            locals.set(declaration.id.name, declaration);
+
+          if (declaration?.type === "VariableDeclaration")
+            for (const variable of declaration.declarations)
+              if (variable.id.type === "Identifier")
+                locals.set(variable.id.name, variable.init);
+        }
+
+        // Check each component that a statement exports from this module.
+        function checkExports(statement) {
+          if (statement.type === "ExportDefaultDeclaration")
+            check(statement.declaration);
+
+          if (statement.type !== "ExportNamedDeclaration" || statement.source)
+            return;
+
+          declared(statement.declaration).forEach(check);
+
+          for (const specifier of statement.specifiers)
+            if (specifier.local.type === "Identifier") check(specifier.local);
+        }
+
         return {
           ImportDeclaration(node) {
             if (node.source.value !== base) return;
@@ -605,37 +635,8 @@ module.exports = {
                 baseTypes.add(specifier.local.name);
           },
           "Program:exit"(program) {
-            for (const statement of program.body) {
-              const declaration =
-                statement.type === "ExportNamedDeclaration"
-                  ? statement.declaration
-                  : statement;
-
-              if (declaration?.type === "FunctionDeclaration" && declaration.id)
-                locals.set(declaration.id.name, declaration);
-
-              if (declaration?.type === "VariableDeclaration")
-                for (const variable of declaration.declarations)
-                  if (variable.id.type === "Identifier")
-                    locals.set(variable.id.name, variable.init);
-            }
-
-            for (const statement of program.body) {
-              if (statement.type === "ExportDefaultDeclaration")
-                check(statement.declaration);
-
-              if (
-                statement.type !== "ExportNamedDeclaration" ||
-                statement.source
-              )
-                continue;
-
-              declared(statement.declaration).forEach(check);
-
-              for (const specifier of statement.specifiers)
-                if (specifier.local.type === "Identifier")
-                  check(specifier.local);
-            }
+            program.body.forEach(recordLocals);
+            program.body.forEach(checkExports);
           },
         };
       },

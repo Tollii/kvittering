@@ -20,6 +20,12 @@ const registeredFunction = z.looseObject({
   exportReturns: exportedJson,
 });
 
+/** A module export that is a registered function; its contract is in its own properties. */
+const registeredExport = z
+  .custom<object>((value) => value instanceof Function)
+  .transform((value) => ({ ...value }))
+  .pipe(registeredFunction);
+
 /** Module namespaces by path, parsed so each export can be inspected. */
 export const moduleNamespaces = z.record(
   z.string(),
@@ -45,34 +51,38 @@ export function extractContract(modules: ModuleNamespaces): Contract {
   for (const [modulePath, exports] of byKey(modules)) {
     for (const [name, value] of byKey(exports)) {
       if (modulePath === "http" && name === "default") {
-        const router = httpRouter.parse(value);
-
-        httpRoutes = routes
-          .parse(router.getRoutes())
-          .map(([path, method]) => `${method} ${path}`)
-          .sort((a, b) => a.localeCompare(b));
+        httpRoutes = routeList(httpRouter.parse(value));
         continue;
       }
 
-      // Registered functions are callables carrying their contract as properties.
-      if (!(value instanceof Function)) continue;
+      const registered = registeredExport.safeParse(value);
 
-      const registered = registeredFunction.safeParse({ ...value });
-
-      if (!registered.success) continue;
-
-      const fn = registered.data;
-
-      functions[`${modulePath}:${name}`] = {
-        kind: fn.isQuery ? "query" : fn.isMutation ? "mutation" : "action",
-        visibility: fn.isPublic ? "public" : "internal",
-        args: parseValidatorJson(fn.exportArgs()),
-        returns: parseValidatorJson(fn.exportReturns()),
-      };
+      if (registered.success)
+        functions[`${modulePath}:${name}`] = functionContract(registered.data);
     }
   }
 
   return { functions, httpRoutes };
+}
+
+/** List the routes of the `convex/http` router as sorted "METHOD path" entries. */
+function routeList(router: z.infer<typeof httpRouter>): string[] {
+  return routes
+    .parse(router.getRoutes())
+    .map(([path, method]) => `${method} ${path}`)
+    .sort((a, b) => a.localeCompare(b));
+}
+
+/** Give the contract of a registered Convex function. */
+function functionContract(
+  fn: z.infer<typeof registeredFunction>,
+): FunctionContract {
+  return {
+    kind: fn.isQuery ? "query" : fn.isMutation ? "mutation" : "action",
+    visibility: fn.isPublic ? "public" : "internal",
+    args: parseValidatorJson(fn.exportArgs()),
+    returns: parseValidatorJson(fn.exportReturns()),
+  };
 }
 
 function byKey<T>(record: Record<string, T>): [string, T][] {

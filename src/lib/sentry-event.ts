@@ -70,29 +70,36 @@ export function diagnosticBreadcrumb(
   };
 }
 
+/**
+ * Give the primary exception the capture stack when the SDK found no stack,
+ * and record which stack the event contains.
+ */
+function applyCaptureStack(event: ErrorEvent, captureFrames: StackFrame[]) {
+  const primary = event.exception?.values?.[0];
+
+  if (!primary) return;
+  const originalStack = !!primary.stacktrace?.frames?.length;
+
+  if (!originalStack && captureFrames.length)
+    primary.stacktrace = { frames: captureFrames };
+  event.contexts = {
+    ...event.contexts,
+    diagnostics: {
+      stack_source: originalStack
+        ? "original"
+        : captureFrames.length
+          ? "capture"
+          : "unavailable",
+    },
+  };
+}
+
 /** Run after SDK stack parsing and linked-error processing, including native causes. */
 export function prepareErrorEvent(
   event: ErrorEvent,
   captureFrames: StackFrame[] = [],
 ) {
-  const primary = event.exception?.values?.[0];
-
-  if (primary) {
-    const originalStack = !!primary.stacktrace?.frames?.length;
-
-    if (!originalStack && captureFrames.length)
-      primary.stacktrace = { frames: captureFrames };
-    event.contexts = {
-      ...event.contexts,
-      diagnostics: {
-        stack_source: originalStack
-          ? "original"
-          : captureFrames.length
-            ? "capture"
-            : "unavailable",
-      },
-    };
-  }
+  applyCaptureStack(event, captureFrames);
 
   for (const exception of event.exception?.values ?? []) {
     if (exception.value) exception.value = diagnosticText(exception.value);

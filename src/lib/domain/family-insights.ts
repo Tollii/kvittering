@@ -19,6 +19,18 @@ export type FamilyPurchase = {
   contributions: (PurchaseContribution & { quantity: PurchaseQuantity })[];
 };
 
+/** Add each known measure of one purchase to the family total and its coverage count. */
+function addFamilyQuantity(family: FamilyPurchase, quantity: PurchaseQuantity) {
+  for (const key of purchaseQuantityKeys) {
+    const value = quantity[key];
+
+    if (value !== null) {
+      family.quantity[key] = (family.quantity[key] ?? 0) + value;
+      family.coverage[key]++;
+    }
+  }
+}
+
 export function familyInsights(receipts: Receipt[]) {
   const families = new Map<string, FamilyPurchase>();
 
@@ -56,15 +68,7 @@ export function familyInsights(receipts: Receipt[]) {
         quantity: result.quantity,
       });
 
-      for (const key of purchaseQuantityKeys) {
-        const value = result.quantity[key];
-
-        if (value !== null) {
-          family.quantity[key] = (family.quantity[key] ?? 0) + value;
-          family.coverage[key]++;
-        }
-      }
-
+      addFamilyQuantity(family, result.quantity);
       families.set(family.id, family);
     }
   }

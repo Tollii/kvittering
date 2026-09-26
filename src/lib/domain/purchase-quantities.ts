@@ -152,28 +152,39 @@ export function normalizePurchase(
 
   if (kind === "g") result.grams = amount;
   else if (kind === "ml") result.millilitres = amount;
-  else {
-    if (kind === "packages") {
-      result.packages = amount;
-      result.units =
-        profile.unitsPerPackage === null
-          ? null
-          : amount * profile.unitsPerPackage;
-    } else result.units = amount;
+  else return countedPurchase(profile, amount, kind);
 
-    const multiplier =
-      kind === "packages"
-        ? amount
-        : profile.unitsPerPackage
-          ? amount / profile.unitsPerPackage
-          : null;
+  return result;
+}
 
-    if (multiplier !== null && profile.measurePerPackage) {
-      const total = multiplier * profile.measurePerPackage.amount;
+/** A package or unit count, with the units and measure that the package profile gives. */
+function countedPurchase(
+  profile: PackageProfile,
+  amount: number,
+  kind: "packages" | "units",
+): PurchaseQuantity {
+  const result = emptyPurchaseQuantity();
 
-      if (profile.measurePerPackage.unit === "g") result.grams = total;
-      else result.millilitres = total;
-    }
+  if (kind === "packages") {
+    result.packages = amount;
+    result.units =
+      profile.unitsPerPackage === null
+        ? null
+        : amount * profile.unitsPerPackage;
+  } else result.units = amount;
+
+  const multiplier =
+    kind === "packages"
+      ? amount
+      : profile.unitsPerPackage
+        ? amount / profile.unitsPerPackage
+        : null;
+
+  if (multiplier !== null && profile.measurePerPackage) {
+    const total = multiplier * profile.measurePerPackage.amount;
+
+    if (profile.measurePerPackage.unit === "g") result.grams = total;
+    else result.millilitres = total;
   }
 
   return result;

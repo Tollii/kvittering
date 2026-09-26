@@ -108,6 +108,16 @@ export function incompatibilities(
     return fits ? [] : [`${path}: ${describe(narrow)} is no longer accepted`];
   }
 
+  return alternativeIncompatibilities(wide, narrow, mode, path);
+}
+
+/** Compare a `narrow` validator that is not a union with a `wide` validator that is not a union. */
+function alternativeIncompatibilities(
+  wide: ValidatorJson,
+  narrow: Exclude<ValidatorJson, { type: "union" }>,
+  mode: ObjectMode,
+  path: string,
+): string[] {
   switch (narrow.type) {
     case "literal":
       return literalFits(wide, narrow.value)

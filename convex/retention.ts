@@ -116,6 +116,58 @@ export const workflowJournal = internalMutation({
   },
 });
 
+/**
+ * Register one workflow of the inventory and set its journal expiry when the
+ * workflow is complete or its receipt is deleted. Cancel the workflow of a deleted receipt.
+ */
+async function inventoryWorkflow(
+  ctx: MutationCtx,
+  component: WorkflowComponent,
+  workflow: { workflowId: string; args: unknown; runResult?: unknown },
+) {
+  const owner = componentFor(component);
+  const args = z.object({ id: z.string() }).safeParse(workflow.args);
+
+  const receiptId = args.success
+    ? ctx.db.normalizeId("receipts", args.data.id)
+    : null;
+
+  // SAFETY: The component API returns validated workflow IDs but erases the SDK brand.
+  const workflowId = workflow.workflowId as WorkflowId;
+
+  const id = await trackWorkflow(
+    ctx,
+    workflowId,
+    component,
+    receiptId ?? undefined,
+  );
+
+  const record = await ctx.db.get("workflowJournals", id);
+
+  if (!record) throw new Error("Workflow journal was not created.");
+
+  const deleted =
+    receiptId !== null && !(await ctx.db.get("receipts", receiptId));
+
+  if (deleted && !workflow.runResult) await cancel(ctx, owner, workflowId);
+
+  if (workflow.runResult || deleted) {
+    // Legacy journals get a full grace period from first observation, not creation.
+    const expiresAt = deleted
+      ? Date.now()
+      : (record.expiresAt ?? Date.now() + thirtyDays);
+
+    await ctx.db.patch("workflowJournals", id, { expiresAt });
+
+    if (record.expiresAt === undefined || expiresAt <= Date.now())
+      await ctx.scheduler.runAfter(
+        Math.max(0, expiresAt - Date.now()),
+        internal.retention.workflowJournal,
+        { workflowId: workflowId, component },
+      );
+  }
+}
+
 /** Daily inventory also covers journals created before cleanup identifiers were recorded. */
 export const inventoryWorkflows = internalMutation({
   args: { component: workflowComponent, cursor: v.string().optional() },
@@ -133,48 +185,8 @@ export const inventoryWorkflows = internalMutation({
       },
     });
 
-    for (const workflow of page.page) {
-      const args = z.object({ id: z.string() }).safeParse(workflow.args);
-
-      const receiptId = args.success
-        ? ctx.db.normalizeId("receipts", args.data.id)
-        : null;
-
-      // SAFETY: The component API returns validated workflow IDs but erases the SDK brand.
-      const workflowId = workflow.workflowId as WorkflowId;
-
-      const id = await trackWorkflow(
-        ctx,
-        workflowId,
-        component,
-        receiptId ?? undefined,
-      );
-
-      const record = await ctx.db.get("workflowJournals", id);
-
-      if (!record) throw new Error("Workflow journal was not created.");
-
-      const deleted =
-        receiptId !== null && !(await ctx.db.get("receipts", receiptId));
-
-      if (deleted && !workflow.runResult) await cancel(ctx, owner, workflowId);
-
-      if (workflow.runResult || deleted) {
-        // Legacy journals get a full grace period from first observation, not creation.
-        const expiresAt = deleted
-          ? Date.now()
-          : (record.expiresAt ?? Date.now() + thirtyDays);
-
-        await ctx.db.patch("workflowJournals", id, { expiresAt });
-
-        if (record.expiresAt === undefined || expiresAt <= Date.now())
-          await ctx.scheduler.runAfter(
-            Math.max(0, expiresAt - Date.now()),
-            internal.retention.workflowJournal,
-            { workflowId: workflowId, component },
-          );
-      }
-    }
+    for (const workflow of page.page)
+      await inventoryWorkflow(ctx, component, workflow);
 
     if (!page.isDone)
       await ctx.scheduler.runAfter(0, internal.retention.inventoryWorkflows, {

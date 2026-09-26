@@ -6,14 +6,19 @@ import { commitReceiptChange } from "./receiptChanges";
 import { isCategoryUncertain } from "../src/lib/domain/receipt-issues";
 import { featureEnabled } from "./featureFlags";
 import { clientMutation as mutation } from "./clientFunctions";
-import { v } from "convex/values";
+import { v, type Infer } from "convex/values";
 import {
   WorkflowManager,
   start as startWorkflow,
   vWorkflowId,
 } from "@convex-dev/workflow";
 import { components, internal } from "./_generated/api";
-import { internalQuery, env, type MutationCtx } from "./_generated/server";
+import {
+  internalQuery,
+  env,
+  type MutationCtx,
+  type QueryCtx,
+} from "./_generated/server";
 import { internalMutation } from "./serverFunctions";
 import { requireReceipt } from "./access";
 import schema from "./schema";
@@ -33,10 +38,17 @@ import {
 import { normalizeSearch } from "../src/lib/catalog/policy";
 import { matchingKey } from "../src/lib/domain/product-matching";
 import { isDecidedCategory } from "../src/lib/domain/categories";
-import { lineValidator } from "../src/lib/domain/receipt";
+import {
+  lineValidator,
+  type ReceiptData,
+  type ReceiptLine,
+} from "../src/lib/domain/receipt";
 import type { Id } from "./_generated/dataModel";
 
-import { catalogDecision } from "../src/lib/catalog/decisions";
+import {
+  catalogDecision,
+  type CatalogDecision,
+} from "../src/lib/catalog/decisions";
 
 export { catalogDecision } from "../src/lib/catalog/decisions";
 
@@ -258,43 +270,104 @@ export const inputs = internalQuery({
     for (const line of data.lines) {
       if (line.kind !== "product" || line.productMatchManual) continue;
 
-      const mapping = await findMapping(
+      const input = await lineMatchingInput(
         ctx,
         receipt.householdId,
-        matchingKey(data.store ?? ""),
+        data.store,
         line,
       );
 
-      if (mapping?.confirmedBy && !mapping.productId) continue;
-
-      const saved = mapping?.productId
-        ? await ctx.db.get("products", mapping.productId)
-        : null;
-
-      if (mapping?.confirmedBy && !saved?.catalogKey) continue;
-      const key = line.catalogProduct?.key ?? saved?.catalogKey;
-
-      const record = key
-        ? await ctx.db
-            .query("catalogProducts")
-            .withIndex("by_key", (q) => q.eq("key", key))
-            .unique()
-        : null;
-
-      result.push({
-        line,
-        search: productSearch(line.name).slice(0, 120),
-        store: retailerCode(data.store) ?? undefined,
-        product:
-          record && compatibleCatalogProduct(line, record.product)
-            ? record.product
-            : null,
-      });
+      if (input) result.push(input);
     }
 
     return result;
   },
 });
+
+/**
+ * Builds the matching input for one product line. Returns null when a person
+ * confirmed that the line has no product, or confirmed a product without a
+ * catalog identity.
+ */
+async function lineMatchingInput(
+  ctx: QueryCtx,
+  householdId: Id<"households">,
+  store: ReceiptData["store"],
+  line: ReceiptLine,
+): Promise<Infer<typeof matchingInput> | null> {
+  const mapping = await findMapping(
+    ctx,
+    householdId,
+    matchingKey(store ?? ""),
+    line,
+  );
+
+  if (mapping?.confirmedBy && !mapping.productId) return null;
+
+  const saved = mapping?.productId
+    ? await ctx.db.get("products", mapping.productId)
+    : null;
+
+  if (mapping?.confirmedBy && !saved?.catalogKey) return null;
+  const key = line.catalogProduct?.key ?? saved?.catalogKey;
+
+  const record = key
+    ? await ctx.db
+        .query("catalogProducts")
+        .withIndex("by_key", (q) => q.eq("key", key))
+        .unique()
+    : null;
+
+  return {
+    line,
+    search: productSearch(line.name).slice(0, 120),
+    store: retailerCode(store) ?? undefined,
+    product:
+      record && compatibleCatalogProduct(line, record.product)
+        ? record.product
+        : null,
+  };
+}
+
+/** Counts the decisions for each reason, for the evaluation log. */
+function countDecisionReasons(decisions: CatalogDecision[]) {
+  const reasons: Record<string, number> = {};
+
+  for (const decision of decisions) {
+    const reason = decision.reason ?? "unspecified";
+    reasons[reason] = (reasons[reason] ?? 0) + 1;
+  }
+
+  return reasons;
+}
+
+/**
+ * Applies a confident category decision to a line that no person or alias
+ * settled. Returns true when the line changed.
+ */
+function applyCategoryDecision(
+  line: ReceiptLine,
+  decision: CatalogDecision,
+): boolean {
+  const settled =
+    line.manual || Boolean(line.categoryAliasKey ?? line.productKey);
+
+  const confident = decision.categoryConfidence >= 0.85;
+
+  if (settled || !confident || !isDecidedCategory(decision.categoryId))
+    return false;
+
+  if (
+    line.categoryId === decision.categoryId &&
+    !line.issues.some(isCategoryUncertain)
+  )
+    return false;
+  line.categoryId = decision.categoryId;
+  line.confidence = decision.categoryConfidence;
+  line.issues = line.issues.filter((issue) => !isCategoryUncertain(issue));
+
+  return true;
+}
 
 export const apply = internalMutation({
   args: {
@@ -315,12 +388,7 @@ export const apply = internalMutation({
       return null;
     const data = receipt.data;
     let changed = false;
-    const reasons: Record<string, number> = {};
-
-    for (const decision of args.decisions) {
-      const reason = decision.reason ?? "unspecified";
-      reasons[reason] = (reasons[reason] ?? 0) + 1;
-    }
+    const reasons = countDecisionReasons(args.decisions);
 
     console.info("catalog.matching_evaluated", {
       receiptId: args.id,
@@ -371,21 +439,7 @@ export const apply = internalMutation({
         }
       }
 
-      if (
-        !line.manual &&
-        !(line.categoryAliasKey ?? line.productKey) &&
-        isDecidedCategory(decision.categoryId) &&
-        decision.categoryConfidence >= 0.85 &&
-        (line.categoryId !== decision.categoryId ||
-          line.issues.some(isCategoryUncertain))
-      ) {
-        line.categoryId = decision.categoryId;
-        line.confidence = decision.categoryConfidence;
-        line.issues = line.issues.filter(
-          (issue) => !isCategoryUncertain(issue),
-        );
-        changed = true;
-      }
+      if (applyCategoryDecision(line, decision)) changed = true;
     }
 
     await ctx.db.patch("receipts", args.id, {
