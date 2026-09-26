@@ -142,7 +142,8 @@
       "vitest": "$vitest"
     },
     "decode-uri-component": "$decode-uri-component",
-    "qs": "^6.16.0"
+    "qs": "^6.16.0",
+    "uuid": "^11.1.1"
   },
   "expo": {
     "install": {
