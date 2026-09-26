@@ -11,7 +11,10 @@ import { internalMutation } from "./serverFunctions";
 import { internal } from "./_generated/api";
 import { requireMember, requireReceipt } from "./access";
 import type { Doc, Id } from "./_generated/dataModel";
-import { receiptActivityProgress } from "../src/lib/domain/receipt-activity";
+import {
+  liveActivityReceiptLimit,
+  receiptActivityProgress,
+} from "../src/lib/domain/receipt-activity";
 import schema from "./schema";
 
 const progressValidator = v.object({
@@ -47,7 +50,7 @@ export const register = mutation({
     if (
       !/^[\w-]{1,100}$/.test(args.activityId) ||
       args.receiptIds.length < 2 ||
-      args.receiptIds.length > 30 ||
+      args.receiptIds.length > liveActivityReceiptLimit ||
       new Set(args.receiptIds).size !== args.receiptIds.length ||
       (args.token && !/^[a-f0-9]{32,512}$/.test(args.token))
     )

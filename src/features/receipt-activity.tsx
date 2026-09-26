@@ -12,6 +12,7 @@ import { reportError } from "@/lib/observability";
 import { storageSuffix } from "@/lib/deployment-storage";
 import { useHousehold } from "./household-context";
 import { Button, Notice } from "@/components/ui";
+import { liveActivityReceiptLimit } from "@/lib/domain/receipt-activity";
 
 const key = "receipt-live-activity";
 
@@ -235,8 +236,8 @@ export function ReceiptActivityButton({
     <>
       <Button
         title={
-          receiptIds.length > 30
-            ? "Følg de neste 30 på låseskjermen"
+          receiptIds.length > liveActivityReceiptLimit
+            ? `Følg de neste ${liveActivityReceiptLimit} på låseskjermen`
             : "Følg behandling på låseskjermen"
         }
         variant="secondary"
@@ -248,7 +249,7 @@ export function ReceiptActivityButton({
           void startActivity(
             client,
             `${storageSuffix}:${owner}:${household.id}`,
-            receiptIds.slice(0, 30),
+            receiptIds.slice(0, liveActivityReceiptLimit),
           )
             .catch((cause) => {
               reportError(cause, "activity.start");

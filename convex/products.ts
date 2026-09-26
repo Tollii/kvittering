@@ -13,7 +13,11 @@ import {
 import type { Id } from "./_generated/dataModel";
 import schema from "./schema";
 import { requireReceipt } from "./access";
-import { lineValidator, type ReceiptLine } from "../src/lib/domain/receipt";
+import {
+  lineValidator,
+  receiptLineNameLimit,
+  type ReceiptLine,
+} from "../src/lib/domain/receipt";
 import {
   matchingKey,
   compatibleProduct,
@@ -188,8 +192,8 @@ export async function createProduct(
   retailer: string,
   line: ReceiptLine,
 ) {
-  if (!line.name.trim() || line.name.length > 300)
-    throw userError("Varen må ha et navn på 1–300 tegn.");
+  if (!line.name.trim() || line.name.length > receiptLineNameLimit)
+    throw userError(`Varen må ha et navn på 1–${receiptLineNameLimit} tegn.`);
 
   return ctx.db.insert("products", {
     householdId,
