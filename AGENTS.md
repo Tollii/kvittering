@@ -10,7 +10,7 @@ Code and configuration own exact values and feature behavior. Documentation shou
 
 ## UI changes
 
-For any change that alters what a person sees, run the [visual-check](.agents/skills/visual-check/SKILL.md) skill and put before and after screenshots in the PR, with a short video for multi-step flows. The web build approximates iOS: native-only paths such as the camera, Keychain, widgets, and system icons cannot be verified this way.
+Reviewers judge a UI change from its PR, so any change that alters what a person sees needs before and after screenshots there, plus a short video for multi-step flows. In a cloud session, capture them with the [visual-check](.agents/skills/visual-check/SKILL.md) skill. The web build approximates iOS, so name in the PR any native-only path it could not show, such as the camera, Keychain, widgets, or system icons.
 
 ## Tests
 

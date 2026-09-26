@@ -19,7 +19,7 @@ For example, prefer `Preserve receipt drafts when the app restarts` to `Refactor
 
 Open the description with a simple explanation of the problem from the user's original request. Then explain the solution briefly. Include relevant validation and material limitations. Describe the final change; omit abandoned approaches and an inventory of implementation details.
 
-Show, don't tell. Any change with a visual impact needs screenshots from the running app, and a short video when navigation, gestures, or state changes are needed to show the result. Choose the smallest set that lets a reviewer understand and check the changed behavior. Use before-and-after views when the comparison is useful; do not recreate a before view from memory. In a cloud session, capture them with [visual-check](../visual-check/SKILL.md).
+Show, don't tell: reviewers judge the change from the description. Any change with a visual impact needs screenshots from the running app, and a short video when navigation, gestures, or state changes are needed to show the result. Choose the smallest set that lets a reviewer understand and check the changed behavior. Use before-and-after views when the comparison is useful; do not recreate a before view from memory. In a cloud session, capture them with [visual-check](../visual-check/SKILL.md).
 
 Capture the final tested revision with synthetic or approved demonstration data. Add short captions that state what each image or recording proves, including the device, simulator, or web build and relevant appearance or text-size settings.
 
@@ -38,7 +38,7 @@ Put media in the description without committing it to the PR branch or using ext
   To edit, `PATCH` `https://api.github.com/repos/Tollii/kvittering/pulls/<number>` with only the fields that change.
 - **Elsewhere:** use `gh` 2.99.0 or newer with `--attach`, for example `gh pr edit <number> --body-file <description.md> --attach './receipt-details.png#Items in the selected category'`. References to attached local files in the body are replaced with uploaded asset URLs; other attachments are appended. A partial upload can update the PR despite a nonzero exit; inspect the result before retrying. See [GitHub CLI attachment documentation](https://docs.github.com/en/github-cli/github-cli/attaching-files-with-github-cli).
 
-Afterward, read back the body and check that each media URL loads. Never report local paths as attached evidence.
+Afterward, read back the body and check that each media URL loads. Reviewers cannot open local paths, so cite only published URLs as evidence.
 
 For changes that have no useful visual result, give concise execution evidence instead. Describe material release, compatibility, or recovery risks in plain language. Keep the description proportional to the change rather than filling a fixed template. This evidence guidance is inspired by [Matt Pocock's PR skill](https://github.com/mattpocock/skills/blob/main/skills/in-progress/pr/SKILL.md).
 
