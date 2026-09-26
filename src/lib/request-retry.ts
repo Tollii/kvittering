@@ -17,6 +17,9 @@ export class RequestDeferred extends Error {
   }
 }
 
+/** The service refuses requests from this release; the message says what to do. */
+export class ReleaseBlocked extends Error {}
+
 export type RetryDeadline = {
   attempts: number;
   retryAt: number;

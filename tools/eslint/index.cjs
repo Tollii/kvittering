@@ -89,7 +89,7 @@ module.exports = {
         schema: [],
         messages: {
           operation:
-            "Combine amounts with Ore.add, Ore.subtract, Ore.sum, Ore.scale, or Ore.ratio. Arithmetic operators turn an amount into a plain number. See docs/quality.md.",
+            "Combine amounts with Ore.add, Ore.subtract, Ore.sum, Ore.scale, or Ore.ratio. Arithmetic operators turn an amount into a plain number.",
         },
       },
       create(context) {
@@ -141,7 +141,7 @@ module.exports = {
         schema: [],
         messages: {
           nameSet:
-            "Name this set of values: a domain predicate such as isReceiptProcessing, or a module-level Set. Inline lists repeat a rule without an owner. See docs/quality.md.",
+            "Name this set of values: a domain predicate such as isReceiptProcessing, or a module-level Set. Inline lists repeat a rule without an owner.",
         },
       },
       create(context) {
@@ -178,7 +178,7 @@ module.exports = {
         schema: [],
         messages: {
           index:
-            "Select documents with an index range instead of `.filter()`. A filter reads every document in the range and can exceed read limits as data grows. See docs/quality.md.",
+            "Select documents with an index range instead of `.filter()`. A filter reads every document in the range and can exceed read limits as data grows.",
         },
       },
       create(context) {
@@ -204,7 +204,7 @@ module.exports = {
         schema: [],
         messages: {
           bound:
-            "Bound this read with `.take(n)`, `.first()`, `.unique()`, or pagination. `.collect()` grows with the household's data. See docs/quality.md.",
+            "Bound this read with `.take(n)`, `.first()`, `.unique()`, or pagination. `.collect()` grows with the household's data.",
         },
       },
       create(context) {
@@ -239,7 +239,7 @@ module.exports = {
         ],
         messages: {
           access:
-            "Public Convex function `{{name}}` does not call an access check ({{checks}}). Call one in the handler, or state why the function is public in a preceding `// Access:` comment. See docs/quality.md.",
+            "Public Convex function `{{name}}` does not call an access check ({{checks}}). Call one in the handler, or state why the function is public in a preceding `// Access:` comment.",
         },
       },
       create(context) {
@@ -311,7 +311,7 @@ module.exports = {
         schema: [],
         messages: {
           leakedValue:
-            "This value can be 0, NaN, or an empty string, which React Native renders as text outside <Text> and crashes. Compare explicitly, for example `count > 0 &&`. See docs/quality.md.",
+            "This value can be 0, NaN, or an empty string, which React Native renders as text outside <Text> and crashes. Compare explicitly, for example `count > 0 &&`.",
         },
       },
       create(context) {
@@ -379,7 +379,7 @@ module.exports = {
         schema: [],
         messages: {
           subscription:
-            "Load server data through a Convex subscription or a TanStack query. Requests started in effects have no cache, deduplication, cancellation, or ordering between responses. See docs/quality.md.",
+            "Load server data through a Convex subscription or a TanStack query. Requests started in effects have no cache, deduplication, cancellation, or ordering between responses.",
         },
       },
       create(context) {
@@ -566,7 +566,7 @@ module.exports = {
         schema: [],
         messages: {
           explicitType:
-            "Declare the actual properties in a named type. An open dictionary whose only value is undefined does not describe application data. See docs/quality.md.",
+            "Declare the actual properties in a named type. An open dictionary whose only value is undefined does not describe application data.",
         },
       },
       create(context) {

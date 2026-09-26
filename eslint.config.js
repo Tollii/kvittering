@@ -12,7 +12,6 @@ module.exports = defineConfig([
   expo,
   {
     ignores: [
-      "sveltemo/**",
       "convex/_generated/**",
       "convex/kassalapp/generated/**",
       "tools/oxlint/anti-slop/**",
@@ -205,6 +204,20 @@ module.exports = defineConfig([
           property: "toSorted",
           message:
             "Supported Hermes clients lack Array.toSorted. Copy the array before calling sort.",
+        },
+      ],
+    },
+  },
+  {
+    files: ["src/app/**/*.{ts,tsx}", "src/features/**/*.{ts,tsx}"],
+    rules: {
+      "no-restricted-syntax": [
+        "error",
+        {
+          // Convex puts its request trace in Error.message; the user message is in the error data.
+          selector: 'CatchClause MemberExpression[property.name="message"]',
+          message:
+            "Show failureMessage(cause, operation, fallback) instead of a caught error's message.",
         },
       ],
     },

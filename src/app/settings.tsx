@@ -16,6 +16,7 @@ import { useHousehold } from "@/features/household-context";
 import { BudgetSettings } from "@/features/budget-settings";
 import { NotificationSettings } from "@/features/notifications";
 import { useTheme } from "@/constants/theme";
+import { failureMessage } from "@/lib/failure-message";
 
 export default function Settings() {
   const colors = useTheme();
@@ -32,7 +33,9 @@ export default function Settings() {
     try {
       await action();
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "Kunne ikke fullføre.");
+      setError(
+        failureMessage(cause, "settings.action", "Kunne ikke fullføre."),
+      );
     } finally {
       setBusy(false);
     }

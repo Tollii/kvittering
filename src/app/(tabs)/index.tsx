@@ -43,6 +43,8 @@ import {
 } from "@/lib/pending-import";
 import { nextImport, type ImportOutcome } from "@/lib/capture-import";
 import { useTheme } from "@/constants/theme";
+import { failureMessage } from "@/lib/failure-message";
+import { UserError } from "@/lib/user-errors";
 
 const cameraBackground = "#101C51";
 
@@ -106,7 +108,7 @@ export default function Capture() {
         return "completed";
       } catch (cause) {
         setError(
-          cause instanceof Error ? cause.message : "Bildet kunne ikke åpnes.",
+          failureMessage(cause, "receipt.import", "Bildet kunne ikke åpnes."),
         );
 
         return "failed";
@@ -127,7 +129,10 @@ export default function Capture() {
           maxReceiptImages - photos.length,
           (imported) => {
             if (!mounted.current || !imported.uris.length)
-              throw new Error("Importen ble avbrutt. Prøv igjen.");
+              throw new UserError({
+                code: "REJECTED",
+                message: "Importen ble avbrutt. Prøv igjen.",
+              });
             setPhotos((current) => [...current, ...imported.uris]);
 
             if (imported.singleDocument && photos.length === 0)
@@ -144,7 +149,10 @@ export default function Capture() {
       if (!ready || !camera.current) return;
 
       if (photos.length >= maxReceiptImages)
-        throw new Error(`Maks ${maxReceiptImages} bilder`);
+        throw new UserError({
+          code: "REJECTED",
+          message: `Maks ${maxReceiptImages} bilder`,
+        });
       recordEvent("receipt.capture", { operation: "camera" });
       const result = await camera.current.takePictureAsync({ quality: 0.9 });
 
@@ -156,7 +164,10 @@ export default function Capture() {
   const choosePhotos = () =>
     run(async () => {
       if (photos.length >= maxReceiptImages)
-        throw new Error(`Maks ${maxReceiptImages} bilder`);
+        throw new UserError({
+          code: "REJECTED",
+          message: `Maks ${maxReceiptImages} bilder`,
+        });
 
       const result = await ImagePicker.launchImageLibraryAsync({
         mediaTypes: ["images"],
@@ -169,7 +180,10 @@ export default function Capture() {
       if (result.canceled) return;
 
       if (result.assets.length + photos.length > maxReceiptImages)
-        throw new Error(`Maks ${maxReceiptImages} bilder`);
+        throw new UserError({
+          code: "REJECTED",
+          message: `Maks ${maxReceiptImages} bilder`,
+        });
       const selected: string[] = [];
 
       for (const asset of result.assets)

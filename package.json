@@ -19,6 +19,7 @@
     "better-auth": "1.6.33",
     "convex": "^1.46.0",
     "convex-helpers": "^0.1.124",
+    "decode-uri-component": "^0.5.0",
     "expo": "~57.0.25",
     "expo-apple-authentication": "~57.0.2",
     "expo-application": "~57.0.3",
@@ -136,6 +137,7 @@
     "better-auth": {
       "vitest": "$vitest"
     },
+    "decode-uri-component": "$decode-uri-component",
     "qs": "^6.16.0"
   },
   "expo": {

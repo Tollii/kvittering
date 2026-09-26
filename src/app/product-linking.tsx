@@ -22,6 +22,7 @@ import { useHousehold } from "@/features/household-context";
 import { useReleaseMutation } from "@/lib/releases/requests";
 import { errorFeedback, successFeedback } from "@/lib/haptics";
 import type { ReceiptCommitAcknowledgement } from "../../convex/receiptChanges";
+import { failureMessage } from "@/lib/failure-message";
 
 export default function ProductLinking() {
   const colors = useTheme();
@@ -64,9 +65,11 @@ export default function ProductLinking() {
     } catch (cause) {
       errorFeedback();
       setError(
-        cause instanceof Error
-          ? cause.message
-          : "Kunne ikke lagre valget. Prøv igjen.",
+        failureMessage(
+          cause,
+          "product_linking.choose",
+          "Kunne ikke lagre valget. Prøv igjen.",
+        ),
       );
     } finally {
       locked.current = false;
@@ -87,7 +90,11 @@ export default function ProductLinking() {
     } catch (cause) {
       errorFeedback();
       setError(
-        cause instanceof Error ? cause.message : "Kunne ikke angre valget.",
+        failureMessage(
+          cause,
+          "product_linking.undo",
+          "Kunne ikke angre valget.",
+        ),
       );
     } finally {
       locked.current = false;
