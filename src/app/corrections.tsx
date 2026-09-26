@@ -21,6 +21,7 @@ import {
   isDecidedCategory,
   parseCategoryId,
 } from "@/lib/domain/categories";
+import { failureMessage } from "@/lib/failure-message";
 
 /** Corrections record ids as stored, which may predate the current categories. */
 const categoryName = (id: string | null) => {
@@ -79,7 +80,9 @@ export default function Corrections() {
     try {
       await action();
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "Kunne ikke fullføre.");
+      setError(
+        failureMessage(cause, "corrections.action", "Kunne ikke fullføre."),
+      );
     } finally {
       setBusy(false);
     }

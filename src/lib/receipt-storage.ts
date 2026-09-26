@@ -13,6 +13,7 @@ import type { Id } from "../../convex/_generated/dataModel";
 import type { LocalReceipt, QueueStore } from "./upload-queue";
 import { storageSuffix } from "./deployment-storage";
 import { getOrInsert } from "./map-cache";
+import { UserError } from "./user-errors";
 
 const listeners = new Set<() => void>();
 
@@ -153,7 +154,10 @@ export function saveLocalReceipts(
   combined: boolean,
 ) {
   if (!uris.length || uris.length > maxReceiptImages)
-    throw new Error("Velg mellom ett og fem bilder.");
+    throw new UserError({
+      code: "REJECTED",
+      message: "Velg mellom ett og fem bilder.",
+    });
   directory().create({ intermediates: true, idempotent: true });
   const files: File[] = [];
 
@@ -253,7 +257,11 @@ export function regroupQueuedReceipt(
       householdId,
     );
 
-    if (!row) throw new Error("Kvitteringen er endret. Åpne køen på nytt.");
+    if (!row)
+      throw new UserError({
+        code: "REJECTED",
+        message: "Kvitteringen er endret. Åpne køen på nytt.",
+      });
     const entry = migrateReceipt(JSON.parse(row.data));
 
     if (
@@ -261,9 +269,10 @@ export function regroupQueuedReceipt(
       entry.uploaded.some(Boolean) ||
       !entry.error?.includes(receiptImageLimitMessage)
     )
-      throw new Error(
-        "Vent til opplastingen er avklart før du deler opp bildene.",
-      );
+      throw new UserError({
+        code: "REJECTED",
+        message: "Vent til opplastingen er avklart før du deler opp bildene.",
+      });
     const positions = new Set(selected);
 
     if (
@@ -275,7 +284,7 @@ export function regroupQueuedReceipt(
           position >= entry.images.length,
       )
     )
-      throw new Error("Ugyldig bildevalg.");
+      throw new UserError({ code: "REJECTED", message: "Ugyldig bildevalg." });
 
     const groups = [
       entry.images.filter((_, position) => positions.has(position)),
@@ -285,7 +294,10 @@ export function regroupQueuedReceipt(
     if (
       groups.some((group) => !group.length || group.length > maxReceiptImages)
     )
-      throw new Error("Hver kvittering må ha mellom ett og fem bilder.");
+      throw new UserError({
+        code: "REJECTED",
+        message: "Hver kvittering må ha mellom ett og fem bilder.",
+      });
 
     for (const images of groups)
       writeEntry({
