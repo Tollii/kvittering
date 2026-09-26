@@ -1,6 +1,6 @@
 import { present } from "../src/lib/testing/receipts";
 import { expect, it } from "vitest";
-import { batteryFixture } from "../src/lib/domain/receipt";
+import { batteryFixture } from "../src/lib/mock-receipts";
 import { profileDecision, profileQuestions } from "./productAnalysisWorker";
 
 it("interprets package answers and preserves unknown or incomplete evidence", () => {

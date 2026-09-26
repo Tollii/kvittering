@@ -3,7 +3,7 @@ import { present, receiptFixture } from "./testing/receipts";
 import { expect, it } from "vitest";
 import { ReceiptDraftStorage } from "./receipt-draft-storage";
 import { ReceiptDraftController } from "./receipt-draft-controller";
-import { batteryFixture } from "./domain/receipt";
+import { batteryFixture } from "./mock-receipts";
 
 function fixture() {
   const { db, adapter, control } = sqliteDatabase();

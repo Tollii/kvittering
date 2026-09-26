@@ -6,7 +6,8 @@ import {
   compatibleProduct,
   similarProducts,
 } from "./product-matching";
-import { emptyLine, batteryFixture } from "./receipt";
+import { emptyLine } from "./receipt";
+import { batteryFixture } from "../mock-receipts";
 import { productHistory } from "./insights";
 
 it("normalizes formatting while preserving flavour, size and zero", () => {

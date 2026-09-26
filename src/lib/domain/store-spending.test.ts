@@ -4,7 +4,8 @@ import { Ore } from "./ore";
 import { expect, it } from "vitest";
 import { storeSpending, type StorePurchase } from "./store-spending";
 import { monthlyInsights, type Receipt } from "./insights";
-import { batteryFixture, emptyLine } from "./receipt";
+import { emptyLine } from "./receipt";
+import { batteryFixture } from "../mock-receipts";
 import type { PhysicalStore } from "../catalog/model";
 
 const branch: PhysicalStore = {

@@ -5,7 +5,8 @@ import { convexTest } from "convex-test";
 import { afterEach, expect, it, vi } from "vitest";
 import schema from "./schema";
 import { api } from "./_generated/api";
-import { batteryFixture, emptyLine } from "../src/lib/domain/receipt";
+import { emptyLine } from "../src/lib/domain/receipt";
+import { batteryFixture } from "../src/lib/mock-receipts";
 import {
   productReference,
   withProductReference,

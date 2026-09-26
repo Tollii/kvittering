@@ -13,7 +13,8 @@ import { expect, it } from "vitest";
 import { api, internal } from "./_generated/api";
 import schema from "./schema";
 import type { Id } from "./_generated/dataModel";
-import { batteryFixture, validateReceipt } from "../src/lib/domain/receipt";
+import { validateReceipt } from "../src/lib/domain/receipt";
+import { batteryFixture } from "../src/lib/mock-receipts";
 import { quickApproveData } from "../src/lib/domain/receipt-review";
 
 const modules = import.meta.glob("./**/*.ts");

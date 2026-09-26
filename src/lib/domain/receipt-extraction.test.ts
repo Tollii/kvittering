@@ -2,7 +2,8 @@ import { date } from "../testing/calendar";
 import { present } from "../testing/receipts";
 import { describe, expect, it } from "vitest";
 import { extractionSchema, prepareExtraction } from "./receipt-extraction";
-import { batteryFixture, reconcile } from "./receipt";
+import { reconcile } from "./receipt";
+import { batteryFixture } from "../mock-receipts";
 import { canAcceptReceipt } from "./receipt-review";
 
 const fixture = () =>
