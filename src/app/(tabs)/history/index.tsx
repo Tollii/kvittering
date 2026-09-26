@@ -26,6 +26,7 @@ import {
   Row,
   Screen,
   Segments,
+  SettingsButton,
   Sheet,
 } from "@/components/ui";
 import { IllustratedEmpty } from "@/components/monument-artwork";
@@ -106,12 +107,9 @@ export default function History() {
             hideWhenScrolling={false}
           />
           <Stack.Toolbar placement="right">
-            <Stack.Toolbar.Button
-              icon="person.2"
-              onPress={() => router.push("/settings")}
-            >
-              Innstillinger
-            </Stack.Toolbar.Button>
+            <Stack.Toolbar.View hidesSharedBackground>
+              <SettingsButton />
+            </Stack.Toolbar.View>
           </Stack.Toolbar>
         </>
       )}
