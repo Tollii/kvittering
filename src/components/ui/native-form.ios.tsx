@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from "react";
+import { useState } from "react";
 import { Form, Host, RNHostView, Section, VStack } from "@expo/ui/swift-ui";
 import {
   frame,
@@ -7,8 +7,9 @@ import {
 } from "@expo/ui/swift-ui/modifiers";
 import { View } from "react-native";
 import { useTheme } from "@/constants/theme";
+import type { FormSectionProps, NativeFormProps } from "./native-form";
 
-export function NativeForm({ children }: Readonly<{ children: ReactNode }>) {
+export function NativeForm({ children }: NativeFormProps) {
   const colors = useTheme();
 
   return (
@@ -18,10 +19,7 @@ export function NativeForm({ children }: Readonly<{ children: ReactNode }>) {
   );
 }
 
-export function FormSection({
-  title,
-  children,
-}: Readonly<{ title: string; children: ReactNode }>) {
+export function FormSection({ title, children }: FormSectionProps) {
   // Measure the native row before text can establish an unconstrained width.
   const [width, setWidth] = useState(0);
 
