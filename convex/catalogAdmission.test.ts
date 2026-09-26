@@ -1,3 +1,8 @@
+import {
+  invitation,
+  separateHouseholds,
+  testUser,
+} from "../src/lib/testing/households";
 import { HOUR, RateLimiter } from "@convex-dev/rate-limiter";
 /// <reference types="vite/client" />
 import { register as registerRateLimiter } from "@convex-dev/rate-limiter/test";
@@ -21,25 +26,7 @@ async function setup() {
   registerRateLimiter(t);
   registerWorkpool(t, "catalogWorkpool");
 
-  const first = t.withIdentity({
-    subject: "first",
-    issuer: "https://test.local",
-  });
-
-  const other = t.withIdentity({
-    subject: "other",
-    issuer: "https://test.local",
-  });
-
-  const householdId = await first.mutation(api.households.create, {
-    name: "First",
-    invitation: "11111111111111111111111111111111",
-  });
-
-  await other.mutation(api.households.create, {
-    name: "Other",
-    invitation: "22222222222222222222222222222222",
-  });
+  const { first, other, householdId } = await separateHouseholds(t);
 
   return { t, first, other, householdId };
 }
@@ -47,14 +34,8 @@ async function setup() {
 it("limits new catalog work across household members while cached requests and other households remain available", async () => {
   const { t, first, other } = await setup();
 
-  const second = t.withIdentity({
-    subject: "second",
-    issuer: "https://test.local",
-  });
-
-  await second.mutation(api.households.join, {
-    invitation: "11111111111111111111111111111111",
-  });
+  const second = testUser(t, "second");
+  await second.mutation(api.households.join, { invitation });
 
   const search = (index: number) =>
     `Quota product ${String.fromCharCode(65 + Math.floor(index / 26))}${String.fromCharCode(65 + (index % 26))}`;

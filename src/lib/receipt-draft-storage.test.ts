@@ -1,39 +1,12 @@
+import { sqliteDatabase } from "./testing/sqlite";
 import { present, receiptFixture } from "./testing/receipts";
-import { DatabaseSync } from "node:sqlite";
 import { expect, it } from "vitest";
 import { ReceiptDraftStorage } from "./receipt-draft-storage";
 import { ReceiptDraftController } from "./receipt-draft-controller";
-import type { ReceiptCacheDatabase } from "./receipt-cache";
 import { batteryFixture } from "./mock-receipts";
 
 function fixture() {
-  const db = new DatabaseSync(":memory:");
-  const control = { fail: false };
-
-  const adapter: ReceiptCacheDatabase = {
-    execSync: (sql) => db.exec(sql),
-    runSync: (sql, ...values) => {
-      if (control.fail) throw new Error("Disk full");
-      db.prepare(sql).run(...values);
-    },
-    // SAFETY: SQL callers declare their selected columns.
-    getAllSync: <T>(sql: string, ...values: (string | number)[]) =>
-      db.prepare(sql).all(...values) as T[],
-    // SAFETY: SQL callers declare their selected columns.
-    getFirstSync: <T>(sql: string, ...values: (string | number)[]) =>
-      (db.prepare(sql).get(...values) as T | undefined) ?? null,
-    withTransactionSync: (operation) => {
-      db.exec("BEGIN");
-
-      try {
-        operation();
-        db.exec("COMMIT");
-      } catch (error) {
-        db.exec("ROLLBACK");
-        throw error;
-      }
-    },
-  };
+  const { db, adapter, control } = sqliteDatabase();
 
   const receipt = receiptFixture({ data: batteryFixture(), revision: 4 });
 
@@ -159,7 +132,7 @@ it("retains live edits and reports failed durable writes until storage recovers"
 
   try {
     const controller = new ReceiptDraftController(open, receipt);
-    control.fail = true;
+    control.writeFailure = true;
     controller.dispatch({ type: "edit", values: { excluded: true } });
     expect(controller.read()).toMatchObject({
       kind: "ready",
@@ -169,7 +142,7 @@ it("retains live edits and reports failed durable writes until storage recovers"
 
     if (failed.kind !== "ready") throw new Error("Draft is unavailable");
     expect(failed.storageError).toContain("kunne ikke lagres");
-    control.fail = false;
+    control.writeFailure = false;
     controller.dispatch({ type: "finished" });
     expect(controller.read()).toMatchObject({ storageError: "" });
     expect(open().restore(receipt).values.excluded).toBe(true);

@@ -1,3 +1,4 @@
+import { separateHouseholds } from "../src/lib/testing/households";
 import { present } from "../src/lib/testing/receipts";
 
 /// <reference types="vite/client" />
@@ -166,25 +167,7 @@ async function setup() {
   registerRateLimiter(t);
   registerWorkpool(t, "catalogWorkpool");
 
-  const first = t.withIdentity({
-    subject: "first",
-    issuer: "https://test.local",
-  });
-
-  const other = t.withIdentity({
-    subject: "other",
-    issuer: "https://test.local",
-  });
-
-  const householdId = await first.mutation(api.households.create, {
-    name: "First",
-    invitation: "11111111111111111111111111111111",
-  });
-
-  await other.mutation(api.households.create, {
-    name: "Other",
-    invitation: "22222222222222222222222222222222",
-  });
+  const { first, other, householdId } = await separateHouseholds(t);
 
   return { t, first, other, householdId };
 }
