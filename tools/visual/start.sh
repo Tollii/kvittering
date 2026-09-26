@@ -28,7 +28,7 @@ fi
 pkill -f "tools/visual/serve.mts $out/web $port" 2>/dev/null || true
 nohup node tools/visual/serve.mts "$out/web" "$port" </dev/null >"$out/serve.log" 2>&1 &
 for _ in $(seq 1 20); do
-  if curl -fsS -o /dev/null "$origin/"; then break; fi
+  if curl -fs -o /dev/null "$origin/"; then break; fi
   sleep 0.5
 done
 curl -fsS -o /dev/null "$origin/"

@@ -38,6 +38,7 @@ if [[ -z "$binary" ]]; then
   chmod +x "$binary"
 fi
 
+: >"$out/convex-cli.log"
 if [[ ! -f "$state/instance-secret" ]]; then
   openssl rand -hex 32 >"$state/instance-secret"
 fi
@@ -68,7 +69,7 @@ EOF
 
 convex() {
   # A personal CONVEX_DEPLOYMENT must not redirect these commands.
-  env -u CONVEX_DEPLOYMENT npx convex "$@" --env-file "$env_file"
+  env -u CONVEX_DEPLOYMENT npx convex "$@" --env-file "$env_file" 2>>"$out/convex-cli.log"
 }
 
 echo "▸ Deploying functions" >&2
@@ -78,8 +79,8 @@ fi
 convex env set RECEIPT_PROVIDER mock >/dev/null
 convex env set RELEASE_CHANNEL development >/dev/null
 convex env set SITE_URL "$web_origin" >/dev/null
-convex deploy --yes --typecheck disable >"$out/deploy.log" 2>&1 || {
-  tail -n 40 "$out/deploy.log" >&2
+convex deploy --yes --typecheck disable >/dev/null || {
+  tail -n 40 "$out/convex-cli.log" >&2
   exit 1
 }
 

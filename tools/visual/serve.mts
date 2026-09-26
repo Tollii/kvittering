@@ -10,20 +10,25 @@ import { createServer, request as forward } from "node:http";
 import { extname, join, normalize, resolve } from "node:path";
 
 const root = resolve(process.argv[2] ?? "build/visual/web");
+
 const port = Number(process.argv[3] ?? 8081);
+
 const site = new URL(process.argv[4] ?? "http://127.0.0.1:3211");
+
 const proxied = ["/api/auth/", "/receipt-image"];
 
-const types: Record<string, string> = {
-  ".css": "text/css",
-  ".html": "text/html; charset=utf-8",
-  ".ico": "image/x-icon",
-  ".js": "text/javascript",
-  ".json": "application/json",
-  ".png": "image/png",
-  ".ttf": "font/ttf",
-  ".wasm": "application/wasm",
-};
+const types = new Map(
+  Object.entries({
+    ".css": "text/css",
+    ".html": "text/html; charset=utf-8",
+    ".ico": "image/x-icon",
+    ".js": "text/javascript",
+    ".json": "application/json",
+    ".png": "image/png",
+    ".ttf": "font/ttf",
+    ".wasm": "application/wasm",
+  }),
+);
 
 const isolation = {
   "Cross-Origin-Opener-Policy": "same-origin",
@@ -56,19 +61,22 @@ createServer((request, response) => {
         reply.pipe(response);
       },
     );
+
     upstream.on("error", () => response.writeHead(502).end());
     request.pipe(upstream);
+
     return;
   }
 
   const requested = join(root, normalize(decodeURIComponent(url.pathname)));
+
   const path =
     (requested.startsWith(root) &&
       (file(requested) ?? file(join(requested, "index.html")))) ||
     join(root, "index.html");
 
   response.writeHead(200, {
-    "Content-Type": types[extname(path)] ?? "application/octet-stream",
+    "Content-Type": types.get(extname(path)) ?? "application/octet-stream",
     "Cache-Control": "no-store",
     ...isolation,
   });

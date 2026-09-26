@@ -122,6 +122,7 @@
     "test:coverage": "vitest run --coverage",
     "test:mutation": "stryker run",
     "e2e:ios": "tools/e2e/ios.sh",
+    "visual:start": "tools/visual/start.sh",
     "contract:update": "vitest run convex/contract.test.ts --update",
     "check:fast": "npm run format:check && npm run typecheck && npm run lint",
     "check:changed": "node tools/check-changed.mts",

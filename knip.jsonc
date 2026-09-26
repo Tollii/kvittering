@@ -2,22 +2,30 @@
   "$schema": "https://unpkg.com/knip@6/schema.json",
   // Expo loads config plugins by path from app.json; ESLint and Oxlint load rules by path.
   // Stryker runs the mutation test config from a command string; npm scripts
-  // and CI run the tools/*.mts commands with Node.
+  // and CI run the tools/*.mts commands with Node. Metro substitutes the
+  // src/web modules in web bundles, and threads run visual flows directly.
   "entry": [
     "plugins/*.js",
     "tools/eslint/*.cjs",
     "tools/*.mts",
     "tools/e2e/seed.mts",
+    "tools/visual/*.mts",
+    "tools/visual/flows/*.mts",
+    "src/web/*.ts",
     "vitest.mutation.config.mts",
   ],
   // Vendored rule source and rule-test fixtures are not application code.
   "ignore": ["tools/oxlint/anti-slop/**", "tools/eslint/fixtures/**"],
   // expo-router's native tabs require this peer at runtime without an import.
+  // Metro resolves the expo-sqlite name in web bundles (metro.config.js).
   // Stryker core bundles its command runner under this name.
   "ignoreDependencies": [
     "expo-glass-effect",
     "@stryker-mutator/command-runner",
+    "expo-sqlite-web-worker-channel",
   ],
+  // Visual checks encode recordings with the environment's ffmpeg.
+  "ignoreBinaries": ["ffmpeg"],
   // Report exports that nothing uses, including the defining file.
   "ignoreExportsUsedInFile": true,
 }
