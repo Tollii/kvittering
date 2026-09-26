@@ -7,9 +7,7 @@
 import { join } from "node:path";
 import { App, receiptPhoto } from "../app.mts";
 
-const app = await App.open("add-receipt");
-
-try {
+await App.run("add-receipt", async (app) => {
   await app.signUp();
   await app.screenshot("capture");
 
@@ -23,8 +21,6 @@ try {
   await app.see("Eksempelbutikk", 60_000);
   await app.screenshot("inbox");
   await app.tap("Eksempelbutikk");
-  await app.see("Kvittering");
+  await app.see("Godkjenn kvittering");
   await app.screenshot("receipt");
-} finally {
-  console.log(await app.close());
-}
+});

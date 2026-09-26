@@ -96,6 +96,28 @@ export class App {
     return new App(page, output, browser, context);
   }
 
+  /**
+   * Open the app, run a flow, and close it. A failed flow saves a `failed`
+   * screenshot before the error propagates. Prints the saved media paths.
+   */
+  static async run(
+    name: string,
+    flow: (app: App) => Promise<void>,
+    options: AppOptions = {},
+  ) {
+    const app = await App.open(name, options);
+
+    try {
+      await flow(app);
+    } catch (error) {
+      await app.screenshot("failed");
+      throw error;
+    } finally {
+      await app.close();
+      console.log(app.output);
+    }
+  }
+
   /** Press the element with this test ID, label, or exact text. */
   async tap(target: string) {
     await this.find(target).click();
