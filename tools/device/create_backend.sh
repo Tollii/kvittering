@@ -20,10 +20,14 @@ if [[ "${CONVEX_DEPLOY_KEY:-}" != preview:* ]]; then
 fi
 
 branch="$(git branch --show-current)"
-name="device-$(tr '[:upper:]' '[:lower:]' <<<"$branch" | tr -c 'a-z0-9\n' '-' | cut -c 1-40)"
-name="${name%-}"
+# Sanitizing and truncation can map two branches to one name, and --preview-create
+# would then replace the other branch's deployment. The hash keeps names distinct.
+readable="$(tr '[:upper:]' '[:lower:]' <<<"$branch" | tr -c 'a-z0-9\n' '-' | cut -c 1-30)"
+name="device-${readable%-}-$(git hash-object --stdin <<<"$branch" | cut -c 1-8)"
 output="build/device"
 mkdir -p "$output"
+# A failed rerun must not leave the URL of the replaced deployment for start_ios_session.sh.
+rm -f "$output/backend.env" "$output/convex-url"
 
 # --cmd runs after the preview deployment exists and receives its URL.
 npx convex deploy --preview-create "$name" --typecheck disable \

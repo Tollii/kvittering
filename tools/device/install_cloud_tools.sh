@@ -25,10 +25,13 @@ as_root() {
 
 if [[ "$(revyl --version 2>/dev/null)" != *"$revyl_version"* ]]; then
   echo "▸ Installing Revyl CLI $revyl_version"
-  curl -fsSL https://revyl.com/install.sh -o /tmp/revyl-install.sh
+  # A private directory, so no other user can replace the installer before it runs as root.
+  installer_dir="$(mktemp -d)"
+  trap 'rm -rf "$installer_dir"' EXIT
+  curl -fsSL https://revyl.com/install.sh -o "$installer_dir/install.sh"
   # /usr/local/bin is on PATH in every agent shell, so no profile edit is necessary.
   as_root env REVYL_VERSION="$revyl_version" REVYL_INSTALL_DIR=/usr/local/bin \
-    REVYL_NO_MODIFY_PATH=1 sh /tmp/revyl-install.sh
+    REVYL_NO_MODIFY_PATH=1 sh "$installer_dir/install.sh"
 fi
 
 if ! command -v ffmpeg >/dev/null; then
