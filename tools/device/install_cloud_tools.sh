@@ -8,6 +8,12 @@
 #   CONVEX_DEPLOY_KEY    Convex preview deploy key, for the per-branch backend
 #   EXPO_TOKEN           EAS authentication (required only for new native builds)
 #
+# The Revyl and EAS CLIs send their key as "Authorization: Bearer <key>". When the
+# environment injects that header as a credential (*.revyl.ai, api.expo.dev),
+# set REVYL_API_KEY and EXPO_TOKEN to any placeholder value: the CLIs send no request
+# without a key. CONVEX_DEPLOY_KEY must be the real key; the Convex CLI reads the
+# deployment type and project from it.
+#
 # REVYL_VERSION pins the CLI version; update it deliberately.
 set -euo pipefail
 
