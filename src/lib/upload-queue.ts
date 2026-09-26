@@ -152,6 +152,146 @@ export function createQueueRunner(
     };
   }
 
+  /**
+   * Whether the drain may try the capture now. An unreadable deadline is
+   * recorded as a storage failure, and the capture waits.
+   */
+  function isDue(entry: LocalReceipt) {
+    try {
+      const at = deadline(entry);
+
+      return at !== null && at <= clock();
+    } catch {
+      storageFailure(entry);
+
+      return false;
+    }
+  }
+
+  /**
+   * Reserve, upload, and complete one capture, and persist each step.
+   * Returns false when the drain must stop before completion. Throws when a step fails.
+   */
+  async function uploadEntry(
+    entry: LocalReceipt,
+    transport: UploadTransport,
+    active: () => boolean,
+  ) {
+    entry.error = undefined;
+
+    if (!entry.receiptId) {
+      entry.receiptId = await transport.reserve(entry);
+      store.update(entry);
+      record("receipt.reserved", {
+        captureId: entry.id,
+        receiptId: entry.receiptId,
+        imageCount: entry.images.length,
+      });
+    }
+
+    const receiptId = entry.receiptId;
+
+    const uploadImage = async (image: string, position: number) => {
+      if (!active()) return;
+
+      if (entry.uploaded[position]) return;
+      const started = Date.now();
+      await transport.upload(receiptId, position, image);
+      entry.uploaded[position] = true;
+      store.update(entry);
+      record("receipt.image_uploaded", {
+        receiptId: entry.receiptId,
+        position,
+        durationMs: Date.now() - started,
+      });
+    };
+
+    const results = await Promise.allSettled(
+      entry.images.map((image, position) => uploadImage(image, position)),
+    );
+
+    const failed = results.find((result) => result.status === "rejected");
+
+    if (failed) throw failed.reason;
+
+    if (!active()) return false;
+    await transport.complete(entry.receiptId, entry);
+    retries.remove(entry.id);
+    store.remove(entry);
+    attempts.delete(entry.id);
+    restrictions.delete(entry.id);
+    record("receipt.upload_completed", {
+      receiptId: entry.receiptId,
+      imageCount: entry.images.length,
+    });
+
+    return true;
+  }
+
+  /** Apply a deferral to each other capture that has no server reservation yet. */
+  function deferPendingCaptures(
+    owner: string,
+    householdId: Id<"households">,
+    failedId: string,
+    cause: RequestDeferred,
+  ) {
+    for (const pending of store.list(owner, householdId)) {
+      if (pending.receiptId || pending.id === failedId) continue;
+
+      const deferred = {
+        ...pending,
+        error: pending.error ?? cause.message,
+      };
+
+      store.update(deferred);
+
+      try {
+        defer(pending.id, cause);
+      } catch {
+        storageFailure(deferred);
+      }
+    }
+  }
+
+  /** Persist the failure and set when the capture may be tried again. */
+  function recordFailure(
+    owner: string,
+    householdId: Id<"households">,
+    entry: LocalReceipt,
+    retry: RetryState | undefined,
+    cause: unknown,
+  ) {
+    entry.error =
+      cause instanceof Error ? cause.message : "Opplastingen mislyktes.";
+    store.update(entry);
+
+    const failures = (retry?.failures ?? 0) + 1;
+
+    const next = nextAttemptAt(
+      failures,
+      parseUserError(cause)?.code === "REJECTED",
+      clock(),
+    );
+
+    attempts.set(entry.id, { failures, nextAttemptAt: next });
+
+    if (next === null)
+      record("receipt.upload_paused", {
+        captureId: entry.id,
+        attempts: failures,
+      });
+
+    try {
+      if (cause instanceof RequestDeferred) defer(entry.id, cause);
+      else retries.remove(entry.id);
+    } catch {
+      storageFailure(entry);
+    }
+
+    if (cause instanceof RequestDeferred)
+      deferPendingCaptures(owner, householdId, entry.id, cause);
+  }
+
   const run = async (
     owner: string,
     householdId: Id<"households">,
@@ -175,111 +315,14 @@ export function createQueueRunner(
 
         if (!active()) break;
 
-        try {
-          const at = deadline(entry);
-
-          if (at === null || at > clock()) continue;
-        } catch {
-          storageFailure(entry);
-          continue;
-        }
+        if (!isDue(entry)) continue;
 
         const retry = attempts.get(entry.id);
 
         try {
-          entry.error = undefined;
-
-          if (!entry.receiptId) {
-            entry.receiptId = await transport.reserve(entry);
-            store.update(entry);
-            record("receipt.reserved", {
-              captureId: entry.id,
-              receiptId: entry.receiptId,
-              imageCount: entry.images.length,
-            });
-          }
-
-          const receiptId = entry.receiptId;
-
-          const uploadImage = async (image: string, position: number) => {
-            if (!active()) return;
-
-            if (entry.uploaded[position]) return;
-            const started = Date.now();
-            await transport.upload(receiptId, position, image);
-            entry.uploaded[position] = true;
-            store.update(entry);
-            record("receipt.image_uploaded", {
-              receiptId: entry.receiptId,
-              position,
-              durationMs: Date.now() - started,
-            });
-          };
-
-          const results = await Promise.allSettled(
-            entry.images.map((image, position) => uploadImage(image, position)),
-          );
-
-          const failed = results.find((result) => result.status === "rejected");
-
-          if (failed) throw failed.reason;
-
-          if (!active()) return;
-          await transport.complete(entry.receiptId, entry);
-          retries.remove(entry.id);
-          store.remove(entry);
-          attempts.delete(entry.id);
-          restrictions.delete(entry.id);
-          record("receipt.upload_completed", {
-            receiptId: entry.receiptId,
-            imageCount: entry.images.length,
-          });
+          if (!(await uploadEntry(entry, transport, active))) return;
         } catch (cause) {
-          entry.error =
-            cause instanceof Error ? cause.message : "Opplastingen mislyktes.";
-          store.update(entry);
-
-          const failures = (retry?.failures ?? 0) + 1;
-
-          const next = nextAttemptAt(
-            failures,
-            parseUserError(cause)?.code === "REJECTED",
-            clock(),
-          );
-
-          attempts.set(entry.id, { failures, nextAttemptAt: next });
-
-          if (next === null)
-            record("receipt.upload_paused", {
-              captureId: entry.id,
-              attempts: failures,
-            });
-
-          try {
-            if (cause instanceof RequestDeferred) defer(entry.id, cause);
-            else retries.remove(entry.id);
-          } catch {
-            storageFailure(entry);
-          }
-
-          if (cause instanceof RequestDeferred) {
-            for (const pending of store.list(owner, householdId)) {
-              if (pending.receiptId || pending.id === entry.id) continue;
-
-              const deferred = {
-                ...pending,
-                error: pending.error ?? cause.message,
-              };
-
-              store.update(deferred);
-
-              try {
-                defer(pending.id, cause);
-              } catch {
-                storageFailure(deferred);
-              }
-            }
-          }
+          recordFailure(owner, householdId, entry, retry, cause);
         }
       }
     } finally {

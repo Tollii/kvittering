@@ -171,6 +171,33 @@ export type ReceiptCheck =
   | { kind: "valid"; receipt: ParsedReceipt }
   | { kind: "invalid"; message: string };
 
+/** True when a stored amount is a whole number of øre within the accepted range. */
+function isWholeOre(value: number): boolean {
+  return Number.isSafeInteger(value) && Math.abs(value) <= 100_000_000;
+}
+
+/** The first invariant that one receipt line breaks, or null when it has none. */
+function receiptLineIssue(line: ReceiptLine): string | null {
+  for (const value of [line.amountOre, line.unitPriceOre])
+    if (value !== null && !isWholeOre(value)) return "Beløp må være hele øre.";
+
+  for (const value of [line.quantity, line.packageSize])
+    if (value !== null && (!Number.isFinite(value) || value <= 0))
+      return "Mengde må være større enn null.";
+
+  if (line.categoryId && !isCategoryId(line.categoryId))
+    return "Ukjent kategori.";
+
+  if (
+    line.name.length > receiptLineNameLimit ||
+    line.originalText.length > 1500 ||
+    line.tags.length > 10
+  )
+    return "Varelinjen er for lang.";
+
+  return null;
+}
+
 /** Check the domain invariants of well-formed receipt data. */
 export function checkReceipt(data: ReceiptData): ReceiptCheck {
   const invalid = (message: string) => ({ kind: "invalid", message }) as const;
@@ -182,34 +209,12 @@ export function checkReceipt(data: ReceiptData): ReceiptCheck {
   for (const line of data.lines) {
     if (ids.has(line.id)) return invalid("Varelinjene må ha ulike ID-er.");
     ids.add(line.id);
+    const issue = receiptLineIssue(line);
 
-    for (const value of [line.amountOre, line.unitPriceOre])
-      if (
-        value !== null &&
-        (!Number.isSafeInteger(value) || Math.abs(value) > 100_000_000)
-      )
-        return invalid("Beløp må være hele øre.");
-
-    for (const value of [line.quantity, line.packageSize])
-      if (value !== null && (!Number.isFinite(value) || value <= 0))
-        return invalid("Mengde må være større enn null.");
-
-    if (line.categoryId && !isCategoryId(line.categoryId))
-      return invalid("Ukjent kategori.");
-
-    if (
-      line.name.length > receiptLineNameLimit ||
-      line.originalText.length > 1500 ||
-      line.tags.length > 10
-    )
-      return invalid("Varelinjen er for lang.");
+    if (issue) return invalid(issue);
   }
 
-  if (
-    data.totalOre !== null &&
-    (!Number.isSafeInteger(data.totalOre) ||
-      Math.abs(data.totalOre) > 100_000_000)
-  )
+  if (data.totalOre !== null && !isWholeOre(data.totalOre))
     return invalid("Totalen må være hele øre.");
 
   if (data.purchaseDate && !CalendarDate.parse(data.purchaseDate))
@@ -228,18 +233,69 @@ export function validateReceipt(data: ReceiptData): ParsedReceipt {
   return checked.receipt;
 }
 
-export function reconcile(data: ReceiptData) {
+type LineTotals = {
+  products: Ore;
+  discounts: Ore;
+  deposits: Ore;
+  returns: Ore;
+  adjustments: Ore;
+};
+
+/** The total that each line kind other than discounts and totals lines adds to. */
+const lineTotalOfKind: Partial<Record<LineKind, keyof LineTotals>> = {
+  product: "products",
+  deposit: "deposits",
+  deposit_return: "returns",
+  adjustment: "adjustments",
+};
+
+/**
+ * Review issues that one line with a known amount causes. Discounts are
+ * recorded in `discountsSeen` so that a repeated discount is found.
+ */
+function lineReviewIssues(
+  line: ReceiptLine,
+  amountOre: Ore,
+  discountsSeen: Set<string>,
+): ReceiptIssue[] {
+  const issues: ReceiptIssue[] = [];
+
+  if (isDiscountLine(line.kind)) {
+    const key = JSON.stringify([
+      line.kind,
+      line.name,
+      amountOre,
+      line.relatedLineId,
+    ]);
+
+    if (discountsSeen.has(key)) issues.push({ code: "duplicate_discount" });
+    discountsSeen.add(key);
+
+    if (amountOre > 0) issues.push({ code: "positive_discount" });
+  }
+
+  if (line.kind === "deposit_return" && amountOre > 0)
+    issues.push({ code: "positive_deposit_return" });
+
+  return issues;
+}
+
+/** Sum the known line amounts by total, and count the lines without an amount. */
+function reconcileLines(lines: ReceiptLine[]) {
   const reviewIssues: ReceiptIssue[] = [];
   const discountsSeen = new Set<string>();
 
-  let products = Ore.zero,
-    discounts = Ore.zero,
-    deposits = Ore.zero,
-    returns = Ore.zero,
-    adjustments = Ore.zero,
-    unknown = 0;
+  const totals: LineTotals = {
+    products: Ore.zero,
+    discounts: Ore.zero,
+    deposits: Ore.zero,
+    returns: Ore.zero,
+    adjustments: Ore.zero,
+  };
 
-  for (const line of data.lines) {
+  let unknown = 0;
+
+  for (const line of lines) {
     if (isTotalsLine(line.kind)) continue;
 
     if (line.amountOre === null) {
@@ -247,36 +303,20 @@ export function reconcile(data: ReceiptData) {
       continue;
     }
 
-    if (line.kind === "product") products = Ore.add(products, line.amountOre);
+    const total = isDiscountLine(line.kind)
+      ? "discounts"
+      : lineTotalOfKind[line.kind];
 
-    if (isDiscountLine(line.kind)) {
-      const key = JSON.stringify([
-        line.kind,
-        line.name,
-        line.amountOre,
-        line.relatedLineId,
-      ]);
-
-      if (discountsSeen.has(key))
-        reviewIssues.push({ code: "duplicate_discount" });
-      discountsSeen.add(key);
-      discounts = Ore.add(discounts, line.amountOre);
-
-      if (line.amountOre > 0) reviewIssues.push({ code: "positive_discount" });
-    }
-
-    if (line.kind === "deposit") deposits = Ore.add(deposits, line.amountOre);
-
-    if (line.kind === "deposit_return") {
-      returns = Ore.add(returns, line.amountOre);
-
-      if (line.amountOre > 0)
-        reviewIssues.push({ code: "positive_deposit_return" });
-    }
-
-    if (line.kind === "adjustment")
-      adjustments = Ore.add(adjustments, line.amountOre);
+    if (total) totals[total] = Ore.add(totals[total], line.amountOre);
+    reviewIssues.push(...lineReviewIssues(line, line.amountOre, discountsSeen));
   }
+
+  return { totals, unknown, reviewIssues };
+}
+
+export function reconcile(data: ReceiptData) {
+  const { totals, unknown, reviewIssues } = reconcileLines(data.lines);
+  const { products, discounts, deposits, returns, adjustments } = totals;
 
   const calculated = Ore.sum([
     products,

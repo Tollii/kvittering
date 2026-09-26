@@ -9,6 +9,17 @@ export class CatalogRequestError extends Error {
   }
 }
 
+/** Returns the Retry-After delay in milliseconds, or 0 when the header is absent or not valid. */
+function retryAfterMs(retry: string | null): number {
+  if (!retry) return 0;
+
+  const delay = /^\d+$/.test(retry)
+    ? Number(retry) * 1000
+    : Date.parse(retry) - Date.now();
+
+  return Number.isFinite(delay) ? Math.max(0, delay) : 0;
+}
+
 /** Called by the catalog worker; credentials remain on the server. */
 export async function kassalappFetch<T>(
   path: string,
@@ -40,20 +51,11 @@ export async function kassalappFetch<T>(
     },
   });
 
-  if (!response.ok) {
-    const retry = response.headers.get("Retry-After");
-
-    const delay = retry
-      ? /^\d+$/.test(retry)
-        ? Number(retry) * 1000
-        : Date.parse(retry) - Date.now()
-      : 0;
-
+  if (!response.ok)
     throw new CatalogRequestError(
       response.status,
-      Number.isFinite(delay) ? Math.max(0, delay) : 0,
+      retryAfterMs(response.headers.get("Retry-After")),
     );
-  }
 
   // SAFETY: Generated client types describe transport data only; worker schemas parse every result before domain use.
   return response.json() as Promise<T>;

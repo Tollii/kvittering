@@ -167,6 +167,57 @@ export const applyChanges = internalMutation({
   handler: applyChangesPage,
 });
 
+type CategoryAlias = { categoryId: string; confirmedBy: string };
+
+/** Reads the household aliases for the keys and keeps only the aliases with a known category. */
+async function loadCategoryAliases(
+  ctx: MutationCtx,
+  householdId: Id<"households">,
+  keys: string[],
+): Promise<Map<string, CategoryAlias>> {
+  const aliases = new Map<string, CategoryAlias>();
+
+  for (const key of new Set(keys)) {
+    const alias = await ctx.db
+      .query("aliases")
+      .withIndex("by_householdId_and_key", (q) =>
+        q.eq("householdId", householdId).eq("key", key),
+      )
+      .unique();
+
+    if (alias && isCategoryId(alias.categoryId)) aliases.set(key, alias);
+  }
+
+  return aliases;
+}
+
+/**
+ * Settles each product line that has an alias. Returns the person who
+ * confirmed the last alias that changed a line, or null when no line changed.
+ */
+function settleLinesWithAliases(
+  data: ReceiptData,
+  aliases: Map<string, CategoryAlias>,
+): string | null {
+  let editor: string | null = null;
+
+  for (const line of data.lines) {
+    if (line.kind !== "product") continue;
+    const key = aliasKey(data, line);
+    const alias = key ? aliases.get(key) : null;
+
+    if (
+      key &&
+      alias &&
+      isCategoryId(alias.categoryId) &&
+      settleLineWithAlias(line, key, alias.categoryId)
+    )
+      editor = alias.confirmedBy;
+  }
+
+  return editor;
+}
+
 async function applyChangesPage(
   ctx: MutationCtx,
   args: {
@@ -179,21 +230,7 @@ async function applyChangesPage(
   if (!args.keys.length || args.keys.length > 300)
     throw new Error("Invalid alias batch.");
 
-  const aliases = new Map<
-    string,
-    { categoryId: string; confirmedBy: string }
-  >();
-
-  for (const key of new Set(args.keys)) {
-    const alias = await ctx.db
-      .query("aliases")
-      .withIndex("by_householdId_and_key", (q) =>
-        q.eq("householdId", args.householdId).eq("key", key),
-      )
-      .unique();
-
-    if (alias && isCategoryId(alias.categoryId)) aliases.set(key, alias);
-  }
+  const aliases = await loadCategoryAliases(ctx, args.householdId, args.keys);
 
   if (!aliases.size) return null;
 
@@ -213,21 +250,7 @@ async function applyChangesPage(
     // Completion applies current aliases after extraction owns the state transition.
     if (!receipt.data || isReceiptProcessing(receipt.status)) continue;
     const data = structuredClone(receipt.data);
-    let editor: string | null = null;
-
-    for (const line of data.lines) {
-      if (line.kind !== "product") continue;
-      const key = aliasKey(data, line);
-      const alias = key ? aliases.get(key) : null;
-
-      if (
-        key &&
-        alias &&
-        isCategoryId(alias.categoryId) &&
-        settleLineWithAlias(line, key, alias.categoryId)
-      )
-        editor = alias.confirmedBy;
-    }
+    const editor = settleLinesWithAliases(data, aliases);
 
     if (editor !== null)
       await commitReceiptChange(ctx, {

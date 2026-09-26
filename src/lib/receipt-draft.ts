@@ -112,12 +112,12 @@ function acceptSavedSnapshot(state: ReceiptDraft): ReceiptDraft {
   };
 }
 
-/** Pure edit transitions. The controller supplies all I/O results. */
-export function reduceReceiptDraft(
+/** Records an edit and keeps a save in flight until its result arrives. */
+function applyEdit(
   state: ReceiptDraft,
-  action: ReceiptDraftAction,
+  values: Partial<ReceiptDraftValues>,
 ): ReceiptDraft {
-  const edit = (values: Partial<ReceiptDraftValues>): ReceiptDraft => ({
+  return {
     ...state,
     values: { ...state.values, ...values },
     dirty: true,
@@ -125,91 +125,124 @@ export function reduceReceiptDraft(
     operation: isSaveInFlight(state.operation)
       ? state.operation
       : { kind: "idle" },
-  });
+  };
+}
 
+/** A new store or branch clears the physical store chosen for the old one. */
+function applyData(state: ReceiptDraft, data: ReceiptData): ReceiptDraft {
+  const storeChanged =
+    state.values.data &&
+    (data.store !== state.values.data.store ||
+      data.branch !== state.values.data.branch);
+
+  return applyEdit(
+    state,
+    storeChanged
+      ? {
+          data: { ...data, physicalStore: null, physicalStoreManual: false },
+          physicalStoreId: undefined,
+        }
+      : { data },
+  );
+}
+
+function removeLine(state: ReceiptDraft, lineId: string): ReceiptDraft {
+  const productChanges = { ...state.values.productChanges };
+  const moneyErrors = { ...state.moneyErrors };
+  delete productChanges[lineId];
+  delete moneyErrors[lineId];
+
+  return {
+    ...applyEdit(state, {
+      data: state.values.data
+        ? {
+            ...state.values.data,
+            lines: state.values.data.lines.filter((line) => line.id !== lineId),
+          }
+        : null,
+      productChanges,
+      remember: state.values.remember.filter((id) => id !== lineId),
+    }),
+    moneyErrors,
+  };
+}
+
+function setMoneyError(
+  state: ReceiptDraft,
+  key: string,
+  error: string | null,
+): ReceiptDraft {
+  const moneyErrors = { ...state.moneyErrors };
+
+  if (error) moneyErrors[key] = error;
+  else delete moneyErrors[key];
+
+  return { ...applyEdit(state, {}), moneyErrors };
+}
+
+/** A newer snapshot replaces the draft only when no local edit or request depends on the old one. */
+function receiveRemote(state: ReceiptDraft, receipt: Receipt): ReceiptDraft {
+  if (receipt.revision < state.remote.revision) return state;
+  const next = { ...state, remote: receipt };
+
+  if (state.operation.kind === "awaiting-snapshot")
+    return acceptSavedSnapshot(next);
+
+  if (state.dirty || isRequestRunning(state.operation)) return next;
+
+  return {
+    ...createReceiptDraft(receipt),
+    generation: state.generation + 1,
+  };
+}
+
+function receiveSaved(
+  state: ReceiptDraft,
+  revision: number,
+  approved: boolean,
+): ReceiptDraft {
+  if (state.operation.kind !== "saving") return state;
+
+  return acceptSavedSnapshot({
+    ...state,
+    operation: {
+      kind: "awaiting-snapshot",
+      revision,
+      approved,
+      editVersion: state.operation.editVersion,
+    },
+  });
+}
+
+/** Pure edit transitions. The controller supplies all I/O results. */
+export function reduceReceiptDraft(
+  state: ReceiptDraft,
+  action: ReceiptDraftAction,
+): ReceiptDraft {
   switch (action.type) {
     case "edit":
-      return edit(action.values);
-    case "data": {
-      const storeChanged =
-        state.values.data &&
-        (action.data.store !== state.values.data.store ||
-          action.data.branch !== state.values.data.branch);
-
-      return edit(
-        storeChanged
-          ? {
-              data: {
-                ...action.data,
-                physicalStore: null,
-                physicalStoreManual: false,
-              },
-              physicalStoreId: undefined,
-            }
-          : { data: action.data },
-      );
-    }
-
+      return applyEdit(state, action.values);
+    case "data":
+      return applyData(state, action.data);
     case "remember":
-      return edit({
+      return applyEdit(state, {
         remember: action.value
           ? [...new Set([...state.values.remember, ...action.ids])]
           : state.values.remember.filter((id) => !action.ids.includes(id)),
       });
     case "product":
-      return edit({
+      return applyEdit(state, {
         productChanges: {
           ...state.values.productChanges,
           [action.lineId]: action.choice,
         },
       });
-    case "remove-line": {
-      const productChanges = { ...state.values.productChanges };
-      const moneyErrors = { ...state.moneyErrors };
-      delete productChanges[action.lineId];
-      delete moneyErrors[action.lineId];
-
-      return {
-        ...edit({
-          data: state.values.data
-            ? {
-                ...state.values.data,
-                lines: state.values.data.lines.filter(
-                  (line) => line.id !== action.lineId,
-                ),
-              }
-            : null,
-          productChanges,
-          remember: state.values.remember.filter((id) => id !== action.lineId),
-        }),
-        moneyErrors,
-      };
-    }
-
-    case "money-error": {
-      const moneyErrors = { ...state.moneyErrors };
-
-      if (action.error) moneyErrors[action.key] = action.error;
-      else delete moneyErrors[action.key];
-
-      return { ...edit({}), moneyErrors };
-    }
-
-    case "remote": {
-      if (action.receipt.revision < state.remote.revision) return state;
-      const next = { ...state, remote: action.receipt };
-
-      if (state.operation.kind === "awaiting-snapshot")
-        return acceptSavedSnapshot(next);
-
-      if (state.dirty || isRequestRunning(state.operation)) return next;
-
-      return {
-        ...createReceiptDraft(action.receipt),
-        generation: state.generation + 1,
-      };
-    }
-
+    case "remove-line":
+      return removeLine(state, action.lineId);
+    case "money-error":
+      return setMoneyError(state, action.key, action.error);
+    case "remote":
+      return receiveRemote(state, action.receipt);
     case "discard":
       return {
         ...createReceiptDraft(state.remote),
@@ -223,20 +256,8 @@ export function reduceReceiptDraft(
             ? { kind: "saving", editVersion: state.editVersion }
             : { kind: action.operation },
       };
-    case "saved": {
-      if (state.operation.kind !== "saving") return state;
-
-      return acceptSavedSnapshot({
-        ...state,
-        operation: {
-          kind: "awaiting-snapshot",
-          revision: action.revision,
-          approved: action.approved,
-          editVersion: state.operation.editVersion,
-        },
-      });
-    }
-
+    case "saved":
+      return receiveSaved(state, action.revision, action.approved);
     case "failed":
       return { ...state, operation: { kind: "failed", error: action.error } };
     case "finished":

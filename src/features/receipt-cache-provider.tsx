@@ -9,7 +9,12 @@ import {
   useSyncExternalStore,
   type ReactNode,
 } from "react";
-import { useConvex, useConvexAuth, useQuery } from "convex/react";
+import {
+  useConvex,
+  useConvexAuth,
+  useQuery,
+  type ConvexReactClient,
+} from "convex/react";
 import { api } from "../../convex/_generated/api";
 import type { Id } from "../../convex/_generated/dataModel";
 import { receiptCache, retainReceiptCache } from "@/lib/receipt-cache-storage";
@@ -27,6 +32,48 @@ const emptySnapshot: import("@/lib/receipt-cache").ReceiptCacheSnapshot = {
 const readEmpty = () => emptySnapshot;
 
 const subscribeEmpty = () => () => {};
+
+type PullOutcome = "complete" | "cancelled" | "write-failed";
+
+/**
+ * Applies change pages to the cache until it holds every change through
+ * `through`. Query failures propagate to the caller; a failed cache write
+ * is reported here.
+ */
+async function pullReceiptChanges(
+  cache: NonNullable<ReturnType<typeof receiptCache>>,
+  convex: ConvexReactClient,
+  through: number,
+  isCancelled: () => boolean,
+): Promise<PullOutcome> {
+  while (!isCancelled()) {
+    const current = cache.read();
+
+    if (current.complete && current.sequence >= through) return "complete";
+
+    const page = await convex.query(api.receiptSync.changes, {
+      after: current.sequence,
+      through: through,
+    });
+
+    if (isCancelled()) return "cancelled";
+
+    try {
+      cache.apply(current.sequence, page);
+    } catch (error) {
+      reportError(error, "receipt.cache_write");
+
+      return "write-failed";
+    }
+
+    for (const change of page.changes)
+      if (!change.receipt) removeCachedReceiptImages(change.id);
+
+    if (page.done) return "complete";
+  }
+
+  return "cancelled";
+}
 
 export function ReceiptCacheProvider({
   owner,
@@ -81,34 +128,20 @@ export function ReceiptCacheProvider({
 
     async function synchronize() {
       try {
-        while (!isCancelled()) {
-          const current = currentCache.read();
+        const outcome = await pullReceiptChanges(
+          currentCache,
+          convex,
+          through,
+          isCancelled,
+        );
 
-          if (current.complete && current.sequence >= through) break;
+        if (outcome === "write-failed") {
+          setCache(null);
 
-          const page = await convex.query(api.receiptSync.changes, {
-            after: current.sequence,
-            through: through,
-          });
-
-          if (isCancelled()) return;
-
-          try {
-            currentCache.apply(current.sequence, page);
-          } catch (error) {
-            reportError(error, "receipt.cache_write");
-            setCache(null);
-
-            return;
-          }
-
-          for (const change of page.changes)
-            if (!change.receipt) removeCachedReceiptImages(change.id);
-
-          if (page.done) break;
+          return;
         }
 
-        if (!isCancelled()) {
+        if (outcome === "complete" && !isCancelled()) {
           consecutiveFailures.current = 0;
           setFailure(0);
         }

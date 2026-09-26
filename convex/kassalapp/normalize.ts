@@ -53,6 +53,74 @@ const string = (value: string | null | undefined, limit = 5000) =>
 const imageUrl = (value: string | null | undefined) =>
   value?.startsWith("https://") ? value : undefined;
 
+/** Converts one parsed provider row to a catalog product, with bounded text and list sizes. */
+function catalogProductFromRow(
+  row: z.infer<typeof productSchema>,
+): CatalogProduct {
+  const ean = row.ean && /^\d{8,14}$/.test(row.ean) ? row.ean : undefined;
+  const key = ean ? `ean:${ean}` : `kassalapp:${row.id}`;
+
+  const namedSize = parseProductEvidence({
+    source: "catalog",
+    name: row.name,
+  }).measures[0];
+
+  const namedWeight = namedSize?.rawAmount;
+
+  const weightUnit =
+    string(row.weight_unit, 20) ??
+    (namedWeight && (!row.weight || row.weight === namedWeight)
+      ? namedSize.rawUnit
+      : undefined);
+
+  return {
+    key,
+    ids: [row.id],
+    ean,
+    name: row.name.slice(0, 300),
+    brand: string(row.brand, 200),
+    image: imageUrl(row.image),
+    url: imageUrl(row.url),
+    description: string(row.description),
+    categories: row.category?.map((value) => value.name).slice(0, 12) ?? [],
+    ingredients: string(row.ingredients),
+    weight: row.weight && row.weight > 0 ? row.weight : namedWeight,
+    weightUnit,
+    nutrition:
+      row.nutrition?.slice(0, 30).map((value) => ({
+        name: value.display_name,
+        amount: value.amount ?? undefined,
+        unit: value.unit ?? undefined,
+      })) ?? [],
+    allergens:
+      row.allergens?.slice(0, 30).map((value) => ({
+        name: value.display_name,
+        status: value.contains,
+      })) ?? [],
+    labels: row.labels?.map((value) => value.display_name).slice(0, 30) ?? [],
+  };
+}
+
+/** Keeps the earlier row for a key and fills only the details that it lacks from the later row. */
+function mergeCatalogProducts(
+  previous: CatalogProduct,
+  product: CatalogProduct,
+): CatalogProduct {
+  return {
+    ...previous,
+    ids: [...new Set([...previous.ids, ...product.ids])],
+    image: previous.image ?? product.image,
+    brand: previous.brand ?? product.brand,
+    ingredients: previous.ingredients ?? product.ingredients,
+    nutrition: previous.nutrition.length
+      ? previous.nutrition
+      : product.nutrition,
+    categories: previous.categories.length
+      ? previous.categories
+      : product.categories,
+  };
+}
+
 // oxlint-disable-next-line anti-slop/no-unknown-parameters -- This boundary parser validates external input before returning a domain value.
 export function normalizeProducts(response: unknown): CatalogProduct[] {
   const rows = z
@@ -62,66 +130,13 @@ export function normalizeProducts(response: unknown): CatalogProduct[] {
   const products = new Map<string, CatalogProduct>();
 
   for (const row of (Array.isArray(rows) ? rows : [rows]).slice(0, 24)) {
-    const ean = row.ean && /^\d{8,14}$/.test(row.ean) ? row.ean : undefined;
-    const key = ean ? `ean:${ean}` : `kassalapp:${row.id}`;
+    const product = catalogProductFromRow(row);
+    const previous = products.get(product.key);
 
-    const namedSize = parseProductEvidence({
-      source: "catalog",
-      name: row.name,
-    }).measures[0];
-
-    const namedWeight = namedSize?.rawAmount;
-
-    const weightUnit =
-      string(row.weight_unit, 20) ??
-      (namedWeight && (!row.weight || row.weight === namedWeight)
-        ? namedSize.rawUnit
-        : undefined);
-
-    const product: CatalogProduct = {
-      key,
-      ids: [row.id],
-      ean,
-      name: row.name.slice(0, 300),
-      brand: string(row.brand, 200),
-      image: imageUrl(row.image),
-      url: imageUrl(row.url),
-      description: string(row.description),
-      categories: row.category?.map((value) => value.name).slice(0, 12) ?? [],
-      ingredients: string(row.ingredients),
-      weight: row.weight && row.weight > 0 ? row.weight : namedWeight,
-      weightUnit,
-      nutrition:
-        row.nutrition?.slice(0, 30).map((value) => ({
-          name: value.display_name,
-          amount: value.amount ?? undefined,
-          unit: value.unit ?? undefined,
-        })) ?? [],
-      allergens:
-        row.allergens?.slice(0, 30).map((value) => ({
-          name: value.display_name,
-          status: value.contains,
-        })) ?? [],
-      labels: row.labels?.map((value) => value.display_name).slice(0, 30) ?? [],
-    };
-
-    const previous = products.get(key);
-
-    if (!previous) products.set(key, product);
-    else
-      products.set(key, {
-        ...previous,
-        ids: [...new Set([...previous.ids, row.id])],
-        image: previous.image ?? product.image,
-        brand: previous.brand ?? product.brand,
-        ingredients: previous.ingredients ?? product.ingredients,
-        nutrition: previous.nutrition.length
-          ? previous.nutrition
-          : product.nutrition,
-        categories: previous.categories.length
-          ? previous.categories
-          : product.categories,
-      });
+    products.set(
+      product.key,
+      previous ? mergeCatalogProducts(previous, product) : product,
+    );
   }
 
   return [...products.values()];

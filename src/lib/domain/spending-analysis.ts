@@ -3,6 +3,7 @@ import { Ore } from "./ore";
 import {
   preparePurchases,
   comparisonPurchasePolicy,
+  type PreparedPurchase,
 } from "./purchase-projection";
 import type { Contribution, PurchaseContribution, Receipt } from "./insights";
 import {
@@ -100,6 +101,159 @@ type Group = {
   previous: MeasuredLine[];
 };
 
+type Side = "current" | "previous";
+
+type PreparedReceipt = ReturnType<typeof preparePurchases>[number];
+
+type LineContribution = Omit<PreparedPurchase, "analysis">;
+
+const unitLabels = { millilitres: "ml", grams: "g", units: "stk" } as const;
+
+/** Add one line to the spending of its category on one side of the comparison. */
+function addCategoryLine(
+  categories: Map<string, SpendingEffect>,
+  side: Side,
+  contribution: LineContribution,
+) {
+  const found = categoryOf(contribution.line.categoryId);
+
+  const category = categories.get(found.id) ?? {
+    id: found.id,
+    name: found.name,
+    currentOre: Ore.zero,
+    previousOre: Ore.zero,
+    differenceOre: Ore.zero,
+    priceOre: null,
+    quantityOre: null,
+    currentQuantity: null,
+    previousQuantity: null,
+    unit: null,
+    contributions: [],
+  };
+
+  const key = side === "current" ? "currentOre" : "previousOre";
+  category[key] = Ore.add(category[key], contribution.line.netOre);
+  category.contributions.push(contribution);
+  categories.set(found.id, category);
+}
+
+/** Add one line to its product family group. Lines without a family are not grouped. */
+function addFamilyLine(
+  groups: Map<string, Group>,
+  side: Side,
+  contribution: LineContribution,
+  result: PreparedPurchase["analysis"],
+) {
+  if (!result?.family) return;
+  const { line } = contribution;
+
+  const group = groups.get(result.family.id) ?? {
+    name: result.family.name,
+    current: [],
+    previous: [],
+  };
+
+  group[side].push({
+    ...contribution,
+    quantity:
+      line.amountOre !== null && line.netOre >= 0 ? result.quantity : null,
+  });
+  groups.set(result.family.id, group);
+}
+
+/** Receipt totals, category rows, and product family groups for both periods. */
+function collectPurchases(
+  sides: readonly (readonly [Side, PreparedReceipt[]])[],
+) {
+  const groups = new Map<string, Group>();
+  const categories = new Map<string, SpendingEffect>();
+  const totals = { currentOre: Ore.zero, previousOre: Ore.zero };
+
+  let missingAmounts = 0,
+    productLines = 0;
+
+  for (const [side, selected] of sides) {
+    const key = side === "current" ? "currentOre" : "previousOre";
+
+    for (const { receipt, totals: total, purchases } of selected) {
+      totals[key] = Ore.add(totals[key], total.productSpending);
+      missingAmounts += total.unknown;
+
+      for (const { line, analysis } of purchases) {
+        productLines++;
+        const contribution = { receipt, line, amountOre: line.netOre };
+        addCategoryLine(categories, side, contribution);
+        addFamilyLine(groups, side, contribution, analysis);
+      }
+    }
+  }
+
+  return { groups, categories, ...totals, missingAmounts, productLines };
+}
+
+/** Spending on a family bought only in the current period, or null when there is none. */
+function currentOnlyFamily(id: string, group: Group) {
+  if (!group.current.length || group.previous.length) return null;
+  const amountOre = Ore.sum(group.current.map((item) => item.amountOre));
+
+  return amountOre > 0
+    ? { id, name: group.name, amountOre, contributions: group.current }
+    : null;
+}
+
+/**
+ * The price and quantity effects of a family bought in both periods, or null
+ * when the two periods have no comparable measure.
+ */
+function familyEffect(
+  id: string,
+  group: Group,
+): (SpendingEffect & { priceOre: Ore; quantityOre: Ore }) | null {
+  if (!group.current.length || !group.previous.length) return null;
+  const all = [...group.current, ...group.previous];
+
+  // Physical measures allow comparison across package sizes. Package counts do not.
+  const measured = measures
+    .flatMap((measure) => {
+      const cq = measuredTotal(group.current, measure);
+      const pq = measuredTotal(group.previous, measure);
+
+      return cq !== null && pq !== null ? [{ measure, cq, pq }] : [];
+    })
+    .at(0);
+
+  if (!measured) return null;
+
+  const mixedProfiles =
+    new Set(all.map((item) => productProfileKey(item.line))).size !== 1;
+
+  if (measured.measure === "units" && mixedProfiles) return null;
+  const { measure, cq, pq } = measured;
+
+  const sum = (items: MeasuredLine[]) =>
+    Ore.sum(items.map((item) => item.amountOre));
+
+  const c = sum(group.current),
+    p = sum(group.previous);
+
+  // Symmetric decomposition: price and quantity effects add exactly to the change.
+  const price = Ore.round(((Ore.per(c, cq) - Ore.per(p, pq)) * (cq + pq)) / 2);
+
+  return {
+    id,
+    name: group.name,
+    currentOre: c,
+    previousOre: p,
+    differenceOre: Ore.subtract(c, p),
+    priceOre: price,
+    quantityOre: Ore.subtract(Ore.subtract(c, p), price),
+    currentQuantity: cq,
+    previousQuantity: pq,
+    unit: unitLabels[measure],
+    contributions: all,
+  };
+}
+
 export function spendingAnalysis(
   receipts: Receipt[],
   period: AnalysisPeriod,
@@ -121,71 +275,21 @@ export function spendingAnalysis(
   const current = within(period.start, period.end),
     previous = within(period.previousStart, period.previousEnd);
 
-  const groups = new Map<string, Group>();
-  const categories = new Map<string, SpendingEffect>();
-
-  let currentOre = Ore.zero,
-    previousOre = Ore.zero,
-    missingAmounts = 0,
-    measuredLines = 0,
-    productLines = 0;
-
-  for (const [side, selected] of [
+  const {
+    groups,
+    categories,
+    currentOre,
+    previousOre,
+    missingAmounts,
+    productLines,
+  } = collectPurchases([
     ["current", current],
     ["previous", previous],
-  ] as const) {
-    for (const { receipt, totals: total, purchases } of selected) {
-      if (side === "current")
-        currentOre = Ore.add(currentOre, total.productSpending);
-      else previousOre = Ore.add(previousOre, total.productSpending);
-      missingAmounts += total.unknown;
-
-      for (const { line, analysis: result } of purchases) {
-        productLines++;
-        const contribution = { receipt, line, amountOre: line.netOre };
-        const found = categoryOf(line.categoryId);
-
-        const category = categories.get(found.id) ?? {
-          id: found.id,
-          name: found.name,
-          currentOre: Ore.zero,
-          previousOre: Ore.zero,
-          differenceOre: Ore.zero,
-          priceOre: null,
-          quantityOre: null,
-          currentQuantity: null,
-          previousQuantity: null,
-          unit: null,
-          contributions: [],
-        };
-
-        const key = side === "current" ? "currentOre" : "previousOre";
-        category[key] = Ore.add(category[key], line.netOre);
-        category.contributions.push(contribution);
-        categories.set(found.id, category);
-
-        if (!result?.family) continue;
-
-        const group = groups.get(result.family.id) ?? {
-          name: result.family.name,
-          current: [],
-          previous: [],
-        };
-
-        group[side].push({
-          ...contribution,
-          quantity:
-            line.amountOre !== null && line.netOre >= 0
-              ? result.quantity
-              : null,
-        });
-        groups.set(result.family.id, group);
-      }
-    }
-  }
+  ]);
 
   let priceOre = Ore.zero,
-    quantityOre = Ore.zero;
+    quantityOre = Ore.zero,
+    measuredLines = 0;
 
   const effects: SpendingEffect[] = [];
 
@@ -197,69 +301,16 @@ export function spendingAnalysis(
   }[] = [];
 
   for (const [id, group] of groups) {
-    const all = [...group.current, ...group.previous];
+    const onlyCurrent = currentOnlyFamily(id, group);
 
-    if (group.current.length && !group.previous.length) {
-      const amountOre = Ore.sum(group.current.map((item) => item.amountOre));
+    if (onlyCurrent) currentOnly.push(onlyCurrent);
+    const effect = familyEffect(id, group);
 
-      if (amountOre > 0)
-        currentOnly.push({
-          id,
-          name: group.name,
-          amountOre,
-          contributions: group.current,
-        });
-    }
-
-    if (!group.current.length || !group.previous.length) continue;
-
-    // Physical measures allow comparison across package sizes. Package counts do not.
-    const measured = measures
-      .flatMap((measure) => {
-        const cq = measuredTotal(group.current, measure);
-        const pq = measuredTotal(group.previous, measure);
-
-        return cq !== null && pq !== null ? [{ measure, cq, pq }] : [];
-      })
-      .at(0);
-
-    if (
-      !measured ||
-      (measured.measure === "units" &&
-        new Set(all.map((item) => productProfileKey(item.line))).size !== 1)
-    )
-      continue;
-    const { measure, cq, pq } = measured;
-
-    const sum = (items: MeasuredLine[]) =>
-      Ore.sum(items.map((item) => item.amountOre));
-
-    const c = sum(group.current),
-      p = sum(group.previous);
-
-    // Symmetric decomposition: price and quantity effects add exactly to the change.
-    const price = Ore.round(
-      ((Ore.per(c, cq) - Ore.per(p, pq)) * (cq + pq)) / 2,
-    );
-
-    const amount = Ore.subtract(Ore.subtract(c, p), price);
-    priceOre = Ore.add(priceOre, price);
-    quantityOre = Ore.add(quantityOre, amount);
-    measuredLines += all.length;
-    effects.push({
-      id,
-      name: group.name,
-      currentOre: c,
-      previousOre: p,
-      differenceOre: Ore.subtract(c, p),
-      priceOre: price,
-      quantityOre: amount,
-      currentQuantity: cq,
-      previousQuantity: pq,
-      unit:
-        measure === "grams" ? "g" : measure === "millilitres" ? "ml" : "stk",
-      contributions: all,
-    });
+    if (!effect) continue;
+    priceOre = Ore.add(priceOre, effect.priceOre);
+    quantityOre = Ore.add(quantityOre, effect.quantityOre);
+    measuredLines += effect.contributions.length;
+    effects.push(effect);
   }
 
   effects.sort((a, b) =>

@@ -97,6 +97,80 @@ export async function linkCatalogProduct(
   return withProductReference(line, reference);
 }
 
+/** Links one receipt line to the selected catalog or household product and saves the mapping. */
+async function linkSelectedProduct(
+  ctx: MutationCtx,
+  householdId: Id<"households">,
+  editor: string,
+  retailer: string,
+  line: ReceiptLine,
+  selection: ProductSelection,
+): Promise<ReceiptLine> {
+  if (selection.kind === "catalog") {
+    const record = await ctx.db
+      .query("catalogProducts")
+      .withIndex("by_key", (q) => q.eq("key", selection.key))
+      .unique();
+
+    if (!record)
+      throw userError("Produktet finnes ikke i katalogen. Søk på nytt.");
+
+    return linkCatalogProduct(
+      ctx,
+      householdId,
+      retailer,
+      line,
+      record.product,
+      editor,
+    );
+  }
+
+  const id =
+    selection.kind === "new_household"
+      ? await createProduct(ctx, householdId, retailer, line)
+      : selection.kind === "household"
+        ? selection.productId
+        : null;
+
+  const linked = await linkProduct(
+    ctx,
+    householdId,
+    retailer,
+    line,
+    id,
+    "manual",
+  );
+
+  await saveMapping(
+    ctx,
+    householdId,
+    retailer,
+    line,
+    id,
+    editor,
+    linked.productReference,
+  );
+
+  return linked;
+}
+
+/** Returns the selected catalog store, or null when the selection clears it. */
+async function selectedPhysicalStore(
+  ctx: MutationCtx,
+  physicalStoreId: number | null,
+): Promise<ReceiptData["physicalStore"]> {
+  if (physicalStoreId === null) return null;
+
+  const record = await ctx.db
+    .query("catalogStores")
+    .withIndex("by_externalId", (q) => q.eq("externalId", physicalStoreId))
+    .unique();
+
+  if (!record) throw userError("Butikken finnes ikke i katalogen.");
+
+  return record.store;
+}
+
 /** Resolve one explicit selection per line inside the receipt transaction. */
 export async function resolveProductSelections(
   ctx: MutationCtx,
@@ -124,66 +198,18 @@ export async function resolveProductSelections(
     if (!line || !retailer || !matchingKey(line.receiptName ?? line.name))
       throw userError("Butikk og varenavn kreves for produktkobling.");
 
-    if (selection.kind === "catalog") {
-      const record = await ctx.db
-        .query("catalogProducts")
-        .withIndex("by_key", (q) => q.eq("key", selection.key))
-        .unique();
-
-      if (!record)
-        throw userError("Produktet finnes ikke i katalogen. Søk på nytt.");
-      data.lines[index] = await linkCatalogProduct(
-        ctx,
-        householdId,
-        retailer,
-        line,
-        record.product,
-        editor,
-      );
-    } else {
-      const id =
-        selection.kind === "new_household"
-          ? await createProduct(ctx, householdId, retailer, line)
-          : selection.kind === "household"
-            ? selection.productId
-            : null;
-
-      const linked = await linkProduct(
-        ctx,
-        householdId,
-        retailer,
-        line,
-        id,
-        "manual",
-      );
-
-      data.lines[index] = linked;
-      await saveMapping(
-        ctx,
-        householdId,
-        retailer,
-        line,
-        id,
-        editor,
-        linked.productReference,
-      );
-    }
+    data.lines[index] = await linkSelectedProduct(
+      ctx,
+      householdId,
+      editor,
+      retailer,
+      line,
+      selection,
+    );
   }
 
   if (physicalStoreId !== undefined) {
-    const record =
-      physicalStoreId === null
-        ? null
-        : await ctx.db
-            .query("catalogStores")
-            .withIndex("by_externalId", (q) =>
-              q.eq("externalId", physicalStoreId),
-            )
-            .unique();
-
-    if (physicalStoreId !== null && !record)
-      throw userError("Butikken finnes ikke i katalogen.");
-    data.physicalStore = record?.store ?? null;
+    data.physicalStore = await selectedPhysicalStore(ctx, physicalStoreId);
     data.physicalStoreManual = true;
   }
 

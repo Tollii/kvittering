@@ -29,6 +29,7 @@ import {
   category,
   parseCategoryId,
   unclearCategoryId,
+  type CategoryId,
 } from "@/lib/domain/categories";
 import {
   lineKinds,
@@ -117,51 +118,27 @@ export function ReceiptLineEditor({
     "search" | "details" | null
   >(null);
 
-  const catalogProduct =
-    productChoice?.kind === "catalog"
-      ? productChoice.product
-      : productChoice?.kind === "separate" ||
-          productChoice?.kind === "new_household" ||
-          productChoice?.kind === "household"
-        ? null
-        : line.catalogProduct;
+  const catalogProduct = linkedCatalogProduct(line, productChoice);
 
   const patch = (value: Partial<ReceiptLine>) =>
     onChange({ ...line, ...value, manual: true });
 
   const reference = productReference(line);
   const productKind = productChoice?.kind ?? reference.kind;
-  const productMissing = productKind === "unresolved";
-
-  const productLabel = productMissing
-    ? "Mangler produkt"
-    : productKind === "separate"
-      ? "Holdes separat"
-      : productKind === "household" || productKind === "new_household"
-        ? "Eget produkt"
-        : catalogProduct?.equivalence
-          ? "Tilsvarende produkt"
-          : "Produkt";
-
-  const categoryId = parseCategoryId(line.categoryId);
-
-  const categoryLabel = categoryId
-    ? category(categoryId).name
-    : "Velg kategori";
-
-  const confidenceLabel =
-    line.confidence != null
-      ? `, ${Math.round(line.confidence * 100)} prosent sikker`
-      : "";
 
   const showEditor = expanded || (review && (missingAmount || missingName));
 
-  const kindLabel =
-    line.kind === "product" ||
-    lineLabels[line.kind].toLocaleLowerCase("nb-NO") ===
-      line.name.trim().toLocaleLowerCase("nb-NO")
-      ? null
-      : lineLabels[line.kind];
+  // The reader's remarks about the line, apart from an uncertain category.
+  const readerIssues = line.issues.filter(
+    (issue) => !isCategoryUncertain(issue),
+  );
+
+  function acceptReaderIssues() {
+    tapFeedback();
+    patch({
+      issues: line.issues.filter((issue) => isCategoryUncertain(issue)),
+    });
+  }
 
   return (
     <View
@@ -170,168 +147,31 @@ export function ReceiptLineEditor({
         gap: 8,
       }}
     >
-      <Pressable
-        accessibilityRole="button"
-        accessibilityLabel={`${expanded ? "Skjul" : "Rediger"} ${line.name || "ny vare"}, ${Ore.format(line.amountOre)}`}
-        accessibilityState={{ expanded }}
+      <LineHeader
+        line={line}
+        expanded={expanded}
+        missingName={missingName}
+        missingAmount={missingAmount}
+        fontScale={fontScale}
         onPress={() => setExpanded(!expanded)}
-        style={({ pressed: down }) => ({
-          minHeight: 44,
-          flexDirection: "row",
-          alignItems: "center",
-          gap: 10,
-          opacity: down ? 0.6 : 1,
-        })}
-      >
-        <View style={{ flex: 1, gap: 1 }}>
-          <Copy
-            size={16}
-            weight="600"
-            numberOfLines={fontScale > 1.3 ? undefined : 2}
-          >
-            {line.name || (missingName ? "Navn mangler" : "Ny vare")}
-          </Copy>
-          {!!(kindLabel || (line.quantity && line.quantity !== 1)) && (
-            <Copy size={12} muted>
-              {[
-                kindLabel,
-                line.quantity && line.quantity !== 1
-                  ? `${line.quantity} ${line.unit ?? "stk"}`
-                  : null,
-              ]
-                .filter(Boolean)
-                .join(" · ")}
-            </Copy>
-          )}
-        </View>
-        <Copy
-          size={16}
-          weight="600"
-          style={{
-            flexShrink: 1,
-            maxWidth: "45%",
-            textAlign: "right",
-            color: missingAmount ? colors.warning : colors.text,
-          }}
-        >
-          {missingAmount ? "Beløp?" : Ore.format(line.amountOre)}
-        </Copy>
-        <Icon
-          name={expanded ? "chevron.up" : "chevron.down"}
-          size={11}
-          color={colors.secondary}
-        />
-      </Pressable>
+      />
       {line.kind === "product" && (
-        <View
-          style={{
-            flexDirection: "row",
-            alignItems: "center",
-            gap: 8,
-            flexWrap: "wrap",
-            paddingBottom: review ? 0 : 6,
+        <LineProductRow
+          line={line}
+          review={review}
+          categoryUncertain={categoryUncertain}
+          priceSignal={priceSignal}
+          catalogProduct={catalogProduct}
+          productKind={productKind}
+          onOpenCategory={() => setCategoryOpen(true)}
+          onConfirmCategory={(categoryId) => {
+            tapFeedback();
+            onChange(confirmLineCategory(line, categoryId));
           }}
-        >
-          {review && canConfirmSuggestedCategory(line) ? (
-            <>
-              <Chip
-                label={
-                  line.confidence != null && line.confidence < 1
-                    ? `${categoryLabel} · ${Math.round(line.confidence * 100)} %`
-                    : categoryLabel
-                }
-                icon="tag"
-                tone="warning"
-                accessibilityLabel={`Forslag: ${categoryLabel}${confidenceLabel}. Trykk for å velge en annen kategori`}
-                onPress={() => setCategoryOpen(true)}
-              />
-              <Pressable
-                accessibilityRole="button"
-                accessibilityLabel={`Bekreft kategorien ${categoryLabel} for ${line.name}`}
-                onPress={() => {
-                  tapFeedback();
-                  onChange(confirmLineCategory(line, line.categoryId));
-                }}
-                style={(state) => [
-                  {
-                    flexDirection: "row",
-                    alignItems: "center",
-                    gap: 5,
-                    minHeight: 44,
-                    paddingHorizontal: 11,
-                    borderRadius: 10,
-                    borderCurve: "continuous",
-                    backgroundColor: colors.primary,
-                  },
-                  pressed(state),
-                ]}
-              >
-                <Icon name="checkmark" size={11} color={colors.onPrimary} />
-                <Copy
-                  size={15}
-                  weight="600"
-                  style={{ color: colors.onPrimary }}
-                >
-                  Bekreft kategori
-                </Copy>
-              </Pressable>
-            </>
-          ) : (
-            <Chip
-              label={
-                categoryUncertain && line.categoryId === unclearCategoryId
-                  ? "Velg kategori"
-                  : categoryLabel
-              }
-              icon={categoryUncertain ? "tag" : "checkmark.circle"}
-              tone={categoryUncertain ? "warning" : "muted"}
-              accessibilityLabel={`Kategori for ${line.name}: ${categoryLabel}. Trykk for å endre`}
-              onPress={() => setCategoryOpen(true)}
-            />
-          )}
-          {!review && priceSignal && (
-            <Chip
-              label={priceSignalLabel(priceSignal)}
-              icon={priceSignal.ratio > 1 ? "arrow.up" : "arrow.down"}
-              tone={priceSignal.ratio > 1 ? "warning" : "success"}
-              accessibilityLabel={`${priceSignalLabel(priceSignal)}. Vanlig pris ${Ore.format(Ore.round(priceSignal.typicalUnitPrice))}`}
-            />
-          )}
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel={
-              catalogProduct
-                ? `Produktinformasjon for ${catalogProduct.name}`
-                : `${productLabel} for ${line.name}. Endre produktkobling`
-            }
-            onPress={() =>
-              setCatalogScreen(catalogProduct ? "details" : "search")
-            }
-            style={({ pressed: down }) => ({
-              minHeight: 44,
-              flexDirection: "row",
-              alignItems: "center",
-              gap: 5,
-              marginLeft: "auto",
-              opacity: down ? 0.6 : 1,
-            })}
-          >
-            <Icon
-              name={productMissing ? "link" : "checkmark.circle"}
-              size={13}
-              color={colors.primary}
-            />
-            <Copy
-              size={14}
-              weight="600"
-              style={{
-                color: colors.primary,
-              }}
-            >
-              {productLabel}
-            </Copy>
-          </Pressable>
-        </View>
+          onOpenCatalog={() =>
+            setCatalogScreen(catalogProduct ? "details" : "search")
+          }
+        />
       )}
       {categoryOpen && (
         <CategoryPicker
@@ -353,13 +193,7 @@ export function ReceiptLineEditor({
         <CatalogProductPicker
           name={line.name}
           store={retailer}
-          onSelect={(product) =>
-            onProduct(
-              product
-                ? { kind: "catalog", key: product.key, product }
-                : { kind: "separate" },
-            )
-          }
+          onSelect={(product) => onProduct(catalogChoice(product))}
           onClose={() => setCatalogScreen(null)}
         />
       )}
@@ -410,110 +244,30 @@ export function ReceiptLineEditor({
               onError={onMoneyError}
             />
           )}
-          {expanded && line.kind === "product" && (
-            <>
-              <Button
-                title={
-                  productChoice
-                    ? "Produktkobling endret"
-                    : "Endre produktkobling"
-                }
-                variant="secondary"
-                compact
-                onPress={() => setProductOpen(!productOpen)}
-              />
-              {productOpen && (
-                <ProductSelector
-                  receiptId={receiptId}
-                  retailer={retailer}
-                  line={line}
-                  choice={productChoice}
-                  onChange={onProduct}
-                />
-              )}
-              {details && (
-                <>
-                  <Field
-                    label="Merke"
-                    value={line.brand ?? ""}
-                    onChangeText={(brand) => patch({ brand: brand || null })}
-                  />
-                  <Field
-                    label="Etiketter (kommadelt)"
-                    defaultValue={line.tags.join(", ")}
-                    onEndEditing={(event) =>
-                      patch({
-                        tags: event.nativeEvent.text
-                          .split(",")
-                          .map((tag) => tag.trim())
-                          .filter(Boolean),
-                      })
-                    }
-                  />
-                </>
-              )}
-            </>
-          )}
-          {expanded && line.kind === "item_discount" && (
-            <Select
-              label="Rabatten gjelder"
-              value={line.relatedLineId ?? ""}
-              options={[
-                { value: "", label: "Uavklart" },
-                ...lines
-                  .filter((item) => item.kind === "product")
-                  .map((item) => ({ value: item.id, label: item.name })),
-              ]}
-              onChange={(relatedLineId) =>
-                patch({ relatedLineId: relatedLineId || null })
-              }
-            />
-          )}
           {expanded && (
-            <Row
-              title={details ? "Skjul flere detaljer" : "Flere detaljer"}
-              onPress={() => setDetails(!details)}
+            <ExpandedLineFields
+              line={line}
+              lines={lines}
+              receiptId={receiptId}
+              retailer={retailer}
+              productChoice={productChoice}
+              productOpen={productOpen}
+              details={details}
+              patch={patch}
+              onToggleProduct={() => setProductOpen(!productOpen)}
+              onToggleDetails={() => setDetails(!details)}
+              onProduct={onProduct}
             />
           )}
-          {expanded && details && (
-            <Select
-              label="Linjetype"
-              value={line.kind}
-              options={lineKinds.map((kind) => ({
-                value: kind,
-                label: lineLabels[kind],
-              }))}
-              onChange={(kind) =>
-                patch({
-                  kind,
-                  categoryId: kind === "product" ? unclearCategoryId : null,
-                  issues: line.issues.filter(
-                    (issue) => !isCategoryUncertain(issue),
-                  ),
-                })
-              }
-            />
-          )}
-          {line.issues.some((issue) => !isCategoryUncertain(issue)) && (
+          {readerIssues.length > 0 && (
             <>
-              <Notice tone="warning">
-                {line.issues
-                  .filter((issue) => !isCategoryUncertain(issue))
-                  .join("\n")}
-              </Notice>
+              <Notice tone="warning">{readerIssues.join("\n")}</Notice>
               <Button
                 title="Dette stemmer"
                 variant="tint"
                 compact
                 icon="checkmark"
-                onPress={() => {
-                  tapFeedback();
-                  patch({
-                    issues: line.issues.filter((issue) =>
-                      isCategoryUncertain(issue),
-                    ),
-                  });
-                }}
+                onPress={acceptReaderIssues}
               />
             </>
           )}
@@ -527,34 +281,435 @@ export function ReceiptLineEditor({
           )}
         </View>
       )}
-      {!showEditor &&
-        review &&
-        line.issues.some((issue) => !isCategoryUncertain(issue)) && (
-          <View style={{ flexDirection: "row", gap: 8 }}>
-            <Button
-              title="Dette stemmer"
-              variant="tint"
-              compact
-              icon="checkmark"
-              onPress={() => {
-                tapFeedback();
-                patch({
-                  issues: line.issues.filter((issue) =>
-                    isCategoryUncertain(issue),
-                  ),
-                });
-              }}
-            />
-            <Button
-              title="Rediger"
-              variant="secondary"
-              compact
-              onPress={() => setExpanded(true)}
-            />
-          </View>
-        )}
+      {!showEditor && review && readerIssues.length > 0 && (
+        <View style={{ flexDirection: "row", gap: 8 }}>
+          <Button
+            title="Dette stemmer"
+            variant="tint"
+            compact
+            icon="checkmark"
+            onPress={acceptReaderIssues}
+          />
+          <Button
+            title="Rediger"
+            variant="secondary"
+            compact
+            onPress={() => setExpanded(true)}
+          />
+        </View>
+      )}
     </View>
   );
+}
+
+/** A product choice made in this draft replaces the line's catalog product. */
+function linkedCatalogProduct(
+  line: ReceiptLine,
+  productChoice: ProductChoice | undefined,
+) {
+  if (productChoice?.kind === "catalog") return productChoice.product;
+
+  const catalogReplaced =
+    productChoice?.kind === "separate" ||
+    productChoice?.kind === "new_household" ||
+    productChoice?.kind === "household";
+
+  return catalogReplaced ? null : line.catalogProduct;
+}
+
+/** A catalog product links the line; no product keeps the line separate. */
+function catalogChoice(
+  product: Extract<ProductChoice, { kind: "catalog" }>["product"] | null,
+): ProductChoice {
+  return product
+    ? { kind: "catalog", key: product.key, product }
+    : { kind: "separate" };
+}
+
+/** The line name, amount, and kind or quantity. A press expands the editor. */
+function LineHeader({
+  line,
+  expanded,
+  missingName,
+  missingAmount,
+  fontScale,
+  onPress,
+}: Readonly<{
+  line: ReceiptLine;
+  expanded: boolean;
+  missingName: boolean;
+  missingAmount: boolean;
+  fontScale: number;
+  onPress: () => void;
+}>) {
+  const colors = useTheme();
+  const detail = lineDetail(line);
+
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={`${expanded ? "Skjul" : "Rediger"} ${line.name || "ny vare"}, ${Ore.format(line.amountOre)}`}
+      accessibilityState={{ expanded }}
+      onPress={onPress}
+      style={({ pressed: down }) => ({
+        minHeight: 44,
+        flexDirection: "row",
+        alignItems: "center",
+        gap: 10,
+        opacity: down ? 0.6 : 1,
+      })}
+    >
+      <View style={{ flex: 1, gap: 1 }}>
+        <Copy
+          size={16}
+          weight="600"
+          numberOfLines={fontScale > 1.3 ? undefined : 2}
+        >
+          {line.name || (missingName ? "Navn mangler" : "Ny vare")}
+        </Copy>
+        {!!detail && (
+          <Copy size={12} muted>
+            {detail}
+          </Copy>
+        )}
+      </View>
+      <Copy
+        size={16}
+        weight="600"
+        style={{
+          flexShrink: 1,
+          maxWidth: "45%",
+          textAlign: "right",
+          color: missingAmount ? colors.warning : colors.text,
+        }}
+      >
+        {missingAmount ? "Beløp?" : Ore.format(line.amountOre)}
+      </Copy>
+      <Icon
+        name={expanded ? "chevron.up" : "chevron.down"}
+        size={11}
+        color={colors.secondary}
+      />
+    </Pressable>
+  );
+}
+
+/**
+ * The line kind when the name does not already tell it, and a quantity
+ * other than one. Empty when neither applies.
+ */
+function lineDetail(line: ReceiptLine): string {
+  const kindLabel =
+    line.kind === "product" ||
+    lineLabels[line.kind].toLocaleLowerCase("nb-NO") ===
+      line.name.trim().toLocaleLowerCase("nb-NO")
+      ? null
+      : lineLabels[line.kind];
+
+  const quantity =
+    line.quantity && line.quantity !== 1
+      ? `${line.quantity} ${line.unit ?? "stk"}`
+      : null;
+
+  return [kindLabel, quantity].filter(Boolean).join(" · ");
+}
+
+/** The category, price signal, and product link of a product line. */
+function LineProductRow({
+  line,
+  review,
+  categoryUncertain,
+  priceSignal,
+  catalogProduct,
+  productKind,
+  onOpenCategory,
+  onConfirmCategory,
+  onOpenCatalog,
+}: Readonly<{
+  line: ReceiptLine;
+  review: boolean;
+  categoryUncertain: boolean;
+  priceSignal?: PriceSignal;
+  catalogProduct: ReturnType<typeof linkedCatalogProduct>;
+  productKind:
+    ProductChoice["kind"] | ReturnType<typeof productReference>["kind"];
+  onOpenCategory: () => void;
+  onConfirmCategory: (categoryId: CategoryId) => void;
+  onOpenCatalog: () => void;
+}>) {
+  const colors = useTheme();
+  const productMissing = productKind === "unresolved";
+  const productLabel = productLinkLabel(productKind, catalogProduct);
+  const categoryId = parseCategoryId(line.categoryId);
+
+  const categoryLabel = categoryId
+    ? category(categoryId).name
+    : "Velg kategori";
+
+  return (
+    <View
+      style={{
+        flexDirection: "row",
+        alignItems: "center",
+        gap: 8,
+        flexWrap: "wrap",
+        paddingBottom: review ? 0 : 6,
+      }}
+    >
+      {review && canConfirmSuggestedCategory(line) ? (
+        <CategorySuggestion
+          line={line}
+          categoryLabel={categoryLabel}
+          onOpenCategory={onOpenCategory}
+          onConfirmCategory={onConfirmCategory}
+        />
+      ) : (
+        <Chip
+          label={
+            categoryUncertain && line.categoryId === unclearCategoryId
+              ? "Velg kategori"
+              : categoryLabel
+          }
+          icon={categoryUncertain ? "tag" : "checkmark.circle"}
+          tone={categoryUncertain ? "warning" : "muted"}
+          accessibilityLabel={`Kategori for ${line.name}: ${categoryLabel}. Trykk for å endre`}
+          onPress={onOpenCategory}
+        />
+      )}
+      {!review && priceSignal && <PriceSignalChip signal={priceSignal} />}
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel={
+          catalogProduct
+            ? `Produktinformasjon for ${catalogProduct.name}`
+            : `${productLabel} for ${line.name}. Endre produktkobling`
+        }
+        onPress={onOpenCatalog}
+        style={({ pressed: down }) => ({
+          minHeight: 44,
+          flexDirection: "row",
+          alignItems: "center",
+          gap: 5,
+          marginLeft: "auto",
+          opacity: down ? 0.6 : 1,
+        })}
+      >
+        <Icon
+          name={productMissing ? "link" : "checkmark.circle"}
+          size={13}
+          color={colors.primary}
+        />
+        <Copy
+          size={14}
+          weight="600"
+          style={{
+            color: colors.primary,
+          }}
+        >
+          {productLabel}
+        </Copy>
+      </Pressable>
+    </View>
+  );
+}
+
+function productLinkLabel(
+  productKind:
+    ProductChoice["kind"] | ReturnType<typeof productReference>["kind"],
+  catalogProduct: ReturnType<typeof linkedCatalogProduct>,
+): string {
+  if (productKind === "unresolved") return "Mangler produkt";
+
+  if (productKind === "separate") return "Holdes separat";
+
+  if (productKind === "household" || productKind === "new_household")
+    return "Eget produkt";
+
+  return catalogProduct?.equivalence ? "Tilsvarende produkt" : "Produkt";
+}
+
+/** A suggested category in review mode, with a one-tap confirmation. */
+function CategorySuggestion({
+  line,
+  categoryLabel,
+  onOpenCategory,
+  onConfirmCategory,
+}: Readonly<{
+  line: ReceiptLine & { categoryId: CategoryId };
+  categoryLabel: string;
+  onOpenCategory: () => void;
+  onConfirmCategory: (categoryId: CategoryId) => void;
+}>) {
+  const colors = useTheme();
+
+  const confidenceLabel =
+    line.confidence != null
+      ? `, ${Math.round(line.confidence * 100)} prosent sikker`
+      : "";
+
+  return (
+    <>
+      <Chip
+        label={
+          line.confidence != null && line.confidence < 1
+            ? `${categoryLabel} · ${Math.round(line.confidence * 100)} %`
+            : categoryLabel
+        }
+        icon="tag"
+        tone="warning"
+        accessibilityLabel={`Forslag: ${categoryLabel}${confidenceLabel}. Trykk for å velge en annen kategori`}
+        onPress={onOpenCategory}
+      />
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel={`Bekreft kategorien ${categoryLabel} for ${line.name}`}
+        onPress={() => onConfirmCategory(line.categoryId)}
+        style={(state) => [
+          {
+            flexDirection: "row",
+            alignItems: "center",
+            gap: 5,
+            minHeight: 44,
+            paddingHorizontal: 11,
+            borderRadius: 10,
+            borderCurve: "continuous",
+            backgroundColor: colors.primary,
+          },
+          pressed(state),
+        ]}
+      >
+        <Icon name="checkmark" size={11} color={colors.onPrimary} />
+        <Copy size={15} weight="600" style={{ color: colors.onPrimary }}>
+          Bekreft kategori
+        </Copy>
+      </Pressable>
+    </>
+  );
+}
+
+function PriceSignalChip({ signal }: Readonly<{ signal: PriceSignal }>) {
+  return (
+    <Chip
+      label={priceSignalLabel(signal)}
+      icon={signal.ratio > 1 ? "arrow.up" : "arrow.down"}
+      tone={signal.ratio > 1 ? "warning" : "success"}
+      accessibilityLabel={`${priceSignalLabel(signal)}. Vanlig pris ${Ore.format(Ore.round(signal.typicalUnitPrice))}`}
+    />
+  );
+}
+
+/** The fields that only the expanded editor shows: product link, discount target, and line details. */
+function ExpandedLineFields({
+  line,
+  lines,
+  receiptId,
+  retailer,
+  productChoice,
+  productOpen,
+  details,
+  patch,
+  onToggleProduct,
+  onToggleDetails,
+  onProduct,
+}: Readonly<{
+  line: ReceiptLine;
+  lines: ReceiptLine[];
+  receiptId: Id<"receipts">;
+  retailer: string;
+  productChoice?: ProductChoice;
+  productOpen: boolean;
+  details: boolean;
+  patch: (value: Partial<ReceiptLine>) => void;
+  onToggleProduct: () => void;
+  onToggleDetails: () => void;
+  onProduct: (choice: ProductChoice) => void;
+}>) {
+  return (
+    <>
+      {line.kind === "product" && (
+        <>
+          <Button
+            title={
+              productChoice ? "Produktkobling endret" : "Endre produktkobling"
+            }
+            variant="secondary"
+            compact
+            onPress={onToggleProduct}
+          />
+          {productOpen && (
+            <ProductSelector
+              receiptId={receiptId}
+              retailer={retailer}
+              line={line}
+              choice={productChoice}
+              onChange={onProduct}
+            />
+          )}
+          {details && (
+            <>
+              <Field
+                label="Merke"
+                value={line.brand ?? ""}
+                onChangeText={(brand) => patch({ brand: brand || null })}
+              />
+              <Field
+                label="Etiketter (kommadelt)"
+                defaultValue={line.tags.join(", ")}
+                onEndEditing={(event) =>
+                  patch({ tags: parseTags(event.nativeEvent.text) })
+                }
+              />
+            </>
+          )}
+        </>
+      )}
+      {line.kind === "item_discount" && (
+        <Select
+          label="Rabatten gjelder"
+          value={line.relatedLineId ?? ""}
+          options={[
+            { value: "", label: "Uavklart" },
+            ...lines
+              .filter((item) => item.kind === "product")
+              .map((item) => ({ value: item.id, label: item.name })),
+          ]}
+          onChange={(relatedLineId) =>
+            patch({ relatedLineId: relatedLineId || null })
+          }
+        />
+      )}
+      <Row
+        title={details ? "Skjul flere detaljer" : "Flere detaljer"}
+        onPress={onToggleDetails}
+      />
+      {details && (
+        <Select
+          label="Linjetype"
+          value={line.kind}
+          options={lineKinds.map((kind) => ({
+            value: kind,
+            label: lineLabels[kind],
+          }))}
+          onChange={(kind) =>
+            patch({
+              kind,
+              categoryId: kind === "product" ? unclearCategoryId : null,
+              issues: line.issues.filter(
+                (issue) => !isCategoryUncertain(issue),
+              ),
+            })
+          }
+        />
+      )}
+    </>
+  );
+}
+
+function parseTags(text: string): string[] {
+  return text
+    .split(",")
+    .map((tag) => tag.trim())
+    .filter(Boolean);
 }
 
 function ProductSelector({

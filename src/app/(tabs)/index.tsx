@@ -46,6 +46,20 @@ import { useTheme } from "@/constants/theme";
 import { failureMessage } from "@/lib/failure-message";
 import { UserError } from "@/lib/user-errors";
 
+/** The title of the note that follows the saved receipts through upload. */
+function uploadStatusTitle(
+  saved: number,
+  uploading: boolean,
+  failed: boolean,
+  online: boolean,
+) {
+  if (uploading) return online ? "Laster opp …" : "Venter på nett";
+
+  if (failed) return "Prøver igjen";
+
+  return saved === 1 ? "Lastet opp" : `${saved} kvitteringer lastet opp`;
+}
+
 export default function Capture() {
   const colors = useTheme();
   const { owner, household, online, synchronize, queue } = useHousehold();
@@ -250,6 +264,7 @@ export default function Capture() {
     });
 
   const live = permission?.granted && focused && foreground && !review;
+  const shutterDisabled = busy || !ready || !live;
 
   const uploading = queue.some((entry) => !entry.error);
   const failed = queue.some((entry) => !!entry.error);
@@ -375,15 +390,7 @@ export default function Capture() {
                 />
               )}
               <Copy weight="700" style={{ flex: 1 }}>
-                {uploading
-                  ? online
-                    ? "Laster opp …"
-                    : "Venter på nett"
-                  : failed
-                    ? "Prøver igjen"
-                    : saved === 1
-                      ? "Lastet opp"
-                      : `${saved} kvitteringer lastet opp`}
+                {uploadStatusTitle(saved, uploading, failed, online)}
               </Copy>
               <IconButton
                 name="xmark"
@@ -509,9 +516,9 @@ export default function Capture() {
           <Pressable
             accessibilityRole="button"
             accessibilityLabel="Ta bilde av kvitteringen"
-            disabled={busy || !ready || !live}
+            disabled={shutterDisabled}
             accessibilityState={{
-              disabled: busy || !ready || !live,
+              disabled: shutterDisabled,
               busy,
             }}
             onPress={() => void takePhoto()}
@@ -523,7 +530,7 @@ export default function Capture() {
                 borderRadius: 39,
                 borderWidth: 3,
                 borderColor: "white",
-                opacity: busy || !ready || !live ? 0.4 : 1,
+                opacity: shutterDisabled ? 0.4 : 1,
               },
               state.pressed && { opacity: 0.7 },
             ]}

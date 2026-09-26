@@ -19,6 +19,7 @@ import { categoryMemoryKey } from "../src/lib/domain/category-memory";
 import {
   classificationInputs,
   type ReceiptData,
+  type ReceiptLine,
 } from "../src/lib/domain/receipt";
 import {
   isCategoryUncertain,
@@ -29,6 +30,21 @@ import {
   extractedReceipt,
   type ExtractedReceipt,
 } from "../src/lib/domain/receipt-state";
+
+/** Get the value of a line that a correction of this field records. */
+function correctedValue(line: ReceiptLine, field: "category" | "catalog") {
+  return field === "category"
+    ? line.categoryId
+    : (line.catalogProduct?.key ?? null);
+}
+
+/** Tell if a save removed the category uncertainty of a line. */
+function isCategoryConfirmed(before: ReceiptLine, after: ReceiptLine) {
+  return (
+    before.issues.some(isCategoryUncertain) &&
+    !after.issues.some(isCategoryUncertain)
+  );
+}
 
 /** Only human saves create evaluation examples; automatic propagation does not. */
 export async function recordCorrections(
@@ -57,20 +73,11 @@ export async function recordCorrections(
     if (!before || after.kind !== "product") continue;
 
     for (const field of ["category", "catalog"] as const) {
-      const previous =
-        field === "category"
-          ? before.categoryId
-          : (before.catalogProduct?.key ?? null);
-
-      const expected =
-        field === "category"
-          ? after.categoryId
-          : (after.catalogProduct?.key ?? null);
+      const previous = correctedValue(before, field);
+      const expected = correctedValue(after, field);
 
       const confirmed =
-        field === "category" &&
-        before.issues.some(isCategoryUncertain) &&
-        !after.issues.some(isCategoryUncertain);
+        field === "category" && isCategoryConfirmed(before, after);
 
       if (previous === expected && !confirmed) continue;
       await ctx.db.insert("corrections", {

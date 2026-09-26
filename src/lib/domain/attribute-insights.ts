@@ -3,6 +3,7 @@ import type { Receipt, SpendingGroup } from "./insights";
 import {
   preparePurchases,
   overviewPurchasePolicy,
+  type PreparedPurchase,
 } from "./purchase-projection";
 import {
   emptyPurchaseQuantity,
@@ -24,6 +25,25 @@ export const attributeLabels = {
   preparation: preparationTypes,
 };
 
+/** The attribute value for a dimension, or "unknown" when the analysis is not confident. */
+function confidentAttribute(
+  analysis: PreparedPurchase["analysis"],
+  dimension: AttributeDimension,
+): string {
+  const attribute = analysis?.attributes?.[dimension];
+
+  return attribute && attribute.confidence >= 0.8 ? attribute.value : "unknown";
+}
+
+/** Add each known measure of `source` to `total`. Unknown measures stay unknown. */
+function addKnownQuantity(total: PurchaseQuantity, source: PurchaseQuantity) {
+  for (const key of purchaseQuantityKeys) {
+    const value = source[key];
+
+    if (value !== null) total[key] = (total[key] ?? 0) + value;
+  }
+}
+
 export function attributeInsights(
   receipts: Receipt[],
   dimension: AttributeDimension,
@@ -44,10 +64,7 @@ export function attributeInsights(
 
     for (const { line, analysis } of prepared.purchases) {
       total++;
-      const attribute = analysis?.attributes?.[dimension];
-
-      const id =
-        attribute && attribute.confidence >= 0.8 ? attribute.value : "unknown";
+      const id = confidentAttribute(analysis, dimension);
 
       if (id !== "unknown") known++;
       const labels: Record<string, string> = attributeLabels[dimension];
@@ -62,14 +79,8 @@ export function attributeInsights(
 
       group.amountOre = Ore.add(group.amountOre, line.netOre);
 
-      if (analysis && line.amountOre !== null && line.netOre >= 0) {
-        for (const key of purchaseQuantityKeys) {
-          const value = analysis.quantity[key];
-
-          if (value !== null)
-            group.quantity[key] = (group.quantity[key] ?? 0) + value;
-        }
-      }
+      if (analysis && line.amountOre !== null && line.netOre >= 0)
+        addKnownQuantity(group.quantity, analysis.quantity);
 
       group.contributions.push({ receipt, line, amountOre: line.netOre });
       groups.set(id, group);

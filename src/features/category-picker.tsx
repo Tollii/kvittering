@@ -38,6 +38,47 @@ const keywords = new Map(
   }),
 );
 
+// Most-used first: the household's own habits are the best predictor.
+function mostUsedCategories(
+  recent: string[],
+  currentId: CategoryId | null,
+): CategoryId[] {
+  const usage = new Map<CategoryId, number>();
+
+  for (const id of recent.map(parseCategoryId))
+    if (id && category(id).group !== "fallback")
+      usage.set(id, (usage.get(id) ?? 0) + 1);
+
+  return [...usage.entries()]
+    .filter(([id]) => id !== currentId)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 6)
+    .map(([id]) => id);
+}
+
+/** Describes the receipt text, brand, and confidence behind a suggestion. */
+function suggestionSource({
+  name,
+  originalText,
+  brand,
+  confidence,
+}: Readonly<{
+  name: string;
+  originalText?: string;
+  brand?: string | null;
+  confidence?: number | null;
+}>): string {
+  return [
+    originalText && originalText !== name ? `Lest: ${originalText}` : null,
+    brand,
+    confidence != null && confidence < 1
+      ? `${Math.round(confidence * 100)} % sikker`
+      : null,
+  ]
+    .filter(Boolean)
+    .join(" · ");
+}
+
 export function CategoryPicker({
   name,
   value,
@@ -77,18 +118,7 @@ export function CategoryPicker({
       : category.group === group,
   );
 
-  // Most-used first: the household's own habits are the best predictor.
-  const usage = new Map<CategoryId, number>();
-
-  for (const id of recent.map(parseCategoryId))
-    if (id && category(id).group !== "fallback")
-      usage.set(id, (usage.get(id) ?? 0) + 1);
-
-  const recentCategories = [...usage.entries()]
-    .filter(([id]) => id !== currentId)
-    .sort((a, b) => b[1] - a[1])
-    .slice(0, 6)
-    .map(([id]) => id);
+  const recentCategories = mostUsedCategories(recent, currentId);
 
   const choose = (id: CategoryId) => {
     onSelect(id);
@@ -137,17 +167,7 @@ export function CategoryPicker({
           </Copy>
           {!!(originalText || brand || confidence != null) && (
             <Copy size={12} muted numberOfLines={2}>
-              {[
-                originalText && originalText !== name
-                  ? `Lest: ${originalText}`
-                  : null,
-                brand,
-                confidence != null && confidence < 1
-                  ? `${Math.round(confidence * 100)} % sikker`
-                  : null,
-              ]
-                .filter(Boolean)
-                .join(" · ")}
+              {suggestionSource({ name, originalText, brand, confidence })}
             </Copy>
           )}
           <Field
