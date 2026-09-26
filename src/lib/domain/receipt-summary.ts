@@ -1,5 +1,6 @@
 import { Ore, oreValidator } from "./ore";
-import { CalendarDate } from "./calendar";
+import { CalendarDate, calendarDateValidator } from "./calendar";
+import { receiptStatusValidator } from "./receipt-state";
 import { v } from "convex/values";
 import { monthlyInsights, type Receipt } from "./insights";
 import { reconcile } from "./receipt";
@@ -84,6 +85,17 @@ export function receiptSpendingTotals(receipt: Receipt): SpendingTotals {
     comparisonReceipts: comparable ? insight.selected.length : 0,
   };
 }
+
+export const receiptListItemValidator = v.object({
+  _id: v.id("receipts"),
+  _creationTime: v.number(),
+  status: receiptStatusValidator,
+  store: v.union(v.string(), v.null()),
+  purchaseDate: v.union(calendarDateValidator, v.null()),
+  totalOre: v.union(oreValidator, v.null()),
+  spendingOre: oreValidator,
+  excluded: v.boolean(),
+});
 
 export function receiptListItem(receipt: Receipt) {
   return {
