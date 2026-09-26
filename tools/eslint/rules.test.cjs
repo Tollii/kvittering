@@ -56,6 +56,40 @@ tester.run("no-effect-fetch", plugin.rules["no-effect-fetch"], {
   ].map((code) => ({ code, errors: [{ messageId: "subscription" }] })),
 });
 
+tester.run("no-silent-catch", plugin.rules["no-silent-catch"], {
+  valid: [
+    "try { send(); } catch (error) { throw new Error('Push failed', { cause: error }); }",
+    "try { send(); } catch (error) { console.warn('push.delivery_failed', { error }); }",
+    "try { send(); } catch (error) { return failure(error); }",
+    "try { send(); } catch {\n  // Handled: the caller falls back to exact matches.\n  model = null;\n}",
+    "try { send(); } catch {\n  /** Handled: the caller falls back to exact matches. */\n}",
+  ],
+  invalid: [
+    "try { send(); } catch {}",
+    "try { send(); } catch (error) { console.warn('push.delivery_failed'); }",
+    "try { send(); } catch { console.warn('push.delivery_failed'); }",
+    "try { send(); } catch (error) { error = null; }",
+    "try { send(); } catch {\n  model = null;\n  // Handled: too late to explain.\n}",
+    "try { send(); } catch {\n  // Keep going.\n  model = null;\n}",
+  ].map((code) => ({ code, errors: [{ messageId: "silent" }] })),
+});
+
+tester.run("structured-log", plugin.rules["structured-log"], {
+  valid: [
+    "console.warn('push.delivery_failed', { attempt: 1 });",
+    "console.info('receipt.processing_completed');",
+    "console.warn(`push.delivery_failed`, { attempt: 1 });",
+    "logger.warn('Anything goes outside console.');",
+  ],
+  invalid: [
+    "console.warn('Receipt notification delivery failed.');",
+    "console.error(`receipt.${kind}_failed`);",
+    "console.info(event, fields);",
+    "console.log('Push');",
+    "console.warn();",
+  ].map((code) => ({ code, errors: [{ messageId: "event" }] })),
+});
+
 tester.run("no-inline-literal-set", plugin.rules["no-inline-literal-set"], {
   valid: [
     "const open = new Set(['pending', 'running']); open.has(state);",

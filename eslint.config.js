@@ -249,6 +249,8 @@ module.exports = defineConfig([
     rules: {
       "kvitto/no-db-query-filter": "error",
       "kvitto/no-unbounded-collect": "error",
+      "kvitto/no-silent-catch": "error",
+      "kvitto/structured-log": "error",
       "kvitto/convex-function-access": [
         "error",
         {
