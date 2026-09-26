@@ -1,6 +1,6 @@
 ---
 name: simulator-check
-description: Check a pull request's change on the iOS Simulator on this Mac and put screenshots and a video in the PR. Use when the user gives a PR number for a simulator check, typically for a branch that a cloud agent made.
+description: Check a pull request's change on the iOS Simulator on this Mac and put screenshots and a video in the PR. Use with a PR number, or without one to check every open PR labeled simulator-check, as the scheduled task on the Mac does.
 metadata:
   harness: [claude]
   platform: [macos]
@@ -9,7 +9,15 @@ metadata:
 
 # Check a pull request on the simulator
 
-The argument is a PR number. The result is simulator screenshots and a short video in the PR description, captured from the real native app against a local backend with seeded data. Cloud sessions cannot run this; they use [visual-check](../visual-check/SKILL.md).
+The result is simulator screenshots and a short video in the PR description, captured from the real native app against a local backend with seeded data. Cloud sessions cannot run this; they use [visual-check](../visual-check/SKILL.md) and add the `simulator-check` label to the PR.
+
+With a PR number as the argument, check that PR. Without one, check each open PR with the label, oldest first:
+
+```sh
+gh pr list --repo Tollii/kvittering --state open --label simulator-check --json number,headRefOid --jq 'sort_by(.number)[]'
+```
+
+Only one check runs at a time, because they share the simulator and the local backend ports. Take the lock with `mkdir ~/Library/Caches/kvitto-simulator/lock` and stop without output if it already exists; remove it when you finish, also after a failure. A lock older than three hours is left from a stopped run: remove it and continue.
 
 ## Decide what to show
 
@@ -46,4 +54,6 @@ Find the screenshots and the recording: `find . -newer package-lock.json \( -nam
 
 Append a `## Simulator check` section to the PR description with a caption for each item, and upload the media with `gh pr edit <number> --body-file <description.md> --attach '<file>#<caption>'`, as [file-pr](../file-pr/SKILL.md) describes. Keep the rest of the description unchanged. If the flow found a defect, report it to the user instead of hiding it in the PR.
 
-Remove the worktrees with `git worktree remove --force` when done.
+Then remove the label with `gh pr edit <number> --remove-label simulator-check`. When the check fails or finds a defect, keep the label, add a PR comment that states what failed with the relevant log lines, and include it in the final report, so the user sees it.
+
+Remove the worktrees with `git worktree remove --force` when done. Finish with one line for each PR checked: the PR, the result, and a link to the new section or comment. With nothing to check, finish with one line that says so.
