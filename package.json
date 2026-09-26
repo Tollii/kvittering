@@ -60,6 +60,7 @@
     "react-native-reanimated": "4.5.1",
     "react-native-safe-area-context": "~5.7.0",
     "react-native-screens": "~4.26.0",
+    "react-native-web": "~0.21.3",
     "react-native-worklets": "0.10.1",
     "zod": "^4.6.5"
   },
@@ -67,6 +68,7 @@
     "@edge-runtime/vm": "^5.0.0",
     "@jest/globals": "^29.7.0",
     "@oxlint/plugins": "1.85.0",
+    "@playwright/test": "1.56.1",
     "@react-native/jest-preset": "^0.86.3",
     "@sentry/browser": "^10.75.1",
     "@stryker-mutator/core": "^10.0.0",
@@ -121,6 +123,7 @@
     "test:coverage": "vitest run --coverage",
     "test:mutation": "stryker run",
     "e2e:ios": "tools/e2e/ios.sh",
+    "visual:start": "tools/visual/start.sh",
     "contract:update": "vitest run convex/contract.test.ts --update",
     "check:fast": "npm run format:check && npm run typecheck && npm run lint",
     "check:changed": "node tools/check-changed.mts",

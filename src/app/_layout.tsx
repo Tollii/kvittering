@@ -22,6 +22,7 @@ import { useTheme } from "@/constants/theme";
 import { Button, Notice, Screen } from "@/components/ui";
 import { parseUserError } from "@/lib/user-errors";
 import { ShareIntentRoot, ShareIntentRouting } from "@/features/share-intent";
+import { StorageReady } from "@/features/storage-ready";
 
 export function ErrorBoundary({ retry, error }: Readonly<ErrorBoundaryProps>) {
   useEffect(() => {
@@ -107,4 +108,12 @@ function RootLayout() {
   );
 }
 
-export default sentryEnabled ? Sentry.wrap(RootLayout) : RootLayout;
+function App() {
+  return (
+    <StorageReady>
+      <RootLayout />
+    </StorageReady>
+  );
+}
+
+export default sentryEnabled ? Sentry.wrap(App) : App;
