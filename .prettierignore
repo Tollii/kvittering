@@ -6,6 +6,7 @@ expo-env.d.ts
 convex/_generated
 convex/kassalapp/generated
 package-lock.json
+eslint-suppressions.json
 assets
 api/kassalapp.openapi.json
 ios

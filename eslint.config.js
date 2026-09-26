@@ -53,9 +53,13 @@ module.exports = defineConfig([
       "sonarjs/file-header": "off",
       // Literal labels and validator values do not need shared constants merely because they repeat.
       "sonarjs/no-duplicate-string": "off",
+      // Nesting and breaks in linear flow make a function hard to follow; this
+      // is not a size limit. eslint-suppressions.json lists the functions that
+      // exceeded it when the rule was enabled: new or more complex functions
+      // fail, and `eslint --prune-suppressions` drops an entry once it is fixed.
+      "sonarjs/cognitive-complexity": ["error", 15],
       // These limits measure syntax or size rather than a module's responsibility.
       "sonarjs/cyclomatic-complexity": "off",
-      "sonarjs/cognitive-complexity": "off",
       "sonarjs/expression-complexity": "off",
       "sonarjs/nested-control-flow": "off",
       "sonarjs/max-lines": "off",
