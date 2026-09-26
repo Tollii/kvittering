@@ -143,7 +143,7 @@ it("aggregates calendar dates with discounts, excludes pant, and applies receipt
     [purchase, second, excluded, foreign, receipt("2026-10-01")],
     2026,
     false,
-    "2026-09-17",
+    date("2026-09-17"),
   );
 
   const day = calendar.find((d) => d.date === "2026-09-07")!;
@@ -153,7 +153,7 @@ it("aggregates calendar dates with discounts, excludes pant, and applies receipt
   expect(day.level).toBe(4);
   expect(calendar.find((d) => d.date === "2026-10-01")?.future).toBe(true);
   expect(
-    spendingCalendar([purchase, second], 2026, true, "2026-09-17").find(
+    spendingCalendar([purchase, second], 2026, true, date("2026-09-17")).find(
       (d) => d.date === "2026-09-07",
     )?.amountOre,
   ).toBe(2331);
@@ -164,7 +164,7 @@ it("keeps leap days, empty dates and negative totals without colouring refunds a
     [receipt("2024-02-29", -1000)],
     2024,
     false,
-    "2025-01-01",
+    date("2025-01-01"),
   );
 
   expect(calendar).toHaveLength(366);
@@ -189,7 +189,7 @@ it("uses stronger calendar colours for larger daily amounts", () => {
     ],
     2026,
     false,
-    "2026-09-17",
+    date("2026-09-17"),
   );
 
   expect(days.slice(0, 4).map((day) => day.level)).toEqual([1, 1, 2, 4]);
