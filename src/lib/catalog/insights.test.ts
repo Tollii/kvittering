@@ -2,7 +2,7 @@ import { present, receiptFixture } from "../testing/receipts";
 import { expect, it } from "vitest";
 import { catalogInsights } from "./insights";
 import { productHistory } from "../domain/insights";
-import { batteryFixture } from "../domain/receipt";
+import { batteryFixture } from "../mock-receipts";
 import { normalizeProducts } from "../../../convex/kassalapp/normalize";
 import { catalogIdentity } from "./model";
 

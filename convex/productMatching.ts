@@ -5,6 +5,7 @@ import { providerFetch } from "./providerTransport";
 import { v, type Infer } from "convex/values";
 import { TypeSafeClient, choice } from "@typesafe-ai/sdk";
 import { internalAction, env } from "./_generated/server";
+import { receiptProductModel } from "./providerConfig";
 import { internal } from "./_generated/api";
 import { receiptDataValidator } from "../src/lib/domain/receipt";
 import {
@@ -25,14 +26,16 @@ export const match = internalAction({
       productId: null,
     }));
 
+    const productModel = receiptProductModel();
+
     const client =
-      env.TYPESAFE_API_KEY && env.RECEIPT_PROVIDER !== "mock"
+      productModel.kind === "typesafe"
         ? new TypeSafeClient({
             fetch: providerFetch(ctx, "typesafe", {
               kind: "receipt",
               id: args.id,
             }),
-            apiKey: env.TYPESAFE_API_KEY,
+            apiKey: productModel.apiKey,
             timeout: 10000,
             retry: { maxRetries: 0 },
           })
@@ -132,7 +135,7 @@ export const match = internalAction({
             };
         });
       } catch {
-        // Keep exact mappings available, but stop model calls after a provider failure.
+        // Handled: keep exact mappings available, but stop model calls after a provider failure.
         model = null;
       }
     }

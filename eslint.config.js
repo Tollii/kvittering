@@ -177,6 +177,21 @@ module.exports = defineConfig([
     },
   },
   {
+    files: ["src/**/*.tsx"],
+    // expo-widgets serializes each "widget" function to a string, so widgets
+    // cannot read theme values from module scope and keep their literals.
+    ignores: ["src/widgets/**"],
+    rules: {
+      "no-restricted-syntax": [
+        "error",
+        {
+          selector: "Literal[value=/^#[0-9a-f]{3,8}$|^rgba?\\(/i]",
+          message: "Add a theme token in src/constants/theme.ts.",
+        },
+      ],
+    },
+  },
+  {
     files: ["src/lib/**/*.ts", "convex/**/*.ts"],
     ignores: ["**/*.test.ts"],
     rules: {
@@ -189,6 +204,11 @@ module.exports = defineConfig([
             {
               target: ["./src/lib", "./convex"],
               from: ["./src/app", "./src/features", "./src/components"],
+            },
+            {
+              target: ["./src/lib", "./convex"],
+              from: ["./src/lib/testing"],
+              message: "Test helpers are for tests only.",
             },
           ],
         },
@@ -245,10 +265,29 @@ module.exports = defineConfig([
   },
   {
     files: ["convex/**/*.ts"],
+    ignores: ["**/*.test.ts", "convex/providerConfig.ts"],
+    rules: {
+      "no-restricted-properties": [
+        "error",
+        ...["RECEIPT_PROVIDER", "OPENAI_API_KEY", "OPENAI_RECEIPT_MODEL"].map(
+          (property) => ({
+            object: "env",
+            property,
+            message:
+              "Use providerConfig so a missing receipt reader key fails instead of changing receipt data.",
+          }),
+        ),
+      ],
+    },
+  },
+  {
+    files: ["convex/**/*.ts"],
     ignores: ["**/*.test.ts"],
     rules: {
       "kvitto/no-db-query-filter": "error",
       "kvitto/no-unbounded-collect": "error",
+      "kvitto/no-silent-catch": "error",
+      "kvitto/structured-log": "error",
       "kvitto/convex-function-access": [
         "error",
         {

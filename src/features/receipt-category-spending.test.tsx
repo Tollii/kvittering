@@ -1,6 +1,7 @@
 import { expect, test } from "@jest/globals";
 import { fireEvent, render, screen } from "@testing-library/react-native";
-import { batteryFixture, emptyLine } from "@/lib/domain/receipt";
+import { emptyLine } from "@/lib/domain/receipt";
+import { batteryFixture } from "@/lib/mock-receipts";
 import { Ore } from "@/lib/domain/ore";
 import { ReceiptCategorySpending } from "./receipt-category-spending";
 

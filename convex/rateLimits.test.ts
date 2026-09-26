@@ -7,10 +7,8 @@ import { afterEach, expect, it, vi } from "vitest";
 import { api, components, internal } from "./_generated/api";
 import schema from "./schema";
 import { providerAllowances } from "./rateLimits";
-import {
-  batteryFixture,
-  classificationInputs,
-} from "../src/lib/domain/receipt";
+import { classificationInputs } from "../src/lib/domain/receipt";
+import { batteryFixture } from "../src/lib/mock-receipts";
 import { providerFetch } from "./providerTransport";
 
 const modules = import.meta.glob("./**/*.ts");

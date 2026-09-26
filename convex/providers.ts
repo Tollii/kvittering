@@ -8,11 +8,10 @@ import OpenAI from "openai";
 import { zodTextFormat } from "openai/helpers/zod";
 import { TypeSafeClient } from "@typesafe-ai/sdk";
 import { v } from "convex/values";
-import { internalAction, env } from "./_generated/server";
-import {
-  receiptDataValidator,
-  batteryFixture,
-} from "../src/lib/domain/receipt";
+import { internalAction } from "./_generated/server";
+import { receiptProductModel, receiptReader } from "./providerConfig";
+import { receiptDataValidator } from "../src/lib/domain/receipt";
+import { batteryFixture } from "../src/lib/mock-receipts";
 import {
   extractionSchema,
   extractionInstructions,
@@ -41,7 +40,9 @@ export const extract = internalAction({
   handler: async (ctx, args) => {
     const started = Date.now();
 
-    if (env.RECEIPT_PROVIDER === "mock" || !env.OPENAI_API_KEY)
+    const reader = receiptReader();
+
+    if (reader.kind === "mock")
       return {
         data: batteryFixture(),
         provider: "mock: Battery fixture; photo not read",
@@ -62,7 +63,7 @@ export const extract = internalAction({
       }),
     );
 
-    const model = env.OPENAI_RECEIPT_MODEL ?? "gpt-6-luna";
+    const { model } = reader;
 
     const client = new OpenAI({
       fetch: providerFetch(
@@ -70,7 +71,7 @@ export const extract = internalAction({
         "openai",
         args.receiptId ? { kind: "receipt", id: args.receiptId } : undefined,
       ),
-      apiKey: env.OPENAI_API_KEY,
+      apiKey: reader.apiKey,
       timeout: 120000,
       maxRetries: 1,
     });
@@ -142,14 +143,16 @@ export const classify = internalAction({
         durationMs: 0,
       };
 
-    if (env.RECEIPT_PROVIDER === "mock" || !env.TYPESAFE_API_KEY)
+    const productModel = receiptProductModel();
+
+    if (productModel.kind === "disabled")
       return {
         classifications: args.products.map((p) => ({
           id: p.id,
           categoryId: unclearCategoryId,
           confidence: 0,
         })),
-        provider: "mock: classification unavailable",
+        provider: "classification disabled",
         durationMs: 0,
       };
 
@@ -159,14 +162,14 @@ export const classify = internalAction({
         "typesafe",
         args.receiptId ? { kind: "receipt", id: args.receiptId } : undefined,
       ),
-      apiKey: env.TYPESAFE_API_KEY,
+      apiKey: productModel.apiKey,
       retry: { maxRetries: 0 },
     });
 
     const results: { id: string; categoryId: string; confidence: number }[] =
       [];
 
-    const model = env.TYPESAFE_MODEL ?? "jev-latest";
+    const { model } = productModel;
     let provider = model;
     let batchCount = 0;
 

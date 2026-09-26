@@ -31,6 +31,15 @@ export const areas: Area[] = [
     ],
   },
   {
+    name: "configuration",
+    title: "Deployment variables",
+    matches: (path) =>
+      path === "convex/convex.config.ts" || path === "convex/providerConfig.ts",
+    checklist: [
+      "A deployment without the variable must fail visibly or take an explicit disabled path, never substitute sample data.",
+    ],
+  },
+  {
     name: "releases",
     title: "Release policy and installed clients",
     matches: under(

@@ -11,7 +11,7 @@ import {
   priceSignalLabel,
   priceSignals,
 } from "./price-signals";
-import { weeklyShopFixture } from "./receipt";
+import { weeklyShopFixture } from "../mock-receipts";
 
 const receipt = (id: string, purchaseDate: string, colaOre: number) => {
   const data = weeklyShopFixture();

@@ -224,6 +224,86 @@ module.exports = {
         };
       },
     },
+    "no-silent-catch": {
+      meta: {
+        type: "problem",
+        schema: [],
+        messages: {
+          silent:
+            "This catch discards the error. Bind it and rethrow, log, or hand it to a named handler, or state how the failure is handled in a `// Handled:` comment at the start of the block.",
+        },
+      },
+      create(context) {
+        const { sourceCode } = context;
+
+        return {
+          CatchClause(node) {
+            const used = sourceCode
+              .getDeclaredVariables(node)
+              .some((variable) =>
+                variable.references.some((reference) => reference.isRead()),
+              );
+
+            const explained = sourceCode
+              .getCommentsInside(node.body)
+              .some(
+                (comment) =>
+                  comment.range[0] <
+                    (node.body.body[0]?.range[0] ?? Infinity) &&
+                  comment.value
+                    .replace(/^\*+/, "")
+                    .trim()
+                    .startsWith("Handled:"),
+              );
+
+            if (!used && !explained)
+              context.report({ node, messageId: "silent" });
+          },
+        };
+      },
+    },
+    "structured-log": {
+      meta: {
+        type: "suggestion",
+        schema: [],
+        messages: {
+          event:
+            "Start a backend log with a literal event name such as `receipt.processing_failed`, and put details in a fields object, so log search can find it.",
+        },
+      },
+      create(context) {
+        const methods = new Set(["debug", "log", "info", "warn", "error"]);
+
+        const eventName = /^[a-z]+(\.[a-z_]+)+$/;
+
+        return {
+          CallExpression(node) {
+            const { callee } = node;
+
+            if (
+              callee.type !== "MemberExpression" ||
+              callee.object.type !== "Identifier" ||
+              callee.object.name !== "console" ||
+              callee.property.type !== "Identifier" ||
+              !methods.has(callee.property.name)
+            )
+              return;
+
+            const [first] = node.arguments;
+
+            const name =
+              first?.type === "TemplateLiteral" && !first.expressions.length
+                ? first.quasis[0].value.cooked
+                : first?.type === "Literal"
+                  ? String(first.value)
+                  : null;
+
+            if (name === null || !eventName.test(name))
+              context.report({ node: first ?? node, messageId: "event" });
+          },
+        };
+      },
+    },
     "convex-function-access": {
       meta: {
         type: "problem",

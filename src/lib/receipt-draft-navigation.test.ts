@@ -13,7 +13,7 @@ import { useDraftNavigation } from "../features/receipt-draft-navigation";
 import { createReceiptDraft } from "./receipt-draft";
 import { ReceiptDraftController } from "./receipt-draft-controller";
 import { receiptFixture } from "./testing/receipts";
-import { batteryFixture } from "./domain/receipt";
+import { batteryFixture } from "./mock-receipts";
 
 type PreventCallback = Parameters<typeof usePreventRemove>[1];
 

@@ -155,6 +155,7 @@ http.route({
         },
       });
     } catch {
+      // Handled: a malformed or unauthorized request gets the same 403, so it reveals nothing.
       return new Response(null, { status: 403, headers: headers(request) });
     }
   }),

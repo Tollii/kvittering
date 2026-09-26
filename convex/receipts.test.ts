@@ -8,7 +8,7 @@ import { convexTest } from "convex-test";
 import { expect, it } from "vitest";
 import { api, internal } from "./_generated/api";
 import schema from "./schema";
-import { batteryFixture, weeklyShopFixture } from "../src/lib/domain/receipt";
+import { batteryFixture, weeklyShopFixture } from "../src/lib/mock-receipts";
 
 const modules = import.meta.glob("./**/*.ts");
 

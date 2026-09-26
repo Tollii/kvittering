@@ -19,10 +19,7 @@ const control = vi.hoisted(() => ({
   writesBeforeFailure: -1,
 }));
 
-// oxlint-disable-next-line anti-slop/no-module-mocking -- Replace the native SDK or environment boundary; application behavior remains under test.
-vi.mock("./deployment-storage", () => ({ storageSuffix: "-test" }));
-
-// oxlint-disable-next-line anti-slop/no-module-mocking -- Replace the native SDK or environment boundary; application behavior remains under test.
+// oxlint-disable-next-line anti-slop/no-module-mocking -- Replace native expo-crypto UUIDs with a counter so capture identities are predictable.
 vi.mock("expo-crypto", () => ({
   randomUUID: () => {
     control.sequence++;
@@ -31,7 +28,7 @@ vi.mock("expo-crypto", () => ({
   },
 }));
 
-// oxlint-disable-next-line anti-slop/no-module-mocking -- Replace the native SDK or environment boundary; application behavior remains under test.
+// oxlint-disable-next-line anti-slop/no-module-mocking -- Replace the native file system to count image copies and deletions and inject copy failures.
 vi.mock("expo-file-system", () => ({
   Paths: { document: "test" },
   Directory: class {
@@ -49,7 +46,7 @@ vi.mock("expo-file-system", () => ({
   },
 }));
 
-// oxlint-disable-next-line anti-slop/no-module-mocking -- Replace the native SDK or environment boundary; application behavior remains under test.
+// oxlint-disable-next-line anti-slop/no-module-mocking -- Back native expo-sqlite with node:sqlite so the real schema and transactions run, with injectable write failures.
 vi.mock("expo-sqlite", async () => {
   const { DatabaseSync } = await import("node:sqlite");
   const db = new DatabaseSync(":memory:");

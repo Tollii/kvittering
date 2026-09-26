@@ -1,14 +1,13 @@
 import { present } from "../../src/lib/testing/receipts";
-import { afterEach, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { kassalappFetch, CatalogRequestError } from "./transport";
 
-// vi.mock is hoisted, so the import above still sees the mocked module.
-// oxlint-disable-next-line anti-slop/no-module-mocking -- Replace the native SDK or environment boundary; application behavior remains under test.
-vi.mock("../_generated/server", () => ({
-  env: { KASSALAPP_API_KEY: "test-key" },
-}));
+beforeEach(() => vi.stubEnv("KASSALAPP_API_KEY", "test-key"));
 
-afterEach(() => vi.unstubAllGlobals());
+afterEach(() => {
+  vi.unstubAllGlobals();
+  vi.unstubAllEnvs();
+});
 
 it("adapts OpenAPI boolean query values to Kassalapp's accepted encoding", async () => {
   const fetch = vi
