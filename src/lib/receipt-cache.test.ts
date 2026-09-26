@@ -1,38 +1,10 @@
-import { DatabaseSync } from "node:sqlite";
+import { sqliteDatabase } from "./testing/sqlite";
 import { expect, it } from "vitest";
-import { ReceiptCache, type ReceiptCacheDatabase } from "./receipt-cache";
+import { ReceiptCache } from "./receipt-cache";
 import { receiptFixture, testId } from "./testing/receipts";
 
-function database() {
-  const db = new DatabaseSync(":memory:");
-
-  const adapter: ReceiptCacheDatabase = {
-    execSync: (sql) => db.exec(sql),
-    runSync: (sql, ...values) => db.prepare(sql).run(...values),
-    // SAFETY: SQL callers specify the selected row columns.
-    getAllSync: <T>(sql: string, ...values: (string | number)[]) =>
-      db.prepare(sql).all(...values) as T[],
-    // SAFETY: SQL callers specify the selected row columns.
-    getFirstSync: <T>(sql: string, ...values: (string | number)[]) =>
-      (db.prepare(sql).get(...values) as T | undefined) ?? null,
-    withTransactionSync: (operation) => {
-      db.exec("BEGIN");
-
-      try {
-        operation();
-        db.exec("COMMIT");
-      } catch (error) {
-        db.exec("ROLLBACK");
-        throw error;
-      }
-    },
-  };
-
-  return { db, adapter };
-}
-
 it("resumes an incomplete download and applies deletions without mixing household data", () => {
-  const { db, adapter } = database();
+  const { db, adapter } = sqliteDatabase();
 
   try {
     const receipt = receiptFixture();
@@ -72,7 +44,7 @@ it("resumes an incomplete download and applies deletions without mixing househol
 });
 
 it("rolls back the page and cursor together when storage fails", () => {
-  const { db, adapter } = database();
+  const { db, adapter } = sqliteDatabase();
 
   try {
     const receipt = receiptFixture();
@@ -96,7 +68,7 @@ it("rolls back the page and cursor together when storage fails", () => {
 });
 
 it("rejects another household and discards late responses after access is revoked", () => {
-  const { db, adapter } = database();
+  const { db, adapter } = sqliteDatabase();
 
   try {
     const receipt = receiptFixture();
@@ -133,7 +105,7 @@ it("rejects another household and discards late responses after access is revoke
 });
 
 it("revokes memory and rejects delayed pages even when disk cleanup fails", () => {
-  const { db, adapter } = database();
+  const { db, adapter } = sqliteDatabase();
 
   try {
     const receipt = receiptFixture();
