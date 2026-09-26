@@ -19,6 +19,42 @@ import { Copy, Icon, pressed, styles } from "./typography";
 import { IconButton } from "./controls";
 import { SheetPresentation } from "./sheet-presentation";
 
+/**
+ * The household and settings entry. Every tab puts it at the top right so
+ * people find it in the same place; `surface` only adapts it to the backdrop.
+ */
+export function SettingsButton({
+  surface = "hero",
+}: Readonly<{ surface?: "hero" | "camera" }>) {
+  const colors = useTheme();
+  const camera = surface === "camera";
+
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel="Husstanden og innstillinger"
+      onPress={() => router.push("/settings")}
+      hitSlop={6}
+      style={(state) => [
+        styles.iconButton,
+        {
+          width: 44,
+          height: 44,
+          borderRadius: 22,
+          backgroundColor: camera ? colors.cameraOverlay : colors.heroControl,
+        },
+        pressed(state),
+      ]}
+    >
+      <Icon
+        name="person.2"
+        size={18}
+        color={camera ? colors.onCamera : colors.onHero}
+      />
+    </Pressable>
+  );
+}
+
 export function Screen({
   children,
   title,
@@ -73,26 +109,7 @@ export function Screen({
         )}
       </View>
       {headerRight}
-      {settings && (
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel="Husstanden og innstillinger"
-          onPress={() => router.push("/settings")}
-          hitSlop={6}
-          style={(state) => [
-            styles.iconButton,
-            {
-              backgroundColor: colors.heroControl,
-              borderRadius: 20,
-              minWidth: 44,
-              minHeight: 44,
-            },
-            pressed(state),
-          ]}
-        >
-          <Icon name="person.2" size={18} color={colors.onHero} />
-        </Pressable>
-      )}
+      {settings && <SettingsButton />}
     </View>
   );
 

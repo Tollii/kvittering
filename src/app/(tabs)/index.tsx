@@ -21,7 +21,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { CameraView, useCameraPermissions } from "expo-camera";
 import * as ImagePicker from "expo-image-picker";
 import * as DocumentPicker from "expo-document-picker";
-import { router, useIsFocused } from "expo-router";
+import { useIsFocused } from "expo-router";
 import {
   Button,
   Copy,
@@ -30,6 +30,7 @@ import {
   Notice,
   Panel,
   pressed,
+  SettingsButton,
 } from "@/components/ui";
 import { useHousehold } from "@/features/household-context";
 import { saveLocalReceipts } from "@/lib/receipt-storage";
@@ -338,24 +339,7 @@ export default function Capture() {
           >
             <Icon name="doc.badge.plus" size={17} color={colors.onCamera} />
           </Pressable>
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel="Husstanden og innstillinger"
-            onPress={() => router.push("/settings")}
-            style={(state) => [
-              {
-                width: 44,
-                height: 44,
-                borderRadius: 22,
-                backgroundColor: colors.cameraOverlay,
-                alignItems: "center",
-                justifyContent: "center",
-              },
-              pressed(state),
-            ]}
-          >
-            <Icon name="person.2" size={17} color={colors.onCamera} />
-          </Pressable>
+          <SettingsButton surface="camera" />
         </View>
         {!online && <Notice icon="wifi.slash">Uten nett</Notice>}
         {saved > 0 && (
