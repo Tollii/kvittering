@@ -19,6 +19,7 @@
     "better-auth": "1.6.33",
     "convex": "^1.46.0",
     "convex-helpers": "^0.1.124",
+    "decode-uri-component": "^0.5.0",
     "expo": "~57.0.25",
     "expo-apple-authentication": "~57.0.2",
     "expo-application": "~57.0.3",
@@ -100,7 +101,7 @@
     "start": "expo start",
     "android": "expo run:android",
     "ios": "expo run:ios",
-    "lint": "npm run lint:oxlint && npm run lint:policy && npm run lint:eslint && npm run lint:unused && npm run lint:docs",
+    "lint": "npm run lint:oxlint && npm run lint:policy && npm run lint:eslint && npm run lint:unused && npm run lint:docs && npm run lint:mocks",
     "typecheck": "tsc --noEmit && tsc --noEmit -p convex && tsc --noEmit -p tools/tsconfig.json",
     "test": "vitest run",
     "backend": "convex dev",
@@ -128,6 +129,7 @@
     "format": "prettier --write . && oxlint --config oxlint.policy.config.mjs --allow all --deny anti-slop/require-readable-spacing --fix",
     "format:check": "prettier --check .",
     "lint:docs": "node tools/check-docs.mts",
+    "lint:mocks": "node tools/check-mock-reasons.mts",
     "test:components": "jest",
     "release:check": "node tools/release.mts client"
   },
@@ -136,6 +138,7 @@
     "better-auth": {
       "vitest": "$vitest"
     },
+    "decode-uri-component": "$decode-uri-component",
     "qs": "^6.16.0",
     "uuid": "^11.1.1"
   },

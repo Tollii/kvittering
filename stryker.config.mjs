@@ -25,7 +25,6 @@ export default {
     "plans",
     "ios",
     "android",
-    "sveltemo",
     "coverage",
     "reports",
   ],

@@ -54,6 +54,11 @@ export async function requestAppleIdentity() {
   }
 }
 
+/** Rejections the person can act on; any other code is a failure worth reporting. */
+export function isAppleRejection(code?: string) {
+  return code === "OAUTH_LINK_ERROR" || code === "LINKING_FAILED";
+}
+
 export function appleAuthenticationError(code?: string) {
   if (code === "OAUTH_LINK_ERROR")
     return "Har du allerede en konto? Logg inn med e-post og koble til Apple i innstillingene.";

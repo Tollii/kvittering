@@ -42,8 +42,5 @@ example
 /ios
 /android
 
-# Previous web application
-/sveltemo/
-
 # Local release exports
 /dist-ios/

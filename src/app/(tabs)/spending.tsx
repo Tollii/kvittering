@@ -354,7 +354,7 @@ function Spending({ initialMonth }: Readonly<{ initialMonth: CalendarMonth }>) {
                   style={{
                     height: 6,
                     borderRadius: 3,
-                    backgroundColor: "#FFFFFF33",
+                    backgroundColor: colors.heroTrack,
                     overflow: "hidden",
                   }}
                 >
@@ -364,7 +364,9 @@ function Spending({ initialMonth }: Readonly<{ initialMonth: CalendarMonth }>) {
                       borderRadius: 3,
                       width: `${Math.min(100, pace.spentShare * 100)}%`,
                       backgroundColor:
-                        pace.status === "over" ? "#FFE3A1" : colors.onHero,
+                        pace.status === "over"
+                          ? colors.heroWarning
+                          : colors.onHero,
                     }}
                   />
                   {pace.elapsedShare > 0 && pace.elapsedShare < 1 && (
@@ -375,7 +377,7 @@ function Spending({ initialMonth }: Readonly<{ initialMonth: CalendarMonth }>) {
                         top: -2,
                         width: 2,
                         height: 10,
-                        backgroundColor: "#FFFFFFAA",
+                        backgroundColor: colors.heroMarker,
                       }}
                     />
                   )}

@@ -43,12 +43,8 @@ import {
 } from "@/lib/pending-import";
 import { nextImport, type ImportOutcome } from "@/lib/capture-import";
 import { useTheme } from "@/constants/theme";
-
-const cameraBackground = "#101C51";
-
-const onCamera = "#F6F3EA";
-
-const onCameraMuted = "#E3E7FF";
+import { failureMessage } from "@/lib/failure-message";
+import { UserError } from "@/lib/user-errors";
 
 export default function Capture() {
   const colors = useTheme();
@@ -106,7 +102,7 @@ export default function Capture() {
         return "completed";
       } catch (cause) {
         setError(
-          cause instanceof Error ? cause.message : "Bildet kunne ikke åpnes.",
+          failureMessage(cause, "receipt.import", "Bildet kunne ikke åpnes."),
         );
 
         return "failed";
@@ -127,7 +123,10 @@ export default function Capture() {
           maxReceiptImages - photos.length,
           (imported) => {
             if (!mounted.current || !imported.uris.length)
-              throw new Error("Importen ble avbrutt. Prøv igjen.");
+              throw new UserError({
+                code: "REJECTED",
+                message: "Importen ble avbrutt. Prøv igjen.",
+              });
             setPhotos((current) => [...current, ...imported.uris]);
 
             if (imported.singleDocument && photos.length === 0)
@@ -144,7 +143,10 @@ export default function Capture() {
       if (!ready || !camera.current) return;
 
       if (photos.length >= maxReceiptImages)
-        throw new Error(`Maks ${maxReceiptImages} bilder`);
+        throw new UserError({
+          code: "REJECTED",
+          message: `Maks ${maxReceiptImages} bilder`,
+        });
       recordEvent("receipt.capture", { operation: "camera" });
       const result = await camera.current.takePictureAsync({ quality: 0.9 });
 
@@ -156,7 +158,10 @@ export default function Capture() {
   const choosePhotos = () =>
     run(async () => {
       if (photos.length >= maxReceiptImages)
-        throw new Error(`Maks ${maxReceiptImages} bilder`);
+        throw new UserError({
+          code: "REJECTED",
+          message: `Maks ${maxReceiptImages} bilder`,
+        });
 
       const result = await ImagePicker.launchImageLibraryAsync({
         mediaTypes: ["images"],
@@ -169,7 +174,10 @@ export default function Capture() {
       if (result.canceled) return;
 
       if (result.assets.length + photos.length > maxReceiptImages)
-        throw new Error(`Maks ${maxReceiptImages} bilder`);
+        throw new UserError({
+          code: "REJECTED",
+          message: `Maks ${maxReceiptImages} bilder`,
+        });
       const selected: string[] = [];
 
       for (const asset of result.assets)
@@ -264,7 +272,7 @@ export default function Capture() {
           paddingVertical: 8,
           borderRadius: 14,
           borderCurve: "continuous",
-          backgroundColor: "#101C51B3",
+          backgroundColor: colors.cameraOverlay,
         },
         style,
       ]}
@@ -274,7 +282,7 @@ export default function Capture() {
   );
 
   return (
-    <View style={{ flex: 1, backgroundColor: cameraBackground }}>
+    <View style={{ flex: 1, backgroundColor: colors.cameraBackground }}>
       {live && (
         <CameraView
           ref={attachCamera}
@@ -296,13 +304,13 @@ export default function Capture() {
         <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
           {overlay(
             <>
-              <Copy size={15} weight="700" style={{ color: onCamera }}>
+              <Copy size={15} weight="700" style={{ color: colors.onCamera }}>
                 Ny kvittering
               </Copy>
               <Copy
                 size={13}
                 numberOfLines={1}
-                style={{ color: onCameraMuted, flexShrink: 1 }}
+                style={{ color: colors.onCameraMuted, flexShrink: 1 }}
               >
                 {household.name}
               </Copy>
@@ -321,14 +329,14 @@ export default function Capture() {
                 width: 44,
                 height: 44,
                 borderRadius: 22,
-                backgroundColor: "#101C51B3",
+                backgroundColor: colors.cameraOverlay,
                 alignItems: "center",
                 justifyContent: "center",
               },
               pressed(state),
             ]}
           >
-            <Icon name="doc.badge.plus" size={17} color={onCamera} />
+            <Icon name="doc.badge.plus" size={17} color={colors.onCamera} />
           </Pressable>
           <Pressable
             accessibilityRole="button"
@@ -339,14 +347,14 @@ export default function Capture() {
                 width: 44,
                 height: 44,
                 borderRadius: 22,
-                backgroundColor: "#101C51B3",
+                backgroundColor: colors.cameraOverlay,
                 alignItems: "center",
                 justifyContent: "center",
               },
               pressed(state),
             ]}
           >
-            <Icon name="person.2" size={17} color={onCamera} />
+            <Icon name="person.2" size={17} color={colors.onCamera} />
           </Pressable>
         </View>
         {!online && <Notice icon="wifi.slash">Uten nett</Notice>}
@@ -408,7 +416,7 @@ export default function Capture() {
                     position: "absolute",
                     width: 28,
                     height: 28,
-                    borderColor: "#FFFFFFCC",
+                    borderColor: colors.cameraGuide,
                     top: corner.startsWith("t") ? 0 : undefined,
                     bottom: corner.startsWith("b") ? 0 : undefined,
                     left: corner.endsWith("l") ? 0 : undefined,
@@ -431,19 +439,19 @@ export default function Capture() {
                 <Icon
                   name="camera.viewfinder"
                   size={52}
-                  color={onCameraMuted}
+                  color={colors.onCameraMuted}
                 />
                 <Copy
                   accessibilityRole="header"
                   size={24}
                   weight="600"
-                  style={{ color: onCamera, textAlign: "center" }}
+                  style={{ color: colors.onCamera, textAlign: "center" }}
                 >
                   Ta vare på kvitteringen
                 </Copy>
                 <Copy
                   size={15}
-                  style={{ color: onCameraMuted, textAlign: "center" }}
+                  style={{ color: colors.onCameraMuted, textAlign: "center" }}
                 >
                   Ta et bilde, eller importer en kvittering fra Bilder eller
                   Filer.
@@ -489,14 +497,14 @@ export default function Capture() {
                 height: 54,
                 borderRadius: 18,
                 borderCurve: "continuous",
-                backgroundColor: "#101C51B3",
+                backgroundColor: colors.cameraOverlay,
                 alignItems: "center",
                 justifyContent: "center",
               },
               pressed(state),
             ]}
           >
-            <Icon name="photo.on.rectangle" size={22} color={onCamera} />
+            <Icon name="photo.on.rectangle" size={22} color={colors.onCamera} />
           </Pressable>
           <Pressable
             accessibilityRole="button"
@@ -536,7 +544,7 @@ export default function Capture() {
                   borderRadius: 18,
                   borderCurve: "continuous",
                   overflow: "hidden",
-                  backgroundColor: "#101C51B3",
+                  backgroundColor: colors.cameraOverlay,
                   alignItems: "center",
                   justifyContent: "center",
                 },

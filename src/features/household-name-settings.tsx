@@ -3,6 +3,7 @@ import { api } from "../../convex/_generated/api";
 import { Button, Field, Notice, Row, Sheet } from "@/components/ui";
 import { useReleaseMutation } from "@/lib/releases/requests";
 import { useHousehold } from "./household-context";
+import { failureMessage } from "@/lib/failure-message";
 
 export function HouseholdNameSettings() {
   const { household, online } = useHousehold();
@@ -26,7 +27,7 @@ export function HouseholdNameSettings() {
       setDraft(null);
     } catch (cause) {
       setError(
-        cause instanceof Error ? cause.message : "Kunne ikke lagre navnet.",
+        failureMessage(cause, "household.rename", "Kunne ikke lagre navnet."),
       );
     } finally {
       setBusy(false);

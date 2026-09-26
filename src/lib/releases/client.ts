@@ -1,4 +1,8 @@
-import { RequestDeferred, deferredRequestSchema } from "../request-retry";
+import {
+  ReleaseBlocked,
+  RequestDeferred,
+  deferredRequestSchema,
+} from "../request-retry";
 import { z } from "zod";
 import * as Application from "expo-application";
 import * as Updates from "expo-updates";
@@ -66,7 +70,7 @@ export function releaseError(
   if (data?.code === "UNSUPPORTED_API_VERSION") {
     reportError(cause, operation, fields);
 
-    return new Error(
+    return new ReleaseBlocked(
       "Denne appversjonen støttes ikke av tjenesten ennå. Prøv igjen senere.",
     );
   }
@@ -87,7 +91,7 @@ export function releaseError(
       /* A future policy format must not discard the last valid policy. */
     }
 
-    return new Error(
+    return new ReleaseBlocked(
       data.code === "UPDATE_REQUIRED"
         ? "Oppdater Kvitto for å fortsette."
         : "Funksjonen er midlertidig satt på pause. Prøv igjen senere.",

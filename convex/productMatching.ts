@@ -132,7 +132,7 @@ export const match = internalAction({
             };
         });
       } catch {
-        // Keep exact mappings available, but stop model calls after a provider failure.
+        // Handled: keep exact mappings available, but stop model calls after a provider failure.
         model = null;
       }
     }

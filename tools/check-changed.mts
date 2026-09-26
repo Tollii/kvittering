@@ -58,6 +58,7 @@ if (code.length > 0) {
     "--no-warn-ignored",
     ...code,
   ]);
+  run("Module-mocking reasons", null, ["tools/check-mock-reasons.mts"]);
 
   run("Related tests", "vitest/vitest.mjs", [
     "related",

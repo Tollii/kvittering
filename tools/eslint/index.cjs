@@ -89,7 +89,7 @@ module.exports = {
         schema: [],
         messages: {
           operation:
-            "Combine amounts with Ore.add, Ore.subtract, Ore.sum, Ore.scale, or Ore.ratio. Arithmetic operators turn an amount into a plain number. See docs/quality.md.",
+            "Combine amounts with Ore.add, Ore.subtract, Ore.sum, Ore.scale, or Ore.ratio. Arithmetic operators turn an amount into a plain number.",
         },
       },
       create(context) {
@@ -141,7 +141,7 @@ module.exports = {
         schema: [],
         messages: {
           nameSet:
-            "Name this set of values: a domain predicate such as isReceiptProcessing, or a module-level Set. Inline lists repeat a rule without an owner. See docs/quality.md.",
+            "Name this set of values: a domain predicate such as isReceiptProcessing, or a module-level Set. Inline lists repeat a rule without an owner.",
         },
       },
       create(context) {
@@ -178,7 +178,7 @@ module.exports = {
         schema: [],
         messages: {
           index:
-            "Select documents with an index range instead of `.filter()`. A filter reads every document in the range and can exceed read limits as data grows. See docs/quality.md.",
+            "Select documents with an index range instead of `.filter()`. A filter reads every document in the range and can exceed read limits as data grows.",
         },
       },
       create(context) {
@@ -204,7 +204,7 @@ module.exports = {
         schema: [],
         messages: {
           bound:
-            "Bound this read with `.take(n)`, `.first()`, `.unique()`, or pagination. `.collect()` grows with the household's data. See docs/quality.md.",
+            "Bound this read with `.take(n)`, `.first()`, `.unique()`, or pagination. `.collect()` grows with the household's data.",
         },
       },
       create(context) {
@@ -224,6 +224,86 @@ module.exports = {
         };
       },
     },
+    "no-silent-catch": {
+      meta: {
+        type: "problem",
+        schema: [],
+        messages: {
+          silent:
+            "This catch discards the error. Bind it and rethrow, log, or hand it to a named handler, or state how the failure is handled in a `// Handled:` comment at the start of the block.",
+        },
+      },
+      create(context) {
+        const { sourceCode } = context;
+
+        return {
+          CatchClause(node) {
+            const used = sourceCode
+              .getDeclaredVariables(node)
+              .some((variable) =>
+                variable.references.some((reference) => reference.isRead()),
+              );
+
+            const explained = sourceCode
+              .getCommentsInside(node.body)
+              .some(
+                (comment) =>
+                  comment.range[0] <
+                    (node.body.body[0]?.range[0] ?? Infinity) &&
+                  comment.value
+                    .replace(/^\*+/, "")
+                    .trim()
+                    .startsWith("Handled:"),
+              );
+
+            if (!used && !explained)
+              context.report({ node, messageId: "silent" });
+          },
+        };
+      },
+    },
+    "structured-log": {
+      meta: {
+        type: "suggestion",
+        schema: [],
+        messages: {
+          event:
+            "Start a backend log with a literal event name such as `receipt.processing_failed`, and put details in a fields object, so log search can find it.",
+        },
+      },
+      create(context) {
+        const methods = new Set(["debug", "log", "info", "warn", "error"]);
+
+        const eventName = /^[a-z]+(\.[a-z_]+)+$/;
+
+        return {
+          CallExpression(node) {
+            const { callee } = node;
+
+            if (
+              callee.type !== "MemberExpression" ||
+              callee.object.type !== "Identifier" ||
+              callee.object.name !== "console" ||
+              callee.property.type !== "Identifier" ||
+              !methods.has(callee.property.name)
+            )
+              return;
+
+            const [first] = node.arguments;
+
+            const name =
+              first?.type === "TemplateLiteral" && !first.expressions.length
+                ? first.quasis[0].value.cooked
+                : first?.type === "Literal"
+                  ? String(first.value)
+                  : null;
+
+            if (name === null || !eventName.test(name))
+              context.report({ node: first ?? node, messageId: "event" });
+          },
+        };
+      },
+    },
     "convex-function-access": {
       meta: {
         type: "problem",
@@ -239,7 +319,7 @@ module.exports = {
         ],
         messages: {
           access:
-            "Public Convex function `{{name}}` does not call an access check ({{checks}}). Call one in the handler, or state why the function is public in a preceding `// Access:` comment. See docs/quality.md.",
+            "Public Convex function `{{name}}` does not call an access check ({{checks}}). Call one in the handler, or state why the function is public in a preceding `// Access:` comment.",
         },
       },
       create(context) {
@@ -311,7 +391,7 @@ module.exports = {
         schema: [],
         messages: {
           leakedValue:
-            "This value can be 0, NaN, or an empty string, which React Native renders as text outside <Text> and crashes. Compare explicitly, for example `count > 0 &&`. See docs/quality.md.",
+            "This value can be 0, NaN, or an empty string, which React Native renders as text outside <Text> and crashes. Compare explicitly, for example `count > 0 &&`.",
         },
       },
       create(context) {
@@ -379,7 +459,7 @@ module.exports = {
         schema: [],
         messages: {
           subscription:
-            "Load server data through a Convex subscription or a TanStack query. Requests started in effects have no cache, deduplication, cancellation, or ordering between responses. See docs/quality.md.",
+            "Load server data through a Convex subscription or a TanStack query. Requests started in effects have no cache, deduplication, cancellation, or ordering between responses.",
         },
       },
       create(context) {
@@ -566,7 +646,7 @@ module.exports = {
         schema: [],
         messages: {
           explicitType:
-            "Declare the actual properties in a named type. An open dictionary whose only value is undefined does not describe application data. See docs/quality.md.",
+            "Declare the actual properties in a named type. An open dictionary whose only value is undefined does not describe application data.",
         },
       },
       create(context) {

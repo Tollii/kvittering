@@ -10,6 +10,7 @@ import { radius, useTheme } from "@/constants/theme";
 import type { Receipt } from "@/lib/domain/insights";
 import { quickApproveData } from "@/lib/domain/receipt-review";
 import { errorFeedback, successFeedback } from "@/lib/haptics";
+import { failureMessage } from "@/lib/failure-message";
 
 /**
  * Swipe left to approve receipt facts without confirming category suggestions.
@@ -62,7 +63,7 @@ export function SwipeToApprove({
       swipeable.current?.close();
       Alert.alert(
         "Kunne ikke godkjenne",
-        cause instanceof Error ? cause.message : "Prøv igjen.",
+        failureMessage(cause, "receipt.approve", "Prøv igjen."),
       );
     } finally {
       setBusy(false);

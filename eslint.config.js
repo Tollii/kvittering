@@ -12,7 +12,6 @@ module.exports = defineConfig([
   expo,
   {
     ignores: [
-      "sveltemo/**",
       "convex/_generated/**",
       "convex/kassalapp/generated/**",
       "tools/oxlint/anti-slop/**",
@@ -178,6 +177,21 @@ module.exports = defineConfig([
     },
   },
   {
+    files: ["src/**/*.tsx"],
+    // expo-widgets serializes each "widget" function to a string, so widgets
+    // cannot read theme values from module scope and keep their literals.
+    ignores: ["src/widgets/**"],
+    rules: {
+      "no-restricted-syntax": [
+        "error",
+        {
+          selector: "Literal[value=/^#[0-9a-f]{3,8}$|^rgba?\\(/i]",
+          message: "Add a theme token in src/constants/theme.ts.",
+        },
+      ],
+    },
+  },
+  {
     files: ["src/lib/**/*.ts", "convex/**/*.ts"],
     ignores: ["**/*.test.ts"],
     rules: {
@@ -210,6 +224,20 @@ module.exports = defineConfig([
     },
   },
   {
+    files: ["src/app/**/*.{ts,tsx}", "src/features/**/*.{ts,tsx}"],
+    rules: {
+      "no-restricted-syntax": [
+        "error",
+        {
+          // Convex puts its request trace in Error.message; the user message is in the error data.
+          selector: 'CatchClause MemberExpression[property.name="message"]',
+          message:
+            "Show failureMessage(cause, operation, fallback) instead of a caught error's message.",
+        },
+      ],
+    },
+  },
+  {
     files: ["src/lib/domain/**/*.ts", "src/lib/catalog/**/*.ts"],
     rules: {
       // Domain rules stay pure so tests and the backend can run them.
@@ -236,6 +264,8 @@ module.exports = defineConfig([
     rules: {
       "kvitto/no-db-query-filter": "error",
       "kvitto/no-unbounded-collect": "error",
+      "kvitto/no-silent-catch": "error",
+      "kvitto/structured-log": "error",
       "kvitto/convex-function-access": [
         "error",
         {

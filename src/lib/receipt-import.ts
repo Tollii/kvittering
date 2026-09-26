@@ -5,6 +5,7 @@ import { ImageManipulator, SaveFormat } from "expo-image-manipulator";
 import ReceiptIntelligence from "../../modules/receipt-intelligence/src/ReceiptIntelligenceModule";
 
 import { maxReceiptImages } from "./domain/receipt-images";
+import { UserError } from "./user-errors";
 
 export { maxReceiptImages } from "./domain/receipt-images";
 
@@ -72,7 +73,10 @@ export async function importReceiptFiles(
   room = Math.min(room, maxReceiptImages);
 
   if (!Number.isInteger(room) || room < 1 || files.length > room)
-    throw new Error(`Maks ${maxReceiptImages} bilder`);
+    throw new UserError({
+      code: "REJECTED",
+      message: `Maks ${maxReceiptImages} bilder`,
+    });
 
   if (!files.length) return { uris: [], singleDocument: false };
   const uris: string[] = [];
@@ -80,9 +84,10 @@ export async function importReceiptFiles(
   for (const file of files) {
     if (isPdf(file)) {
       if (!ReceiptIntelligence?.renderPdf)
-        throw new Error(
-          "PDF-kvitteringer krever en oppdatert versjon av appen.",
-        );
+        throw new UserError({
+          code: "REJECTED",
+          message: "PDF-kvitteringer krever en oppdatert versjon av appen.",
+        });
 
       const pages = await ReceiptIntelligence.renderPdf(
         file.uri,
@@ -93,10 +98,17 @@ export async function importReceiptFiles(
     } else if (!file.mimeType || file.mimeType.startsWith("image/")) {
       uris.push(await prepareImage(file.uri, file.width, file.height));
     } else {
-      throw new Error("Kvitto kan lese bilder og PDF-filer.");
+      throw new UserError({
+        code: "REJECTED",
+        message: "Kvitto kan lese bilder og PDF-filer.",
+      });
     }
 
-    if (uris.length > room) throw new Error(`Maks ${maxReceiptImages} bilder`);
+    if (uris.length > room)
+      throw new UserError({
+        code: "REJECTED",
+        message: `Maks ${maxReceiptImages} bilder`,
+      });
   }
 
   const only = soleElement(files);

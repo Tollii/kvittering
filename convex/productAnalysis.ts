@@ -80,6 +80,7 @@ export const process = manager
         failed: false,
       });
     } catch {
+      // Handled: `finish` records the failed analysis and logs `product.analysis_failed`.
       await step.runMutation(internal.productAnalysis.finish, {
         ...args,
         results: [],

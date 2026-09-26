@@ -218,6 +218,7 @@ export const queueMessage = internalMutation({
     if (subscription?.householdId === householdId)
       await ctx.scheduler.runAfter(0, internal.pushDelivery.sendMessage, {
         subscriptionId,
+        householdId,
         title,
         body,
       });
