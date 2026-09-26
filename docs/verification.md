@@ -36,8 +36,9 @@ Other agents should run the same command before reporting a change as done.
 If no main branch is available, fetch `origin/main` before running change checks.
 Deleting a file still runs the type, unused-code, and documentation checks.
 
-Cloud agent sessions cannot start a local Convex backend or an iOS Simulator.
-Start the end-to-end workflow instead: run the `End-to-end` workflow with
+Cloud agent sessions cannot start an iOS Simulator. They can run the web build
+against a local Convex backend with the visual-check skill. For the native app,
+start the end-to-end workflow: run the `End-to-end` workflow with
 `workflow_dispatch` on the branch, or add the `e2e` label to the pull request,
 then read the job summary and the `e2e-ios` artifact with its screenshots.
 

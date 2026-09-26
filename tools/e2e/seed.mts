@@ -5,28 +5,47 @@ import { parseEnv } from "node:util";
 import { z } from "zod";
 import { loadFixture, resolveTables } from "./fixtures.mts";
 
-// This command clears the entire deployment, including components. Restrict
-// both the auth request and CLI selection to this worktree's anonymous backend.
-const local = parseEnv(readFileSync(".env.local", "utf8"));
-
-const deployment = z
-  .string()
-  .regex(/^anonymous:[a-zA-Z0-9_-]+$/)
-  .parse(local.CONVEX_DEPLOYMENT);
-
-const site = z
-  .literal("http://127.0.0.1:3211")
-  .parse(local.EXPO_PUBLIC_CONVEX_SITE_URL);
-
-z.literal("http://127.0.0.1:3210").parse(local.EXPO_PUBLIC_CONVEX_URL);
+const site = "http://127.0.0.1:3211";
 
 const output = resolve(process.argv[3] ?? "build/e2e/seed");
 
 mkdirSync(output, { recursive: true });
 
-const envFile = resolve(output, "deployment.env");
+// This command clears the entire deployment, including components. Restrict
+// both the auth request and CLI selection to a disposable backend on this
+// machine: the self-hosted backend of tools/visual/backend.sh when
+// VISUAL_ENV_FILE names its CLI environment file, otherwise this worktree's
+// anonymous backend.
+function selectEnvFile() {
+  const visual = process.env.VISUAL_ENV_FILE;
 
-writeFileSync(envFile, `CONVEX_DEPLOYMENT=${deployment}\n`);
+  if (visual) {
+    z.literal("http://127.0.0.1:3210").parse(
+      parseEnv(readFileSync(visual, "utf8")).CONVEX_SELF_HOSTED_URL,
+    );
+
+    return resolve(visual);
+  }
+
+  const local = parseEnv(readFileSync(".env.local", "utf8"));
+
+  const deployment = z
+    .string()
+    .regex(/^anonymous:[a-zA-Z0-9_-]+$/)
+    .parse(local.CONVEX_DEPLOYMENT);
+
+  z.literal(site).parse(local.EXPO_PUBLIC_CONVEX_SITE_URL);
+
+  z.literal("http://127.0.0.1:3210").parse(local.EXPO_PUBLIC_CONVEX_URL);
+
+  const file = resolve(output, "deployment.env");
+
+  writeFileSync(file, `CONVEX_DEPLOYMENT=${deployment}\n`);
+
+  return file;
+}
+
+const envFile = selectEnvFile();
 
 const environment = Object.fromEntries(
   Object.entries(process.env).filter(([key]) => !key.startsWith("CONVEX_")),

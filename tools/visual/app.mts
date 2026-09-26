@@ -5,8 +5,9 @@
 // are real, but native modules (camera, Keychain, widgets, share sheet) are
 // not exercised.
 import { execFileSync } from "node:child_process";
-import { mkdirSync, rmSync, statSync } from "node:fs";
+import { mkdirSync, readFileSync, rmSync, statSync } from "node:fs";
 import { join, resolve } from "node:path";
+import { z } from "zod";
 import {
   chromium,
   devices,
@@ -156,6 +157,24 @@ export class App {
     return path;
   }
 
+  /** Sign in with an existing account, by default the seeded fixture account. */
+  async signIn(account = seededAccount()) {
+    // The welcome screen offers email sign-in; without it, the form shows directly.
+    await this.page
+      .getByText(/^(Logg inn med e-post|Ny her\? Opprett konto)$/)
+      .first()
+      .waitFor({ state: "visible", timeout: 60_000 });
+
+    if (await this.find("Logg inn med e-post").isVisible())
+      await this.tap("Logg inn med e-post");
+    await this.type("sign-in-email", account.email);
+    await this.type("sign-in-password", account.password);
+    await this.tap("sign-in-submit");
+    await this.see("Historikk");
+
+    return account;
+  }
+
   /** Create an email account and a household, ending on the main tabs. */
   async signUp(account = testAccount()) {
     await this.see("Ny her? Opprett konto", 60_000);
@@ -289,4 +308,11 @@ export function encodeRecording(input: string, directory: string) {
   );
 
   return { video, preview };
+}
+
+/** The account that tools/visual/start.sh seeded with the fixture. */
+export function seededAccount(output = "build/visual/seed"): Account {
+  return z
+    .object({ name: z.string(), email: z.string(), password: z.string() })
+    .parse(JSON.parse(readFileSync(join(output, "account.json"), "utf8")));
 }

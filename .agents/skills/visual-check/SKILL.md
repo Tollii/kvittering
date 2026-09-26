@@ -9,7 +9,7 @@ metadata:
 
 # Check a change visually
 
-On a Mac with Xcode, use the iOS Simulator instead, as [file-pr](../file-pr/SKILL.md) describes: it runs the native app. The web build is an approximation of the iOS app. Layout, text, navigation, and JavaScript behavior are real; SF Symbol icons, the camera, Keychain, widgets, the share sheet, and native tab bars are not. The tab bar sits at the top on web. When the change touches a native-only path, say in the PR that the web build cannot show it; the `End-to-end` workflow covers it on iOS (see [verification](../../../docs/verification.md)).
+On a Mac with Xcode, use the iOS Simulator instead, as [file-pr](../file-pr/SKILL.md) and [simulator-check](../simulator-check/SKILL.md) describe: it runs the native app. The web build is an approximation of the iOS app. Layout, text, navigation, and JavaScript behavior are real; SF Symbol icons, the camera, Keychain, widgets, the share sheet, and native tab bars are not. The tab bar sits at the top on web. When the change touches a native-only path, say in the PR that the web build cannot show it; the `End-to-end` workflow covers it on iOS (see [verification](../../../docs/verification.md)).
 
 ## Start the app
 
@@ -17,13 +17,13 @@ On a Mac with Xcode, use the iOS Simulator instead, as [file-pr](../file-pr/SKIL
 npm run visual:start
 ```
 
-This starts a disposable local Convex backend with the mock receipt provider and email sign-up, exports the web build, and serves it at `http://127.0.0.1:8081`. It prints the URL when ready. Rerun it after every source change: the export is static. Data persists between runs; `VISUAL_RESET=1 npm run visual:start` clears it. Logs are in `build/visual/`.
+This starts a disposable local Convex backend with the mock receipt provider and email sign-up, exports the web build, and serves it at `http://127.0.0.1:8081`. It prints the URL when ready. Rerun it after every source change: the export is static. Each start resets the data to the `reviewed-receipts` fixture from `tools/e2e/fixtures/`: one household with three reviewed receipts. Choose another fixture with `VISUAL_FIXTURE=<name>`, or start without data with `VISUAL_FIXTURE=`. When a branch changes the schema, update the fixtures in the same change. `VISUAL_RESET=1` also deletes the database before the start. Logs are in `build/visual/`.
 
 The environment's setup script provides Chromium, ffmpeg, and unzip. The helper needs ffmpeg to shrink recordings to a size the PR can link, so if it is missing, report that and stop.
 
 ## Drive a flow
 
-Write a flow as `tools/visual/flows/<name>.mts` and run it with `node tools/visual/flows/<name>.mts`. [add-receipt.mts](../../../tools/visual/flows/add-receipt.mts) is the worked example: a new member signs up, picks a synthetic receipt photo, saves it, and opens the processed receipt from the inbox.
+Write a flow as `tools/visual/flows/<name>.mts` and run it with `node tools/visual/flows/<name>.mts`. There are two worked examples. In [history.mts](../../../tools/visual/flows/history.mts), the seeded member signs in and opens the history. In [add-receipt.mts](../../../tools/visual/flows/add-receipt.mts), a new member signs up, picks a synthetic receipt photo, saves it, and opens the processed receipt from the inbox.
 
 ```ts
 import { App, receiptPhoto } from "../app.mts";
@@ -39,7 +39,7 @@ await App.run("add-receipt", async (app) => {
 });
 ```
 
-[app.mts](../../../tools/visual/app.mts) opens an iPhone 15-sized page in Norwegian and records video by default. `tap`, `see`, and `type` find an element by test ID, accessibility label, or exact visible text, as Maestro flows do. `app.page` is the Playwright page for anything else. `signUp` creates a fresh account and household, so each run starts empty. The mock provider always returns the same example receipt (Eksempelbutikk).
+[app.mts](../../../tools/visual/app.mts) opens an iPhone 15-sized page in Norwegian and records video by default. `tap`, `see`, and `type` find an element by test ID, accessibility label, or exact visible text, as Maestro flows do. `app.page` is the Playwright page for anything else. `signIn` signs in to the seeded fixture account, so the flow starts with the fixture's data. `signUp` creates a new account and household, so the flow starts empty. The mock provider always returns the same example receipt (Eksempelbutikk).
 
 `App.run` saves numbered screenshots, `flow.mp4`, and a `flow.gif` preview in `build/visual/media/<name>/`, prints that directory, and on failure saves `failed.png` first. Browser errors print to stderr. Open the screenshots and check that each shows what its caption will claim before you publish them; a capture of an error or loading screen proves nothing.
 

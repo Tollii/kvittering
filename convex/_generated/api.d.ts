@@ -91,6 +91,7 @@ import type * as productAnalysisWorker from "../productAnalysisWorker.js";
 import type * as productLinking from "../productLinking.js";
 import type * as productMatching from "../productMatching.js";
 import type * as products from "../products.js";
+import type * as providerConfig from "../providerConfig.js";
 import type * as providerTransport from "../providerTransport.js";
 import type * as providers from "../providers.js";
 import type * as pushDelivery from "../pushDelivery.js";
@@ -197,6 +198,7 @@ declare const fullApi: ApiFromModules<{
   productLinking: typeof productLinking;
   productMatching: typeof productMatching;
   products: typeof products;
+  providerConfig: typeof providerConfig;
   providerTransport: typeof providerTransport;
   providers: typeof providers;
   pushDelivery: typeof pushDelivery;
