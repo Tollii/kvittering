@@ -21,6 +21,14 @@ and untracked files, including deletions: formatting, types, lint, unused code, 
 the changed files, the backend contract, lint-rule tests, and documentation
 references. It prints output only for failing steps.
 
+`check:fast` includes `npm run lint:duplicates`. It checks application, backend,
+native module, plugin, and tool source with the shared exclusions in
+[.jscpd.json](../.jscpd.json). Production duplication above the limit fails the
+check. Test files, test helpers, and fixtures have a separate advisory report;
+their repetition does not affect the production percentage. Both JSON reports
+are saved under `build/duplication/` and uploaded as the `duplication` CI artifact.
+A scan error or an empty scan fails the check so missing input cannot pass silently.
+
 In Claude Code, the project hooks install dependencies at the start of a cloud
 session and run `check:changed` when the agent stops. A failure keeps the agent
 working with the findings; a passing tree is remembered and not checked again.

@@ -1,0 +1,27 @@
+{
+  "path": ["src", "convex", "modules", "plugins", "tools"],
+  "minTokens": 60,
+  "minLines": 5,
+  "mode": "mild",
+  "format": [
+    "typescript",
+    "tsx",
+    "javascript",
+    "jsx",
+    "swift",
+    "kotlin",
+    "bash"
+  ],
+  "formatsExts": {
+    "typescript": ["ts", "mts", "cts"],
+    "javascript": ["js", "mjs", "cjs"]
+  },
+  "ignore": [
+    "**/_generated/**",
+    "**/generated/**",
+    "**/node_modules/**",
+    "**/oxlint/anti-slop/**"
+  ],
+  "reporters": ["console", "json"],
+  "failOnEmpty": true
+}
