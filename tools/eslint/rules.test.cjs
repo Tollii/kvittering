@@ -168,12 +168,26 @@ typedTester.run(
       `${calendarDeclaration} const same = day === day;`,
       `${calendarDeclaration} const size = day.length;`,
       "declare const text: string; const month = text.slice(0, 7);",
+      'const label = new Date().toLocaleDateString("nb-NO", { timeZone: "Europe/Oslo" });',
+      'const format = new Intl.DateTimeFormat("nb-NO", { timeZone: "Europe/Oslo" });',
     ].map(typed),
     invalid: [
-      `${calendarDeclaration} const month = day.slice(0, 7);`,
-      `${calendarDeclaration} const first = \`\${day}-01\`;`,
-      `${calendarDeclaration} const later = day.localeCompare(day);`,
-    ].map((code) => ({ ...typed(code), errors: [{ messageId: "operation" }] })),
+      ...[
+        `${calendarDeclaration} const month = day.slice(0, 7);`,
+        `${calendarDeclaration} const first = \`\${day}-01\`;`,
+        `${calendarDeclaration} const later = day.localeCompare(day);`,
+      ].map((code) => ({
+        ...typed(code),
+        errors: [{ messageId: "operation" }],
+      })),
+      ...[
+        'const today = new Date().toLocaleDateString("sv-SE", { timeZone: "Europe/Oslo" });',
+        'const format = new Intl.DateTimeFormat("sv-SE", { timeZone: "Europe/Oslo" });',
+      ].map((code) => ({
+        ...typed(code),
+        errors: [{ messageId: "construction" }],
+      })),
+    ],
   },
 );
 
