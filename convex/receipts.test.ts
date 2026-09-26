@@ -1,3 +1,4 @@
+import { sharedHousehold, invitation } from "../src/lib/testing/households";
 import { date } from "../src/lib/testing/calendar";
 import { present } from "../src/lib/testing/receipts";
 import { Ore } from "../src/lib/domain/ore";
@@ -15,32 +16,7 @@ async function setup() {
   const t = convexTest(schema, modules);
   registerRateLimiter(t);
 
-  const first = t.withIdentity({
-    subject: "first",
-    issuer: "https://test.local",
-    name: "First",
-  });
-
-  const second = t.withIdentity({
-    subject: "second",
-    issuer: "https://test.local",
-    name: "Second",
-  });
-
-  const outsider = t.withIdentity({
-    subject: "outsider",
-    issuer: "https://test.local",
-    name: "Outsider",
-  });
-
-  const householdId = await first.mutation(api.households.create, {
-    name: "Test household",
-    invitation: "0123456789abcdef0123456789abcdef",
-  });
-
-  await second.mutation(api.households.join, {
-    invitation: "0123456789abcdef0123456789abcdef",
-  });
+  const { first, second, outsider, householdId } = await sharedHousehold(t);
 
   return { t, first, second, outsider, householdId };
 }
@@ -49,7 +25,7 @@ it("allows two household members, refuses a third, and rejects unauthenticated a
   const { t, first, second, outsider, householdId } = await setup();
   await expect(
     outsider.mutation(api.households.join, {
-      invitation: "0123456789abcdef0123456789abcdef",
+      invitation,
     }),
   ).rejects.toThrow("to medlemmer");
 

@@ -137,7 +137,8 @@
     "better-auth": {
       "vitest": "$vitest"
     },
-    "decode-uri-component": "$decode-uri-component"
+    "decode-uri-component": "$decode-uri-component",
+    "qs": "^6.16.0"
   },
   "expo": {
     "install": {
