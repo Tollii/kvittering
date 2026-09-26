@@ -14,11 +14,6 @@ dist
 build
 coverage
 
-# Local Revyl session state; .revyl/.gitignore keeps only config.yaml and tests.
-.revyl/*
-!.revyl/config.yaml
-!.revyl/tests
-
 # External rules, agent assets, and archived review material.
 tools/oxlint/anti-slop
 .agents
