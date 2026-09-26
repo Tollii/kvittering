@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Setup script for Linux cloud agent environments. It installs the tools that the
-# device-check skill uses: the Revyl CLI, ffmpeg, and, when run from the repository,
-# the npm dependencies. Rerunning it is safe.
+# device-check skill uses: the Revyl CLI, ffmpeg, the EAS CLI, and, when run from the
+# repository, the npm dependencies. Rerunning it is safe.
 #
 # Secrets come from the environment, never from files:
 #   REVYL_API_KEY        Revyl CLI authentication (required for device sessions)
@@ -41,6 +41,10 @@ if [[ -f package-lock.json ]]; then
   echo "▸ Installing npm dependencies"
   npm ci --no-audit --no-fund
 fi
+
+# The build scripts run `npx --yes eas-cli`; fill the npx cache now instead of in each thread.
+echo "▸ Caching EAS CLI"
+npx --yes eas-cli --version
 
 for name in REVYL_API_KEY CONVEX_DEPLOY_KEY EXPO_TOKEN; do
   if [[ -z "${!name:-}" ]]; then
