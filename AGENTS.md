@@ -8,6 +8,10 @@ Use [architecture](docs/architecture.md) for ownership and data-flow changes, [p
 
 Code and configuration own exact values and feature behavior. Documentation should explain non-obvious constraints and decisions; task procedures belong in skills.
 
+## UI changes
+
+For any change that alters what a person sees, run the [visual-check](.agents/skills/visual-check/SKILL.md) skill and put before and after screenshots in the PR, with a short video for multi-step flows. The web build approximates iOS: native-only paths such as the camera, Keychain, widgets, and system icons cannot be verified this way.
+
 ## Tests
 
 - Tautological tests are harmful.

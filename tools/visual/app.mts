@@ -178,8 +178,7 @@ export class App {
     await this.browser.close();
 
     if (!video) return undefined;
-    const path = join(this.output, "flow.mp4");
-    compressVideo(await video.path(), path);
+    const { video: path } = encodeRecording(await video.path(), this.output);
     rmSync(join(this.output, "raw"), { recursive: true, force: true });
 
     return path;
@@ -232,18 +231,35 @@ export function testAccount(): Account {
   };
 }
 
-/** GitHub rejects attachments over 10 MB; keep recordings well below that. */
-const maxVideoBytes = 9_000_000;
+// Recordings stay well below GitHub's 10 MB file view limit.
+const maxMediaBytes = 9_000_000;
 
-/** Re-encode a recording as H.264 MP4, which GitHub plays inline. */
-export function compressVideo(input: string, output: string) {
+function ffmpeg(args: string[], output: string) {
   execFileSync(
     // eslint-disable-next-line sonarjs/no-os-command-from-path -- ffmpeg comes from the environment's setup script; see the visual-check skill.
     "ffmpeg",
+    ["-y", "-loglevel", "error", ...args, output],
+    { stdio: "inherit" },
+  );
+
+  const size = statSync(output).size;
+
+  if (size > maxMediaBytes)
+    throw new Error(
+      `${output} is ${Math.round(size / 1e6)} MB. Record a shorter flow.`,
+    );
+}
+
+/**
+ * Encode a recording as an H.264 MP4, which browsers play, and a small GIF
+ * preview, which a PR description shows inline.
+ */
+export function encodeRecording(input: string, directory: string) {
+  const video = join(directory, "flow.mp4");
+  const preview = join(directory, "flow.gif");
+
+  ffmpeg(
     [
-      "-y",
-      "-loglevel",
-      "error",
       "-i",
       input,
       "-vf",
@@ -259,15 +275,18 @@ export function compressVideo(input: string, output: string) {
       "-movflags",
       "+faststart",
       "-an",
-      output,
     ],
-    { stdio: "inherit" },
+    video,
+  );
+  ffmpeg(
+    [
+      "-i",
+      video,
+      "-vf",
+      "fps=8,scale=320:-1:flags=lanczos,split[a][b];[a]palettegen=max_colors=96[p];[b][p]paletteuse=dither=bayer",
+    ],
+    preview,
   );
 
-  const size = statSync(output).size;
-
-  if (size > maxVideoBytes)
-    throw new Error(
-      `${output} is ${Math.round(size / 1e6)} MB. Record a shorter flow.`,
-    );
+  return { video, preview };
 }

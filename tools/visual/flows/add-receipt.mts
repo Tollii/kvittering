@@ -4,14 +4,13 @@
 //
 //   npm run visual:start
 //   node tools/visual/flows/add-receipt.mts
-import { join } from "node:path";
 import { App, receiptPhoto } from "../app.mts";
 
 await App.run("add-receipt", async (app) => {
   await app.signUp();
   await app.screenshot("capture");
 
-  const photo = await receiptPhoto(join(app.output, "receipt.jpg"));
+  const photo = await receiptPhoto("build/visual/receipt.jpg");
   await app.chooseFiles([photo], () => app.tap("Velg fra bilder"));
   await app.see("Lagre kvittering");
   await app.screenshot("selected-photo");
