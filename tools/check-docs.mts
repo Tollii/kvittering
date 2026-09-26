@@ -9,12 +9,7 @@ import { dirname, join, normalize } from "node:path";
 import { z } from "zod";
 
 // Vendored, archived, and generated documents are not maintained here.
-const excluded = [
-  "tools/oxlint/anti-slop/",
-  "sveltemo/",
-  "plans/simplification-review/",
-  "convex/_generated/",
-];
+const excluded = ["tools/oxlint/anti-slop/", "convex/_generated/"];
 
 const packageJson = z.object({ scripts: z.record(z.string(), z.string()) });
 
@@ -24,14 +19,9 @@ const scripts = new Set(
   ),
 );
 
-// eslint-disable-next-line sonarjs/no-os-command-from-path -- Git is the contributor's own installation; the repository cannot pin its path.
-const documents = execFileSync("git", ["ls-files", "*.md"], {
-  encoding: "utf8",
-})
-  .split("\n")
-  .filter(
-    (path) => path && !excluded.some((prefix) => path.startsWith(prefix)),
-  );
+const documents = trackedFiles(["*.md"]).filter(
+  (path) => !excluded.some((prefix) => path.startsWith(prefix)),
+);
 
 const problems: string[] = [];
 
@@ -71,11 +61,33 @@ for (const document of documents) {
   }
 }
 
+// Lint messages and review configuration also send agents to documents.
+for (const file of trackedFiles([
+  "tools/eslint/*.cjs",
+  ".coderabbit.yaml",
+  ".github/*.yml",
+]))
+  for (const match of readFileSync(file, "utf8").matchAll(
+    /(?<![\w/.-])((?:docs|plans|\.agents)\/[\w./-]+\.md)\b/g,
+  )) {
+    const path = match[1] ?? "";
+
+    if (!existsSync(path))
+      problems.push(`${file}: reference to missing ${path}`);
+  }
+
 if (problems.length > 0) {
   console.error(
     `${problems.join("\n")}\n\nUpdate the reference or restore its target. Documentation is the agents' source of truth; see docs/verification.md.`,
   );
   process.exit(1);
+}
+
+function trackedFiles(patterns: string[]): string[] {
+  // eslint-disable-next-line sonarjs/no-os-command-from-path -- Git is the contributor's own installation; the repository cannot pin its path.
+  return execFileSync("git", ["ls-files", ...patterns], { encoding: "utf8" })
+    .split("\n")
+    .filter(Boolean);
 }
 
 function withoutFencedCode(text: string): string {

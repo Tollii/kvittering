@@ -6,7 +6,6 @@ const config = getSentryExpoConfig(__dirname);
 
 config.resolver.blockList = [
   ...config.resolver.blockList,
-  /[/\\]sveltemo[/\\].*/,
   // Deployment credentials are CLI inputs, not Expo environment modules.
   /[/\\]\.env\.staging\.local$/,
 ];
@@ -44,6 +43,13 @@ config.resolver.resolveRequest = (context, moduleName, platform) => {
     platform === "web" ? webModule(context, moduleName) : undefined;
 
   if (replacement) return { type: "sourceFile", filePath: replacement };
+
+  if (moduleName === "decode-uri-component") {
+    return {
+      type: "sourceFile",
+      filePath: path.join(__dirname, "tools/metro/decode-uri-component.cjs"),
+    };
+  }
 
   return (resolveRequest ?? context.resolveRequest)(
     context,
