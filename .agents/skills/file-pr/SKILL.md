@@ -27,7 +27,15 @@ Prefer a picture to a long block of text elsewhere too: a chart for numbers that
 
 Put media in the description without committing it to the PR branch or using external hosts:
 
-- **Cloud sessions:** GitHub's attachment upload and GraphQL are blocked, so `gh pr create` and `gh pr edit` fail. Publish media to the `pr-media` branch with `tools/visual/publish-media.sh` and paste the Markdown it prints. Create and edit the PR through the REST API (`POST` or `PATCH` on `repos/Tollii/kvittering/pulls`); the session proxy supplies the credentials.
+- **Cloud sessions:** GitHub's attachment upload and GraphQL are blocked, so `gh pr create` and `gh pr edit` fail. Publish media to the `pr-media` branch with `tools/visual/publish-media.sh` and paste the Markdown it prints. Create and edit the PR with `curl` against the REST API; the session proxy supplies the credentials, so send no token. Build the JSON with `jq` so the body is escaped:
+
+  ```sh
+  jq -n --arg title "<title>" --rawfile body <description.md> \
+    '{title: $title, body: $body, head: "<branch>", base: "main"}' |
+    curl -fsS -X POST https://api.github.com/repos/Tollii/kvittering/pulls --data @-
+  ```
+
+  To edit, `PATCH` `https://api.github.com/repos/Tollii/kvittering/pulls/<number>` with only the fields that change.
 - **Elsewhere:** use `gh` 2.99.0 or newer with `--attach`, for example `gh pr edit <number> --body-file <description.md> --attach './receipt-details.png#Items in the selected category'`. References to attached local files in the body are replaced with uploaded asset URLs; other attachments are appended. A partial upload can update the PR despite a nonzero exit; inspect the result before retrying. See [GitHub CLI attachment documentation](https://docs.github.com/en/github-cli/github-cli/attaching-files-with-github-cli).
 
 Afterward, read back the body and check that each media URL loads. Never report local paths as attached evidence.

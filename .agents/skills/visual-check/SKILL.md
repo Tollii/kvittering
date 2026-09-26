@@ -67,4 +67,4 @@ tools/visual/publish-media.sh build/visual/media/add-receipt
 
 It appends the PNGs, GIFs, and MP4s under `<your-branch>/<flow>/` on `pr-media`, pushes, and prints Markdown for the PR description. Images and GIFs show inline from `raw.githubusercontent.com`; each MP4 is a link through jsDelivr, which plays it in the browser. Links pin the commit, so later pushes do not break them. Never commit media to your PR branch.
 
-Create or edit the PR with the REST API, as described in [file-pr](../file-pr/SKILL.md). Caption each image with what it proves and note that it is from the web build.
+Create or edit the PR with `curl` against the REST API, as described in [file-pr](../file-pr/SKILL.md). Caption each image with what it proves and note that it is from the web build.
