@@ -2,10 +2,18 @@ import { userError } from "./userErrors";
 import { householdName, householdNameLimit } from "../src/lib/domain/household";
 import { oreValidator } from "../src/lib/domain/ore";
 import { clientMutation as mutation } from "./clientFunctions";
-import { query } from "./_generated/server";
+import { query, type QueryCtx } from "./_generated/server";
 import { v } from "convex/values";
+import type { UserIdentity } from "convex/server";
 import schema from "./schema";
 import { requireMember } from "./access";
+
+function membership(ctx: QueryCtx, identity: UserIdentity) {
+  return ctx.db
+    .query("members")
+    .withIndex("by_identity", (q) => q.eq("identity", identity.tokenIdentifier))
+    .unique();
+}
 
 export const current = query({
   args: {},
@@ -22,12 +30,7 @@ export const current = query({
 
     if (!identity) return null;
 
-    const member = await ctx.db
-      .query("members")
-      .withIndex("by_identity", (q) =>
-        q.eq("identity", identity.tokenIdentifier),
-      )
-      .unique();
+    const member = await membership(ctx, identity);
 
     if (!member) return null;
     const household = await ctx.db.get("households", member.householdId);
@@ -47,20 +50,21 @@ export const current = query({
   },
 });
 
+/** Household setup is open to any signed-in caller; a member keeps their household. */
+async function signedInMembership(ctx: QueryCtx) {
+  const identity = await ctx.auth.getUserIdentity();
+
+  if (!identity) throw userError("Logg inn først.");
+
+  return { identity, existing: await membership(ctx, identity) };
+}
+
+// Access: signedInMembership requires a signed-in caller.
 export const create = mutation({
   args: { name: v.string(), invitation: v.string() },
   returns: v.id("households"),
   handler: async (ctx, args) => {
-    const identity = await ctx.auth.getUserIdentity();
-
-    if (!identity) throw userError("Logg inn først.");
-
-    const existing = await ctx.db
-      .query("members")
-      .withIndex("by_identity", (q) =>
-        q.eq("identity", identity.tokenIdentifier),
-      )
-      .unique();
+    const { identity, existing } = await signedInMembership(ctx);
 
     if (existing) return existing.householdId;
 
@@ -84,20 +88,12 @@ export const create = mutation({
   },
 });
 
+// Access: signedInMembership requires a signed-in caller.
 export const join = mutation({
   args: { invitation: v.string() },
   returns: v.id("households"),
   handler: async (ctx, args) => {
-    const identity = await ctx.auth.getUserIdentity();
-
-    if (!identity) throw userError("Logg inn først.");
-
-    const existing = await ctx.db
-      .query("members")
-      .withIndex("by_identity", (q) =>
-        q.eq("identity", identity.tokenIdentifier),
-      )
-      .unique();
+    const { identity, existing } = await signedInMembership(ctx);
 
     if (existing) return existing.householdId;
 
