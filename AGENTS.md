@@ -10,7 +10,7 @@ Code and configuration own exact values and feature behavior. Documentation shou
 
 ## UI changes
 
-Reviewers judge a UI change from its PR, so any change that alters what a person sees needs before and after screenshots there, plus a short video for multi-step flows. In a cloud session, capture them with the [visual-check](.agents/skills/visual-check/SKILL.md) skill. The web build approximates iOS, so name in the PR any native-only path it could not show, such as the camera, Keychain, widgets, or system icons.
+Reviewers judge a UI change from its PR, so any change that alters what a person sees needs before and after screenshots there, plus a short video for multi-step flows. On a Mac with Xcode, verify the change and capture the media on the iOS Simulator, because it runs the real native app. Where no simulator is available, as in cloud sessions, use the [visual-check](.agents/skills/visual-check/SKILL.md) skill instead. The web build approximates iOS, so name in the PR any native-only path it could not show, such as the camera, Keychain, widgets, or system icons.
 
 ## Tests
 

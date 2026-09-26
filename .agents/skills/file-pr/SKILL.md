@@ -19,7 +19,10 @@ For example, prefer `Preserve receipt drafts when the app restarts` to `Refactor
 
 Open the description with a simple explanation of the problem from the user's original request. Then explain the solution briefly. Include relevant validation and material limitations. Describe the final change; omit abandoned approaches and an inventory of implementation details.
 
-Show, don't tell: reviewers judge the change from the description. Any change with a visual impact needs screenshots from the running app, and a short video when navigation, gestures, or state changes are needed to show the result. Choose the smallest set that lets a reviewer understand and check the changed behavior. Use before-and-after views when the comparison is useful; do not recreate a before view from memory. In a cloud session, capture them with [visual-check](../visual-check/SKILL.md).
+Show, don't tell: reviewers judge the change from the description. Any change with a visual impact needs screenshots from the running app, and a short video when navigation, gestures, or state changes are needed to show the result. Choose the smallest set that lets a reviewer understand and check the changed behavior. Use before-and-after views when the comparison is useful; do not recreate a before view from memory. Capture them from the most faithful build you can run:
+
+- **On a Mac with Xcode:** use the iOS Simulator, which runs the native app. Start it as the [README](../../../README.md) describes, or drive a Maestro flow with `E2E_FLOW=<flow> npm run e2e:ios` (see [verification](../../../docs/verification.md)). Capture with `xcrun simctl io booted screenshot <name>.png` and `xcrun simctl io booted recordVideo --codec=h264 <name>.mp4`, stopping the recording with Ctrl-C. GitHub rejects videos over 10 MB, so keep recordings short or re-encode them with ffmpeg.
+- **Without a simulator, as in cloud sessions:** use [visual-check](../visual-check/SKILL.md), which runs the web build.
 
 Capture the final tested revision with synthetic or approved demonstration data. Add short captions that state what each image or recording proves, including the device, simulator, or web build and relevant appearance or text-size settings.
 

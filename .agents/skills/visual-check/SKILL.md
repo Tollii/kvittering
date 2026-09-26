@@ -1,6 +1,6 @@
 ---
 name: visual-check
-description: Run the Kvitto app on web in a cloud session, drive a flow with Playwright, and put screenshots and a short video in the pull request. Use in a cloud session before filing or updating a PR for a change that alters what a person sees.
+description: Run the Kvitto app on web in a cloud session, drive a flow with Playwright, and put screenshots and a short video in the pull request. Use when no iOS Simulator is available, as in cloud sessions, before filing or updating a PR for a change that alters what a person sees.
 metadata:
   harness: [claude]
   platform: [linux]
@@ -9,7 +9,7 @@ metadata:
 
 # Check a change visually
 
-The web build is an approximation of the iOS app. Layout, text, navigation, and JavaScript behavior are real; SF Symbol icons, the camera, Keychain, widgets, the share sheet, and native tab bars are not. The tab bar sits at the top on web. When the change touches a native-only path, say in the PR that the web build cannot show it; the `End-to-end` workflow covers it on iOS (see [verification](../../../docs/verification.md)).
+On a Mac with Xcode, use the iOS Simulator instead, as [file-pr](../file-pr/SKILL.md) describes: it runs the native app. The web build is an approximation of the iOS app. Layout, text, navigation, and JavaScript behavior are real; SF Symbol icons, the camera, Keychain, widgets, the share sheet, and native tab bars are not. The tab bar sits at the top on web. When the change touches a native-only path, say in the PR that the web build cannot show it; the `End-to-end` workflow covers it on iOS (see [verification](../../../docs/verification.md)).
 
 ## Start the app
 
