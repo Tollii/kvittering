@@ -5,6 +5,10 @@ import { parseEnv } from "node:util";
 import { z } from "zod";
 import { loadFixture, resolveTables } from "./fixtures.mts";
 
+const output = resolve(process.argv[3] ?? "build/e2e/seed");
+
+mkdirSync(output, { recursive: true });
+
 // This command clears the entire deployment, including components. Restrict
 // both the auth request and CLI selection to a disposable target: this
 // worktree's anonymous backend, or, when SEED_PREVIEW_DEPLOYMENT is set, the
@@ -34,12 +38,12 @@ function selectTarget() {
       .regex(new RegExp(`^https://${name}\\.([a-z0-9-]+\\.)?convex\\.site$`))
       .parse(process.env.SEED_SITE_URL);
 
-    // The key stays in the process environment, not in the env file on disk.
-    // A preview deploy key authorizes --preview-name; --deployment needs a
-    // personal access token.
+    // The key stays in the process environment, not in a file on disk. The CLI
+    // rejects an --env-file without a deployment variable, and the key takes
+    // precedence over .env.local. A preview deploy key authorizes
+    // --preview-name; --deployment needs a personal access token.
     return {
       site,
-      envFileContents: "",
       variables: { CONVEX_DEPLOY_KEY: key },
       cliArgs: ["--preview-name", previewName],
     };
@@ -54,25 +58,20 @@ function selectTarget() {
 
   z.literal("http://127.0.0.1:3210").parse(local.EXPO_PUBLIC_CONVEX_URL);
 
+  const envFile = resolve(output, "deployment.env");
+
+  writeFileSync(envFile, `CONVEX_DEPLOYMENT=${deployment}\n`);
+
   return {
     site: z
       .literal("http://127.0.0.1:3211")
       .parse(local.EXPO_PUBLIC_CONVEX_SITE_URL),
-    envFileContents: `CONVEX_DEPLOYMENT=${deployment}\n`,
     variables: {},
-    cliArgs: [],
+    cliArgs: ["--env-file", envFile],
   };
 }
 
-const { site, envFileContents, variables, cliArgs } = selectTarget();
-
-const output = resolve(process.argv[3] ?? "build/e2e/seed");
-
-mkdirSync(output, { recursive: true });
-
-const envFile = resolve(output, "deployment.env");
-
-writeFileSync(envFile, envFileContents);
+const { site, variables, cliArgs } = selectTarget();
 
 const environment = {
   ...Object.fromEntries(
@@ -86,13 +85,7 @@ const fixture = process.argv[2] ? loadFixture(process.argv[2]) : undefined;
 function convex(args: string[]) {
   return execFileSync(
     process.execPath,
-    [
-      "node_modules/convex/bin/main.js",
-      ...args,
-      ...cliArgs,
-      "--env-file",
-      envFile,
-    ],
+    ["node_modules/convex/bin/main.js", ...args, ...cliArgs],
     {
       encoding: "utf8",
       env: environment,
