@@ -115,6 +115,9 @@ export function SessionProvider({
 
 function SessionGate({ children }: Readonly<{ children: ReactNode }>) {
   const session = authClient.useSession();
+  const [sessionLoaded, setSessionLoaded] = useState(!session.isPending);
+
+  if (!sessionLoaded && !session.isPending) setSessionLoaded(true);
   const previousOwner = useRef<string | null>(null);
   const owner = session.data?.user.id ?? null;
   useEffect(() => {
@@ -132,7 +135,8 @@ function SessionGate({ children }: Readonly<{ children: ReactNode }>) {
     previousOwner.current = owner;
   }, [owner, session.isPending]);
 
-  if (session.isPending && !session.data)
+  // Later session refreshes must retain the sign-in form and its input.
+  if (!sessionLoaded && !session.data)
     return (
       <Screen>
         <Loading title="Henter innlogging …" />

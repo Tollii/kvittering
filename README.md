@@ -81,7 +81,8 @@ Do not copy constants, enabled rules, event catalogs, or feature inventories int
 
 ## Checks
 
-Merging requires `CI result`, `E2E result`, and an independent approving review.
+Merging requires `CI result`, `E2E result`, and resolution of all review conversations.
+Approving reviews are optional for this single-maintainer repository.
 See [merge requirements](docs/verification.md#merge-requirements-and-repository-settings).
 
 Use `npm run check:changed` during code development, `npm run check` before committing code, and `npm run check:ci` when tests or coverage configuration change. Fix findings without baselines or broad suppressions. Use `npm run lint:docs` for documentation references. See [verification](docs/verification.md) for the current CI and native-test procedures. After a Convex signature change, run `npm run contract:update` and review the resulting contract diff. Commands and tool configuration remain the source of truth for what each check runs.

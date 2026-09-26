@@ -1,4 +1,8 @@
 /** Repository rules shared by ESLint and Oxlint. */
+const { existsSync } = require("node:fs");
+
+const path = require("node:path");
+
 const readsDatabase = require("./reads-database.cjs");
 
 const quoted = /^["'`]/;
@@ -406,6 +410,125 @@ module.exports = {
               insideEffect(node)
             )
               context.report({ node, messageId: "subscription" });
+          },
+        };
+      },
+    },
+    "platform-variant-contract": {
+      meta: {
+        type: "problem",
+        schema: [],
+        messages: {
+          props:
+            "Type the props of this platform variant with a type imported from {{base}}. Type checking, knip, and callers use the base file, so props declared here can drift unnoticed.",
+        },
+      },
+      create(context) {
+        const match = /^(.+)\.(ios|android)\.tsx?$/.exec(
+          path.basename(context.filename),
+        );
+
+        if (!match) return {};
+        const directory = path.dirname(context.filename);
+
+        if (
+          ![".tsx", ".ts"].some((extension) =>
+            existsSync(path.join(directory, match[1] + extension)),
+          )
+        )
+          return {};
+        const base = `./${match[1]}`;
+        const baseTypes = new Set();
+
+        function isBaseType(annotation) {
+          if (
+            annotation?.type !== "TSTypeReference" ||
+            annotation.typeName.type !== "Identifier"
+          )
+            return false;
+
+          const argument = (
+            annotation.typeArguments ?? annotation.typeParameters
+          )?.params[0];
+
+          if (annotation.typeName.name === "Readonly" && argument)
+            return isBaseType(argument);
+
+          return baseTypes.has(annotation.typeName.name);
+        }
+
+        const locals = new Map();
+
+        // Components may be wrapped, as in memo(forwardRef(function ...)).
+        function component(node) {
+          if (node?.type === "CallExpression")
+            return component(node.arguments[0]);
+
+          if (node?.type === "Identifier") return locals.get(node.name);
+
+          return node;
+        }
+
+        function check(node) {
+          const props = component(node)?.params?.[0];
+
+          if (props && !isBaseType(props.typeAnnotation?.typeAnnotation))
+            context.report({
+              node: props,
+              messageId: "props",
+              data: { base },
+            });
+        }
+
+        function declared(declaration) {
+          if (declaration?.type === "FunctionDeclaration") return [declaration];
+
+          if (declaration?.type === "VariableDeclaration")
+            return declaration.declarations.map((variable) => variable.init);
+
+          return [];
+        }
+
+        return {
+          ImportDeclaration(node) {
+            if (node.source.value !== base) return;
+
+            for (const specifier of node.specifiers)
+              if (specifier.type === "ImportSpecifier")
+                baseTypes.add(specifier.local.name);
+          },
+          "Program:exit"(program) {
+            for (const statement of program.body) {
+              const declaration =
+                statement.type === "ExportNamedDeclaration"
+                  ? statement.declaration
+                  : statement;
+
+              if (declaration?.type === "FunctionDeclaration" && declaration.id)
+                locals.set(declaration.id.name, declaration);
+
+              if (declaration?.type === "VariableDeclaration")
+                for (const variable of declaration.declarations)
+                  if (variable.id.type === "Identifier")
+                    locals.set(variable.id.name, variable.init);
+            }
+
+            for (const statement of program.body) {
+              if (statement.type === "ExportDefaultDeclaration")
+                check(statement.declaration);
+
+              if (
+                statement.type !== "ExportNamedDeclaration" ||
+                statement.source
+              )
+                continue;
+
+              declared(statement.declaration).forEach(check);
+
+              for (const specifier of statement.specifiers)
+                if (specifier.local.type === "Identifier")
+                  check(specifier.local);
+            }
           },
         };
       },
