@@ -37,7 +37,8 @@ npx convex deploy --preview-create "$name" --typecheck disable \
 url="$(cat "$output/convex-url")"
 site="${url/.convex.cloud/.convex.site}"
 
-SEED_PREVIEW_DEPLOYMENT="$(sed -E 's#https://([^.]+)\..*#\1#' <<<"$url")" \
+SEED_PREVIEW_NAME="$name" \
+  SEED_PREVIEW_DEPLOYMENT="$(sed -E 's#https://([^.]+)\..*#\1#' <<<"$url")" \
   SEED_SITE_URL="$site" node tools/e2e/seed.mts "$fixture" "$output/seed"
 
 cat >"$output/backend.env" <<EOF

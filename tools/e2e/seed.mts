@@ -8,8 +8,8 @@ import { loadFixture, resolveTables } from "./fixtures.mts";
 // This command clears the entire deployment, including components. Restrict
 // both the auth request and CLI selection to a disposable target: this
 // worktree's anonymous backend, or, when SEED_PREVIEW_DEPLOYMENT is set, the
-// preview deployment that tools/device/create_backend.sh made. A preview
-// deploy key cannot select a development or production deployment.
+// device-* preview deployment that tools/device/create_backend.sh made. A
+// preview deploy key cannot select a development or production deployment.
 function selectTarget() {
   const preview = process.env.SEED_PREVIEW_DEPLOYMENT;
 
@@ -18,6 +18,11 @@ function selectTarget() {
       .string()
       .regex(/^[a-z]+-[a-z]+-\d+$/)
       .parse(preview);
+
+    const previewName = z
+      .string()
+      .regex(/^device-[a-z0-9-]+$/)
+      .parse(process.env.SEED_PREVIEW_NAME);
 
     const key = z
       .string()
@@ -30,11 +35,13 @@ function selectTarget() {
       .parse(process.env.SEED_SITE_URL);
 
     // The key stays in the process environment, not in the env file on disk.
+    // A preview deploy key authorizes --preview-name; --deployment needs a
+    // personal access token.
     return {
       site,
       envFileContents: "",
       variables: { CONVEX_DEPLOY_KEY: key },
-      cliArgs: ["--deployment", name],
+      cliArgs: ["--preview-name", previewName],
     };
   }
 
