@@ -136,6 +136,7 @@
     "better-auth": {
       "vitest": "$vitest"
     },
+    "qs": "^6.16.0",
     "uuid": "^11.1.1"
   },
   "expo": {
