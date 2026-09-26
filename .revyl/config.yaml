@@ -1,0 +1,21 @@
+project:
+  id: 6ab55603-3bcb-4076-954e-8b369ee0fbaa
+session:
+  idle_timeout_seconds: 1800
+build:
+  framework: expo
+  profiles:
+    # Builds the iOS simulator dev client on this Mac.
+    development:
+      ios:
+        app_id: a1966369-8876-44cf-a9bd-3fe8b6279a31
+        build_commands:
+          - npx --yes eas-cli build --platform ios --profile revyl-build --local --output .revyl/build/app.tar.gz
+        output_path: .revyl/build/app.tar.gz
+    # Uploads an artifact that tools/device/build_ios_binary.sh already made.
+    prebuilt:
+      ios:
+        app_id: a1966369-8876-44cf-a9bd-3fe8b6279a31
+        build_commands:
+          - test -f .revyl/build/app.tar.gz
+        output_path: .revyl/build/app.tar.gz

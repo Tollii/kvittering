@@ -1,0 +1,60 @@
+#!/usr/bin/env bash
+# Setup script for Linux cloud agent environments. It installs the tools that the
+# device-check skill uses: the Revyl CLI, ffmpeg, the EAS CLI, and, when run from the
+# repository, the npm dependencies. Rerunning it is safe.
+#
+# Secrets come from the environment, never from files:
+#   REVYL_API_KEY        Revyl CLI authentication (required for device sessions)
+#   CONVEX_DEPLOY_KEY    Convex preview deploy key, for the per-branch backend
+#   EXPO_TOKEN           EAS authentication (required only for new native builds)
+#
+# The Revyl and EAS CLIs send their key as "Authorization: Bearer <key>". When the
+# environment injects that header as a credential (*.revyl.ai, api.expo.dev),
+# set REVYL_API_KEY and EXPO_TOKEN to any placeholder value: the CLIs send no request
+# without a key. CONVEX_DEPLOY_KEY must be the real key; the Convex CLI reads the
+# deployment type and project from it.
+#
+# REVYL_VERSION pins the CLI version; update it deliberately.
+set -euo pipefail
+
+revyl_version="${REVYL_VERSION:-v0.1.128}"
+
+as_root() {
+  if [[ "$(id -u)" -eq 0 ]]; then "$@"; else sudo "$@"; fi
+}
+
+if [[ "$(revyl --version 2>/dev/null)" != *"$revyl_version"* ]]; then
+  echo "▸ Installing Revyl CLI $revyl_version"
+  # A private directory, so no other user can replace the installer before it runs as root.
+  installer_dir="$(mktemp -d)"
+  trap 'rm -rf "$installer_dir"' EXIT
+  curl -fsSL https://revyl.com/install.sh -o "$installer_dir/install.sh"
+  # /usr/local/bin is on PATH in every agent shell, so no profile edit is necessary.
+  as_root env REVYL_VERSION="$revyl_version" REVYL_INSTALL_DIR=/usr/local/bin \
+    REVYL_NO_MODIFY_PATH=1 sh "$installer_dir/install.sh"
+fi
+
+if ! command -v ffmpeg >/dev/null; then
+  echo "▸ Installing ffmpeg"
+  as_root apt-get update -qq
+  as_root env DEBIAN_FRONTEND=noninteractive apt-get install -y -qq ffmpeg >/dev/null
+fi
+
+if [[ -f package-lock.json ]]; then
+  echo "▸ Installing npm dependencies"
+  npm ci --no-audit --no-fund
+fi
+
+# The build scripts run `npx --yes eas-cli`; fill the npx cache now instead of in each thread.
+echo "▸ Caching EAS CLI"
+npx --yes eas-cli --version
+
+for name in REVYL_API_KEY CONVEX_DEPLOY_KEY EXPO_TOKEN; do
+  if [[ -z "${!name:-}" ]]; then
+    echo "warning: $name is not set; the device-check skill cannot use every step." >&2
+  fi
+done
+
+if [[ -n "${REVYL_API_KEY:-}" ]]; then
+  revyl auth status
+fi

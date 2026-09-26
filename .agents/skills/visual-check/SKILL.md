@@ -9,7 +9,7 @@ metadata:
 
 # Check a change visually
 
-On a Mac with Xcode, use the iOS Simulator instead, as [file-pr](../file-pr/SKILL.md) describes: it runs the native app. The web build is an approximation of the iOS app. Layout, text, navigation, and JavaScript behavior are real; SF Symbol icons, the camera, Keychain, widgets, the share sheet, and native tab bars are not. The tab bar sits at the top on web. When the change touches a native-only path, say in the PR that the web build cannot show it; the `End-to-end` workflow covers it on iOS (see [verification](../../../docs/verification.md)).
+On a Mac with Xcode, use the iOS Simulator instead, as [file-pr](../file-pr/SKILL.md) describes: it runs the native app. In cloud sessions, prefer [device-check](../device-check/SKILL.md), which runs the native app on a Revyl cloud iPhone; use this skill when device-check cannot run. The web build is an approximation of the iOS app. Layout, text, navigation, and JavaScript behavior are real; SF Symbol icons, the camera, Keychain, widgets, the share sheet, and native tab bars are not. The tab bar sits at the top on web. When the change touches a native-only path, say in the PR that the web build cannot show it; the `End-to-end` workflow covers it on iOS (see [verification](../../../docs/verification.md)).
 
 ## Start the app
 
