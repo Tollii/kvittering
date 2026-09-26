@@ -55,7 +55,7 @@ revyl device instruction "Open the Innboks tab"
 revyl device tap --target "First receipt in the list"
 revyl device swipe --target "Receipt lines" --direction up
 revyl device validation "The receipt shows three lines"
-revyl device screenshot --out build/device/receipt.png
+revyl device screenshot --out build/device/media/receipt/01-receipt.png
 ```
 
 - `instruction` performs one multi-step intent. Use it for navigation, and `tap`/`type` for exact steps.
@@ -67,20 +67,20 @@ The [revyl-cli-dev-loop](../revyl-cli-dev-loop/SKILL.md) skill has the complete 
 
 ## Collect evidence
 
-Revyl records every session. After the flow, get the video and per-step screenshots from the report:
+Save screenshots for the PR in `build/device/media/<flow>/`, numbered in flow order. Revyl records every session; get the video from the report:
 
 ```sh
 revyl device report --json > build/device/report.json
 curl -fsS -o build/device/session.mp4 "$(node -p 'require("./build/device/report.json").video_url')"
 ```
 
-The recording is large (about 20 MB per minute). Trim and scale it before you link it from a PR:
+The recording is large (about 20 MB per minute), and GitHub rejects videos over 10 MB. Trim it to the steps that the change needs and scale it down:
 
 ```sh
-ffmpeg -i build/device/session.mp4 -ss <start> -to <end> -vf scale=390:-2 -an build/device/flow.mp4
+ffmpeg -i build/device/session.mp4 -ss <start> -to <end> -vf scale=390:-2 -an build/device/media/<flow>/flow.mp4
 ```
 
-`report_url` and `viewer_url` need a Revyl login, so they are for the user only. Put screenshots and video in the PR as described in [file-pr](../file-pr/SKILL.md), and caption each with what it proves.
+Each step in the report has `video_timestamp_start`, which gives the start and end times. Publish the directory with `tools/visual/publish-media.sh build/device/media/<flow>` and use the Markdown it prints, as [file-pr](../file-pr/SKILL.md) describes. Caption each item with what it proves. `report_url` and `viewer_url` need a Revyl login, so do not use them as PR evidence.
 
 ## Stop
 
