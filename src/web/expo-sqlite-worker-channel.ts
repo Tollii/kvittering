@@ -27,7 +27,18 @@ type SyncTrait = {
   resultBuffer: SharedArrayBuffer;
 };
 
-type Message = { result?: unknown; error?: string };
+// Values that cross the worker boundary: SQL parameters, rows, and results.
+type WorkerValue =
+  | string
+  | number
+  | boolean
+  | null
+  | undefined
+  | Uint8Array
+  | WorkerValue[]
+  | { [key: string]: WorkerValue };
+
+type Message = { result: WorkerValue; error?: string };
 
 type EncodedBytes = { __uint8array__: true; data: number[] };
 
@@ -41,13 +52,12 @@ function serialize(message: Message) {
 }
 
 function deserialize(json: string): Message {
-  return JSON.parse(
-    json,
-    (_, item: EncodedBytes | Message | string | number | null) =>
-      item instanceof Object && "__uint8array__" in item
-        ? new Uint8Array(item.data)
-        : item,
-  );
+  // SAFETY: sendWorkerResult below wrote this JSON from a Message.
+  return JSON.parse(json, (_, item: EncodedBytes | WorkerValue) =>
+    item instanceof Object && "__uint8array__" in item
+      ? new Uint8Array((item as EncodedBytes).data)
+      : item,
+  ) as Message;
 }
 
 let messageId = 0;
@@ -55,8 +65,8 @@ let messageId = 0;
 export function invokeWorkerSync(
   worker: Worker,
   type: string,
-  data: object,
-): unknown {
+  data: WorkerValue,
+): WorkerValue {
   const lockBuffer = new SharedArrayBuffer(4);
   const resultBuffer = new SharedArrayBuffer(1024 * 1024);
   const lock = new Int32Array(lockBuffer);
@@ -96,7 +106,7 @@ export function sendWorkerResult({
   syncTrait,
 }: {
   id: number;
-  result: unknown;
+  result: WorkerValue;
   error: Error | null;
   syncTrait?: SyncTrait;
 }) {
@@ -107,7 +117,7 @@ export function sendWorkerResult({
   }
 
   const json = error
-    ? serialize({ error: error.message })
+    ? serialize({ result: null, error: error.message })
     : serialize({ result });
 
   const bytes = new TextEncoder().encode(json);
