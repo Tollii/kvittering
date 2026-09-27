@@ -8,7 +8,7 @@ import { existsSync, readFileSync } from "node:fs";
 
 const marker = "anti-slop/no-module-mocking -- ";
 
-// eslint-disable-next-line sonarjs/no-os-command-from-path -- Git is the contributor's own installation; the repository cannot pin its path.
+// oxlint-disable-next-line sonarjs/no-os-command-from-path -- Git is the contributor's own installation; the repository cannot pin its path.
 const sources = execFileSync("git", ["ls-files", "*.ts", "*.tsx"], {
   encoding: "utf8",
 })

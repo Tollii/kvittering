@@ -429,7 +429,8 @@ function LineProductRow({
   priceSignal?: PriceSignal;
   catalogProduct: ReturnType<typeof linkedCatalogProduct>;
   productKind:
-    ProductChoice["kind"] | ReturnType<typeof productReference>["kind"];
+    | ProductChoice["kind"]
+    | ReturnType<typeof productReference>["kind"];
   onOpenCategory: () => void;
   onConfirmCategory: (categoryId: CategoryId) => void;
   onOpenCatalog: () => void;
@@ -512,7 +513,8 @@ function LineProductRow({
 
 function productLinkLabel(
   productKind:
-    ProductChoice["kind"] | ReturnType<typeof productReference>["kind"],
+    | ProductChoice["kind"]
+    | ReturnType<typeof productReference>["kind"],
   catalogProduct: ReturnType<typeof linkedCatalogProduct>,
 ): string {
   if (productKind === "unresolved") return "Mangler produkt";

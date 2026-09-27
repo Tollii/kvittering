@@ -22,7 +22,12 @@ export const categoryGroups = [
 type CategoryGroup = (typeof categoryGroups)[number][0];
 
 export type PurchaseType =
-  "food" | "household" | "personal-care" | "pets" | "other" | "unknown";
+  | "food"
+  | "household"
+  | "personal-care"
+  | "pets"
+  | "other"
+  | "unknown";
 
 type CategoryDefinition = {
   id: string;

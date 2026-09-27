@@ -21,7 +21,8 @@ export function releasePolicyCache(
   const prefix = `release-policy-v1${storageSuffix}:${release.channel}:${release.platform}`;
 
   function readCachedPolicy():
-    { policy: VersionPolicy; fetchedAt: number } | undefined {
+    | { policy: VersionPolicy; fetchedAt: number }
+    | undefined {
     try {
       const raw = cachedPolicy.safeParse(
         JSON.parse(Storage.getItemSync(prefix) ?? "null"),

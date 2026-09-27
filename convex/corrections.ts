@@ -1,5 +1,4 @@
 import { userError } from "./userErrors";
-import { hasReceiptBeenRead } from "../src/lib/domain/receipt-state";
 import {
   paginationOptsValidator,
   paginationResultValidator,
@@ -28,6 +27,7 @@ import {
 import { correctionTarget } from "../src/lib/domain/corrections";
 import {
   extractedReceipt,
+  hasReceiptBeenRead,
   type ExtractedReceipt,
 } from "../src/lib/domain/receipt-state";
 

@@ -72,7 +72,8 @@ export function selectReceiptHistory(receipts: Receipt[], search: string) {
 /** Keep a selection stable when callers construct an equivalent scope on each render. */
 export function createReceiptSelector() {
   let previous:
-    { receipts: Receipt[]; key: string; selected: Receipt[] } | undefined;
+    | { receipts: Receipt[]; key: string; selected: Receipt[] }
+    | undefined;
 
   return (
     receipts: Receipt[],

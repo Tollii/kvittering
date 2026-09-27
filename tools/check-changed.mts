@@ -3,7 +3,7 @@
  * uncommitted and untracked files. Agents run this after each change;
  * `npm run check` remains the complete check before committing.
  */
-import { existsSync, lstatSync } from "node:fs";
+import { existsSync } from "node:fs";
 import { spawnSync } from "node:child_process";
 import { changedFiles, mergeBase } from "./changes.mts";
 
@@ -18,20 +18,18 @@ if (changed.length === 0) {
 
 const existing = changed.filter(existsSync);
 
-// Prettier rejects explicit symbolic links; format the tracked source instead.
-const regularFiles = existing.filter((path) => lstatSync(path).isFile());
-
 const deleted = changed.length !== existing.length;
 
 const code = existing.filter((path) => /\.[cm]?[jt]sx?$/.test(path));
 
 const failures: string[] = [];
 
-if (regularFiles.length > 0)
-  run("Formatting", "prettier/bin/prettier.cjs", [
+// Files that the formatter ignores or cannot parse are skipped.
+if (existing.length > 0)
+  run("Formatting", "oxfmt/bin/oxfmt", [
     "--check",
-    "--ignore-unknown",
-    ...regularFiles,
+    "--no-error-on-unmatched-pattern",
+    ...existing,
   ]);
 
 run("Types", "typescript/bin/tsc", ["--noEmit"]);
@@ -45,11 +43,9 @@ run("Tool types", "typescript/bin/tsc", [
 ]);
 
 if (code.length > 0) {
-  run("Oxlint", "oxlint/bin/oxlint", ["--deny-warnings", ...code]);
-  run("Repository policy", "oxlint/bin/oxlint", [
-    "--config",
-    "oxlint.policy.config.mjs",
+  run("Oxlint", "oxlint/bin/oxlint", [
     "--deny-warnings",
+    "--no-error-on-unmatched-pattern",
     ...code,
   ]);
   run("ESLint", "eslint/bin/eslint.js", [
@@ -86,8 +82,8 @@ if (changed.some((path) => path.startsWith("convex/")))
     "convex/contract.test.ts",
   ]);
 
-if (changed.some((path) => path.startsWith("tools/eslint/")))
-  run("Lint rule tests", null, ["--test", "tools/eslint/rules.test.cjs"]);
+if (changed.some((path) => path.startsWith("tools/lint-rules/")))
+  run("Lint rule tests", null, ["--test", "tools/lint-rules/rules.test.cjs"]);
 
 if (
   deleted ||

@@ -1,15 +1,20 @@
 const { defineConfig } = require("eslint/config");
 
-const expo = require("eslint-config-expo/flat");
+const globals = require("globals");
 
 const sonarjs = require("eslint-plugin-sonarjs");
 
 const path = require("node:path");
 
-const kvitto = require("./tools/eslint/index.cjs");
+const kvitto = require("./tools/lint-rules/index.cjs");
 
+const { sonarjsRules } = require("./tools/lint-rules/sonarjs.cjs");
+
+/**
+ * The rules that need a TypeScript program. Oxlint (oxlint.config.mts) runs
+ * every other rule; it gives JavaScript plugins no type information.
+ */
 module.exports = defineConfig([
-  expo,
   {
     ignores: [
       "convex/_generated/**",
@@ -24,70 +29,21 @@ module.exports = defineConfig([
       "coverage/**",
       "dist/**",
       "build/**",
+      "plans/**",
     ],
   },
   {
-    plugins: { sonarjs, kvitto },
-    rules: {
-      "kvitto/no-undefined-record": "error",
-      "kvitto/no-effect-fetch": "error",
-      // Tools resolve imports to the base file, not the shipped platform variant.
-      "kvitto/platform-variant-contract": "error",
-      // A file past this size holds several responsibilities; split it along them.
-      "max-lines": [
-        "error",
-        { max: 750, skipBlankLines: true, skipComments: true },
-      ],
-      ...Object.fromEntries(
-        Object.entries(sonarjs.rules).flatMap(([name, rule]) =>
-          rule.meta.deprecated ? [] : [[`sonarjs/${name}`, "error"]],
-        ),
-      ),
-      // Match Prettier: parenthesized parameters and concise single-return arrow bodies.
-      "sonarjs/arrow-function-convention": [
-        "error",
-        { requireParameterParentheses: true, requireBodyBraces: false },
-      ],
-      "sonarjs/shorthand-property-grouping": "off",
-      // The project has no per-file copyright header convention.
-      "sonarjs/file-header": "off",
-      // Literal labels and validator values do not need shared constants merely because they repeat.
-      "sonarjs/no-duplicate-string": "off",
-      // Nesting and breaks in linear flow make a function hard to follow; this
-      // is not a size limit. Split a function along its steps, not arbitrarily.
-      "sonarjs/cognitive-complexity": ["error", 15],
-      // These limits measure syntax or size rather than a module's responsibility.
-      "sonarjs/cyclomatic-complexity": "off",
-      "sonarjs/expression-complexity": "off",
-      "sonarjs/nested-control-flow": "off",
-      "sonarjs/max-lines": "off",
-      "sonarjs/max-lines-per-function": "off",
-      // Named unions, early exits, optional branches, and compact multi-way values are deliberate.
-      "sonarjs/max-union-size": "off",
-      "sonarjs/too-many-break-or-continue-in-loop": "off",
-      "sonarjs/elseif-without-else": "off",
-      "sonarjs/no-nested-conditional": "off",
-      // Undefined clears Convex fields and represents absent local state.
-      "sonarjs/no-undefined-assignment": "off",
-      // SDK namespace imports and PascalCase React components are standard here.
-      "sonarjs/no-wildcard-import": "off",
-      "sonarjs/function-name": ["error", { format: "^[_a-zA-Z][a-zA-Z0-9]*$" }],
-      // ISO dates and stable identifiers use lexical ordering.
-      "sonarjs/strings-comparison": "off",
-      // TypeScript handles type compatibility; Sonar reports overlapping unions as disjoint.
-      "sonarjs/different-types-comparison": "off",
-      // The TypeScript rule supports intentional omission through rest destructuring.
-      "sonarjs/no-unused-vars": "off",
-      // Expo and Convex require specific entry filenames.
-      "sonarjs/file-name-differ-from-class": "off",
-    },
-  },
-  {
     files: ["**/*.{ts,tsx,mts}"],
-    plugins: {
-      "@typescript-eslint": require("@typescript-eslint/eslint-plugin"),
-    },
+    plugins: { sonarjs, kvitto },
+    linterOptions: { reportUnusedDisableDirectives: "error" },
     languageOptions: {
+      // The app runs in React Native and browsers; the backend and tools run in Node.
+      globals: {
+        ...globals.browser,
+        ...globals.node,
+        __DEV__: "readonly",
+        ErrorUtils: "readonly",
+      },
       parser: require("@typescript-eslint/parser"),
       parserOptions: {
         project: "./tsconfig.eslint.json",
@@ -101,46 +57,7 @@ module.exports = defineConfig([
       "kvitto/no-ore-arithmetic": "error",
       // Dates change only through the CalendarDate and CalendarMonth operations.
       "kvitto/no-calendar-string-ops": "error",
-      "react/no-array-index-key": "error",
-      "react/jsx-no-useless-fragment": ["error", { allowExpressions: true }],
-      // Navigation options such as `headerRight` take render functions.
-      "react/no-unstable-nested-components": ["error", { allowAsProps: true }],
-      "@typescript-eslint/no-deprecated": "error",
-      // Rest destructuring deliberately omits persisted metadata.
-      "@typescript-eslint/no-unused-vars": [
-        "warn",
-        { ignoreRestSiblings: true, argsIgnorePattern: "^_" },
-      ],
-      // `any` disables checking; parse external data into declared types instead.
-      "@typescript-eslint/no-explicit-any": "error",
-      "@typescript-eslint/no-unsafe-assignment": "error",
-      "@typescript-eslint/no-unsafe-member-access": "error",
-      "@typescript-eslint/no-unsafe-argument": "error",
-      "@typescript-eslint/no-unsafe-return": "error",
-      "@typescript-eslint/no-unsafe-call": "error",
-      "@typescript-eslint/no-unsafe-function-type": "error",
-      "@typescript-eslint/no-unnecessary-type-assertion": "error",
-      // Index reads include undefined (noUncheckedIndexedAccess), so a guard the
-      // type already rules out is dead code.
-      "@typescript-eslint/no-unnecessary-condition": [
-        "error",
-        { allowConstantLoopConditions: "only-allowed-literals" },
-      ],
-      "@typescript-eslint/ban-ts-comment": [
-        "error",
-        { "ts-expect-error": "allow-with-description" },
-      ],
-      // A dropped promise loses its failure and its ordering.
-      "@typescript-eslint/no-floating-promises": "error",
-      "@typescript-eslint/no-misused-promises": "error",
-      "@typescript-eslint/await-thenable": "error",
-      "@typescript-eslint/only-throw-error": "error",
-      "@typescript-eslint/prefer-promise-reject-errors": "error",
-      "@typescript-eslint/no-base-to-string": "error",
-      "@typescript-eslint/switch-exhaustiveness-check": [
-        "error",
-        { considerDefaultExhaustiveForUnions: true },
-      ],
+      ...sonarjsRules("eslint"),
     },
   },
   {
@@ -150,160 +67,5 @@ module.exports = defineConfig([
   {
     files: ["src/lib/domain/calendar.ts"],
     rules: { "kvitto/no-calendar-string-ops": "off" },
-  },
-  {
-    files: ["**/*.{ts,tsx,mts}"],
-    ignores: ["**/*.test.{ts,tsx}"],
-    // Parse absent values once at a boundary instead of asserting them present.
-    rules: { "@typescript-eslint/no-non-null-assertion": "error" },
-  },
-  {
-    files: ["**/*.{js,cjs,mjs}"],
-    // Expo, Metro and ESLint configuration and rule tests use CommonJS.
-    rules: { "sonarjs/no-require-or-define": "off" },
-  },
-  {
-    files: ["convex/**/*.ts"],
-    // Convex commands deliberately return null after every successful write.
-    rules: { "sonarjs/no-invariant-returns": "off" },
-  },
-  {
-    files: ["src/**/*.{ts,tsx}", "convex/**/*.ts"],
-    ignores: ["**/*.test.ts"],
-    rules: { "kvitto/no-inline-literal-set": "error" },
-  },
-  {
-    files: ["src/**/*.{ts,tsx}", "convex/**/*.ts"],
-    rules: {
-      "import/no-cycle": ["error", { ignoreExternal: true }],
-    },
-  },
-  {
-    files: ["src/**/*.tsx"],
-    // expo-widgets serializes each "widget" function to a string, so widgets
-    // cannot read theme values from module scope and keep their literals.
-    ignores: ["src/widgets/**"],
-    rules: {
-      "no-restricted-syntax": [
-        "error",
-        {
-          selector: "Literal[value=/^#[0-9a-f]{3,8}$|^rgba?\\(/i]",
-          message: "Add a theme token in src/constants/theme.ts.",
-        },
-      ],
-    },
-  },
-  {
-    files: ["src/lib/**/*.ts", "convex/**/*.ts"],
-    ignores: ["**/*.test.ts"],
-    rules: {
-      // Dependencies point inward: screens and features use lib; lib and the
-      // backend never import screens, features, or components.
-      "import/no-restricted-paths": [
-        "error",
-        {
-          zones: [
-            {
-              target: ["./src/lib", "./convex"],
-              from: ["./src/app", "./src/features", "./src/components"],
-            },
-            {
-              target: ["./src/lib", "./convex"],
-              from: ["./src/lib/testing"],
-              message: "Test helpers are for tests only.",
-            },
-          ],
-        },
-      ],
-    },
-  },
-  {
-    files: ["src/**/*.{ts,tsx}"],
-    rules: {
-      "no-restricted-properties": [
-        "error",
-        {
-          property: "toSorted",
-          message:
-            "Supported Hermes clients lack Array.toSorted. Copy the array before calling sort.",
-        },
-      ],
-    },
-  },
-  {
-    files: ["src/app/**/*.{ts,tsx}", "src/features/**/*.{ts,tsx}"],
-    rules: {
-      "no-restricted-syntax": [
-        "error",
-        {
-          // Convex puts its request trace in Error.message; the user message is in the error data.
-          selector: 'CatchClause MemberExpression[property.name="message"]',
-          message:
-            "Show failureMessage(cause, operation, fallback) instead of a caught error's message.",
-        },
-      ],
-    },
-  },
-  {
-    files: ["src/lib/domain/**/*.ts", "src/lib/catalog/**/*.ts"],
-    rules: {
-      // Domain rules stay pure so tests and the backend can run them.
-      "no-restricted-imports": [
-        "error",
-        {
-          patterns: [
-            {
-              regex: "^(react|react-native|expo[^/]*|convex/react)(/|$)",
-              message: "Domain code must not depend on React or Expo.",
-            },
-            {
-              regex: "^@/(app|features|components)/",
-              message: "Domain code must not depend on UI modules.",
-            },
-          ],
-        },
-      ],
-    },
-  },
-  {
-    files: ["convex/**/*.ts"],
-    ignores: ["**/*.test.ts", "convex/providerConfig.ts"],
-    rules: {
-      "no-restricted-properties": [
-        "error",
-        ...["RECEIPT_PROVIDER", "OPENAI_API_KEY", "OPENAI_RECEIPT_MODEL"].map(
-          (property) => ({
-            object: "env",
-            property,
-            message:
-              "Use providerConfig so a missing receipt reader key fails instead of changing receipt data.",
-          }),
-        ),
-      ],
-    },
-  },
-  {
-    files: ["convex/**/*.ts"],
-    ignores: ["**/*.test.ts"],
-    rules: {
-      "kvitto/no-db-query-filter": "error",
-      "kvitto/no-unbounded-collect": "error",
-      "kvitto/no-silent-catch": "error",
-      "kvitto/structured-log": "error",
-      "kvitto/convex-function-access": [
-        "error",
-        {
-          builders: ["query", "mutation", "action"],
-          checks: [
-            "requireMember",
-            "requireReceipt",
-            "requireCorrection",
-            "getUserIdentity",
-            "safeGetAuthUser",
-            "getAuthUser",
-          ],
-        },
-      ],
-    },
   },
 ]);

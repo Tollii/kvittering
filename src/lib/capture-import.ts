@@ -21,14 +21,14 @@ export function createImportQueue() {
 
   return {
     snapshot: () => batches,
-    subscribe(listener: () => void) {
+    subscribe: (listener: () => void) => {
       listeners.add(listener);
 
       return () => {
         listeners.delete(listener);
       };
     },
-    offer(files: ImportedFile[]) {
+    offer: (files: ImportedFile[]) => {
       if (!files.length) return;
       sequence++;
       publish([
@@ -36,7 +36,7 @@ export function createImportQueue() {
         { id: sequence, files: [...files], state: "pending" },
       ]);
     },
-    claim(id: number): ImportBatch | null {
+    claim: (id: number): ImportBatch | null => {
       const batch = batches.find(
         (item) => item.id === id && item.state === "pending",
       );
@@ -50,7 +50,7 @@ export function createImportQueue() {
 
       return batch;
     },
-    finish(id: number, outcome: ImportOutcome) {
+    finish: (id: number, outcome: ImportOutcome) => {
       if (outcome === "completed")
         publish(batches.filter((item) => item.id !== id));
       else
@@ -62,7 +62,7 @@ export function createImportQueue() {
           ),
         );
     },
-    retry(id: number) {
+    retry: (id: number) => {
       publish(
         batches.map((item) =>
           item.id === id && item.state === "failed"
@@ -71,7 +71,7 @@ export function createImportQueue() {
         ),
       );
     },
-    dismiss(id: number) {
+    dismiss: (id: number) => {
       publish(
         batches.filter((item) => item.id !== id || item.state === "claimed"),
       );

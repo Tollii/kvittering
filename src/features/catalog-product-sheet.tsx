@@ -305,7 +305,7 @@ export function CatalogProductSheet({
             )}
             {prices.data?.prices.map((price, index) => (
               <Row
-                // eslint-disable-next-line react/no-array-index-key -- Provider prices have no identity and are never reordered.
+                // oxlint-disable-next-line react/no-array-index-key -- Provider prices have no identity and are never reordered.
                 key={`${price.store}-${index}`}
                 title={price.store}
                 detail={

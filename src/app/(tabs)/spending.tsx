@@ -15,7 +15,6 @@ import {
   type SpendingSelection,
   type SpendingDimension,
 } from "@/lib/spending-selection";
-import { spendingCalendar } from "@/lib/domain/insights";
 import {
   useCompleteReceipts,
   useInitialSpendingTotals,
@@ -43,6 +42,7 @@ import { useHousehold } from "@/features/household-context";
 import {
   comparisonInsights,
   receiptCoverage,
+  spendingCalendar,
   type SpendingGroup,
 } from "@/lib/domain/insights";
 import { isDiscountLine } from "@/lib/domain/receipt";

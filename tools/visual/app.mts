@@ -255,7 +255,7 @@ const maxMediaBytes = 9_000_000;
 
 function ffmpeg(args: string[], output: string) {
   execFileSync(
-    // eslint-disable-next-line sonarjs/no-os-command-from-path -- ffmpeg comes from the environment's setup script; see the visual-check skill.
+    // oxlint-disable-next-line sonarjs/no-os-command-from-path -- ffmpeg comes from the environment's setup script; see the visual-check skill.
     "ffmpeg",
     ["-y", "-loglevel", "error", ...args, output],
     { stdio: "inherit" },

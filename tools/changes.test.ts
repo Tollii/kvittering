@@ -27,7 +27,7 @@ function repository(branch: string) {
   directories.push(directory);
 
   const git = (...args: string[]) =>
-    // eslint-disable-next-line sonarjs/no-os-command-from-path -- Exercise the contributor's Git against a disposable repository.
+    // oxlint-disable-next-line sonarjs/no-os-command-from-path -- Exercise the contributor's Git against a disposable repository.
     execFileSync("git", args, {
       cwd: directory,
       encoding: "utf8",

@@ -15,7 +15,8 @@ export type Ore = number & { readonly [oreBrand]: true };
 
 /** Typed text read as an amount, or the reason it cannot be one. */
 export type OreInput =
-  { kind: "amount"; ore: Ore | null } | { kind: "invalid"; message: string };
+  | { kind: "amount"; ore: Ore | null }
+  | { kind: "invalid"; message: string };
 
 /** Amounts a person can enter: up to one million kroner either way. */
 const inputLimit = 100_000_000;
@@ -36,7 +37,6 @@ function of(value: number): Ore {
 const zero = of(0);
 
 // The type and its operations share one name, as with Date or Number.
-// eslint-disable-next-line @typescript-eslint/no-redeclare -- A companion object names the operations on the Ore type.
 export const Ore = {
   zero,
 
@@ -90,6 +90,7 @@ export const Ore = {
 
   subtract: (a: Ore, b: Ore): Ore => of(a - b),
 
+  // oxlint-disable-next-line typescript/no-unsafe-unary-minus -- Ore is a number; the rule does not see through the brand.
   negate: (amount: Ore): Ore => of(-amount),
 
   abs: (amount: Ore): Ore => of(Math.abs(amount)),

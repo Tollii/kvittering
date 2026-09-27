@@ -2,7 +2,7 @@
 import { execFileSync, spawnSync } from "node:child_process";
 
 export function git(args: string[]): string[] {
-  // eslint-disable-next-line sonarjs/no-os-command-from-path -- Git is the contributor's own installation; the repository cannot pin its path.
+  // oxlint-disable-next-line sonarjs/no-os-command-from-path -- Git is the contributor's own installation; the repository cannot pin its path.
   return execFileSync("git", args, { encoding: "utf8" })
     .split("\n")
     .filter(Boolean);
@@ -11,7 +11,7 @@ export function git(args: string[]): string[] {
 /** The common ancestor with main; fail if committed changes cannot be identified. */
 export function mergeBase(): string {
   for (const branch of ["origin/main", "main"]) {
-    // eslint-disable-next-line sonarjs/no-os-command-from-path -- Git is the contributor's own installation; the repository cannot pin its path.
+    // oxlint-disable-next-line sonarjs/no-os-command-from-path -- Git is the contributor's own installation; the repository cannot pin its path.
     const result = spawnSync("git", ["merge-base", "HEAD", branch], {
       encoding: "utf8",
     });

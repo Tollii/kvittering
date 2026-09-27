@@ -44,6 +44,7 @@ export async function releaseMutation<
         durationMs: Date.now() - started,
       });
 
+    // oxlint-disable-next-line typescript/no-unsafe-return -- typescript-go resolves FunctionReturnType<M> to any here; TypeScript resolves the declared type.
     return result;
   } catch (error) {
     throw releaseError(error, operation, {

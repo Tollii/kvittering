@@ -9,12 +9,11 @@
 // The asynchronous functions are the package's own. Remove this file when
 // expo-sqlite fixes these.
 
-/* eslint-disable import/no-unresolved -- Metro resolves this name to the package's WorkerChannel; see metro.config.js. */
+// Metro resolves this name to the package's WorkerChannel; see metro.config.js.
 export {
   invokeWorkerAsync,
   workerMessageHandler,
 } from "expo-sqlite-web-worker-channel";
-/* eslint-enable import/no-unresolved */
 
 const pending = 1;
 

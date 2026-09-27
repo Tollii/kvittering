@@ -1,4 +1,4 @@
-/** Repository rules shared by ESLint and Oxlint. */
+/** Repository rules. Oxlint runs them, except the rules that read TypeScript types, which ESLint runs. */
 const { existsSync } = require("node:fs");
 
 const path = require("node:path");

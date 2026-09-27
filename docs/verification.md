@@ -142,9 +142,11 @@ and fails more precisely than the next.
    `reviewed-receipts` fixture is an example with three reviewed receipts.
    `npm run check` validates every fixture against the real table validators.
    Per-flow seed logs, reports, and screenshots are in `build/e2e/flows/`.
-6. **A repository-wide rule**: a lint rule in `tools/eslint`, with valid and
-   invalid cases in `tools/eslint/rules.test.cjs`. Its message must say how to
-   fix the finding. Prefer this to a sentence in a document that asks people to
+6. **A repository-wide rule**: a lint rule in `tools/lint-rules`, with valid and
+   invalid cases in `tools/lint-rules/rules.test.cjs`. Its message must say how to
+   fix the finding. Enable it in [oxlint.config.mts](../oxlint.config.mts). A
+   rule that reads TypeScript types goes in [eslint.config.js](../eslint.config.js)
+   instead, because Oxlint gives JavaScript plugins no type information. Prefer this to a sentence in a document that asks people to
    remember something.
 
 ## Prove the check can fail

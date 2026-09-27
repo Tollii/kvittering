@@ -42,6 +42,7 @@ export function ReceiptRenderBoundary({
           componentStack: diagnosticText(componentStack),
         });
       }}
+      // oxlint-disable-next-line typescript/unbound-method -- Sentry passes a bound reset function.
       fallback={({ resetError }) => (
         <Screen title="Kunne ikke åpne kvitteringen" insetTop={false}>
           <Notice tone="error">Prøv å åpne kvitteringen igjen.</Notice>

@@ -1,16 +1,14 @@
 import { SegmentedControl } from "@expo/ui/community/segmented-control";
-import {
-  InputAccessoryView,
-  Keyboard,
-  Platform,
-  useWindowDimensions,
-} from "react-native";
 import { useId, useState } from "react";
 import {
   ActivityIndicator,
+  InputAccessoryView,
+  Keyboard,
+  Platform,
   Pressable,
   Switch,
   TextInput,
+  useWindowDimensions,
   View,
   type StyleProp,
   type TextInputProps,

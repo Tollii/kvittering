@@ -47,6 +47,8 @@ reviews:
     # CI runs these with the repository's own configuration.
     eslint:
       enabled: false
+    oxc:
+      enabled: false
     biome:
       enabled: false
     markdownlint:

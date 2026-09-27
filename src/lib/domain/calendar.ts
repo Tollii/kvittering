@@ -68,7 +68,6 @@ function monthParts(month: string) {
 }
 
 // The types and their operations share names, as with Date or Number.
-// eslint-disable-next-line @typescript-eslint/no-redeclare -- A companion object names the operations on the CalendarDate type.
 export const CalendarDate = {
   /** A real calendar date in "YYYY-MM-DD" form, or null. */
   parse(text: string): CalendarDate | null {
@@ -153,7 +152,6 @@ export const CalendarDate = {
     date ? readable.format(CalendarDate.toNoon(date)) : "Dato ukjent",
 };
 
-// eslint-disable-next-line @typescript-eslint/no-redeclare -- A companion object names the operations on the CalendarMonth type.
 export const CalendarMonth = {
   /** A real month in "YYYY-MM" form, or null. */
   parse(text: string): CalendarMonth | null {

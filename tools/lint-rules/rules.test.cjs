@@ -8,17 +8,24 @@ const { spawnSync } = require("node:child_process");
 
 const { join } = require("node:path");
 
-const { RuleTester } = require("eslint");
+const { RuleTester } = require("oxlint/plugins-dev");
+
+const { RuleTester: TypedRuleTester } = require("eslint");
 
 const parser = require("@typescript-eslint/parser");
 
 const plugin = require("./index.cjs");
 
-RuleTester.describe = describe;
+for (const Tester of [RuleTester, TypedRuleTester]) {
+  Tester.describe = describe;
+  Tester.it = it;
+}
 
-RuleTester.it = it;
-
-const tester = new RuleTester({ languageOptions: { parser } });
+// Oxlint runs most repository rules. ESLint runs the rules that need a
+// TypeScript program, so their tests use its tester below.
+const tester = new RuleTester({
+  languageOptions: { parserOptions: { lang: "tsx" } },
+});
 
 tester.run("no-undefined-record", plugin.rules["no-undefined-record"], {
   valid: [
@@ -141,20 +148,20 @@ tester.run("convex-function-access", plugin.rules["convex-function-access"], {
   })),
 });
 
-const typedTester = new RuleTester({
+const typedTester = new TypedRuleTester({
   languageOptions: {
     parser,
     parserOptions: {
       ecmaFeatures: { jsx: true },
       project: "./tsconfig.json",
-      tsconfigRootDir: join(process.cwd(), "tools", "eslint", "fixtures"),
+      tsconfigRootDir: join(process.cwd(), "tools", "lint-rules", "fixtures"),
     },
   },
 });
 
 const typed = (code) => ({
   code,
-  filename: join(process.cwd(), "tools", "eslint", "fixtures", "file.tsx"),
+  filename: join(process.cwd(), "tools", "lint-rules", "fixtures", "file.tsx"),
 });
 
 typedTester.run("no-leaked-render", plugin.rules["no-leaked-render"], {
@@ -225,7 +232,7 @@ typedTester.run(
   },
 );
 
-const fixtures = join(process.cwd(), "tools", "eslint", "fixtures");
+const fixtures = join(process.cwd(), "tools", "lint-rules", "fixtures");
 
 const variant = join(fixtures, "file.ios.tsx");
 
@@ -268,7 +275,7 @@ tester.run(
   },
 );
 
-it("runs the same rule in the repository Oxlint configuration", () => {
+void it("runs the same rule in the repository Oxlint configuration", () => {
   const directory = mkdtempSync(join(process.cwd(), "tools", "rule-test-"));
 
   try {
@@ -283,7 +290,7 @@ it("runs the same rule in the repository Oxlint configuration", () => {
       [
         "node_modules/oxlint/bin/oxlint",
         "--config",
-        ".oxlintrc.json",
+        "oxlint.config.mts",
         "--format",
         "json",
         file,
