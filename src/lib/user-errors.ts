@@ -32,7 +32,6 @@ export class UserError extends Error {
 }
 
 /** Read a user error from a Convex failure. Older or unknown payloads return null. */
-// oxlint-disable-next-line anti-slop/no-unknown-parameters -- This boundary parser validates caught errors before returning a domain value.
 export function parseUserError(cause: unknown): UserError | null {
   if (cause instanceof UserError) return cause;
 

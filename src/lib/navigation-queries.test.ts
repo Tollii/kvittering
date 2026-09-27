@@ -4,7 +4,6 @@ import { receiptFixture } from "./testing/receipts";
 import type { ReceiptCacheSnapshot } from "./receipt-cache";
 import { z } from "zod";
 import { createElement, StrictMode, act } from "react";
-// eslint-disable-next-line sonarjs/deprecation -- The installed React Native test renderer exercises subscription lifecycle behavior.
 import { create, type ReactTestRenderer } from "react-test-renderer";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { ConvexProvider, ConvexReactClient } from "convex/react";
@@ -58,7 +57,7 @@ let subscriptions: Map<string, Subscription>;
 
 let client: ConvexReactClient;
 
-// eslint-disable-next-line sonarjs/deprecation, @typescript-eslint/no-deprecated -- The installed React Native test renderer exercises subscription lifecycle behavior.
+// oxlint-disable-next-line typescript/no-deprecated -- The installed React Native test renderer exercises subscription lifecycle behavior.
 let renderer: ReactTestRenderer | undefined;
 
 beforeEach(() => {
@@ -157,7 +156,7 @@ async function show(component: (() => null) | null, scope = "household-a") {
 
   await act(async () => {
     if (renderer) renderer.update(tree);
-    // eslint-disable-next-line sonarjs/deprecation, @typescript-eslint/no-deprecated -- The installed React Native test renderer exercises subscription lifecycle behavior.
+    // oxlint-disable-next-line typescript/no-deprecated -- The installed React Native test renderer exercises subscription lifecycle behavior.
     else renderer = create(tree);
   });
 }

@@ -20,6 +20,7 @@ test("captures a render failure with its component and safe editor state, then r
   const events: string[] = [];
   Sentry.init({
     dsn: "https://public@example.com/1",
+    // oxlint-disable-next-line typescript/no-deprecated -- The test matches the application's Sentry options.
     sendDefaultPii: false,
     beforeSend: (event) => prepareErrorEvent(event),
     transport: () => ({

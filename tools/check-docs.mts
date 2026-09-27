@@ -63,7 +63,7 @@ for (const document of documents) {
 
 // Lint messages and review configuration also send agents to documents.
 for (const file of trackedFiles([
-  "tools/eslint/*.cjs",
+  "tools/lint-rules/*.cjs",
   ".coderabbit.yaml",
   ".github/*.yml",
 ]))
@@ -84,7 +84,7 @@ if (problems.length > 0) {
 }
 
 function trackedFiles(patterns: string[]): string[] {
-  // eslint-disable-next-line sonarjs/no-os-command-from-path -- Git is the contributor's own installation; the repository cannot pin its path.
+  // oxlint-disable-next-line sonarjs/no-os-command-from-path -- Git is the contributor's own installation; the repository cannot pin its path.
   return execFileSync("git", ["ls-files", ...patterns], { encoding: "utf8" })
     .split("\n")
     .filter(Boolean);

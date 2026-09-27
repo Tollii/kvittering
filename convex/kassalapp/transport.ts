@@ -41,14 +41,16 @@ export async function kassalappFetch<T>(
   if (!request)
     throw new Error("Catalog requests require a quota-controlled transport.");
 
+  // Headers reads every HeadersInit form; spreading an array or a Headers
+  // object into an object literal would drop the caller's headers.
+  const headers = new Headers(requestOptions.headers);
+  headers.set("Accept", "application/json");
+  headers.set("Authorization", `Bearer ${key}`);
+
   const response = await request(url, {
     ...requestOptions,
     signal: AbortSignal.timeout(15000),
-    headers: {
-      ...options?.headers,
-      Accept: "application/json",
-      Authorization: `Bearer ${key}`,
-    },
+    headers,
   });
 
   if (!response.ok)

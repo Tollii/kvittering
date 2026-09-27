@@ -11,7 +11,8 @@ export class ProviderConfigurationError extends Error {
 }
 
 export type ReceiptReader =
-  { kind: "mock" } | { kind: "openai"; apiKey: string; model: string };
+  | { kind: "mock" }
+  | { kind: "openai"; apiKey: string; model: string };
 
 /** Only an explicit `RECEIPT_PROVIDER=mock` reads the sample receipt. */
 export function receiptReader(): ReceiptReader {
@@ -37,7 +38,8 @@ export function receiptReader(): ReceiptReader {
 }
 
 export type ProductModel =
-  { kind: "disabled" } | { kind: "typesafe"; apiKey: string; model: string };
+  | { kind: "disabled" }
+  | { kind: "typesafe"; apiKey: string; model: string };
 
 /**
  * Receipt product judgments are optional. Without a key, or while the mock

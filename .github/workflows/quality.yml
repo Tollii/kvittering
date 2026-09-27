@@ -74,8 +74,10 @@ jobs:
         run: npm ci
       - name: Check formatting, types, lint rules, documentation, and tests
         # Tests run in random order; the seed reproduces a failure locally.
+        # Oxlint findings appear as annotations on the pull request.
         env:
           SEED: ${{ github.run_id }}
+          OXLINT_FORMAT: github
         run: |
           echo "Test order seed: $SEED (npx vitest run --sequence.seed=$SEED)"
           npm run check:fast

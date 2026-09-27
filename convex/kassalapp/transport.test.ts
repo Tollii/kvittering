@@ -26,6 +26,23 @@ it("adapts OpenAPI boolean query values to Kassalapp's accepted encoding", async
   ).toBe("Bearer test-key");
 });
 
+const headerPairs: [string, string][] = [["X-Request-Id", "receipt-1"]];
+
+it.each([
+  ["a Headers object", new Headers(headerPairs)],
+  ["header pairs", headerPairs],
+])("forwards caller headers given as %s", async (_, headers) => {
+  const fetch = vi
+    .fn<typeof globalThis.fetch>()
+    .mockResolvedValue(new Response('{"data":[]}', { status: 200 }));
+
+  vi.stubGlobal("fetch", fetch);
+  await kassalappFetch("/products", { fetch: globalThis.fetch, headers });
+  const sent = new Headers(present(fetch.mock.calls[0])[1]?.headers);
+  expect(sent.get("X-Request-Id")).toBe("receipt-1");
+  expect(sent.get("Authorization")).toBe("Bearer test-key");
+});
+
 it("retains the rate-limit status and Retry-After delay", async () => {
   vi.stubGlobal(
     "fetch",

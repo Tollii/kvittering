@@ -10,6 +10,7 @@ if (sentryEnabled) {
     // This public ingestion address identifies the project. It is not an API token.
     dsn: "https://367c807fd9918897c076cc5d1a9208c9@o4511198613274624.ingest.de.sentry.io/4512110188167248",
     environment: installedRelease.channel,
+    // oxlint-disable-next-line typescript/no-deprecated -- Replacing it with dataCollection changes what Sentry collects; that needs its own review.
     sendDefaultPii: false,
     replaysSessionSampleRate: 0.1,
     replaysOnErrorSampleRate: 1.0,

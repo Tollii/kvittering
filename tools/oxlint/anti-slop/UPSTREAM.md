@@ -8,6 +8,6 @@ The general plugin, rules, shared helpers, and third-party notices are copied
 without source changes. Effect-specific rules and upstream test files are omitted.
 The local package.json declares ES modules for Node's TypeScript loader.
 
-All exported general rules are enabled by `oxlint.policy.config.mjs`. When updating,
+All exported general rules are enabled by `oxlint.config.mts`. When updating,
 review the upstream diff, preserve licenses, and run the complete quality checks.
 Do not add a baseline to hide findings.

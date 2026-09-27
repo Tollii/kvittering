@@ -1,6 +1,5 @@
 import { unclearCategoryId } from "../src/lib/domain/categories";
 import { userError } from "./userErrors";
-import { hasReceiptBeenRead } from "../src/lib/domain/receipt-state";
 import { consumeWorkQuota, type QuotaActor } from "./rateLimits";
 import { trackWorkflow } from "./retention";
 import { featureEnabled } from "./featureFlags";
@@ -33,6 +32,7 @@ import { catalogProductValidator } from "../src/lib/catalog/model";
 import { lineValidator } from "../src/lib/domain/receipt";
 import {
   extractedReceipt,
+  hasReceiptBeenRead,
   type ExtractedReceipt,
 } from "../src/lib/domain/receipt-state";
 import { getOrInsert } from "../src/lib/map-cache";

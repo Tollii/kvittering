@@ -11,7 +11,6 @@ const messageDataSchema = z.object({ data: z.string().min(1).max(500) });
  * wrote for the person, or the fallback. Convex puts its request trace in
  * `Error.message` and platform failures are in English, so neither is shown.
  */
-// oxlint-disable-next-line anti-slop/no-unknown-parameters -- This boundary reads caught errors before choosing the text to show.
 export function failureMessage(
   cause: unknown,
   operation: string,

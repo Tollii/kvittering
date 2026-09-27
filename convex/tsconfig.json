@@ -7,6 +7,8 @@
     /* These settings are not required by Convex and can be modified. */
     "allowJs": true,
     "strict": true,
+    /* Index reads include undefined, as in the app project. */
+    "noUncheckedIndexedAccess": true,
     "moduleResolution": "Bundler",
     "jsx": "react-jsx",
     "skipLibCheck": true,

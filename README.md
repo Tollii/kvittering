@@ -70,12 +70,12 @@ For push, configure Apple credentials and use a signed physical iPhone. For Appl
 
 ## Source references
 
-| Concern                                           | Source of truth                                                                                                                                               |
-| ------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Build identities, capabilities, and native assets | [app.json](app.json), [plugins](plugins/), [native module](modules/receipt-intelligence/)                                                                     |
-| Release commands and credentials                  | [package.json](package.json), [TestFlight workflow](.github/workflows/testflight.yml), [OTA workflow](.github/workflows/ota.yml)                              |
-| Diagnostics and redaction                         | [Sentry initialization](src/lib/sentry.ts), [event handling](src/lib/sentry-event.ts)                                                                         |
-| Formatting, lint, and coverage                    | [Prettier](.prettierrc.json), [ESLint](eslint.config.js), [Oxlint](.oxlintrc.json), [repository rules](oxlint.policy.config.mjs), [Vitest](vitest.config.mts) |
+| Concern                                           | Source of truth                                                                                                                  |
+| ------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------- |
+| Build identities, capabilities, and native assets | [app.json](app.json), [plugins](plugins/), [native module](modules/receipt-intelligence/)                                        |
+| Release commands and credentials                  | [package.json](package.json), [TestFlight workflow](.github/workflows/testflight.yml), [OTA workflow](.github/workflows/ota.yml) |
+| Diagnostics and redaction                         | [Sentry initialization](src/lib/sentry.ts), [event handling](src/lib/sentry-event.ts)                                            |
+| Formatting, lint, and coverage                    | [oxfmt](.oxfmtrc.jsonc), [Oxlint](oxlint.config.mts), [type-dependent rules](eslint.config.js), [Vitest](vitest.config.mts)      |
 
 Do not copy constants, enabled rules, event catalogs, or feature inventories into documentation. Explain a constraint or procedure only when the code does not make it clear.
 
