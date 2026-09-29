@@ -70,7 +70,7 @@
     "@oxlint/plugins": "1.85.0",
     "@playwright/test": "1.56.1",
     "@react-native/jest-preset": "^0.86.3",
-    "@sentry/browser": "^10.75.1",
+    "@sentry/browser": "^11.0.0",
     "@stryker-mutator/core": "^10.0.0",
     "@testing-library/react-native": "^14.0.1",
     "@types/node": "^26.6.2",
