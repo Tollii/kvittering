@@ -52,7 +52,7 @@ const legacyCatalogPricesValidator = v.array(
   v.object({ store: v.string(), priceOre: oreValidator, checkedAt: text }),
 );
 
-const legacyPricesLookupValidator = v.object({
+export const legacyPricesLookupValidator = v.object({
   kind: v.literal("prices"),
   productKey: v.string(),
 });
@@ -65,7 +65,11 @@ export const catalogRequestValidator = v.union(
     productKey: v.string(),
     id: v.number(),
   }),
-  // Legacy: may still be queued from before store prices were removed.
+);
+
+/** Legacy: rows queued before store prices were removed, until they drain. */
+export const storedCatalogRequestValidator = v.union(
+  ...catalogRequestValidator.members,
   legacyPricesLookupValidator.extend({ id: v.number(), ean: text }),
 );
 
@@ -123,8 +127,6 @@ export const catalogLookupValidator = v.union(
     receiptId: v.id("receipts"),
   }),
   v.object({ kind: v.literal("details"), productKey: v.string() }),
-  // Legacy: installed clients still request store prices.
-  legacyPricesLookupValidator,
 );
 
 export type CatalogLookup = Infer<typeof catalogLookupValidator>;

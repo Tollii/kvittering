@@ -810,3 +810,26 @@ it("answers installed clients' store price lookups without queuing provider work
     await t.run((ctx) => ctx.db.query("catalogRequests").take(10)),
   ).toHaveLength(0);
 });
+
+it("retires price requests queued before store prices were removed without provider work", async () => {
+  const { t } = await setup();
+
+  const id = await t.run((ctx) =>
+    ctx.db.insert("catalogRequests", {
+      key: JSON.stringify(["prices", "kassalapp:41"]),
+      request: { kind: "prices", productKey: "kassalapp:41", id: 41 },
+      state: "pending",
+      result: emptyCatalogResult(),
+      expiresAt: 0,
+      attempts: 0,
+      scheduledAt: Date.now(),
+    }),
+  );
+
+  expect(await t.mutation(internal.catalogQueue.claim, { id })).toBeNull();
+  expect(await t.query(internal.catalogQueue.read, { id })).toMatchObject({
+    state: "ready",
+    attempts: 0,
+    result: { products: [], stores: [] },
+  });
+});

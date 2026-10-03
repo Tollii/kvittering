@@ -108,9 +108,6 @@ async function fetchCatalogResult(
       );
 
       return result;
-    // Store prices were removed; a request queued before then resolves empty.
-    case "prices":
-      return result;
   }
 }
 

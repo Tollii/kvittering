@@ -8,7 +8,7 @@ export const day = 86_400_000;
 export const catalogDetailsTtl = 30 * day;
 
 export function normalizeRequest(request: CatalogRequest): CatalogRequest {
-  if (request.kind === "prices" || request.kind === "details") return request;
+  if (request.kind === "details") return request;
 
   const search =
     request.kind === "products"
@@ -24,7 +24,7 @@ export function normalizeRequest(request: CatalogRequest): CatalogRequest {
 export function requestKey(request: CatalogRequest) {
   const value = normalizeRequest(request);
 
-  if (value.kind === "prices" || value.kind === "details")
+  if (value.kind === "details")
     return JSON.stringify([value.kind, value.productKey]);
 
   // New searches must not reuse empty results from the previous retrieval rules.

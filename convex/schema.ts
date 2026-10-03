@@ -18,7 +18,7 @@ import { defineSchema, defineTable } from "convex/server";
 import { v } from "convex/values";
 import {
   catalogProductValidator,
-  catalogRequestValidator,
+  storedCatalogRequestValidator,
   catalogResultValidator,
   physicalStoreValidator,
 } from "../src/lib/catalog/model";
@@ -199,7 +199,7 @@ export default defineSchema({
       .object({ identity: v.string(), householdId: v.id("households") })
       .optional(),
     key: v.string(),
-    request: catalogRequestValidator,
+    request: storedCatalogRequestValidator,
     state: v.union(
       v.literal("pending"),
       v.literal("running"),

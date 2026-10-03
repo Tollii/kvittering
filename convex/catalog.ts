@@ -8,6 +8,7 @@ import {
 } from "../src/lib/catalog/policy";
 import {
   catalogLookupValidator,
+  legacyPricesLookupValidator,
   type CatalogLookup,
   type CatalogRequest,
   catalogResponseValidator,
@@ -35,6 +36,11 @@ const missingProduct = {
 };
 
 /** Installed clients still ask for store prices, which are no longer fetched. */
+const installedClientLookupValidator = v.union(
+  ...catalogLookupValidator.members,
+  legacyPricesLookupValidator,
+);
+
 const removedPrices: CatalogResponse = {
   ...emptyCatalogResponse(),
   status: "error",
@@ -51,13 +57,12 @@ async function ensureMemberRequest(ctx: MutationCtx, request: CatalogRequest) {
 /** Equivalent identities have no provider SKU from which to fetch details. */
 function equivalentResponse(
   record: Doc<"catalogProducts"> | null,
-  kind: CatalogLookup["kind"],
 ): CatalogResponse | null {
   return record?.product.equivalence
     ? {
         ...emptyCatalogResponse(),
         status: "ready",
-        products: kind === "details" ? [record.product] : [],
+        products: [record.product],
         fetchedAt: record.fetchedAt,
       }
     : null;
@@ -139,7 +144,7 @@ export const product = mutation({
       .withIndex("by_key", (q) => q.eq("key", key))
       .unique();
 
-    const equivalent = equivalentResponse(record, "details");
+    const equivalent = equivalentResponse(record);
 
     if (equivalent) return equivalent;
     const id = providerId(record);
@@ -188,8 +193,6 @@ async function lookupContext(ctx: QueryCtx, lookup: CatalogLookup) {
 
   await requireMember(ctx);
 
-  if (lookup.kind === "prices") return { request: null, record: null };
-
   if (lookup.kind === "products")
     return {
       request: normalizeRequest({
@@ -215,9 +218,15 @@ async function lookupContext(ctx: QueryCtx, lookup: CatalogLookup) {
 // Access: lookupContext requires household membership, and receipt access for store lookups.
 export const ensure = mutation({
   service: "productLookup",
-  args: { lookup: catalogLookupValidator },
+  args: { lookup: installedClientLookupValidator },
   returns: v.null(),
   handler: async (ctx, { lookup }) => {
+    if (lookup.kind === "prices") {
+      await requireMember(ctx);
+
+      return null;
+    }
+
     const { request, record } = await lookupContext(ctx, lookup);
 
     if (!request) return null;
@@ -236,14 +245,22 @@ export const ensure = mutation({
 
 // Access: lookupContext requires household membership, and receipt access for store lookups.
 export const observe = query({
-  args: { lookup: catalogLookupValidator, client: clientValidator.optional() },
+  args: {
+    lookup: installedClientLookupValidator,
+    client: clientValidator.optional(),
+  },
   returns: catalogResponseValidator,
   handler: async (ctx, { lookup, client }) => {
     await requireCompatibleClient(ctx, client, "productLookup");
-    const { request, record } = await lookupContext(ctx, lookup);
 
-    if (lookup.kind === "prices") return removedPrices;
-    const equivalent = equivalentResponse(record, lookup.kind);
+    if (lookup.kind === "prices") {
+      await requireMember(ctx);
+
+      return removedPrices;
+    }
+
+    const { request, record } = await lookupContext(ctx, lookup);
+    const equivalent = equivalentResponse(record);
 
     if (equivalent) return equivalent;
 
