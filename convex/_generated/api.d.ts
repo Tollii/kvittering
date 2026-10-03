@@ -95,6 +95,7 @@ import type * as providerConfig from "../providerConfig.js";
 import type * as providerTransport from "../providerTransport.js";
 import type * as providers from "../providers.js";
 import type * as pushDelivery from "../pushDelivery.js";
+import type * as readingEvaluation from "../readingEvaluation.js";
 import type * as rateLimits from "../rateLimits.js";
 import type * as receiptChanges from "../receiptChanges.js";
 import type * as receiptPeriod from "../receiptPeriod.js";
@@ -202,6 +203,7 @@ declare const fullApi: ApiFromModules<{
   providerTransport: typeof providerTransport;
   providers: typeof providers;
   pushDelivery: typeof pushDelivery;
+  readingEvaluation: typeof readingEvaluation;
   rateLimits: typeof rateLimits;
   receiptChanges: typeof receiptChanges;
   receiptPeriod: typeof receiptPeriod;

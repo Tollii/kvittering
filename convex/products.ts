@@ -15,6 +15,7 @@ import schema from "./schema";
 import { requireReceipt } from "./access";
 import {
   lineValidator,
+  printedName,
   receiptLineNameLimit,
   type ReceiptLine,
 } from "../src/lib/domain/receipt";
@@ -49,7 +50,7 @@ export async function findMapping(
       q
         .eq("householdId", householdId)
         .eq("retailer", retailer)
-        .eq("key", matchingKey(line.receiptName ?? line.name)),
+        .eq("key", matchingKey(printedName(line))),
     )
     .unique();
 }
@@ -176,7 +177,7 @@ export async function saveMapping(
     revision: (existing?.revision ?? 0) + 1,
     householdId,
     retailer,
-    key: matchingKey(line.receiptName ?? line.name),
+    key: matchingKey(printedName(line)),
     productId,
     reference,
     confirmedBy,

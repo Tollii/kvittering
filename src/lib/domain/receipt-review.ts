@@ -1,5 +1,6 @@
 import { Ore } from "./ore";
 import {
+  categoryUncertainIssue,
   isCategoryUncertain,
   isReceiptLevelIssue,
   parseReceiptIssue,
@@ -120,6 +121,30 @@ export function balanceWithAdjustment(
   };
 }
 
+/** Put the classifier's answers on the read lines, flagging the ones a person must confirm. */
+export function applyClassifications(
+  data: ReceiptData,
+  classifications: readonly {
+    id: string;
+    categoryId: string;
+    confidence: number;
+  }[],
+) {
+  for (const result of classifications) {
+    const line = data.lines.find((line) => line.id === result.id);
+
+    if (!line) continue;
+    line.categoryId = result.categoryId;
+    line.confidence = result.confidence;
+
+    if (
+      result.confidence < categoryReviewThreshold ||
+      result.categoryId === unclearCategoryId
+    )
+      line.issues.push(categoryUncertainIssue);
+  }
+}
+
 /** Categories, product matching, and package information do not block receipt approval. */
 export function canAcceptReceipt(
   data: ReceiptData,
@@ -133,13 +158,31 @@ export function canAcceptReceipt(
   );
 }
 
+function printedTotal(data: ReceiptData, amountOre: Ore): string | null {
+  const row = data.lines.find(
+    (line) => line.kind === "summary" && line.amountOre === amountOre,
+  );
+
+  return row ? row.originalText.trim() || row.name : null;
+}
+
 export type ReviewTask =
   | { kind: "duplicate" }
   | { kind: "store" }
   | { kind: "total" }
   | { kind: "date" }
   | { kind: "currency" }
-  | { kind: "difference"; amountOre: Ore }
+  | {
+      kind: "difference";
+      amountOre: Ore;
+      /**
+       * The reader may have taken the wrong printed number as paid; the line
+       * sum is the alternative a person can confirm on the paper receipt. A
+       * printed summary row with that amount is evidence for it.
+       */
+      calculatedOre: Ore;
+      printedAs: string | null;
+    }
   | { kind: "no-lines" }
   | { kind: "amounts"; count: number }
   | { kind: "names"; count: number }
@@ -172,7 +215,12 @@ export function assessReceipt(
     totals.difference !== 0 &&
     totals.unknown === 0
   )
-    tasks.push({ kind: "difference", amountOre: totals.difference });
+    tasks.push({
+      kind: "difference",
+      amountOre: totals.difference,
+      calculatedOre: totals.calculated,
+      printedAs: printedTotal(data, totals.calculated),
+    });
 
   if (!data.lines.some((line) => line.kind === "product"))
     tasks.push({ kind: "no-lines" });

@@ -1,6 +1,8 @@
 import { present } from "../testing/receipts";
 import { expect, it } from "vitest";
 import { weeklyShopFixture } from "../mock-receipts";
+import { emptyLine } from "./receipt";
+import type { CategoryId } from "./categories";
 import {
   applyCategoryMemory,
   categoryMemoryKey,
@@ -17,18 +19,37 @@ it("keys memory on store and receipt name only", () => {
   expect(categoryMemoryKey("REMA 1000", " ")).toBeNull();
 });
 
-it("counts agreeing approvals and restarts on a correction", () => {
-  const first = recordCategoryDecision(null, "dairy.milk");
-  expect(first).toEqual({ categoryId: "dairy.milk", confirmations: 1 });
-  expect(recordCategoryDecision(first, "dairy.milk")).toEqual({
+it("counts agreeing approvals, restarts on a correction and trusts deliberate identifications", () => {
+  const line = (categoryId: CategoryId, name = "TINE LETTMELK") => ({
+    ...emptyLine("milk"),
+    name,
+    receiptName: "TINE LETTMELK",
+    categoryId,
+  });
+
+  const first = recordCategoryDecision(null, line("dairy.milk"), false);
+  expect(first).toEqual({
     categoryId: "dairy.milk",
-    confirmations: 2,
-  });
-  expect(recordCategoryDecision(first, "dairy.plant-milk")).toEqual({
-    categoryId: "dairy.plant-milk",
     confirmations: 1,
+    name: undefined,
   });
-  expect(recordCategoryDecision(null, "dairy.milk", 3).confirmations).toBe(3);
+  expect(
+    recordCategoryDecision(first, line("dairy.milk"), false).confirmations,
+  ).toBe(2);
+  expect(
+    recordCategoryDecision(first, line("dairy.plant-milk"), false)
+      .confirmations,
+  ).toBe(1);
+  expect(
+    recordCategoryDecision(null, line("dairy.milk"), true).confirmations,
+  ).toBe(categoryMemoryThreshold);
+  expect(
+    recordCategoryDecision(null, line("dairy.milk", "Lettmelk"), false),
+  ).toEqual({
+    categoryId: "dairy.milk",
+    confirmations: categoryMemoryThreshold,
+    name: "Lettmelk",
+  });
 });
 
 it("learns only from settled product lines", () => {

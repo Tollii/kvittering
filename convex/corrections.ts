@@ -17,6 +17,7 @@ import {
 import { categoryMemoryKey } from "../src/lib/domain/category-memory";
 import {
   classificationInputs,
+  printedName,
   type ReceiptData,
   type ReceiptLine,
 } from "../src/lib/domain/receipt";
@@ -154,7 +155,10 @@ function matches(
   correction: CategoryCorrection,
   line: ReceiptData["lines"][number],
 ) {
-  const key = categoryMemoryKey(correction.store, correction.name);
+  const key = categoryMemoryKey(
+    correction.store,
+    printedName(correction.evidence),
+  );
 
   return (
     receipt._id !== correction.receiptId &&
@@ -164,7 +168,7 @@ function matches(
     line.kind === "product" &&
     !line.manual &&
     line.categoryId !== correction.expected &&
-    categoryMemoryKey(receipt.data.store, line.name) === key
+    categoryMemoryKey(receipt.data.store, printedName(line)) === key
   );
 }
 

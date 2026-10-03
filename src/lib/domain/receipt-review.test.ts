@@ -1,9 +1,10 @@
 import { present } from "../testing/receipts";
 import { Ore } from "./ore";
 import { expect, it } from "vitest";
-import { reconcile } from "./receipt";
+import { emptyLine, reconcile } from "./receipt";
 import { batteryFixture, weeklyShopFixture } from "../mock-receipts";
 import {
+  applyClassifications,
   balanceWithAdjustment,
   canAcceptReceipt,
   canConfirmSuggestedCategory,
@@ -110,7 +111,12 @@ it("hides the total difference while amounts are still missing", () => {
   ]);
   present(data.lines[1]).amountOre = Ore.of(-100);
   expect(reviewTasks(data, false)).toEqual([
-    { kind: "difference", amountOre: Ore.of(159) },
+    {
+      kind: "difference",
+      amountOre: Ore.of(159),
+      calculatedOre: Ore.of(2690),
+      printedAs: null,
+    },
   ]);
 });
 
@@ -128,6 +134,26 @@ it("balances a receipt with an explicit adjustment line", () => {
   expect(reconcile(balanced).difference).toBe(0);
   expect(canAcceptReceipt(balanced, false)).toBe(true);
   expect(balanceWithAdjustment(batteryFixture(), "noop").lines).toHaveLength(3);
+});
+
+it("offers the line sum as paid, quoting a printed row with that amount", () => {
+  const data = batteryFixture();
+  data.totalOre = Ore.of(3331);
+  data.lines.push({
+    ...emptyLine("paid"),
+    kind: "summary",
+    name: "Betalt",
+    originalText: "BETALT 25,31",
+    amountOre: Ore.of(2531),
+  });
+  expect(reviewTasks(data, false)).toEqual([
+    {
+      kind: "difference",
+      amountOre: Ore.of(-800),
+      calculatedOre: Ore.of(2531),
+      printedAs: "BETALT 25,31",
+    },
+  ]);
 });
 
 it("confirms suggested categories in bulk without touching unclear or other issues", () => {
@@ -249,4 +275,18 @@ it("parses structural invariants separately from approval", async () => {
     "rejected",
   );
   expect(parseReceipt({ unexpected: true }).kind).toBe("rejected");
+});
+
+it("flags classifier answers a person must confirm", () => {
+  const data = batteryFixture();
+  present(data.lines[0]).issues = [];
+  applyClassifications(data, [
+    { id: "battery", categoryId: "drinks.soft-drinks", confidence: 0.3 },
+    { id: "missing", categoryId: "dairy.milk", confidence: 1 },
+  ]);
+  expect(present(data.lines[0])).toMatchObject({
+    categoryId: "drinks.soft-drinks",
+    confidence: 0.3,
+    issues: ["category_uncertain"],
+  });
 });

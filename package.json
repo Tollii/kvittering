@@ -139,7 +139,8 @@
     "lint:mocks": "node tools/check-mock-reasons.mts",
     "test:components": "jest",
     "release:check": "node tools/release.mts client",
-    "lint:duplicates": "node tools/check-duplicates.mts"
+    "lint:duplicates": "node tools/check-duplicates.mts",
+    "eval": "node tools/eval.mts"
   },
   "private": true,
   "overrides": {

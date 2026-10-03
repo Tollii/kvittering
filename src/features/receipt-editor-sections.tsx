@@ -29,7 +29,6 @@ type Totals = ReturnType<typeof reconcile>;
 export function ReviewTaskChips({
   tasks,
   data,
-  totals,
   onResolveDuplicate,
   onEditFields,
   onShowLines,
@@ -38,7 +37,6 @@ export function ReviewTaskChips({
 }: Readonly<{
   tasks: ReviewTask[];
   data: ReceiptData | null;
-  totals: Totals | null;
   onResolveDuplicate: () => void;
   onEditFields: () => void;
   onShowLines: (lines: "review" | "all") => void;
@@ -92,13 +90,22 @@ export function ReviewTaskChips({
         );
       case "no-lines":
         return chip("Ingen varer lest", "plus", onAddLine);
-      case "difference":
+      case "difference": {
+        const printed = task.printedAs
+          ? ` Kvitteringen har også linjen «${task.printedAs}».`
+          : "";
+
         return chip(`Avvik ${Ore.format(task.amountOre)}`, "equal.circle", () =>
           Alert.alert(
             `Avvik ${Ore.format(task.amountOre)}`,
-            `Linjene gir ${Ore.format(totals?.calculated ?? null)}. Kvitteringen sier ${Ore.format(data?.totalOre ?? null)}.`,
+            `Linjene gir ${Ore.format(task.calculatedOre)}, men betalt beløp ble lest som ${Ore.format(data?.totalOre ?? null)}.${printed} Sjekk hva som står på kvitteringen.`,
             [
-              { text: "Avbryt", style: "cancel" },
+              {
+                text: `Betalt var ${Ore.format(task.calculatedOre)}`,
+                onPress: () => {
+                  if (data) onChange({ ...data, totalOre: task.calculatedOre });
+                },
+              },
               { text: "Se alle linjer", onPress: () => onShowLines("all") },
               {
                 text: "Legg inn justering",
@@ -107,9 +114,12 @@ export function ReviewTaskChips({
                   onShowLines("all");
                 },
               },
+              { text: "Avbryt", style: "cancel" },
             ],
           ),
         );
+      }
+
       case "receipt-issues":
         return chip(
           task.issues.length === 1

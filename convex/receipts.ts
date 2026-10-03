@@ -54,6 +54,7 @@ import {
   receiptSearchText,
 } from "../src/lib/domain/receipt-summary";
 import { learnCategories } from "./aliases";
+import { renamedName } from "../src/lib/domain/category-memory";
 import { start } from "@convex-dev/workflow";
 
 export const list = query({
@@ -333,6 +334,7 @@ async function saveCategoryAlias(
   identity: string,
   key: string,
   categoryId: string,
+  name: string | undefined,
 ) {
   const existing = await ctx.db
     .query("aliases")
@@ -341,11 +343,13 @@ async function saveCategoryAlias(
     )
     .unique();
 
-  if (existing?.categoryId === categoryId) return false;
+  if (existing?.categoryId === categoryId && existing.name === name)
+    return false;
 
   if (existing)
     await ctx.db.patch("aliases", existing._id, {
       categoryId,
+      name,
       confirmedBy: identity,
     });
   else
@@ -353,6 +357,7 @@ async function saveCategoryAlias(
       householdId,
       key,
       categoryId,
+      name,
       confirmedBy: identity,
     });
 
@@ -392,7 +397,14 @@ async function rememberCategories(
       throw userError("Butikk og originaltekst kreves for å huske en vare.");
 
     if (
-      await saveCategoryAlias(ctx, householdId, identity, key, line.categoryId)
+      await saveCategoryAlias(
+        ctx,
+        householdId,
+        identity,
+        key,
+        line.categoryId,
+        renamedName(line),
+      )
     )
       changedAliases.add(key);
 
