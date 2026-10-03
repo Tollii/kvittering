@@ -17,6 +17,7 @@ import { ReceiptImages } from "@/features/receipt-images";
 import { type reconcile, type ReceiptData } from "@/lib/domain/receipt";
 import {
   balanceWithAdjustment,
+  paidAmountAlternative,
   type ReviewTask,
 } from "@/lib/domain/receipt-review";
 import type { Receipt } from "@/lib/domain/insights";
@@ -92,13 +93,27 @@ export function ReviewTaskChips({
         );
       case "no-lines":
         return chip("Ingen varer lest", "plus", onAddLine);
-      case "difference":
+      case "difference": {
+        const alternative = data ? paidAmountAlternative(data) : null;
+
+        const printed = alternative?.printedAs
+          ? ` Kvitteringen har også linjen «${alternative.printedAs}».`
+          : "";
+
         return chip(`Avvik ${Ore.format(task.amountOre)}`, "equal.circle", () =>
           Alert.alert(
             `Avvik ${Ore.format(task.amountOre)}`,
-            `Linjene gir ${Ore.format(totals?.calculated ?? null)}. Kvitteringen sier ${Ore.format(data?.totalOre ?? null)}.`,
+            `Linjene gir ${Ore.format(totals?.calculated ?? null)}, men betalt beløp ble lest som ${Ore.format(data?.totalOre ?? null)}.${printed} Sjekk hva som står på kvitteringen.`,
             [
-              { text: "Avbryt", style: "cancel" },
+              ...(data && alternative
+                ? [
+                    {
+                      text: `Betalt var ${Ore.format(alternative.amountOre)}`,
+                      onPress: () =>
+                        onChange({ ...data, totalOre: alternative.amountOre }),
+                    },
+                  ]
+                : []),
               { text: "Se alle linjer", onPress: () => onShowLines("all") },
               {
                 text: "Legg inn justering",
@@ -107,9 +122,12 @@ export function ReviewTaskChips({
                   onShowLines("all");
                 },
               },
+              { text: "Avbryt", style: "cancel" },
             ],
           ),
         );
+      }
+
       case "receipt-issues":
         return chip(
           task.issues.length === 1

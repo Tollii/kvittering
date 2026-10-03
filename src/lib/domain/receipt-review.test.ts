@@ -1,7 +1,7 @@
 import { present } from "../testing/receipts";
 import { Ore } from "./ore";
 import { expect, it } from "vitest";
-import { reconcile } from "./receipt";
+import { emptyLine, reconcile } from "./receipt";
 import { batteryFixture, weeklyShopFixture } from "../mock-receipts";
 import {
   balanceWithAdjustment,
@@ -10,6 +10,7 @@ import {
   confirmLineCategory,
   confirmSuggestedCategories,
   lineReviewIssues,
+  paidAmountAlternative,
   quickApproveData,
   reviewSummary,
   reviewTasks,
@@ -128,6 +129,28 @@ it("balances a receipt with an explicit adjustment line", () => {
   expect(reconcile(balanced).difference).toBe(0);
   expect(canAcceptReceipt(balanced, false)).toBe(true);
   expect(balanceWithAdjustment(batteryFixture(), "noop").lines).toHaveLength(3);
+});
+
+it("offers the line sum as paid when the reader took another printed amount", () => {
+  const data = batteryFixture();
+  data.totalOre = Ore.of(3331);
+  expect(paidAmountAlternative(data)).toEqual({
+    amountOre: Ore.of(2531),
+    printedAs: null,
+  });
+
+  data.lines.push({
+    ...emptyLine("paid"),
+    kind: "summary",
+    name: "Betalt",
+    originalText: "BETALT 25,31",
+    amountOre: Ore.of(2531),
+  });
+  expect(paidAmountAlternative(data)?.printedAs).toBe("BETALT 25,31");
+
+  present(data.lines[1]).amountOre = null;
+  expect(paidAmountAlternative(data)).toBeNull();
+  expect(paidAmountAlternative(batteryFixture())).toBeNull();
 });
 
 it("confirms suggested categories in bulk without touching unclear or other issues", () => {

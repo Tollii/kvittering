@@ -120,6 +120,27 @@ export function balanceWithAdjustment(
   };
 }
 
+/**
+ * When every line has an amount but they disagree with the paid total, the
+ * reader may have taken the wrong printed number as paid. The line sum is then
+ * the alternative a person can confirm against the paper receipt. A printed
+ * summary row with that same amount is evidence for it.
+ */
+export function paidAmountAlternative(data: ReceiptData) {
+  const { calculated, difference, unknown } = reconcile(data);
+
+  if (difference === null || difference === 0 || unknown) return null;
+
+  const printed = data.lines.find(
+    (line) => line.kind === "summary" && line.amountOre === calculated,
+  );
+
+  return {
+    amountOre: calculated,
+    printedAs: printed ? printed.originalText.trim() || printed.name : null,
+  };
+}
+
 /** Categories, product matching, and package information do not block receipt approval. */
 export function canAcceptReceipt(
   data: ReceiptData,
