@@ -1,13 +1,18 @@
-import { normalizeAlias, type ReceiptLine } from "./receipt";
+import { normalizeAlias, printedName, type ReceiptLine } from "./receipt";
 import { isCategoryUncertain } from "./receipt-review";
 import { isCategoryId, isDecidedCategory, type CategoryId } from "./categories";
 
 /**
- * What the household has approved before, keyed only by store and receipt
- * name. Looser than an alias (no brand or size), so it settles the category
- * of an item without claiming product identity.
+ * What the household has approved before, keyed only by store and printed
+ * receipt text. Looser than an alias (no brand or size), so it settles the
+ * category of an item without claiming product identity. A name the person
+ * typed for that text is offered again on the next receipt.
  */
-export type CategoryMemory = { categoryId: string; confirmations: number };
+export type CategoryMemory = {
+  categoryId: string;
+  confirmations: number;
+  name?: string;
+};
 
 /** Approvals needed before a remembered category is trusted on a new receipt. */
 export const categoryMemoryThreshold = 2;
@@ -26,10 +31,23 @@ export function recordCategoryDecision(
   existing: CategoryMemory | null,
   categoryId: CategoryId,
   weight = 1,
+  name?: string,
 ): CategoryMemory {
-  return existing && existing.categoryId === categoryId
-    ? { categoryId, confirmations: existing.confirmations + weight }
-    : { categoryId, confirmations: weight };
+  const confirmations =
+    existing && existing.categoryId === categoryId
+      ? existing.confirmations + weight
+      : weight;
+
+  return name === undefined
+    ? { categoryId, confirmations }
+    : { categoryId, confirmations, name };
+}
+
+/** The name a person gave a printed line, when it differs from the print. */
+export function renamedName(line: ReceiptLine): string | undefined {
+  const name = line.name.trim();
+
+  return name && name !== printedName(line).trim() ? name : undefined;
 }
 
 /** Lines a person approves count; suggestions the reader made on its own do not. */
@@ -57,11 +75,16 @@ export function applyCategoryMemory(
     return false;
   const issues = line.issues.filter((issue) => !isCategoryUncertain(issue));
 
+  const name = memory.name ?? line.name;
+
   const changed =
     line.categoryId !== memory.categoryId ||
+    line.name !== name ||
     issues.length !== line.issues.length ||
     line.confidence !== 1;
 
+  line.receiptName ??= line.name;
+  line.name = name;
   line.categoryId = memory.categoryId;
   line.issues = issues;
   line.confidence = 1;

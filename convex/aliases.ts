@@ -5,7 +5,11 @@ import { type MutationCtx, type QueryCtx } from "./_generated/server";
 import { internalMutation } from "./serverFunctions";
 import { internal } from "./_generated/api";
 import type { Id } from "./_generated/dataModel";
-import { aliasKey, type ReceiptData } from "../src/lib/domain/receipt";
+import {
+  aliasKey,
+  printedName,
+  type ReceiptData,
+} from "../src/lib/domain/receipt";
 import { isCategoryId, type CategoryId } from "../src/lib/domain/categories";
 import {
   applyCategoryMemory,
@@ -13,28 +17,35 @@ import {
   categoryMemoryThreshold,
   learnableLine,
   recordCategoryDecision,
+  renamedName,
 } from "../src/lib/domain/category-memory";
 import { isCategoryUncertain } from "../src/lib/domain/receipt-review";
 
 /**
- * A remembered household decision settles the category: it replaces the
- * automatic suggestion and removes the uncertainty flag for that line.
- * Lines a person edited by hand keep their own category.
+ * A remembered household decision settles the category and the name a person
+ * gave the printed text: it replaces the automatic suggestion and removes the
+ * uncertainty flag for that line. Lines a person edited by hand keep their own
+ * category and name.
  */
 export function settleLineWithAlias(
   line: ReceiptData["lines"][number],
   key: string,
   categoryId: CategoryId,
+  name?: string,
 ): boolean {
   const nextCategory = line.manual ? line.categoryId : categoryId;
+  const nextName = line.manual ? line.name : (name ?? line.name);
   const issues = line.issues.filter((issue) => !isCategoryUncertain(issue));
 
   const changed =
     line.productKey !== key ||
     line.categoryId !== nextCategory ||
+    line.name !== nextName ||
     issues.length !== line.issues.length ||
     line.confidence !== 1;
 
+  line.receiptName ??= line.name;
+  line.name = nextName;
   line.categoryAliasKey = key;
   line.productKey = key;
   line.categoryId = nextCategory;
@@ -69,11 +80,11 @@ export async function applyHouseholdAliases(
       : null;
 
     if (alias && key && isCategoryId(alias.categoryId)) {
-      settleLineWithAlias(line, key, alias.categoryId);
+      settleLineWithAlias(line, key, alias.categoryId, alias.name);
       continue;
     }
 
-    const memoryKey = categoryMemoryKey(data.store, line.name);
+    const memoryKey = categoryMemoryKey(data.store, printedName(line));
 
     const memory = memoryKey
       ? await ctx.db
@@ -105,7 +116,7 @@ export async function learnCategories(
 
   for (const line of data.lines) {
     if (!learnableLine(line)) continue;
-    const key = categoryMemoryKey(data.store, line.name);
+    const key = categoryMemoryKey(data.store, printedName(line));
 
     if (!key || seen.has(key)) continue;
     seen.add(key);
@@ -117,15 +128,22 @@ export async function learnCategories(
       )
       .unique();
 
+    const name = renamedName(line);
+
+    // Typing a name for the printed text is a deliberate identification,
+    // trusted at once like an item the person asked to remember.
     const next = recordCategoryDecision(
       existing,
       line.categoryId,
-      rememberLineIds.includes(line.id) ? categoryMemoryThreshold : 1,
+      rememberLineIds.includes(line.id) || name ? categoryMemoryThreshold : 1,
+      name,
     );
 
     if (existing)
+      // An absent name clears one remembered earlier.
       await ctx.db.patch("categoryMemory", existing._id, {
         ...next,
+        name: next.name,
         confirmedBy: identity,
       });
     else
@@ -167,7 +185,11 @@ export const applyChanges = internalMutation({
   handler: applyChangesPage,
 });
 
-type CategoryAlias = { categoryId: string; confirmedBy: string };
+type CategoryAlias = {
+  categoryId: string;
+  confirmedBy: string;
+  name?: string;
+};
 
 /** Reads the household aliases for the keys and keeps only the aliases with a known category. */
 async function loadCategoryAliases(
@@ -210,7 +232,7 @@ function settleLinesWithAliases(
       key &&
       alias &&
       isCategoryId(alias.categoryId) &&
-      settleLineWithAlias(line, key, alias.categoryId)
+      settleLineWithAlias(line, key, alias.categoryId, alias.name)
     )
       editor = alias.confirmedBy;
   }

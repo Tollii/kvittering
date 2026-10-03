@@ -331,14 +331,17 @@ export default defineSchema({
     householdId: v.id("households"),
     key: v.string(),
     categoryId: v.string(),
+    /** The name a person gave the printed text, applied with the category. */
+    name: v.optional(v.string()),
     confirmedBy: v.string(),
   }).index("by_householdId_and_key", ["householdId", "key"]),
-  /** Categories the household has approved, by store and receipt name. */
+  /** Categories the household has approved, by store and printed receipt text. */
   categoryMemory: defineTable({
     householdId: v.id("households"),
     key: v.string(),
     categoryId: v.string(),
     confirmations: v.number(),
+    name: v.optional(v.string()),
     confirmedBy: v.string(),
   }).index("by_householdId_and_key", ["householdId", "key"]),
 });

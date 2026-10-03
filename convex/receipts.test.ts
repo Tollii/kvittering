@@ -610,6 +610,69 @@ it("trusts a category after two approvals and settles the next reading without a
   expect(detail.receipt.autoAccepted).toBe(true);
 });
 
+it("remembers a name typed for printed text and settles the next reading of that text", async () => {
+  const { t, first, householdId } = await setup();
+
+  const reviewedId = await first.mutation(api.receipts.reserve, {
+    clientId: "renamed-request-0001",
+    imageCount: 1,
+    householdId,
+  });
+
+  await t.run((ctx) =>
+    ctx.db.patch("receipts", reviewedId, {
+      status: "needs_review",
+      data: batteryFixture(),
+    }),
+  );
+  const renamed = batteryFixture();
+  present(renamed.lines[0]).receiptName = "BATTERY REMIX";
+  present(renamed.lines[0]).name = "Battery Remix energidrikk";
+  present(renamed.lines[0]).manual = true;
+  await first.mutation(api.receipts.save, {
+    id: reviewedId,
+    revision: 0,
+    data: renamed,
+    reviewed: true,
+    rememberLineIds: [],
+    duplicateResolved: false,
+    excluded: false,
+  });
+
+  const id = await first.mutation(api.receipts.reserve, {
+    clientId: "renamed-request-0002",
+    imageCount: 1,
+    householdId,
+  });
+
+  await t.run((ctx) =>
+    ctx.db.patch("receipts", id, { status: "processing", generation: 1 }),
+  );
+  const reading = batteryFixture();
+  reading.receiptNumber = "9999";
+  present(reading.lines[0]).categoryId = "fallback.unclear";
+  present(reading.lines[0]).confidence = 0;
+  present(reading.lines[0]).issues = ["Kategorien er usikker."];
+  await t.mutation(internal.processing.finish, {
+    id,
+    generation: 1,
+    data: reading,
+    original: batteryFixture(),
+    provider: "test reader",
+  });
+
+  const line = present(
+    (await first.query(api.receipts.detail, { id }))!.receipt.data?.lines[0],
+  );
+
+  expect(line).toMatchObject({
+    name: "Battery Remix energidrikk",
+    receiptName: "BATTERY REMIX",
+    categoryId: "drinks.soft-drinks",
+    issues: [],
+  });
+});
+
 it("pages narrow history summaries and includes imported older purchases in complete periods", async () => {
   const { t, first, householdId } = await setup();
 
