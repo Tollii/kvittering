@@ -9,12 +9,16 @@ import {
 import {
   classificationInputs,
   receiptDataValidator,
+  type ReceiptData,
 } from "../src/lib/domain/receipt";
+import { applyClassifications } from "../src/lib/domain/receipt-review";
 import {
-  applyClassifications,
+  readingScoreValidator,
+  readingSummaryValidator,
   scoreReading,
   summarizeReadings,
   type ReadingScore,
+  type ReadingSummary,
 } from "../src/lib/domain/reading-evaluation";
 
 /*
@@ -22,32 +26,6 @@ import {
  * reader's lines and ids, so the approved receipt is the expected answer for
  * its own images. Run on a deployment with `npx convex run`; see `npm run eval`.
  */
-
-const scoreValidator = v.object({
-  totalCorrect: v.union(v.boolean(), v.null()),
-  balanced: v.boolean(),
-  products: v.number(),
-  amountsCorrect: v.number(),
-  namesKept: v.number(),
-  categorized: v.number(),
-  categoriesCorrect: v.number(),
-  categoriesUnclear: v.number(),
-  flaggedLines: v.number(),
-});
-
-const summaryValidator = v.object({
-  receipts: v.number(),
-  totalsChecked: v.number(),
-  totalsCorrect: v.number(),
-  balanced: v.number(),
-  products: v.number(),
-  amountsCorrect: v.number(),
-  namesKept: v.number(),
-  categorized: v.number(),
-  categoriesCorrect: v.number(),
-  categoriesUnclear: v.number(),
-  flaggedLines: v.number(),
-});
 
 const missValidator = v.object({
   receiptId: v.id("receipts"),
@@ -58,18 +36,20 @@ const missValidator = v.object({
 
 type Miss = Infer<typeof missValidator>;
 
-type Summary = Infer<typeof summaryValidator>;
-
 const replayResultValidator = v.object({
   receiptId: v.id("receipts"),
-  score: v.union(scoreValidator, v.null()),
+  score: v.union(readingScoreValidator, v.null()),
   error: v.optional(v.string()),
 });
 
 type ReplayResult = Infer<typeof replayResultValidator>;
 
+type ApprovedReceipt = Doc<"receipts"> & { data: ReceiptData };
+
 /** Receipts a person approved; automatic approvals say nothing about the reader. */
-function approvedByPerson(receipt: Doc<"receipts">) {
+function approvedByPerson(
+  receipt: Doc<"receipts">,
+): receipt is ApprovedReceipt {
   return (
     receipt.status === "reviewed" &&
     !receipt.excluded &&
@@ -89,28 +69,30 @@ async function storedReading(ctx: QueryCtx, receipt: Doc<"receipts">) {
   return extraction ? (extraction.classifiedData ?? extraction.data) : null;
 }
 
-function miss(
-  receiptId: Id<"receipts">,
-  reading: Doc<"receipts">["data"],
-  approved: NonNullable<Doc<"receipts">["data"]>,
-): Miss {
+function miss(receipt: ApprovedReceipt, reading: ReceiptData): Miss {
   return {
-    receiptId,
-    store: approved.store,
-    readTotalOre: reading?.totalOre ?? null,
-    approvedTotalOre: approved.totalOre,
+    receiptId: receipt._id,
+    store: receipt.data.store,
+    readTotalOre: reading.totalOre,
+    approvedTotalOre: receipt.data.totalOre,
   };
 }
 
-/** One page of stored readings scored against their approved receipts. */
+const scorePageValidator = v.object({
+  scores: v.array(readingScoreValidator),
+  misses: v.array(missValidator),
+  cursor: v.string(),
+  isDone: v.boolean(),
+});
+
+/**
+ * Stored readings scored against their approved receipts, up to `budget`
+ * of them. A page that reaches the budget stops at that receipt and returns
+ * the cursor of the page, so scores and misses describe the same receipts.
+ */
 export const scorePage = internalQuery({
-  args: { cursor: v.union(v.string(), v.null()) },
-  returns: v.object({
-    scores: v.array(scoreValidator),
-    misses: v.array(missValidator),
-    cursor: v.string(),
-    isDone: v.boolean(),
-  }),
+  args: { cursor: v.union(v.string(), v.null()), budget: v.number() },
+  returns: scorePageValidator,
   handler: async (ctx, args) => {
     const page = await ctx.db.query("receipts").order("desc").paginate({
       cursor: args.cursor,
@@ -123,15 +105,16 @@ export const scorePage = internalQuery({
     const misses: Miss[] = [];
 
     for (const receipt of page.page) {
-      if (!approvedByPerson(receipt) || !receipt.data) continue;
+      if (scores.length >= args.budget) break;
+
+      if (!approvedByPerson(receipt)) continue;
       const reading = await storedReading(ctx, receipt);
 
       if (!reading) continue;
       const score = scoreReading(reading, receipt.data);
       scores.push(score);
 
-      if (score.totalCorrect === false)
-        misses.push(miss(receipt._id, reading, receipt.data));
+      if (score.totalCorrect === false) misses.push(miss(receipt, reading));
     }
 
     return {
@@ -151,14 +134,18 @@ export const scorePage = internalQuery({
 export const scorecard = internalAction({
   args: { maxReceipts: v.optional(v.number()) },
   returns: v.object({
-    summary: summaryValidator,
+    summary: readingSummaryValidator,
     totalMisses: v.array(missValidator),
     complete: v.boolean(),
   }),
   handler: async (
     ctx,
     args,
-  ): Promise<{ summary: Summary; totalMisses: Miss[]; complete: boolean }> => {
+  ): Promise<{
+    summary: ReadingSummary;
+    totalMisses: Miss[];
+    complete: boolean;
+  }> => {
     const limit = args.maxReceipts ?? 500;
     const scores: ReadingScore[] = [];
     const misses: Miss[] = [];
@@ -166,26 +153,24 @@ export const scorecard = internalAction({
     let complete = false;
 
     while (scores.length < limit) {
-      const page: {
-        scores: ReadingScore[];
-        misses: Miss[];
-        cursor: string;
-        isDone: boolean;
-      } = await ctx.runQuery(internal.readingEvaluation.scorePage, { cursor });
+      const page: Infer<typeof scorePageValidator> = await ctx.runQuery(
+        internal.readingEvaluation.scorePage,
+        { cursor, budget: limit - scores.length },
+      );
 
       scores.push(...page.scores);
       misses.push(...page.misses);
       cursor = page.cursor;
 
       if (page.isDone) {
-        complete = true;
+        complete = scores.length < limit;
         break;
       }
     }
 
     return {
-      summary: summarizeReadings(scores.slice(0, limit)),
-      totalMisses: misses.slice(0, 20),
+      summary: summarizeReadings(scores),
+      totalMisses: misses,
       complete,
     };
   },
@@ -204,7 +189,7 @@ export const replayCase = internalQuery({
   handler: async (ctx, args) => {
     const receipt = await ctx.db.get("receipts", args.id);
 
-    if (!receipt?.data || !approvedByPerson(receipt)) return null;
+    if (!receipt || !approvedByPerson(receipt)) return null;
 
     const images = await ctx.db
       .query("images")
@@ -279,7 +264,7 @@ export const replayOne = internalAction({
 
 /** Add up replayed scores the same way the scorecard does. */
 export const summarize = internalQuery({
-  args: { scores: v.array(scoreValidator) },
-  returns: summaryValidator,
-  handler: (_ctx, { scores }): Summary => summarizeReadings(scores),
+  args: { scores: v.array(readingScoreValidator) },
+  returns: readingSummaryValidator,
+  handler: (_ctx, { scores }): ReadingSummary => summarizeReadings(scores),
 });

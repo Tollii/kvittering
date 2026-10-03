@@ -3,7 +3,7 @@ import {
   parseProductEvidence,
   normalizeMeasureText,
 } from "../domain/product-evidence";
-import type { ReceiptLine } from "../domain/receipt";
+import { printedName, type ReceiptLine } from "../domain/receipt";
 import {
   compatibleProduct,
   matchingKey,
@@ -149,7 +149,7 @@ export function automaticCatalogProduct(
   line: ReceiptLine,
   products: CatalogProduct[],
 ) {
-  const name = line.receiptName || line.name;
+  const name = printedName(line);
   const source = productWords(name);
 
   // Single generic words such as “Agurk” do not establish a retail product.
@@ -270,7 +270,7 @@ export function exactPhysicalStore(
 
 export function lineEvidenceKey(line: ReceiptLine) {
   return JSON.stringify([
-    line.receiptName ?? line.name,
+    printedName(line),
     line.name,
     line.brand,
     line.packageSize,

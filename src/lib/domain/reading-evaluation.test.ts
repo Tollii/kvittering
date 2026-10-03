@@ -3,11 +3,7 @@ import { expect, it } from "vitest";
 import { Ore } from "./ore";
 import { emptyLine } from "./receipt";
 import { batteryFixture } from "../mock-receipts";
-import {
-  applyClassifications,
-  scoreReading,
-  summarizeReadings,
-} from "./reading-evaluation";
+import { scoreReading, summarizeReadings } from "./reading-evaluation";
 
 it("scores a reading against what a person approved", () => {
   const reading = batteryFixture();
@@ -71,19 +67,5 @@ it("pairs a fresh reading of the same receipt by printed text and amount", () =>
     amountsCorrect: 1,
     namesKept: 0,
     categoriesCorrect: 1,
-  });
-});
-
-it("flags classifier answers a person must confirm", () => {
-  const data = batteryFixture();
-  present(data.lines[0]).issues = [];
-  applyClassifications(data, [
-    { id: "battery", categoryId: "drinks.soft-drinks", confidence: 0.3 },
-    { id: "missing", categoryId: "dairy.milk", confidence: 1 },
-  ]);
-  expect(present(data.lines[0])).toMatchObject({
-    categoryId: "drinks.soft-drinks",
-    confidence: 0.3,
-    issues: ["category_uncertain"],
   });
 });

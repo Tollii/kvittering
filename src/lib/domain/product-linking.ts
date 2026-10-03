@@ -1,5 +1,5 @@
 import { v, type Infer } from "convex/values";
-import { lineValidator, type ReceiptLine } from "./receipt";
+import { lineValidator, printedName, type ReceiptLine } from "./receipt";
 import {
   productReference,
   productReferenceValidator,
@@ -52,7 +52,7 @@ export function needsProductLink(line: ReceiptLine) {
   return (
     line.kind === "product" &&
     !!line.name.trim() &&
-    !!(line.receiptName ?? line.name).trim() &&
+    !!printedName(line).trim() &&
     productReference(line).kind === "unresolved"
   );
 }

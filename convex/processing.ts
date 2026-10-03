@@ -1,4 +1,3 @@
-import { applyClassifications } from "../src/lib/domain/reading-evaluation";
 import { isReceiptBeingRead } from "../src/lib/domain/receipt-state";
 import { notifyReceiptActivities } from "./liveActivities";
 import { linkCatalogProduct } from "./catalogLinks";
@@ -30,7 +29,10 @@ import {
   matchingKey,
   compatibleProduct,
 } from "../src/lib/domain/product-matching";
-import { canAcceptReceipt } from "../src/lib/domain/receipt-review";
+import {
+  applyClassifications,
+  canAcceptReceipt,
+} from "../src/lib/domain/receipt-review";
 
 const workflow = new WorkflowManager(components.workflow);
 

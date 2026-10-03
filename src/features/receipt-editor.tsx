@@ -361,7 +361,6 @@ export function ReceiptEditor({
               <ReviewTaskChips
                 tasks={tasks}
                 data={data}
-                totals={totals}
                 onResolveDuplicate={() => edit({ duplicateResolved: true })}
                 onEditFields={() => setSheet("fields")}
                 onShowLines={(lines) => setAllLines(lines === "all")}

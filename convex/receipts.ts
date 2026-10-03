@@ -346,7 +346,6 @@ async function saveCategoryAlias(
   if (existing?.categoryId === categoryId && existing.name === name)
     return false;
 
-  // An absent name clears one remembered earlier.
   if (existing)
     await ctx.db.patch("aliases", existing._id, {
       categoryId,

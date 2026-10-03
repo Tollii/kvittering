@@ -119,11 +119,12 @@ export const normalizeAlias = (text: string) =>
   text.normalize("NFKC").trim().replace(/\s+/g, " ").toLocaleUpperCase("nb-NO");
 
 /**
- * The text the store printed for a line. Household memory is keyed on it, so
- * a name a person typed in still matches the next receipt from that store.
+ * The text the store printed for a line. Household memory and product
+ * matching are keyed on it, so a name a person typed in still matches the
+ * next receipt from that store. Lines a person added have no printed text.
  */
-export function printedName(line: ReceiptLine): string {
-  return line.receiptName?.trim() || line.name;
+export function printedName(line: Pick<ReceiptLine, "name" | "receiptName">) {
+  return line.receiptName || line.name;
 }
 
 export function aliasKey(data: ReceiptData, line: ReceiptLine): string | null {

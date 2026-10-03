@@ -5,7 +5,11 @@ import {
 } from "../src/lib/domain/product-reference";
 import type { MutationCtx } from "./_generated/server";
 import type { Id } from "./_generated/dataModel";
-import type { ReceiptData, ReceiptLine } from "../src/lib/domain/receipt";
+import {
+  printedName,
+  type ReceiptData,
+  type ReceiptLine,
+} from "../src/lib/domain/receipt";
 import { catalogIdentity, type CatalogProduct } from "../src/lib/catalog/model";
 import { matchingKey } from "../src/lib/domain/product-matching";
 import { saveMapping, createProduct, linkProduct } from "./products";
@@ -195,7 +199,7 @@ export async function resolveProductSelections(
 
     const line = data.lines[index];
 
-    if (!line || !retailer || !matchingKey(line.receiptName ?? line.name))
+    if (!line || !retailer || !matchingKey(printedName(line)))
       throw userError("Butikk og varenavn kreves for produktkobling.");
 
     data.lines[index] = await linkSelectedProduct(

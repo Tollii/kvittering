@@ -14,6 +14,7 @@ import {
   compatibleCatalogProduct,
 } from "@/lib/catalog/matching";
 import type { CatalogProduct } from "@/lib/catalog/model";
+import { printedName } from "@/lib/domain/receipt";
 import type {
   MatchingReceipt,
   MatchingLine,
@@ -73,7 +74,7 @@ export function ProductLinkingOptions({
     lineId: line.id,
   });
 
-  const name = line.receiptName || line.name;
+  const name = printedName(line);
 
   const search = useCatalogSearch(
     name,

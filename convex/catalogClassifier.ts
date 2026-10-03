@@ -22,7 +22,7 @@ import {
 } from "../src/lib/catalog/matching";
 import type { CatalogProduct } from "../src/lib/catalog/model";
 import { groupCatalogProducts } from "../src/lib/catalog/equivalence";
-import type { ReceiptLine } from "../src/lib/domain/receipt";
+import { printedName, type ReceiptLine } from "../src/lib/domain/receipt";
 
 export function catalogMatchQuestion(item: number, candidate: number) {
   return noul(
@@ -66,7 +66,7 @@ async function classifyCatalogBatch(
 ): Promise<CatalogDecision[]> {
   const prepared = items.map((item) => {
     const candidates = rankCatalogProducts(
-      item.line.receiptName || item.line.name,
+      printedName(item.line),
       groupCatalogProducts(item.candidates),
     )
       .slice(0, 8)
@@ -155,7 +155,7 @@ async function classifyCatalogBatch(
       state: {
         products: prepared.map((item) => ({
           ...productEvidence(item.line),
-          receiptText: item.line.receiptName || item.line.name,
+          receiptText: printedName(item.line),
           originalText: item.line.originalText,
           catalogCandidates: item.candidates.map((product) => ({
             name: product.name,
@@ -249,7 +249,7 @@ export const classify = internalAction({
         ? [item.product]
         : request?.state === "ready"
           ? rankCatalogProducts(
-              item.line.receiptName || item.line.name,
+              printedName(item.line),
               request.result.products,
             ).map(({ product }) => product)
           : [];

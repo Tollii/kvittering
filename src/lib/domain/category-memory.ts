@@ -26,28 +26,33 @@ export function categoryMemoryKey(
   return JSON.stringify([normalizeAlias(store), normalizeAlias(name)]);
 }
 
-/** One more approval for a category; a different decision starts over. */
-export function recordCategoryDecision(
-  existing: CategoryMemory | null,
-  categoryId: CategoryId,
-  weight = 1,
-  name?: string,
-): CategoryMemory {
-  const confirmations =
-    existing && existing.categoryId === categoryId
-      ? existing.confirmations + weight
-      : weight;
-
-  return name === undefined
-    ? { categoryId, confirmations }
-    : { categoryId, confirmations, name };
-}
-
 /** The name a person gave a printed line, when it differs from the print. */
 export function renamedName(line: ReceiptLine): string | undefined {
   const name = line.name.trim();
 
   return name && name !== printedName(line).trim() ? name : undefined;
+}
+
+/**
+ * One more approval for a line's category; a different decision starts over.
+ * An item the person asked to remember, or gave a name of their own, is a
+ * deliberate identification and is trusted at once. The name is always
+ * present, so saving the result also clears a name remembered earlier.
+ */
+export function recordCategoryDecision(
+  existing: CategoryMemory | null,
+  line: ReceiptLine & { categoryId: CategoryId },
+  remembered: boolean,
+): CategoryMemory & { name: string | undefined } {
+  const name = renamedName(line);
+  const weight = remembered || name ? categoryMemoryThreshold : 1;
+
+  const confirmations =
+    existing && existing.categoryId === line.categoryId
+      ? existing.confirmations + weight
+      : weight;
+
+  return { categoryId: line.categoryId, confirmations, name };
 }
 
 /** Lines a person approves count; suggestions the reader made on its own do not. */
@@ -59,6 +64,37 @@ export function learnableLine(
     isDecidedCategory(line.categoryId) &&
     !line.issues.some(isCategoryUncertain)
   );
+}
+
+/**
+ * Settle a line with what the household decided for its printed text: the
+ * category and any name a person gave it replace the automatic suggestion,
+ * and the category uncertainty goes. Lines a person edited by hand keep their
+ * own category and name. Returns whether anything changed.
+ */
+export function settleLine(
+  line: ReceiptLine,
+  decision: { categoryId: CategoryId; name?: string },
+): boolean {
+  const categoryId = line.manual ? line.categoryId : decision.categoryId;
+  const name = line.manual ? line.name : (decision.name ?? line.name);
+  const issues = line.issues.filter((issue) => !isCategoryUncertain(issue));
+
+  const changed =
+    line.categoryId !== categoryId ||
+    line.name !== name ||
+    issues.length !== line.issues.length ||
+    line.confidence !== 1;
+
+  // The reader records the printed text; lines saved before it did keep
+  // theirs here before a remembered name replaces it.
+  line.receiptName ??= line.name;
+  line.name = name;
+  line.categoryId = categoryId;
+  line.issues = issues;
+  line.confidence = 1;
+
+  return changed;
 }
 
 /** Settle a freshly read line from memory. Returns whether anything changed. */
@@ -73,21 +109,6 @@ export function applyCategoryMemory(
     memory.confirmations < categoryMemoryThreshold
   )
     return false;
-  const issues = line.issues.filter((issue) => !isCategoryUncertain(issue));
 
-  const name = memory.name ?? line.name;
-
-  const changed =
-    line.categoryId !== memory.categoryId ||
-    line.name !== name ||
-    issues.length !== line.issues.length ||
-    line.confidence !== 1;
-
-  line.receiptName ??= line.name;
-  line.name = name;
-  line.categoryId = memory.categoryId;
-  line.issues = issues;
-  line.confidence = 1;
-
-  return changed;
+  return settleLine(line, { categoryId: memory.categoryId, name: memory.name });
 }

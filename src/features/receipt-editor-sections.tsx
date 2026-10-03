@@ -17,7 +17,6 @@ import { ReceiptImages } from "@/features/receipt-images";
 import { type reconcile, type ReceiptData } from "@/lib/domain/receipt";
 import {
   balanceWithAdjustment,
-  paidAmountAlternative,
   type ReviewTask,
 } from "@/lib/domain/receipt-review";
 import type { Receipt } from "@/lib/domain/insights";
@@ -30,7 +29,6 @@ type Totals = ReturnType<typeof reconcile>;
 export function ReviewTaskChips({
   tasks,
   data,
-  totals,
   onResolveDuplicate,
   onEditFields,
   onShowLines,
@@ -39,7 +37,6 @@ export function ReviewTaskChips({
 }: Readonly<{
   tasks: ReviewTask[];
   data: ReceiptData | null;
-  totals: Totals | null;
   onResolveDuplicate: () => void;
   onEditFields: () => void;
   onShowLines: (lines: "review" | "all") => void;
@@ -94,26 +91,21 @@ export function ReviewTaskChips({
       case "no-lines":
         return chip("Ingen varer lest", "plus", onAddLine);
       case "difference": {
-        const alternative = data ? paidAmountAlternative(data) : null;
-
-        const printed = alternative?.printedAs
-          ? ` Kvitteringen har også linjen «${alternative.printedAs}».`
+        const printed = task.printedAs
+          ? ` Kvitteringen har også linjen «${task.printedAs}».`
           : "";
 
         return chip(`Avvik ${Ore.format(task.amountOre)}`, "equal.circle", () =>
           Alert.alert(
             `Avvik ${Ore.format(task.amountOre)}`,
-            `Linjene gir ${Ore.format(totals?.calculated ?? null)}, men betalt beløp ble lest som ${Ore.format(data?.totalOre ?? null)}.${printed} Sjekk hva som står på kvitteringen.`,
+            `Linjene gir ${Ore.format(task.calculatedOre)}, men betalt beløp ble lest som ${Ore.format(data?.totalOre ?? null)}.${printed} Sjekk hva som står på kvitteringen.`,
             [
-              ...(data && alternative
-                ? [
-                    {
-                      text: `Betalt var ${Ore.format(alternative.amountOre)}`,
-                      onPress: () =>
-                        onChange({ ...data, totalOre: alternative.amountOre }),
-                    },
-                  ]
-                : []),
+              {
+                text: `Betalt var ${Ore.format(task.calculatedOre)}`,
+                onPress: () => {
+                  if (data) onChange({ ...data, totalOre: task.calculatedOre });
+                },
+              },
               { text: "Se alle linjer", onPress: () => onShowLines("all") },
               {
                 text: "Legg inn justering",

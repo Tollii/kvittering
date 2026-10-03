@@ -61,21 +61,10 @@ const scorecardSchema = z.object({
   complete: z.boolean(),
 });
 
-const scoreSchema = z.object({
-  totalCorrect: z.boolean().nullable(),
-  balanced: z.boolean(),
-  products: count,
-  amountsCorrect: count,
-  namesKept: count,
-  categorized: count,
-  categoriesCorrect: count,
-  categoriesUnclear: count,
-  flaggedLines: count,
-});
-
+// Scores only travel back to readingEvaluation:summarize, which validates them.
 const replayResultSchema = z.object({
   receiptId: z.string(),
-  score: scoreSchema.nullable(),
+  score: z.unknown(),
   error: z.string().optional(),
 });
 
@@ -87,7 +76,7 @@ type FunctionArgs =
   | Record<string, never>
   | { count: number }
   | { receiptId: string }
-  | { scores: z.infer<typeof scoreSchema>[] };
+  | { scores: unknown[] };
 
 const deployment = values.deployment ? ["--deployment", values.deployment] : [];
 

@@ -14,18 +14,14 @@ import { isCategoryId, type CategoryId } from "../src/lib/domain/categories";
 import {
   applyCategoryMemory,
   categoryMemoryKey,
-  categoryMemoryThreshold,
   learnableLine,
   recordCategoryDecision,
-  renamedName,
+  settleLine,
 } from "../src/lib/domain/category-memory";
-import { isCategoryUncertain } from "../src/lib/domain/receipt-review";
 
 /**
- * A remembered household decision settles the category and the name a person
- * gave the printed text: it replaces the automatic suggestion and removes the
- * uncertainty flag for that line. Lines a person edited by hand keep their own
- * category and name.
+ * A remembered household alias settles the line like category memory does,
+ * and also marks the line as identified by that alias.
  */
 export function settleLineWithAlias(
   line: ReceiptData["lines"][number],
@@ -33,26 +29,11 @@ export function settleLineWithAlias(
   categoryId: CategoryId,
   name?: string,
 ): boolean {
-  const nextCategory = line.manual ? line.categoryId : categoryId;
-  const nextName = line.manual ? line.name : (name ?? line.name);
-  const issues = line.issues.filter((issue) => !isCategoryUncertain(issue));
-
-  const changed =
-    line.productKey !== key ||
-    line.categoryId !== nextCategory ||
-    line.name !== nextName ||
-    issues.length !== line.issues.length ||
-    line.confidence !== 1;
-
-  line.receiptName ??= line.name;
-  line.name = nextName;
+  const keyChanged = line.productKey !== key;
   line.categoryAliasKey = key;
   line.productKey = key;
-  line.categoryId = nextCategory;
-  line.issues = issues;
-  line.confidence = 1;
 
-  return changed;
+  return settleLine(line, { categoryId, name }) || keyChanged;
 }
 
 /**
@@ -128,22 +109,15 @@ export async function learnCategories(
       )
       .unique();
 
-    const name = renamedName(line);
-
-    // Typing a name for the printed text is a deliberate identification,
-    // trusted at once like an item the person asked to remember.
     const next = recordCategoryDecision(
       existing,
-      line.categoryId,
-      rememberLineIds.includes(line.id) || name ? categoryMemoryThreshold : 1,
-      name,
+      line,
+      rememberLineIds.includes(line.id),
     );
 
     if (existing)
-      // An absent name clears one remembered earlier.
       await ctx.db.patch("categoryMemory", existing._id, {
         ...next,
-        name: next.name,
         confirmedBy: identity,
       });
     else

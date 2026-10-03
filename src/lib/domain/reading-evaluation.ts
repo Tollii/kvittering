@@ -1,5 +1,5 @@
-import { categoryReviewThreshold } from "./receipt-review";
-import { categoryUncertainIssue, isCategoryUncertain } from "./receipt-issues";
+import { v, type Infer } from "convex/values";
+import { isCategoryUncertain } from "./receipt-issues";
 import { isDecidedCategory, unclearCategoryId } from "./categories";
 import {
   isTotalsLine,
@@ -10,50 +10,40 @@ import {
   type ReceiptLine,
 } from "./receipt";
 
-/** Put the classifier's answers on the read lines, flagging the ones a person must confirm. */
-export function applyClassifications(
-  data: ReceiptData,
-  classifications: readonly {
-    id: string;
-    categoryId: string;
-    confidence: number;
-  }[],
-) {
-  for (const result of classifications) {
-    const line = data.lines.find((line) => line.id === result.id);
-
-    if (!line) continue;
-    line.categoryId = result.categoryId;
-    line.confidence = result.confidence;
-
-    if (
-      result.confidence < categoryReviewThreshold ||
-      result.categoryId === unclearCategoryId
-    )
-      line.issues.push(categoryUncertainIssue);
-  }
-}
-
 /**
  * How one automatic reading compares with the receipt a person approved.
  * Counts are of the approved receipt's product lines, so they add up across
  * receipts into rates.
  */
-export type ReadingScore = {
+export const readingScoreValidator = v.object({
   /** The paid total was read as approved; null when the approved total is unknown. */
-  totalCorrect: boolean | null;
+  totalCorrect: v.union(v.boolean(), v.null()),
   /** The read lines summed to the read total without a person's help. */
-  balanced: boolean;
-  products: number;
-  amountsCorrect: number;
-  namesKept: number;
+  balanced: v.boolean(),
+  products: v.number(),
+  amountsCorrect: v.number(),
+  namesKept: v.number(),
   /** Approved lines with a decided category, and how many of those the reading had right. */
-  categorized: number;
-  categoriesCorrect: number;
+  categorized: v.number(),
+  categoriesCorrect: v.number(),
   /** Read product lines left for a person: an unclear category, or another flagged issue. */
-  categoriesUnclear: number;
-  flaggedLines: number;
-};
+  categoriesUnclear: v.number(),
+  flaggedLines: v.number(),
+});
+
+export type ReadingScore = Infer<typeof readingScoreValidator>;
+
+/** Scores added up: the per-receipt flags become counts of receipts. */
+export const readingSummaryValidator = readingScoreValidator
+  .omit("totalCorrect", "balanced")
+  .extend({
+    receipts: v.number(),
+    totalsChecked: v.number(),
+    totalsCorrect: v.number(),
+    balanced: v.number(),
+  });
+
+export type ReadingSummary = Infer<typeof readingSummaryValidator>;
 
 /**
  * Pair each approved product line with at most one read product line. Stored
@@ -142,13 +132,6 @@ export function scoreReading(
     ).length,
   };
 }
-
-export type ReadingSummary = {
-  receipts: number;
-  totalsChecked: number;
-  totalsCorrect: number;
-  balanced: number;
-} & Omit<ReadingScore, "totalCorrect" | "balanced">;
 
 export function summarizeReadings(
   scores: readonly ReadingScore[],
