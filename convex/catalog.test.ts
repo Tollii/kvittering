@@ -781,3 +781,32 @@ it("keeps receipt-owned store observation inside its household", async () => {
     }),
   ).rejects.toThrow("ikke tilgjengelig");
 });
+
+it("answers installed clients' store price lookups without queuing provider work", async () => {
+  const { t, first } = await setup();
+
+  const product = present(
+    normalizeProducts({ data: [{ id: 41, name: "Cola 500ml" }] })[0],
+  );
+
+  await t.run((ctx) =>
+    ctx.db.insert("catalogProducts", {
+      key: product.key,
+      product,
+      fetchedAt: Date.now(),
+    }),
+  );
+  const lookup = { kind: "prices" as const, productKey: product.key };
+  const removed = { status: "error", prices: [] };
+
+  expect(
+    await first.mutation(api.catalog.prices, { productKey: product.key }),
+  ).toMatchObject(removed);
+  await first.mutation(api.catalog.ensure, { lookup });
+  expect(await first.query(api.catalog.observe, { lookup })).toMatchObject(
+    removed,
+  );
+  expect(
+    await t.run((ctx) => ctx.db.query("catalogRequests").take(10)),
+  ).toHaveLength(0);
+});
