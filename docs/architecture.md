@@ -42,7 +42,7 @@ Caches can be rebuilt; receipt originals, revision evidence, corrections, and un
 
 Printed receipt text and integer øre amounts are the evidence for purchases. Domain calculations use `Ore` operations; serialized storage and client payloads remain numbers. Category memory records a classification decision; it does not establish product identity. A packaged catalog product, an equivalent candidate group, a product family, and purchased quantity serve different purposes.
 
-Equivalent catalog links can help users recognize an item without establishing its barcode, weight, ingredients, or exact-product price. Do not use a representative group's image as authority to fetch that representative's details for the purchased item. Catalog summaries and fetched details have separate completeness and freshness.
+Equivalent catalog links can help users recognize an item without establishing its barcode, weight, or ingredients. Do not use a representative group's image as authority to fetch that representative's details for the purchased item. Catalog summaries and fetched details have separate completeness and freshness.
 
 Parse package notation once and preserve conflicting evidence. A catalog pack count that conflicts with the receipt cannot fill a missing quantity. Unknown quantities stay unknown. Families can span package sizes while keeping brands and variants distinct; physical-quantity comparisons and item-count comparisons therefore need different evidence.
 

@@ -8,15 +8,10 @@ import { internal } from "./_generated/api";
 import {
   searchProducts,
   searchPhysicalStores,
-  findProductByEanBarcode,
   findProductById,
 } from "./kassalapp/generated/client";
 import { CatalogRequestError } from "./kassalapp/transport";
-import {
-  normalizeProducts,
-  normalizeStores,
-  normalizePrices,
-} from "./kassalapp/normalize";
+import { normalizeProducts, normalizeStores } from "./kassalapp/normalize";
 import {
   emptyCatalogResult,
   type CatalogRequest,
@@ -113,12 +108,6 @@ async function fetchCatalogResult(
       );
 
       return result;
-    case "prices":
-      return normalizePrices(
-        request.ean
-          ? await findProductByEanBarcode(request.ean, options)
-          : await findProductById(request.id, options),
-      );
   }
 }
 

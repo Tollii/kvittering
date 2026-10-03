@@ -55,6 +55,28 @@ async function enqueue(
   );
 }
 
+/**
+ * Rows queued before store prices were removed resolve empty here, so neither
+ * the provider worker nor result storage sees them.
+ */
+async function retireLegacyPrices(
+  ctx: MutationCtx,
+  id: Id<"catalogRequests">,
+): Promise<null> {
+  const now = Date.now();
+
+  await ctx.db.patch("catalogRequests", id, {
+    state: "ready",
+    result: emptyCatalogResult(),
+    fetchedAt: now,
+    expiresAt: now,
+    error: undefined,
+  });
+  await ctx.scheduler.runAfter(0, internal.catalogQueue.notify, { id });
+
+  return null;
+}
+
 /** One transactional cache entry is shared by all households and simultaneous requests. */
 /** A pending or running request will produce a result; start no other. */
 function isRequestInFlight(state: Doc<"catalogRequests">["state"]): boolean {
@@ -194,6 +216,8 @@ export const claim = internalMutation({
 
     if (!request || request.state !== "pending") return null;
 
+    if (request.request.kind === "prices") return retireLegacyPrices(ctx, id);
+
     if (!(await featureEnabled(ctx, "productLookup"))) {
       await ctx.db.patch("catalogRequests", id, {
         state: "error",
@@ -252,6 +276,8 @@ export const succeed = internalMutation({
     const request = await ctx.db.get("catalogRequests", id);
 
     if (!request || request.state !== "running") return null;
+
+    if (request.request.kind === "prices") return retireLegacyPrices(ctx, id);
     const now = Date.now();
 
     for (const product of result.products) {

@@ -43,10 +43,18 @@ export const physicalStoreValidator = v.object({
   longitude: number,
 });
 
-export const catalogPriceValidator = v.object({
-  store: v.string(),
-  priceOre: oreValidator,
-  checkedAt: text,
+/**
+ * Store prices were removed because the provider's prices are stale for large
+ * chains. Installed clients and requests stored before the removal still use
+ * these shapes, so the backend accepts and returns them without fetching prices.
+ */
+const legacyCatalogPricesValidator = v.array(
+  v.object({ store: v.string(), priceOre: oreValidator, checkedAt: text }),
+);
+
+export const legacyPricesLookupValidator = v.object({
+  kind: v.literal("prices"),
+  productKey: v.string(),
 });
 
 export const catalogRequestValidator = v.union(
@@ -57,21 +65,24 @@ export const catalogRequestValidator = v.union(
     productKey: v.string(),
     id: v.number(),
   }),
-  v.object({
-    kind: v.literal("prices"),
-    productKey: v.string(),
-    id: v.number(),
-    ean: text,
-  }),
+);
+
+/** Legacy: rows queued before store prices were removed, until they drain. */
+export const storedCatalogRequestValidator = v.union(
+  ...catalogRequestValidator.members,
+  legacyPricesLookupValidator.extend({ id: v.number(), ean: text }),
 );
 
 export const catalogResultValidator = v.object({
   products: v.array(catalogProductValidator),
   stores: v.array(physicalStoreValidator),
-  prices: v.array(catalogPriceValidator),
+  /** Legacy: results stored before store prices were removed. */
+  prices: legacyCatalogPricesValidator.optional(),
 });
 
 export const catalogResponseValidator = catalogResultValidator.extend({
+  /** Legacy: always empty. Installed clients read it from every response. */
+  prices: legacyCatalogPricesValidator,
   status: v.union(v.literal("pending"), v.literal("ready"), v.literal("error")),
   fetchedAt: number,
   retryAt: number,
@@ -93,7 +104,11 @@ export type CatalogResponse = Infer<typeof catalogResponseValidator>;
 export const emptyCatalogResult = (): CatalogResult => ({
   products: [],
   stores: [],
-  prices: [],
+});
+
+export const emptyCatalogResponse = () => ({
+  ...emptyCatalogResult(),
+  prices: [] satisfies CatalogResponse["prices"],
 });
 
 export function catalogIdentity(product: CatalogProduct): CatalogIdentity {
@@ -112,7 +127,6 @@ export const catalogLookupValidator = v.union(
     receiptId: v.id("receipts"),
   }),
   v.object({ kind: v.literal("details"), productKey: v.string() }),
-  v.object({ kind: v.literal("prices"), productKey: v.string() }),
 );
 
 export type CatalogLookup = Infer<typeof catalogLookupValidator>;
