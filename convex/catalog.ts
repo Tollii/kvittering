@@ -11,7 +11,7 @@ import {
   type CatalogLookup,
   type CatalogRequest,
   catalogResponseValidator,
-  emptyCatalogResult,
+  emptyCatalogResponse,
   type CatalogResponse,
 } from "../src/lib/catalog/model";
 import { clientMutation as mutation } from "./clientFunctions";
@@ -21,7 +21,7 @@ import { ensureRequest as enqueueRequest } from "./catalogQueue";
 import type { Doc } from "./_generated/dataModel";
 import { retailerCode } from "../src/lib/catalog/matching";
 
-/** The provider id to fetch details or prices by; equivalence groups have none. */
+/** The provider id to fetch details by; equivalence groups have none. */
 function providerId(record: Doc<"catalogProducts"> | null): number | null {
   return record && !record.product.equivalence
     ? (record.product.ids[0] ?? null)
@@ -29,9 +29,16 @@ function providerId(record: Doc<"catalogProducts"> | null): number | null {
 }
 
 const missingProduct = {
-  ...emptyCatalogResult(),
+  ...emptyCatalogResponse(),
   status: "error" as const,
   message: "Produktet finnes ikke i den lagrede katalogen.",
+};
+
+/** Installed clients still ask for store prices, which are no longer fetched. */
+const removedPrices: CatalogResponse = {
+  ...emptyCatalogResponse(),
+  status: "error",
+  message: "Butikkpriser er ikke lenger tilgjengelige.",
 };
 
 /** Cache hits are free; only admitted new work records its originating caller. */
@@ -41,21 +48,17 @@ async function ensureMemberRequest(ctx: MutationCtx, request: CatalogRequest) {
   return enqueueRequest(ctx, request, { payer, interactive: true });
 }
 
-/** Equivalent identities have no provider SKU from which to fetch details or prices. */
+/** Equivalent identities have no provider SKU from which to fetch details. */
 function equivalentResponse(
   record: Doc<"catalogProducts"> | null,
   kind: CatalogLookup["kind"],
 ): CatalogResponse | null {
   return record?.product.equivalence
     ? {
-        ...emptyCatalogResult(),
+        ...emptyCatalogResponse(),
         status: "ready",
         products: kind === "details" ? [record.product] : [],
         fetchedAt: record.fetchedAt,
-        message:
-          kind === "prices"
-            ? "Velg et bestemt produkt for å hente butikkpriser."
-            : undefined,
       }
     : null;
 }
@@ -65,6 +68,7 @@ export function requestResponse(
 ): CatalogResponse {
   return {
     ...request.result,
+    prices: [],
     status:
       request.state === "ready"
         ? "ready"
@@ -116,29 +120,10 @@ export const prices = mutation({
   service: "productLookup",
   args: { productKey: v.string() },
   returns: catalogResponseValidator,
-  handler: async (ctx, args) => {
+  handler: async (ctx) => {
     await requireMember(ctx);
 
-    const record = await ctx.db
-      .query("catalogProducts")
-      .withIndex("by_key", (q) => q.eq("key", args.productKey))
-      .unique();
-
-    const equivalent = equivalentResponse(record, "prices");
-
-    if (equivalent) return equivalent;
-    const id = providerId(record);
-
-    if (!record || id === null) return missingProduct;
-
-    return requestResponse(
-      await ensureMemberRequest(ctx, {
-        kind: "prices",
-        productKey: record.key,
-        id,
-        ean: record.product.ean,
-      }),
-    );
+    return removedPrices;
   },
 });
 
@@ -166,7 +151,7 @@ export const product = mutation({
       record.detailsFetchedAt + catalogDetailsTtl > Date.now()
     )
       return {
-        ...emptyCatalogResult(),
+        ...emptyCatalogResponse(),
         products: [record.product],
         status: "ready" as const,
         fetchedAt: record.detailsFetchedAt,
@@ -203,6 +188,8 @@ async function lookupContext(ctx: QueryCtx, lookup: CatalogLookup) {
 
   await requireMember(ctx);
 
+  if (lookup.kind === "prices") return { request: null, record: null };
+
   if (lookup.kind === "products")
     return {
       request: normalizeRequest({
@@ -220,12 +207,7 @@ async function lookupContext(ctx: QueryCtx, lookup: CatalogLookup) {
   const id = providerId(record);
 
   return {
-    request:
-      record && id !== null
-        ? lookup.kind === "prices"
-          ? { ...lookup, id, ean: record.product.ean }
-          : { ...lookup, id }
-        : null,
+    request: record && id !== null ? { ...lookup, id } : null,
     record,
   };
 }
@@ -259,13 +241,15 @@ export const observe = query({
   handler: async (ctx, { lookup, client }) => {
     await requireCompatibleClient(ctx, client, "productLookup");
     const { request, record } = await lookupContext(ctx, lookup);
+
+    if (lookup.kind === "prices") return removedPrices;
     const equivalent = equivalentResponse(record, lookup.kind);
 
     if (equivalent) return equivalent;
 
     if (!request)
       return {
-        ...emptyCatalogResult(),
+        ...emptyCatalogResponse(),
         status: "error" as const,
         message: "Produktet finnes ikke i den lagrede katalogen.",
       };
@@ -276,7 +260,7 @@ export const observe = query({
       record.detailsFetchedAt + catalogDetailsTtl > Date.now()
     )
       return {
-        ...emptyCatalogResult(),
+        ...emptyCatalogResponse(),
         products: [record.product],
         status: "ready" as const,
         fetchedAt: record.detailsFetchedAt,
@@ -306,7 +290,7 @@ export const observe = query({
     const response: CatalogResponse = row
       ? requestResponse(row)
       : {
-          ...emptyCatalogResult(),
+          ...emptyCatalogResponse(),
           status: "error",
           message: "Søket er ikke startet. Prøv igjen.",
         };

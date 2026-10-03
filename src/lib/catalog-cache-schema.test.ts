@@ -5,7 +5,7 @@ import {
   catalogCacheSchema,
   shouldPersistCatalogQuery,
 } from "./catalog-cache-schema";
-import { emptyCatalogResult } from "./catalog/model";
+import { emptyCatalogResponse } from "./catalog/model";
 
 const key = ["catalog", "lookup", '{"kind":"products","search":"milk"}'];
 
@@ -14,7 +14,7 @@ it("restores complete catalogue data and rejects damaged response fields", () =>
     defaultOptions: { queries: { gcTime: Infinity } },
   });
 
-  const response = { ...emptyCatalogResult(), status: "ready" };
+  const response = { ...emptyCatalogResponse(), status: "ready" };
   client.setQueryData(key, response);
 
   const stored = {
@@ -57,7 +57,7 @@ it("excludes pending, failed, malformed and unrelated query data", () => {
   });
 
   for (const status of ["pending", "error"]) {
-    client.setQueryData(key, { ...emptyCatalogResult(), status });
+    client.setQueryData(key, { ...emptyCatalogResponse(), status });
     expect(
       dehydrate(client, { shouldDehydrateQuery: shouldPersistCatalogQuery })
         .queries,
@@ -66,7 +66,7 @@ it("excludes pending, failed, malformed and unrelated query data", () => {
 
   client.setQueryData(key, { status: "ready" });
   client.setQueryData(["receipts"], {
-    ...emptyCatalogResult(),
+    ...emptyCatalogResponse(),
     status: "ready",
   });
   expect(

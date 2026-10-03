@@ -35,14 +35,9 @@ export function requestKey(request: CatalogRequest) {
 }
 
 export function resultLifetime(request: CatalogRequest, result: CatalogResult) {
-  const count =
-    result.products.length + result.stores.length + result.prices.length;
+  if (!result.products.length && !result.stores.length) return 7 * day;
 
-  if (!count) return 7 * day;
-
-  return request.kind === "prices"
-    ? 6 * 60 * 60 * 1000
-    : request.kind === "stores" || request.kind === "details"
-      ? catalogDetailsTtl
-      : day;
+  return request.kind === "stores" || request.kind === "details"
+    ? catalogDetailsTtl
+    : day;
 }

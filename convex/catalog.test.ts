@@ -110,7 +110,7 @@ it("persists equivalent matches safely across catalog reads, old editors and man
   ).toEqual(details.products);
   expect(
     await first.mutation(api.catalog.prices, { productKey: group.key }),
-  ).toMatchObject({ status: "ready", prices: [] });
+  ).toMatchObject({ status: "error", prices: [] });
   expect(
     await t.run((ctx) => ctx.db.query("catalogRequests").take(10)),
   ).toHaveLength(0);

@@ -1,10 +1,8 @@
-import { date } from "../testing/calendar";
 import { present } from "../testing/receipts";
 import { expect, it } from "vitest";
 import { parse } from "convex-helpers/validators";
 import {
   normalizeProducts,
-  normalizePrices,
   normalizeStores,
 } from "../../../convex/kassalapp/normalize";
 import {
@@ -334,7 +332,7 @@ it("requires a barcode for a branded match with additional catalog words", () =>
   ).toBeNull();
 });
 
-it("requires a unique branch match and keeps price data separate from product identity", () => {
+it("requires a unique branch match", () => {
   const stores = normalizeStores({
     data: [
       {
@@ -353,21 +351,6 @@ it("requires a unique branch match and keeps price data separate from product id
       { ...present(stores[0]), id: 2 },
     ]),
   ).toBeNull();
-
-  const result = normalizePrices({
-    data: {
-      products: [
-        { store: { name: "KIWI" }, current_price: 29.9 },
-        {
-          store: { name: "MENY" },
-          current_price: { price: 32.5, date: date("2026-09-18") },
-        },
-      ],
-    },
-  });
-
-  expect(result.prices.map((item) => item.priceOre)).toEqual([2990, 3250]);
-  expect(result.products).toEqual([]);
 });
 
 it("recovers an omitted weight unit only from an explicit, consistent product name", () => {
