@@ -1,10 +1,9 @@
-import { unclearCategoryId } from "../src/lib/domain/categories";
+import { applyClassifications } from "../src/lib/domain/reading-evaluation";
 import { isReceiptBeingRead } from "../src/lib/domain/receipt-state";
 import { notifyReceiptActivities } from "./liveActivities";
 import { linkCatalogProduct } from "./catalogLinks";
 import { compatibleCatalogProduct } from "../src/lib/catalog/matching";
 import { commitReceiptChange } from "./receiptChanges";
-import { categoryUncertainIssue } from "../src/lib/domain/receipt-issues";
 import { v, type Infer, type ObjectType } from "convex/values";
 import { errorDetails } from "../src/lib/diagnostics";
 import { WorkflowManager } from "@convex-dev/workflow";
@@ -31,10 +30,7 @@ import {
   matchingKey,
   compatibleProduct,
 } from "../src/lib/domain/product-matching";
-import {
-  canAcceptReceipt,
-  categoryReviewThreshold,
-} from "../src/lib/domain/receipt-review";
+import { canAcceptReceipt } from "../src/lib/domain/receipt-review";
 
 const workflow = new WorkflowManager(components.workflow);
 
@@ -92,20 +88,7 @@ export const processReceipt = workflow
         },
       );
 
-      for (const result of classification.classifications) {
-        const line = prepared.lines.find((line) => line.id === result.id);
-
-        if (line) {
-          line.categoryId = result.categoryId;
-          line.confidence = result.confidence;
-
-          if (
-            result.confidence < categoryReviewThreshold ||
-            result.categoryId === unclearCategoryId
-          )
-            line.issues.push(categoryUncertainIssue);
-        }
-      }
+      applyClassifications(prepared, classification.classifications);
 
       stage = "product_matching";
 

@@ -1,0 +1,39 @@
+name: Reading evaluation
+
+# Scores staging's stored readings against what people approved. A replay
+# re-reads approved receipts with staging's reader and costs model calls.
+on:
+  workflow_dispatch:
+    inputs:
+      replay:
+        description: Re-read this many of the newest approved receipts (0 for none)
+        required: false
+        default: "0"
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  evaluate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - name: Evaluate staging readings
+        env:
+          CONVEX_DEPLOY_KEY: ${{ secrets.CONVEX_STAGING_DEPLOY_KEY }}
+          REPLAY: ${{ inputs.replay }}
+        run: |
+          if [ "$REPLAY" -gt 0 ] 2>/dev/null; then
+            npm run eval -- --replay "$REPLAY"
+          else
+            npm run eval
+          fi
