@@ -1,12 +1,9 @@
-import { Ore } from "../../src/lib/domain/ore";
 import { parseProductEvidence } from "../../src/lib/domain/product-evidence";
 import { z } from "zod";
 import type {
   CatalogProduct,
-  CatalogResult,
   PhysicalStore,
 } from "../../src/lib/catalog/model";
-import { emptyCatalogResult } from "../../src/lib/catalog/model";
 
 const nullableText = z.string().nullish();
 
@@ -169,60 +166,4 @@ export function normalizeStores(response: unknown): PhysicalStore[] {
       latitude: row.position?.lat ?? undefined,
       longitude: row.position?.lng ?? undefined,
     }));
-}
-
-// oxlint-disable-next-line anti-slop/no-unknown-parameters -- This boundary parser validates external input before returning a domain value.
-export function normalizePrices(response: unknown): CatalogResult {
-  const data = z.object({ data: z.unknown() }).parse(response).data;
-  const rows = z.object({ products: z.array(z.unknown()) }).safeParse(data);
-  const products = rows.success ? rows.data.products : [data];
-  const result = emptyCatalogResult();
-
-  for (const product of products.slice(0, 24)) {
-    const value = z
-      .object({
-        store: z
-          .union([
-            z.array(z.object({ name: z.string() })),
-            z.object({ name: z.string() }),
-          ])
-          .nullish(),
-        current_price: z
-          .union([
-            z
-              .number()
-              .transform((price) => [
-                { price, date: undefined, useUpdatedAt: true as const },
-              ]),
-            z.array(z.object({ price: z.number(), date: nullableText })),
-            z
-              .object({ price: z.number(), date: nullableText })
-              .transform((price) => [price]),
-          ])
-          .nullish(),
-        updated_at: nullableText,
-      })
-      .parse(product);
-
-    const store = Array.isArray(value.store)
-      ? value.store[0]?.name
-      : value.store?.name;
-
-    const prices = value.current_price ?? [];
-
-    for (const price of prices) {
-      if (price.price < 0 || !Number.isFinite(price.price)) continue;
-      result.prices.push({
-        store: store ?? "Ukjent butikk",
-        priceOre: Ore.fromKroner(price.price),
-        checkedAt:
-          ("useUpdatedAt" in price ? value.updated_at : price.date) ??
-          undefined,
-      });
-    }
-  }
-
-  result.prices = result.prices.slice(0, 24);
-
-  return result;
 }

@@ -110,7 +110,7 @@ it("persists equivalent matches safely across catalog reads, old editors and man
   ).toEqual(details.products);
   expect(
     await first.mutation(api.catalog.prices, { productKey: group.key }),
-  ).toMatchObject({ status: "ready", prices: [] });
+  ).toMatchObject({ status: "error", prices: [] });
   expect(
     await t.run((ctx) => ctx.db.query("catalogRequests").take(10)),
   ).toHaveLength(0);
@@ -780,4 +780,56 @@ it("keeps receipt-owned store observation inside its household", async () => {
       lookup: { kind: "stores", receiptId, search: "Oslo" },
     }),
   ).rejects.toThrow("ikke tilgjengelig");
+});
+
+it("answers installed clients' store price lookups without queuing provider work", async () => {
+  const { t, first } = await setup();
+
+  const product = present(
+    normalizeProducts({ data: [{ id: 41, name: "Cola 500ml" }] })[0],
+  );
+
+  await t.run((ctx) =>
+    ctx.db.insert("catalogProducts", {
+      key: product.key,
+      product,
+      fetchedAt: Date.now(),
+    }),
+  );
+  const lookup = { kind: "prices" as const, productKey: product.key };
+  const removed = { status: "error", prices: [] };
+
+  expect(
+    await first.mutation(api.catalog.prices, { productKey: product.key }),
+  ).toMatchObject(removed);
+  await first.mutation(api.catalog.ensure, { lookup });
+  expect(await first.query(api.catalog.observe, { lookup })).toMatchObject(
+    removed,
+  );
+  expect(
+    await t.run((ctx) => ctx.db.query("catalogRequests").take(10)),
+  ).toHaveLength(0);
+});
+
+it("retires price requests queued before store prices were removed without provider work", async () => {
+  const { t } = await setup();
+
+  const id = await t.run((ctx) =>
+    ctx.db.insert("catalogRequests", {
+      key: JSON.stringify(["prices", "kassalapp:41"]),
+      request: { kind: "prices", productKey: "kassalapp:41", id: 41 },
+      state: "pending",
+      result: emptyCatalogResult(),
+      expiresAt: 0,
+      attempts: 0,
+      scheduledAt: Date.now(),
+    }),
+  );
+
+  expect(await t.mutation(internal.catalogQueue.claim, { id })).toBeNull();
+  expect(await t.query(internal.catalogQueue.read, { id })).toMatchObject({
+    state: "ready",
+    attempts: 0,
+    result: { products: [], stores: [] },
+  });
 });

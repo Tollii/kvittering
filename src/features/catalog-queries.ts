@@ -93,11 +93,3 @@ export function useCatalogProduct(key: string) {
     catalogDetailsTtl,
   );
 }
-
-export function useCatalogPrices(key: string, enabled: boolean) {
-  return useCatalogLookup(
-    { kind: "prices", productKey: key },
-    enabled,
-    day / 4,
-  );
-}

@@ -16,11 +16,7 @@ import {
   Row,
   Sheet,
 } from "@/components/ui";
-import {
-  useCatalogProduct,
-  useCatalogPrices,
-  useCatalogSearch,
-} from "./catalog-queries";
+import { useCatalogProduct, useCatalogSearch } from "./catalog-queries";
 import type { CatalogIdentity, CatalogProduct } from "@/lib/catalog/model";
 import { catalogInsights } from "@/lib/catalog/insights";
 import { productSearch, rankCatalogProducts } from "@/lib/catalog/matching";
@@ -161,8 +157,6 @@ export function CatalogProductSheet({
 }>) {
   const productLookup = useFeatureFlag("productLookup");
   const query = useCatalogProduct(product.key);
-  const [showPrices, setShowPrices] = useState(false);
-  const prices = useCatalogPrices(product.key, showPrices);
   const full = query.data?.products[0];
 
   const imageSources = [
@@ -284,45 +278,6 @@ export function CatalogProductSheet({
           Strekkode: {product.ean}
         </Copy>
       )}
-      {!product.equivalence &&
-        (!showPrices ? (
-          <Button
-            title="Hent butikkpriser"
-            variant="secondary"
-            onPress={() => setShowPrices(true)}
-          />
-        ) : (
-          <Panel>
-            <Copy weight="600">Priser i katalogen</Copy>
-            {((prices.isFetching && !prices.data) ||
-              prices.data?.status === "pending") && (
-              <Loading title="Henter priser …" />
-            )}
-            {(prices.isError || prices.data?.status === "error") && (
-              <Notice>
-                {prices.data?.message ?? "Prisene kunne ikke hentes nå."}
-              </Notice>
-            )}
-            {prices.data?.prices.map((price, index) => (
-              <Row
-                // oxlint-disable-next-line react/no-array-index-key -- Provider prices have no identity and are never reordered.
-                key={`${price.store}-${index}`}
-                title={price.store}
-                detail={
-                  price.checkedAt
-                    ? CalendarDate.format(
-                        CalendarDate.ofInstant(price.checkedAt),
-                      )
-                    : "Dato ukjent"
-                }
-                value={Ore.format(price.priceOre)}
-              />
-            ))}
-            {prices.data?.status === "ready" && !prices.data.prices.length && (
-              <Copy muted>Ingen priser</Copy>
-            )}
-          </Panel>
-        ))}
       <Copy size={12} muted>
         Produktdata fra Kassalapp
         {query.data?.fetchedAt
