@@ -4,6 +4,7 @@ import { isDecidedCategory, unclearCategoryId } from "./categories";
 import {
   isTotalsLine,
   normalizeAlias,
+  printedName,
   reconcile,
   type ReceiptData,
   type ReceiptLine,
@@ -55,24 +56,54 @@ export type ReadingScore = {
 };
 
 /**
- * Lines keep their reader ids through review, so they pair by id. A line a
- * person added has no reading and counts as missed.
+ * Pair each approved product line with at most one read product line. Stored
+ * readings keep their ids through review; a new reading of the same images
+ * gets new ids, so the rest pair by printed text, then by amount. A line a
+ * person added and nothing matches counts as missed.
  */
+function pairProducts(reading: ReceiptData, approved: ReceiptLine[]) {
+  const unused = new Set(
+    reading.lines.filter((line) => line.kind === "product"),
+  );
+
+  const pairs = new Map<ReceiptLine, ReceiptLine>();
+
+  const printed = (line: ReceiptLine) =>
+    normalizeAlias(line.originalText || printedName(line));
+
+  const rules: ((expected: ReceiptLine, read: ReceiptLine) => boolean)[] = [
+    (expected, read) => expected.id === read.id,
+    (expected, read) =>
+      printed(expected) === printed(read) &&
+      expected.amountOre === read.amountOre,
+    (expected, read) => printed(expected) === printed(read),
+    (expected, read) => expected.amountOre === read.amountOre,
+  ];
+
+  for (const rule of rules)
+    for (const expected of approved) {
+      if (pairs.has(expected)) continue;
+
+      const match = [...unused].find((read) => rule(expected, read));
+
+      if (!match) continue;
+      pairs.set(expected, match);
+      unused.delete(match);
+    }
+
+  return (line: ReceiptLine) => pairs.get(line) ?? null;
+}
+
 export function scoreReading(
   reading: ReceiptData,
   approved: ReceiptData,
 ): ReadingScore {
-  const read = new Map(reading.lines.map((line) => [line.id, line]));
   const products = approved.lines.filter((line) => line.kind === "product");
 
   const counted = (predicate: (line: ReceiptLine) => boolean) =>
     products.filter(predicate).length;
 
-  const pair = (line: ReceiptLine) => {
-    const other = read.get(line.id);
-
-    return other?.kind === "product" ? other : null;
-  };
+  const pair = pairProducts(reading, products);
 
   const categorized = products.filter((line) =>
     isDecidedCategory(line.categoryId),

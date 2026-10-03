@@ -61,11 +61,22 @@ const scorecardSchema = z.object({
   complete: z.boolean(),
 });
 
-const replaySchema = z.object({
-  summary: summarySchema,
-  results: z.array(
-    z.object({ receiptId: z.string(), error: z.string().optional() }),
-  ),
+const scoreSchema = z.object({
+  totalCorrect: z.boolean().nullable(),
+  balanced: z.boolean(),
+  products: count,
+  amountsCorrect: count,
+  namesKept: count,
+  categorized: count,
+  categoriesCorrect: count,
+  categoriesUnclear: count,
+  flaggedLines: count,
+});
+
+const replayResultSchema = z.object({
+  receiptId: z.string(),
+  score: scoreSchema.nullable(),
+  error: z.string().optional(),
 });
 
 const ratesSchema = z.record(z.string(), z.number());
@@ -74,8 +85,9 @@ const resultsSchema = z.record(z.string(), ratesSchema);
 
 type FunctionArgs =
   | Record<string, never>
-  | { sample: number }
-  | { receiptIds: string[] };
+  | { count: number }
+  | { receiptId: string }
+  | { scores: z.infer<typeof scoreSchema>[] };
 
 const deployment = values.deployment ? ["--deployment", values.deployment] : [];
 
@@ -152,17 +164,35 @@ const receiptIds = values["replay-ids"]
   : undefined;
 
 if (receiptIds || values.replay) {
-  const replay = run(
-    "readingEvaluation:replay",
-    replaySchema,
-    receiptIds ? { receiptIds } : { sample: Number(values.replay) },
+  const ids =
+    receiptIds ??
+    run("readingEvaluation:recentApproved", z.array(z.string()), {
+      count: Number(values.replay),
+    });
+
+  const replayed = ids.map((receiptId, index) => {
+    console.error(`replaying ${index + 1}/${ids.length} ${receiptId}`);
+
+    return run("readingEvaluation:replayOne", replayResultSchema, {
+      receiptId,
+    });
+  });
+
+  const scores = replayed.flatMap((result) =>
+    result.score ? [result.score] : [],
   );
 
-  print("Replayed with this deployment's reader", replay.summary);
-  results.replay = rates(replay.summary);
+  const summary = run("readingEvaluation:summarize", summarySchema, {
+    scores,
+  });
 
-  for (const result of replay.results.filter((result) => result.error))
+  print("Replayed with this deployment's reader", summary);
+  results.replay = rates(summary);
+
+  for (const result of replayed.filter((result) => result.error))
     console.log(`  not scored: ${result.receiptId} ${result.error}`);
+
+  console.log(`  replayed ids: ${JSON.stringify(ids)}`);
 }
 
 if (values.fixed) {

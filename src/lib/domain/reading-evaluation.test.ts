@@ -56,6 +56,24 @@ it("scores a reading against what a person approved", () => {
   });
 });
 
+it("pairs a fresh reading of the same receipt by printed text and amount", () => {
+  const reading = batteryFixture();
+  reading.lines = reading.lines.map((line) => ({
+    ...line,
+    id: `new-${line.id}`,
+  }));
+
+  const approved = batteryFixture();
+  present(approved.lines[0]).name = "Battery Remix energidrikk";
+
+  expect(scoreReading(reading, approved)).toMatchObject({
+    products: 1,
+    amountsCorrect: 1,
+    namesKept: 0,
+    categoriesCorrect: 1,
+  });
+});
+
 it("flags classifier answers a person must confirm", () => {
   const data = batteryFixture();
   present(data.lines[0]).issues = [];

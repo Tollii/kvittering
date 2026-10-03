@@ -60,11 +60,13 @@ type Miss = Infer<typeof missValidator>;
 
 type Summary = Infer<typeof summaryValidator>;
 
-type ReplayResult = {
-  receiptId: Id<"receipts">;
-  score: ReadingScore | null;
-  error?: string;
-};
+const replayResultValidator = v.object({
+  receiptId: v.id("receipts"),
+  score: v.union(scoreValidator, v.null()),
+  error: v.optional(v.string()),
+});
+
+type ReplayResult = Infer<typeof replayResultValidator>;
 
 /** Receipts a person approved; automatic approvals say nothing about the reader. */
 function approvedByPerson(receipt: Doc<"receipts">) {
@@ -235,83 +237,49 @@ export const recentApproved = internalQuery({
 });
 
 /**
- * Read approved receipts again with this deployment's reader and classifier,
- * without household memory, and score them. Each receipt costs one reading
- * and one classification call. Compare runs across deployments or prompts.
+ * Read one approved receipt again with this deployment's reader and
+ * classifier, without household memory, and score it. One receipt per call
+ * keeps each reading within the action time limit; `npm run eval` loops.
+ * Each call costs one reading and one classification call.
  */
-export const replay = internalAction({
-  args: {
-    receiptIds: v.optional(v.array(v.id("receipts"))),
-    sample: v.optional(v.number()),
-  },
-  returns: v.object({
-    summary: summaryValidator,
-    results: v.array(
-      v.object({
-        receiptId: v.id("receipts"),
-        score: v.union(scoreValidator, v.null()),
-        error: v.optional(v.string()),
-      }),
-    ),
-  }),
-  handler: async (
-    ctx,
-    args,
-  ): Promise<{ summary: Summary; results: ReplayResult[] }> => {
-    const ids: Id<"receipts">[] =
-      args.receiptIds ??
-      (await ctx.runQuery(internal.readingEvaluation.recentApproved, {
-        count: args.sample ?? 10,
-      }));
+export const replayOne = internalAction({
+  args: { receiptId: v.id("receipts") },
+  returns: replayResultValidator,
+  handler: async (ctx, { receiptId }): Promise<ReplayResult> => {
+    const replayCase: {
+      storageIds: Id<"_storage">[];
+      approved: Infer<typeof receiptDataValidator>;
+    } | null = await ctx.runQuery(internal.readingEvaluation.replayCase, {
+      id: receiptId,
+    });
 
-    if (ids.length > 50) throw new Error("Replay at most 50 receipts at once.");
+    if (!replayCase) return { receiptId, score: null, error: "not replayable" };
 
-    const results: ReplayResult[] = [];
-
-    for (const receiptId of ids) {
-      const replayCase: {
-        storageIds: Id<"_storage">[];
-        approved: Infer<typeof receiptDataValidator>;
-      } | null = await ctx.runQuery(internal.readingEvaluation.replayCase, {
-        id: receiptId,
+    try {
+      const { data } = await ctx.runAction(internal.providers.extract, {
+        storageIds: replayCase.storageIds,
       });
 
-      if (!replayCase) {
-        results.push({ receiptId, score: null, error: "not replayable" });
-        continue;
-      }
+      const classification = await ctx.runAction(internal.providers.classify, {
+        products: classificationInputs(data),
+      });
 
-      try {
-        const { data } = await ctx.runAction(internal.providers.extract, {
-          storageIds: replayCase.storageIds,
-        });
+      applyClassifications(data, classification.classifications);
 
-        const classification = await ctx.runAction(
-          internal.providers.classify,
-          {
-            products: classificationInputs(data),
-          },
-        );
-
-        applyClassifications(data, classification.classifications);
-        results.push({
-          receiptId,
-          score: scoreReading(data, replayCase.approved),
-        });
-      } catch (error) {
-        results.push({
-          receiptId,
-          score: null,
-          error: error instanceof Error ? error.message : "replay failed",
-        });
-      }
+      return { receiptId, score: scoreReading(data, replayCase.approved) };
+    } catch (error) {
+      return {
+        receiptId,
+        score: null,
+        error: error instanceof Error ? error.message : "replay failed",
+      };
     }
-
-    return {
-      summary: summarizeReadings(
-        results.flatMap((result) => (result.score ? [result.score] : [])),
-      ),
-      results,
-    };
   },
+});
+
+/** Add up replayed scores the same way the scorecard does. */
+export const summarize = internalQuery({
+  args: { scores: v.array(scoreValidator) },
+  returns: summaryValidator,
+  handler: (_ctx, { scores }): Summary => summarizeReadings(scores),
 });
