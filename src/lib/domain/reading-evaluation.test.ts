@@ -28,6 +28,7 @@ it("scores a reading against what a person approved", () => {
     namesKept: 0,
     categorized: 2,
     categoriesCorrect: 0,
+    readProducts: 1,
     categoriesUnclear: 1,
     flaggedLines: 1,
   });

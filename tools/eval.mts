@@ -30,6 +30,14 @@ const { values } = parseArgs({
   },
 });
 
+const replayCount = values.replay ? Number(values.replay) : undefined;
+
+if (
+  replayCount !== undefined &&
+  (!Number.isInteger(replayCount) || replayCount < 1)
+)
+  throw new Error("--replay takes a positive whole number.");
+
 const count = z.number();
 
 const summarySchema = z.object({
@@ -42,6 +50,7 @@ const summarySchema = z.object({
   namesKept: count,
   categorized: count,
   categoriesCorrect: count,
+  readProducts: count,
   categoriesUnclear: count,
   flaggedLines: count,
 });
@@ -114,7 +123,7 @@ function rates(summary: Summary) {
       summary.categorized,
     ),
     "lines with a clear category":
-      100 - percent(summary.categoriesUnclear, summary.products),
+      100 - percent(summary.categoriesUnclear, summary.readProducts),
   } satisfies z.infer<typeof ratesSchema>;
 }
 
@@ -152,13 +161,15 @@ const receiptIds = values["replay-ids"]
       .parse(JSON.parse(readFileSync(values["replay-ids"], "utf8")))
   : undefined;
 
-if (receiptIds || values.replay) {
-  const ids =
-    receiptIds ??
-    run("readingEvaluation:recentApproved", z.array(z.string()), {
-      count: Number(values.replay),
-    });
+const ids =
+  receiptIds ??
+  (replayCount
+    ? run("readingEvaluation:recentApproved", z.array(z.string()), {
+        count: replayCount,
+      })
+    : undefined);
 
+if (ids) {
   const replayed = ids.map((receiptId, index) => {
     console.error(`replaying ${index + 1}/${ids.length} ${receiptId}`);
 

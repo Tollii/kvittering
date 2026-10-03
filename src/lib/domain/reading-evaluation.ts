@@ -26,8 +26,10 @@ export const readingScoreValidator = v.object({
   /** Approved lines with a decided category, and how many of those the reading had right. */
   categorized: v.number(),
   categoriesCorrect: v.number(),
-  /** Read product lines left for a person: an unclear category, or another flagged issue. */
+  /** Product lines the reading returned, and how many of those it left without a clear category. */
+  readProducts: v.number(),
   categoriesUnclear: v.number(),
+  /** Read lines with an issue other than category uncertainty. */
   flaggedLines: v.number(),
 });
 
@@ -120,6 +122,7 @@ export function scoreReading(
     categoriesCorrect: categorized.filter(
       (line) => pair(line)?.categoryId === line.categoryId,
     ).length,
+    readProducts: readProducts.length,
     categoriesUnclear: readProducts.filter(
       (line) =>
         line.categoryId === unclearCategoryId ||
@@ -149,6 +152,7 @@ export function summarizeReadings(
     namesKept: sum((score) => score.namesKept),
     categorized: sum((score) => score.categorized),
     categoriesCorrect: sum((score) => score.categoriesCorrect),
+    readProducts: sum((score) => score.readProducts),
     categoriesUnclear: sum((score) => score.categoriesUnclear),
     flaggedLines: sum((score) => score.flaggedLines),
   };
