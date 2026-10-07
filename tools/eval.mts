@@ -5,6 +5,11 @@
  *   npm run eval -- --replay 10           also re-read the 10 newest approved receipts
  *   npm run eval -- --replay-ids ids.json also re-read a fixed golden set of receipt ids
  *   npm run eval -- --fixed               also run the fixed product family and catalog cases
+ *   npm run eval -- --compare openai:gpt-6-luna,anthropic:claude-haiku-5-5
+ *                                         compare models side by side: each re-reads the
+ *                                         same receipts (10 unless --replay or --replay-ids
+ *                                         says otherwise) and answers the same product
+ *                                         questions; typesafe models only answer questions
  *   npm run eval -- --replay 10 --readers openai:gpt-6-luna,anthropic:claude-haiku-5-5
  *                                         re-read the same receipts with each reader model
  *   npm run eval -- --compare-models      compare decision models on the same product questions
@@ -17,9 +22,9 @@
  * Receipt images and ids stay in the deployment and local files; never commit
  * a golden set, because receipts are household data and the repo is public.
  */
-import { execFileSync } from "node:child_process";
+import { execFile } from "node:child_process";
 import { readFileSync, writeFileSync } from "node:fs";
-import { parseArgs } from "node:util";
+import { parseArgs, promisify } from "node:util";
 import { z } from "zod";
 import { summarizeReadings } from "../src/lib/domain/reading-summary.ts";
 
@@ -35,10 +40,17 @@ const { values } = parseArgs({
     readers: { type: "string" },
     "compare-models": { type: "boolean", default: false },
     models: { type: "string" },
+    compare: { type: "string" },
   },
 });
 
-const replayCount = values.replay ? Number(values.replay) : undefined;
+const compared = values.compare?.split(",");
+
+const replayCount = values.replay
+  ? Number(values.replay)
+  : compared && !values["replay-ids"]
+    ? 10
+    : undefined;
 
 if (
   replayCount !== undefined &&
@@ -109,8 +121,14 @@ type FunctionArgs =
 
 const deployment = values.deployment ? ["--deployment", values.deployment] : [];
 
-function run<T>(fn: string, schema: z.ZodType<T>, args: FunctionArgs = {}): T {
-  const output = execFileSync(
+const execFileAsync = promisify(execFile);
+
+async function run<T>(
+  fn: string,
+  schema: z.ZodType<T>,
+  args: FunctionArgs = {},
+): Promise<T> {
+  const { stdout } = await execFileAsync(
     process.execPath,
     [
       "node_modules/convex/bin/main.js",
@@ -123,7 +141,7 @@ function run<T>(fn: string, schema: z.ZodType<T>, args: FunctionArgs = {}): T {
   );
 
   // `convex run` prints nothing when a function returns null.
-  return schema.parse(JSON.parse(output.trim() || "null"));
+  return schema.parse(JSON.parse(stdout.trim() || "null"));
 }
 
 const percent = (part: number, whole: number) =>
@@ -160,9 +178,28 @@ function print(title: string, summary: Summary) {
   printRates(rates(summary));
 }
 
+/** One column per model, so two readers read side by side. */
+function printColumns(columns: Record<string, z.infer<typeof ratesSchema>>) {
+  const names = Object.keys(columns);
+  const width = Math.max(...names.map((name) => name.length), 7);
+
+  console.log(
+    `\n  ${"".padEnd(30)} ${names.map((name) => name.padStart(width)).join("  ")}`,
+  );
+
+  for (const rate of Object.keys(Object.values(columns)[0] ?? {}))
+    console.log(
+      `  ${rate.padEnd(30)} ${names
+        .map((name) =>
+          `${(columns[name]?.[rate] ?? 0).toFixed(1)} %`.padStart(width),
+        )
+        .join("  ")}`,
+    );
+}
+
 const results: z.infer<typeof resultsSchema> = {};
 
-const scorecard = run("readingEvaluation:scorecard", scorecardSchema);
+const scorecard = await run("readingEvaluation:scorecard", scorecardSchema);
 
 print(
   `Stored readings${scorecard.complete ? "" : " (newest 500)"}`,
@@ -185,51 +222,80 @@ const receiptIds = values["replay-ids"]
 const ids =
   receiptIds ??
   (replayCount
-    ? run("readingEvaluation:recentApproved", z.array(z.string()), {
+    ? await run("readingEvaluation:recentApproved", z.array(z.string()), {
         count: replayCount,
       })
     : undefined);
 
+/** Typesafe models only answer product questions; they cannot read images. */
+const canRead = (model: string) => !model.startsWith("typesafe:");
+
 // One column per reader model; without --readers, the deployment's own reader.
-const readers = values.readers?.split(",") ?? [undefined];
+const readers = compared?.filter(canRead) ??
+  values.readers?.split(",") ?? [undefined];
 
-if (ids)
-  for (const model of readers) {
-    const replayed = ids.map((receiptId, index) => {
-      const reader = model ? ` with ${model}` : "";
-      console.error(
-        `replaying ${index + 1}/${ids.length} ${receiptId}${reader}`,
-      );
+async function replay(model: string | undefined, receipts: string[]) {
+  const replayed = [];
 
-      return run(
+  // Each model reads one receipt at a time; the models run side by side.
+  for (const [index, receiptId] of receipts.entries()) {
+    const reader = model ? ` with ${model}` : "";
+    console.error(
+      `replaying ${index + 1}/${receipts.length} ${receiptId}${reader}`,
+    );
+
+    replayed.push(
+      await run(
         "readingEvaluation:replayOne",
         replayResultSchema,
         model ? { receiptId, model } : { receiptId },
-      );
-    });
-
-    const scores = replayed.flatMap((result) =>
-      result.score ? [result.score] : [],
+      ),
     );
+  }
 
-    const summary = summarizeReadings(scores);
+  return replayed;
+}
+
+if (ids) {
+  const replays = await Promise.all(
+    readers.map(async (model) => ({
+      model,
+      replayed: await replay(model, ids),
+    })),
+  );
+
+  for (const { model, replayed } of replays) {
+    const summary = summarizeReadings(
+      replayed.flatMap((result) => (result.score ? [result.score] : [])),
+    );
 
     print(`Replayed with ${model ?? "this deployment's reader"}`, summary);
     results[model ? `replay ${model}` : "replay"] = rates(summary);
 
     for (const result of replayed.filter((result) => result.error))
       console.log(`  not scored: ${result.receiptId} ${result.error}`);
-
-    console.log(`  replayed ids: ${JSON.stringify(ids)}`);
   }
 
+  if (replays.length > 1)
+    printColumns(
+      Object.fromEntries(
+        replays.map(({ model }) => [
+          model ?? "deployment",
+          results[model ? `replay ${model}` : "replay"] ?? {},
+        ]),
+      ),
+    );
+
+  console.log(`  replayed ids: ${JSON.stringify(ids)}`);
+}
+
 if (values.fixed) {
-  const families = run(
+  const families = await run(
     "productAnalysisEvaluation:evaluate",
     z.array(z.object({ expected: z.string(), choice: z.string() })),
   );
 
-  const catalog = run(
+  const catalog = await run(
     "catalogMatchingEvaluation:evaluate",
     z.array(z.object({ passed: z.boolean() })),
   );
@@ -248,14 +314,13 @@ if (values.fixed) {
   printRates(results.fixed);
 }
 
-if (values["compare-models"]) {
-  const models = values.models
-    ? values.models.split(",")
-    : [
-        "typesafe:jev-latest",
-        "openai:gpt-6-luna",
-        "anthropic:claude-haiku-5-5",
-      ];
+if (compared ?? values["compare-models"]) {
+  const models = compared ??
+    values.models?.split(",") ?? [
+      "typesafe:jev-latest",
+      "openai:gpt-6-luna",
+      "anthropic:claude-haiku-5-5",
+    ];
 
   const outcome = z.object({
     actual: z.string(),
@@ -286,12 +351,13 @@ if (values["compare-models"]) {
 
   type Outcome = z.infer<typeof outcome>;
 
-  const fixed = run("modelComparison:compareFixed", comparison, { models });
-
-  const approved = run("modelComparison:compareCategories", comparison, {
-    models,
-    count: 100,
-  });
+  const [fixed, approved] = await Promise.all([
+    run("modelComparison:compareFixed", comparison, { models }),
+    run("modelComparison:compareCategories", comparison, {
+      models,
+      count: 100,
+    }),
+  ]);
 
   const missing: Outcome = { actual: "not run", confidence: null };
 
