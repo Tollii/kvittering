@@ -8,6 +8,7 @@ import { errorDetails } from "../src/lib/diagnostics";
 import { WorkflowManager } from "@convex-dev/workflow";
 import { components, internal } from "./_generated/api";
 import { internalQuery, env, type MutationCtx } from "./_generated/server";
+import { hasProductModel } from "./providerConfig";
 import type { Doc, Id } from "./_generated/dataModel";
 import { internalMutation } from "./serverFunctions";
 import {
@@ -377,7 +378,7 @@ async function linkExtractedLine(
 function nextEnrichment(): "catalog" | "analysis" | "none" {
   if (env.KASSALAPP_API_KEY) return "catalog";
 
-  if (env.TYPESAFE_API_KEY) return "analysis";
+  if (hasProductModel()) return "analysis";
 
   return "none";
 }

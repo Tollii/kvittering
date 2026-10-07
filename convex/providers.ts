@@ -1,12 +1,7 @@
 "use node";
 
-import { providerFetch } from "./providerTransport";
-
-import { Buffer } from "node:buffer";
-
-import OpenAI from "openai";
-import { zodTextFormat } from "openai/helpers/zod";
-import { TypeSafeClient } from "@typesafe-ai/sdk";
+import { generateText, NoObjectGeneratedError, Output } from "ai";
+import { languageModel, productJudgments } from "./aiModels";
 import { v } from "convex/values";
 import { internalAction } from "./_generated/server";
 import { receiptProductModel, receiptReader } from "./providerConfig";
@@ -31,6 +26,8 @@ export const extract = internalAction({
     storageIds: v.array(v.id("_storage")),
     receiptId: v.id("receipts").optional(),
     generation: v.number().optional(),
+    /** Evaluations read with another `provider:model` than production. */
+    model: v.string().optional(),
   },
   returns: v.object({
     data: receiptDataValidator,
@@ -56,51 +53,53 @@ export const extract = internalAction({
         if (!blob) throw new Error("Et kvitteringsbilde mangler.");
 
         return {
-          type: "input_image" as const,
-          image_url: `data:${blob.type};base64,${Buffer.from(await blob.arrayBuffer()).toString("base64")}`,
-          detail: "original" as const,
+          type: "image" as const,
+          image: new Uint8Array(await blob.arrayBuffer()),
+          mediaType: blob.type,
+          providerOptions: { openai: { imageDetail: "original" } },
         };
       }),
     );
 
-    const { model } = reader;
+    const model = args.model ?? reader.model;
 
-    const client = new OpenAI({
-      fetch: providerFetch(
+    const request = generateText({
+      model: languageModel(
         ctx,
-        "openai",
+        model,
         args.receiptId ? { kind: "receipt", id: args.receiptId } : undefined,
       ),
-      apiKey: reader.apiKey,
-      timeout: 120000,
+      maxOutputTokens: 32000,
       maxRetries: 1,
-    });
-
-    const response = await client.responses.parse({
-      model,
-      store: false,
-      max_output_tokens: 16000,
-      input: [
-        {
-          role: "system",
-          content: `${extractionInstructions}\n\n${overlapInstructions}\n\n${uncertaintyInstructions}`,
-        },
+      abortSignal: AbortSignal.timeout(120000),
+      providerOptions: { openai: { store: false } },
+      instructions: `${extractionInstructions}\n\n${overlapInstructions}\n\n${uncertaintyInstructions}`,
+      messages: [
         {
           role: "user",
           content: images.flatMap((image, index) => [
-            { type: "input_text" as const, text: `Image ${index + 1}` },
+            { type: "text" as const, text: `Image ${index + 1}` },
             image,
           ]),
         },
       ],
-      text: { format: zodTextFormat(extractionSchema, "grocery_receipt") },
+      output: Output.object({
+        schema: extractionSchema,
+        name: "grocery_receipt",
+      }),
     });
 
-    if (!response.output_parsed || response.status !== "completed")
-      throw new Error(
-        "Modellen kunne ikke lese kvitteringen. Prøv et tydeligere bilde.",
-      );
-    const data = prepareExtraction(response.output_parsed, images.length);
+    // A truncated or unparsable answer is a failed reading, not a crash.
+    const response = await request.catch((error: Error) => {
+      throw NoObjectGeneratedError.isInstance(error)
+        ? new Error(
+            "Modellen kunne ikke lese kvitteringen. Prøv et tydeligere bilde.",
+            { cause: error },
+          )
+        : error;
+    });
+
+    const data = prepareExtraction(response.output, images.length);
     console.info("receipt.extraction_completed", {
       receiptId: args.receiptId,
       generation: args.generation,
@@ -108,8 +107,8 @@ export const extract = internalAction({
       durationMs: Date.now() - started,
       imageCount: images.length,
       lineCount: data.lines.length,
-      inputTokens: response.usage?.input_tokens,
-      outputTokens: response.usage?.output_tokens,
+      inputTokens: response.usage.inputTokens,
+      outputTokens: response.usage.outputTokens,
     });
 
     return { data, provider: model, durationMs: Date.now() - started };
@@ -156,15 +155,14 @@ export const classify = internalAction({
         durationMs: 0,
       };
 
-    const client = new TypeSafeClient({
-      fetch: providerFetch(
-        ctx,
-        "typesafe",
-        args.receiptId ? { kind: "receipt", id: args.receiptId } : undefined,
-      ),
-      apiKey: productModel.apiKey,
-      retry: { maxRetries: 0 },
+    const client = productJudgments(ctx, {
+      ...(args.receiptId && {
+        source: { kind: "receipt" as const, id: args.receiptId },
+      }),
+      timeoutMs: 10000,
     });
+
+    if (!client) throw new Error("Kategoriseringen er ikke tilgjengelig.");
 
     const results: { id: string; categoryId: string; confidence: number }[] =
       [];
@@ -187,7 +185,6 @@ export const classify = internalAction({
 
       const response = await client
         .systemOne({
-          model,
           state: {
             products: batch.map((p) => classificationEvidence(p)),
           },

@@ -11,6 +11,7 @@ import type { Doc } from "./_generated/dataModel";
 /** Fixed UTC windows have no rollover. Provider allowances are shared by all accounts. */
 export const providerAllowances = {
   openai: { daily: 300, thirtyDays: 3000 },
+  anthropic: { daily: 300, thirtyDays: 3000 },
   typesafe: { daily: 10000, thirtyDays: 100000 },
   kassalapp: { daily: 10000, thirtyDays: 100000 },
 } as const;
@@ -27,6 +28,7 @@ export const workAllowances = {
 
 export const actorProviderAllowances = {
   openai: { hourly: 30, daily: 60 },
+  anthropic: { hourly: 30, daily: 60 },
   typesafe: { hourly: 600, daily: 2000 },
   kassalapp: { hourly: 600, daily: 2000 },
 } as const;
@@ -159,6 +161,7 @@ export const consumeProvider = internalMutation({
     source: providerSourceValidator.optional(),
     provider: v.union(
       v.literal("openai"),
+      v.literal("anthropic"),
       v.literal("typesafe"),
       v.literal("kassalapp"),
     ),

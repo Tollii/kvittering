@@ -1,10 +1,9 @@
 "use node";
 
-import { providerFetch } from "./providerTransport";
-
 import { v, type Infer } from "convex/values";
-import { TypeSafeClient, choice } from "@typesafe-ai/sdk";
-import { internalAction, env } from "./_generated/server";
+import { choice } from "@typesafe-ai/sdk";
+import { internalAction } from "./_generated/server";
+import { productJudgments } from "./aiModels";
 import { receiptProductModel } from "./providerConfig";
 import { internal } from "./_generated/api";
 import { receiptDataValidator } from "../src/lib/domain/receipt";
@@ -44,18 +43,11 @@ export const match = internalAction({
       productId: null,
     }));
 
-    const productModel = receiptProductModel();
-
     const client =
-      productModel.kind === "typesafe"
-        ? new TypeSafeClient({
-            fetch: providerFetch(ctx, "typesafe", {
-              kind: "receipt",
-              id: args.id,
-            }),
-            apiKey: productModel.apiKey,
-            timeout: 10000,
-            retry: { maxRetries: 0 },
+      receiptProductModel().kind === "model"
+        ? productJudgments(ctx, {
+            source: { kind: "receipt", id: args.id },
+            timeoutMs: 10000,
           })
         : null;
 
@@ -102,7 +94,6 @@ export const match = internalAction({
         );
 
         const response = await model.systemOne({
-          model: env.TYPESAFE_MODEL ?? "jev-latest",
           state: {
             items: unresolved.map((item) => ({
               receiptDescription: productEvidence(item.line),

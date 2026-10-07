@@ -9,11 +9,11 @@ import { v, type Infer } from "convex/values";
 import { WorkflowManager } from "@convex-dev/workflow";
 import { components, internal } from "./_generated/api";
 import {
-  env,
   internalQuery,
   type MutationCtx,
   type QueryCtx,
 } from "./_generated/server";
+import { hasProductModel } from "./providerConfig";
 import { internalMutation } from "./serverFunctions";
 import type { Doc, Id } from "./_generated/dataModel";
 import schema from "./schema";
@@ -104,7 +104,7 @@ async function launch(
     receipt.excluded ||
     receipt.catalogStatus === "pending" ||
     !hasReceiptBeenRead(receipt.status) ||
-    !env.TYPESAFE_API_KEY
+    !hasProductModel()
   )
     return "ineligible" as const;
   const previous = receipt.productAnalysis;

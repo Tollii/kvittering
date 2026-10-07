@@ -10,9 +10,12 @@ const app = defineApp({
   env: {
     KASSALAPP_API_KEY: v.string().optional(),
     OPENAI_API_KEY: v.string().optional(),
+    ANTHROPIC_API_KEY: v.string().optional(),
     TYPESAFE_API_KEY: v.string().optional(),
     OPENAI_RECEIPT_MODEL: v.string().optional(),
     TYPESAFE_MODEL: v.string().optional(),
+    RECEIPT_MODEL: v.string().optional(),
+    PRODUCT_MODEL: v.string().optional(),
     BETTER_AUTH_SECRET: v.string().optional(),
     SITE_URL: v.string().optional(),
     ALLOW_EXPO_GO: v.string().optional(),

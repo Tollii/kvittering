@@ -10,11 +10,12 @@ export class ProviderConfigurationError extends Error {
   override name = "ProviderConfigurationError";
 }
 
-export type ReceiptReader =
-  | { kind: "mock" }
-  | { kind: "openai"; apiKey: string; model: string };
+export type ReceiptReader = { kind: "mock" } | { kind: "model"; model: string };
 
-/** Only an explicit `RECEIPT_PROVIDER=mock` reads the sample receipt. */
+/**
+ * `RECEIPT_MODEL` names the reader as `provider:model`. Only an explicit
+ * `RECEIPT_PROVIDER=mock` reads the sample receipt.
+ */
 export function receiptReader(): ReceiptReader {
   const provider = env.RECEIPT_PROVIDER || "openai";
 
@@ -25,40 +26,69 @@ export function receiptReader(): ReceiptReader {
       "Kvitteringsleseren er feilkonfigurert. Kontakt support.",
     );
 
-  if (!env.OPENAI_API_KEY)
+  const model =
+    env.RECEIPT_MODEL ?? `openai:${env.OPENAI_RECEIPT_MODEL ?? "gpt-6-luna"}`;
+
+  if (!modelKey(model))
     throw new ProviderConfigurationError(
       "Kvitteringsleseren mangler API-nøkkel. Kontakt support.",
     );
 
-  return {
-    kind: "openai",
-    apiKey: env.OPENAI_API_KEY,
-    model: env.OPENAI_RECEIPT_MODEL ?? "gpt-6-luna",
-  };
+  return { kind: "model", model };
 }
 
 export type ProductModel =
   | { kind: "disabled" }
-  | { kind: "typesafe"; apiKey: string; model: string };
+  | { kind: "model"; model: string };
+
+/** `PRODUCT_MODEL` names the product judgment model as `provider:model`, Jev by default. */
+export function productModelName() {
+  return env.PRODUCT_MODEL ?? `typesafe:${env.TYPESAFE_MODEL ?? "jev-latest"}`;
+}
+
+/** Whether product judgments can run on this deployment. */
+export function hasProductModel() {
+  return Boolean(modelKey(productModelName()));
+}
 
 /**
  * Receipt product judgments are optional. Without a key, or while the mock
  * reader is active, products stay unclear for the household to review.
  */
 export function receiptProductModel(): ProductModel {
-  if (env.RECEIPT_PROVIDER === "mock" || !env.TYPESAFE_API_KEY)
-    return { kind: "disabled" };
+  const model = productModelName();
 
-  return {
-    kind: "typesafe",
-    apiKey: env.TYPESAFE_API_KEY,
-    model: env.TYPESAFE_MODEL ?? "jev-latest",
-  };
+  return env.RECEIPT_PROVIDER !== "mock" && modelKey(model)
+    ? { kind: "model", model }
+    : { kind: "disabled" };
 }
 
-/** OpenAI Decisions, which only evaluations call, shares the reader's key. */
-export function decisionsModel() {
-  return env.OPENAI_API_KEY
-    ? { apiKey: env.OPENAI_API_KEY, model: "gpt-6-luna" }
-    : null;
+const apiKeys = {
+  openai: () => env.OPENAI_API_KEY,
+  anthropic: () => env.ANTHROPIC_API_KEY,
+  typesafe: () => env.TYPESAFE_API_KEY,
+};
+
+export type ModelProvider = keyof typeof apiKeys;
+
+const isProvider = (name: string): name is ModelProvider =>
+  Object.hasOwn(apiKeys, name);
+
+/** Split a `provider:model` name; the model part may itself contain colons. */
+export function parseModel(name: string) {
+  const separator = name.indexOf(":");
+  const provider = name.slice(0, separator);
+  const model = name.slice(separator + 1);
+
+  if (separator < 1 || !model || !isProvider(provider))
+    throw new ProviderConfigurationError(
+      `Unknown model ${name}. Use provider:model with openai, anthropic or typesafe.`,
+    );
+
+  return { provider, model };
+}
+
+/** The API key of the model's provider, if this deployment has one. */
+export function modelKey(name: string) {
+  return apiKeys[parseModel(name).provider]();
 }

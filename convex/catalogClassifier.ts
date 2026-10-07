@@ -1,10 +1,9 @@
 "use node";
 
-import { providerFetch } from "./providerTransport";
-
 import { v } from "convex/values";
-import { TypeSafeClient, noul, type Questions } from "@typesafe-ai/sdk";
-import { internalAction, env } from "./_generated/server";
+import { noul, type Questions } from "@typesafe-ai/sdk";
+import { internalAction } from "./_generated/server";
+import { productJudgments } from "./aiModels";
 import { internal } from "./_generated/api";
 import type { JudgmentClient } from "./decisions";
 import { matchingInput } from "./catalogMatching";
@@ -152,7 +151,6 @@ async function classifyCatalogBatch(
 
   try {
     const response = await client.systemOne({
-      model: env.TYPESAFE_MODEL ?? "jev-latest",
       state: {
         products: prepared.map((item) => ({
           ...productEvidence(item.line),
@@ -258,18 +256,10 @@ export const classify = internalAction({
       return { line: item.line, product: item.product, candidates };
     });
 
-    const client = env.TYPESAFE_API_KEY
-      ? new TypeSafeClient({
-          fetch: providerFetch(
-            ctx,
-            "typesafe",
-            receiptId ? { kind: "receipt", id: receiptId } : undefined,
-          ),
-          apiKey: env.TYPESAFE_API_KEY,
-          timeout: 30000,
-          retry: { maxRetries: 0 },
-        })
-      : null;
+    const client = productJudgments(ctx, {
+      ...(receiptId && { source: { kind: "receipt", id: receiptId } }),
+      timeoutMs: 30000,
+    });
 
     return classifyCatalogProducts(prepared, client);
   },

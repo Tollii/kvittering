@@ -31,6 +31,7 @@ type Env = {
   readonly CONVEX_CLOUD_URL: string;
   readonly CONVEX_SITE_URL: string;
   readonly ALLOW_EXPO_GO: string | undefined;
+  readonly ANTHROPIC_API_KEY: string | undefined;
   readonly APNS_KEY_ID: string | undefined;
   readonly APNS_PRIVATE_KEY: string | undefined;
   readonly APNS_TEAM_ID: string | undefined;
@@ -39,6 +40,8 @@ type Env = {
   readonly KASSALAPP_API_KEY: string | undefined;
   readonly OPENAI_API_KEY: string | undefined;
   readonly OPENAI_RECEIPT_MODEL: string | undefined;
+  readonly PRODUCT_MODEL: string | undefined;
+  readonly RECEIPT_MODEL: string | undefined;
   readonly RECEIPT_PROVIDER: string | undefined;
   readonly SITE_URL: string | undefined;
   readonly TYPESAFE_API_KEY: string | undefined;

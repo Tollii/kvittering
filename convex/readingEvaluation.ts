@@ -11,7 +11,6 @@ import {
   normalizeAlias,
   printedName,
   receiptDataValidator,
-  reconcile,
   type ReceiptData,
 } from "../src/lib/domain/receipt";
 import { classificationEvidenceValidator } from "../src/lib/domain/classification";
@@ -233,9 +232,13 @@ export const recentApproved = internalQuery({
  * Each call costs one reading and one classification call.
  */
 export const replayOne = internalAction({
-  args: { receiptId: v.id("receipts") },
+  args: {
+    receiptId: v.id("receipts"),
+    /** Read with this `provider:model` instead of the production reader. */
+    model: v.optional(v.string()),
+  },
   returns: replayResultValidator,
-  handler: async (ctx, { receiptId }): Promise<ReplayResult> => {
+  handler: async (ctx, { receiptId, model }): Promise<ReplayResult> => {
     const replayCase: {
       storageIds: Id<"_storage">[];
       approved: Infer<typeof receiptDataValidator>;
@@ -248,6 +251,7 @@ export const replayOne = internalAction({
     try {
       const { data } = await ctx.runAction(internal.providers.extract, {
         storageIds: replayCase.storageIds,
+        ...(model && { model }),
       });
 
       const classification = await ctx.runAction(internal.providers.classify, {
@@ -338,64 +342,5 @@ export const labeledCategories = internalQuery({
     }
 
     return cases.slice(0, Math.min(args.count, 200));
-  },
-});
-
-/**
- * An approved receipt's images and the amounts its reading offered as the
- * paid total: the read total, the read lines' sum, and printed summary lines.
- */
-export const totalCase = internalQuery({
-  args: { id: v.id("receipts") },
-  returns: v.union(
-    v.object({
-      storageIds: v.array(v.id("_storage")),
-      approvedTotalOre: v.number(),
-      readTotalOre: v.union(v.number(), v.null()),
-      candidates: v.array(v.number()),
-    }),
-    v.null(),
-  ),
-  handler: async (ctx, args) => {
-    const receipt = await ctx.db.get("receipts", args.id);
-
-    if (
-      !receipt ||
-      !approvedByPerson(receipt) ||
-      receipt.data.totalOre === null
-    )
-      return null;
-    const reading = await storedReading(ctx, receipt);
-
-    if (!reading) return null;
-
-    const images = await ctx.db
-      .query("images")
-      .withIndex("by_receiptId", (q) => q.eq("receiptId", args.id))
-      .take(8);
-
-    if (!images.length) return null;
-    images.sort((a, b) => a.position - b.position);
-
-    const amounts: (number | null)[] = [
-      reading.totalOre,
-      reconcile(reading).calculated,
-      ...reading.lines
-        .filter((line) => line.kind === "summary")
-        .map((line) => line.amountOre),
-    ];
-
-    return {
-      storageIds: images.map((image) => image.storageId),
-      approvedTotalOre: receipt.data.totalOre,
-      readTotalOre: reading.totalOre,
-      candidates: [
-        ...new Set(
-          amounts.filter(
-            (amount): amount is number => amount !== null && amount > 0,
-          ),
-        ),
-      ],
-    };
   },
 });

@@ -1,12 +1,12 @@
 "use node";
 
 import { userError } from "./userErrors";
-import { providerFetch } from "./providerTransport";
 
 import { clientValidator } from "../src/lib/releases/policy";
 import { v } from "convex/values";
-import { TypeSafeClient } from "@typesafe-ai/sdk";
-import { action, env } from "./_generated/server";
+import { action } from "./_generated/server";
+import { productJudgments } from "./aiModels";
+import { modelKey, parseModel, productModelName } from "./providerConfig";
 import { api, internal } from "./_generated/api";
 import type { Doc } from "./_generated/dataModel";
 import {
@@ -56,7 +56,7 @@ export const evaluate = action({
     const history: { entries: Doc<"corrections">[]; truncated: boolean } =
       await ctx.runQuery(api.corrections.list, {});
 
-    if (!env.TYPESAFE_API_KEY)
+    if (!modelKey(productModelName()))
       throw userError("Kategoritesten er ikke tilgjengelig.");
     const seen = new Set<string>();
 
@@ -73,7 +73,7 @@ export const evaluate = action({
       return [{ ...entry, expected }];
     });
 
-    const model = env.TYPESAFE_MODEL ?? "jev-latest";
+    const { model } = parseModel(productModelName());
 
     if (!examples.length) return { model, checked: 0, matched: 0, results: [] };
 
@@ -81,15 +81,14 @@ export const evaluate = action({
       client: release,
     });
 
-    const client = new TypeSafeClient({
-      fetch: providerFetch(ctx, "typesafe", { kind: "member" }),
-      apiKey: env.TYPESAFE_API_KEY,
-      timeout: 30000,
-      retry: { maxRetries: 0 },
+    const client = productJudgments(ctx, {
+      source: { kind: "member" },
+      timeoutMs: 30000,
     });
 
+    if (!client) throw new Error("Product judgments are unavailable.");
+
     const response = await client.systemOne({
-      model,
       state: {
         products: examples.map(
           (entry) =>
