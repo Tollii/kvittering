@@ -156,6 +156,28 @@ it("offers the line sum as paid, quoting a printed row with that amount", () => 
   ]);
 });
 
+it("settles a reader note about the sum once a corrected line balances the paid total", () => {
+  const data = batteryFixture();
+  present(data.lines[0]).amountOre = Ore.of(1890);
+  data.issues = [
+    "Varelinjene gir 18,31 kr, mens BETALT er 25,31 kr.",
+    "Datoen er utydelig.",
+  ];
+  expect(reviewTasks(data, false).map((task) => task.kind)).toEqual([
+    "difference",
+    "receipt-issues",
+  ]);
+
+  present(data.lines[0]).amountOre = Ore.of(2590);
+  expect(reviewTasks(data, false)).toEqual([
+    { kind: "receipt-issues", issues: ["Datoen er utydelig."] },
+  ]);
+  data.issues = ["Varelinjene gir 18.31, mens BETALT er 25.31."];
+  expect(canAcceptReceipt(data, false)).toBe(true);
+  data.issues = ["Beløpet 125,31 kr er utydelig."];
+  expect(canAcceptReceipt(data, false)).toBe(false);
+});
+
 it("confirms suggested categories in bulk without touching unclear or other issues", () => {
   const data = batteryFixture();
   present(data.lines[0]).issues = ["Kategorien er usikker."];

@@ -166,6 +166,19 @@ function printedTotal(data: ReceiptData, amountOre: Ore): string | null {
   return row ? row.originalText.trim() || row.name : null;
 }
 
+/**
+ * Whether a reader note quotes this amount, as 150,60 or 150.60. A note that
+ * quotes the paid total is about the sum, and the lines matching that total
+ * settle it.
+ */
+function citesAmount(note: string, amountOre: Ore | null): boolean {
+  if (amountOre === null) return false;
+
+  const [kroner, ore] = Ore.formatInput(amountOre).split(",");
+
+  return new RegExp(`(?<![\\d.,])${kroner}[.,]${ore}(?!\\d)`).test(note);
+}
+
 export type ReviewTask =
   | { kind: "duplicate" }
   | { kind: "store" }
@@ -227,7 +240,10 @@ export function assessReceipt(
 
   const receiptIssues = [
     ...new Set([
-      ...data.issues,
+      ...data.issues.filter(
+        (issue) =>
+          !(totals.difference === 0 && citesAmount(issue, data.totalOre)),
+      ),
       ...totals.reviewIssues.filter(isReceiptLevelIssue).map(receiptIssueText),
     ]),
   ];
