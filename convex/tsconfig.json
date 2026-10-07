@@ -13,6 +13,8 @@
     "jsx": "react-jsx",
     "skipLibCheck": true,
     "allowSyntheticDefaultImports": true,
+    /* "use node" actions run on Node. */
+    "types": ["node"],
 
     /* These compiler options are required by Convex */
     "target": "ESNext",

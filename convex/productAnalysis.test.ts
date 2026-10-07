@@ -1,6 +1,7 @@
 import { separateHouseholds } from "../src/lib/testing/households";
 import { present } from "../src/lib/testing/receipts";
 import {
+  choiceAnswer,
   readModelRequest,
   type ModelRequest,
 } from "../src/lib/testing/model-requests";
@@ -335,12 +336,7 @@ it("batches independent profiles and uses only quantity questions for cached pro
                 : quantityAnswers,
             ).map(([key, selected]) => [
               key,
-              {
-                type: "choice",
-                choice: selected,
-                confidence: 0.9,
-                probabilities: { [selected]: 0.9 },
-              },
+              choiceAnswer(request.questions[key], selected, 0.9),
             ]),
           ),
         }),

@@ -1,7 +1,6 @@
 "use node";
 
 import { Ore } from "../src/lib/domain/ore";
-import { providerFetch } from "./providerTransport";
 
 import {
   readAttributes,
@@ -9,8 +8,10 @@ import {
 } from "../src/lib/domain/product-attributes";
 import { attributeQuestions } from "../src/lib/domain/product-attribute-classification";
 import { v } from "convex/values";
-import { TypeSafeClient, choice } from "@typesafe-ai/sdk";
-import { env, internalAction, type ActionCtx } from "./_generated/server";
+import { choice } from "@typesafe-ai/sdk";
+import { internalAction, type ActionCtx } from "./_generated/server";
+import { productJudgments } from "./aiModels";
+import type { JudgmentClient } from "./decisions";
 import type { Id } from "./_generated/dataModel";
 import { internal } from "./_generated/api";
 import {
@@ -217,7 +218,7 @@ type AnalysisSnapshot = {
  */
 async function classifyMissingProfiles(
   ctx: ActionCtx,
-  client: TypeSafeClient,
+  client: JudgmentClient,
   args: AnalysisSnapshot,
   contexts: PreparedProfile[],
 ): Promise<Id<"productProfiles">[]> {
@@ -237,7 +238,6 @@ async function classifyMissingProfiles(
   if (!requests.length) return [];
 
   const response = await client.systemOne({
-    model: env.TYPESAFE_MODEL ?? "jev-latest",
     state: { items: requests.map((request) => request.state) },
     questions: Object.fromEntries(
       requests.flatMap((request, index) =>
@@ -315,15 +315,12 @@ export const analyze = internalAction({
 
     if (!receipt?.data) return [];
 
-    if (!env.TYPESAFE_API_KEY)
-      throw new Error("Product analysis is unavailable.");
-
-    const client = new TypeSafeClient({
-      fetch: providerFetch(ctx, "typesafe", { kind: "receipt", id: args.id }),
-      apiKey: env.TYPESAFE_API_KEY,
-      timeout: 20000,
-      retry: { maxRetries: 0 },
+    const client = productJudgments(ctx, {
+      source: { kind: "receipt", id: args.id },
+      timeoutMs: 20000,
     });
+
+    if (!client) throw new Error("Product analysis is unavailable.");
 
     const prepared: PreparedLine[] = [];
 
@@ -392,7 +389,6 @@ export const analyze = internalAction({
       );
 
       const response = await client.systemOne({
-        model: env.TYPESAFE_MODEL ?? "jev-latest",
         state: {
           items: batch.map(({ line, profile, candidates }) => ({
             receiptText: line.originalText,

@@ -343,14 +343,21 @@ export default defineConfig({
       rules: {
         "no-restricted-properties": [
           "error",
-          ...["RECEIPT_PROVIDER", "OPENAI_API_KEY", "OPENAI_RECEIPT_MODEL"].map(
-            (property) => ({
-              object: "env",
-              property,
-              message:
-                "Use providerConfig so a missing receipt reader key fails instead of changing receipt data.",
-            }),
-          ),
+          ...[
+            "RECEIPT_PROVIDER",
+            "RECEIPT_MODEL",
+            "OPENAI_RECEIPT_MODEL",
+            "PRODUCT_MODEL",
+            "TYPESAFE_MODEL",
+            "OPENAI_API_KEY",
+            "ANTHROPIC_API_KEY",
+            "TYPESAFE_API_KEY",
+          ].map((property) => ({
+            object: "env",
+            property,
+            message:
+              "Use providerConfig so a missing model key fails in one place instead of changing receipt data.",
+          })),
         ],
       },
     },

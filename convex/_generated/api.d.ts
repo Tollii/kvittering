@@ -9,6 +9,7 @@
  */
 
 import type * as access from "../access.js";
+import type * as aiModels from "../aiModels.js";
 import type * as aliases from "../aliases.js";
 import type * as auth from "../auth.js";
 import type * as catalog from "../catalog.js";
@@ -24,7 +25,6 @@ import type * as correctionEvaluation from "../correctionEvaluation.js";
 import type * as corrections from "../corrections.js";
 import type * as crons from "../crons.js";
 import type * as decisions from "../decisions.js";
-import type * as decisionsComparison from "../decisionsComparison.js";
 import type * as deployment from "../deployment.js";
 import type * as digest from "../digest.js";
 import type * as featureFlags from "../featureFlags.js";
@@ -85,6 +85,7 @@ import type * as kassalapp_normalize from "../kassalapp/normalize.js";
 import type * as kassalapp_transport from "../kassalapp/transport.js";
 import type * as liveActivities from "../liveActivities.js";
 import type * as liveActivityPush from "../liveActivityPush.js";
+import type * as modelComparison from "../modelComparison.js";
 import type * as notifications from "../notifications.js";
 import type * as processing from "../processing.js";
 import type * as productAnalysis from "../productAnalysis.js";
@@ -119,6 +120,7 @@ import type {
 
 declare const fullApi: ApiFromModules<{
   access: typeof access;
+  aiModels: typeof aiModels;
   aliases: typeof aliases;
   auth: typeof auth;
   catalog: typeof catalog;
@@ -134,7 +136,6 @@ declare const fullApi: ApiFromModules<{
   corrections: typeof corrections;
   crons: typeof crons;
   decisions: typeof decisions;
-  decisionsComparison: typeof decisionsComparison;
   deployment: typeof deployment;
   digest: typeof digest;
   featureFlags: typeof featureFlags;
@@ -195,6 +196,7 @@ declare const fullApi: ApiFromModules<{
   "kassalapp/transport": typeof kassalapp_transport;
   liveActivities: typeof liveActivities;
   liveActivityPush: typeof liveActivityPush;
+  modelComparison: typeof modelComparison;
   notifications: typeof notifications;
   processing: typeof processing;
   productAnalysis: typeof productAnalysis;

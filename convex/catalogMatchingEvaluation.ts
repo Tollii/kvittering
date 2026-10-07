@@ -1,10 +1,8 @@
 "use node";
 
-import { providerFetch } from "./providerTransport";
-
 import { v } from "convex/values";
-import { TypeSafeClient } from "@typesafe-ai/sdk";
-import { internalAction, env } from "./_generated/server";
+import { internalAction } from "./_generated/server";
+import { productJudgments } from "./aiModels";
 import { classifyCatalogProducts } from "./catalogClassifier";
 import { normalizeProducts } from "./kassalapp/normalize";
 import { emptyLine } from "../src/lib/domain/receipt";
@@ -114,16 +112,10 @@ export const evaluate = internalAction({
     }),
   ),
   handler: async (ctx) => {
-    if (!env.TYPESAFE_API_KEY)
-      throw new Error("Product matching is unavailable.");
+    const client = productJudgments(ctx, { timeoutMs: 30000 });
 
-    return evaluateCatalogCases(
-      new TypeSafeClient({
-        fetch: providerFetch(ctx, "typesafe"),
-        apiKey: env.TYPESAFE_API_KEY,
-        timeout: 30000,
-        retry: { maxRetries: 0 },
-      }),
-    );
+    if (!client) throw new Error("Product matching is unavailable.");
+
+    return evaluateCatalogCases(client);
   },
 });

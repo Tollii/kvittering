@@ -11,6 +11,13 @@ import { afterEach, expect, it, vi } from "vitest";
 import { api, internal } from "./_generated/api";
 import schema from "./schema";
 import { batteryFixture } from "../src/lib/mock-receipts";
+import { categories } from "../src/lib/domain/categories";
+
+/** Jev answers a category question with a distribution over every category. */
+const certain = (choice: string) =>
+  Object.fromEntries(
+    categories.map((category) => [category.id, category.id === choice ? 1 : 0]),
+  );
 
 const modules = import.meta.glob("./**/*.ts");
 
@@ -206,7 +213,7 @@ it("evaluates only the caller's latest category decisions in one request", async
                 type: "choice",
                 choice: "drinks.sports-drinks",
                 confidence: 0.95,
-                probabilities: { "drinks.sports-drinks": 1 },
+                probabilities: certain("drinks.sports-drinks"),
               },
             ]),
           ),
@@ -278,6 +285,7 @@ it("blocks category evaluation during a pause for legacy and other-platform call
           type: "choice",
           choice: "drinks.soft-drinks",
           confidence: 1,
+          probabilities: certain("drinks.soft-drinks"),
         },
       },
     }),
@@ -458,6 +466,7 @@ it("admits six evaluations per hour and denies extra provider calls until recove
             type: "choice",
             choice: "drinks.soft-drinks",
             confidence: 1,
+            probabilities: certain("drinks.soft-drinks"),
           },
         },
       }),
