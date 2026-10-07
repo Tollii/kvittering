@@ -55,3 +55,10 @@ export function receiptProductModel(): ProductModel {
     model: env.TYPESAFE_MODEL ?? "jev-latest",
   };
 }
+
+/** OpenAI Decisions, which only evaluations call, shares the reader's key. */
+export function decisionsModel() {
+  return env.OPENAI_API_KEY
+    ? { apiKey: env.OPENAI_API_KEY, model: "gpt-6-luna" }
+    : null;
+}

@@ -5,6 +5,7 @@
  *   npm run eval -- --replay 10           also re-read the 10 newest approved receipts
  *   npm run eval -- --replay-ids ids.json also re-read a fixed golden set of receipt ids
  *   npm run eval -- --fixed               also run the fixed product family and catalog cases
+ *   npm run eval -- --compare-decisions   compare Jev with OpenAI Decisions on the same questions
  *   npm run eval -- --save base.json      store the result as a baseline
  *   npm run eval -- --baseline base.json  fail when a rate drops more than --margin points
  *
@@ -27,6 +28,7 @@ const { values } = parseArgs({
     margin: { type: "string", default: "2" },
     deployment: { type: "string" },
     fixed: { type: "boolean", default: false },
+    "compare-decisions": { type: "boolean", default: false },
   },
 });
 
@@ -104,6 +106,9 @@ function run<T>(fn: string, schema: z.ZodType<T>, args: FunctionArgs = {}): T {
 
   return schema.parse(JSON.parse(output));
 }
+
+const median = (values: number[]) =>
+  values.length ? [...values].sort((a, b) => a - b)[values.length >> 1] : 0;
 
 const percent = (part: number, whole: number) =>
   whole ? Math.round((1000 * part) / whole) / 10 : 0;
@@ -218,6 +223,152 @@ if (values.fixed) {
   };
   console.log("\nFixed cases");
   printRates(results.fixed);
+}
+
+if (values["compare-decisions"]) {
+  const outcome = z.object({
+    actual: z.string(),
+    confidence: z.number().nullable(),
+  });
+
+  const comparison = z.object({
+    cases: z.array(
+      z.object({
+        suite: z.string(),
+        name: z.string(),
+        expected: z.string(),
+        threshold: z.number().nullable(),
+        corrected: z.boolean().optional(),
+        jev: outcome,
+        decisions: outcome,
+      }),
+    ),
+    timings: z.array(
+      z.object({
+        suite: z.string(),
+        requests: z.number(),
+        jevMs: z.number(),
+        decisionsMs: z.number(),
+      }),
+    ),
+  });
+
+  type Comparison = z.infer<typeof comparison>;
+
+  type ComparedCase = Comparison["cases"][number];
+
+  const fixed = run("decisionsComparison:compareFixed", comparison);
+
+  const approved = run("decisionsComparison:compareCategories", comparison, {
+    count: 100,
+  });
+
+  /** Production acts on a confident answer, so a confident miss is the costly kind. */
+  const acted = (o: z.infer<typeof outcome>, threshold: number | null) =>
+    threshold === null || (o.confidence ?? 0) >= threshold;
+
+  const line = (label: string, items: ComparedCase[]) => {
+    const count = (model: "jev" | "decisions") => {
+      const correct = items.filter(
+        (item) => item[model].actual === item.expected,
+      ).length;
+
+      const confidentMisses = items.filter(
+        (item) =>
+          item[model].actual !== item.expected &&
+          acted(item[model], item.threshold),
+      ).length;
+
+      return `${String(correct).padStart(3)}/${items.length} right, ${confidentMisses} confident misses`;
+    };
+
+    console.log(
+      `  ${label.padEnd(30)} Jev ${count("jev")}   Decisions ${count("decisions")}`,
+    );
+  };
+
+  const cases = [...fixed.cases, ...approved.cases];
+  console.log("\nJev vs OpenAI Decisions");
+
+  for (const suite of new Set(cases.map((item) => item.suite)))
+    line(
+      suite,
+      cases.filter((item) => item.suite === suite),
+    );
+
+  const corrected = approved.cases.filter((item) => item.corrected);
+
+  if (corrected.length) line("  of which people corrected", corrected);
+
+  console.log("\nTime per suite (sequential requests)");
+
+  for (const timing of [...fixed.timings, ...approved.timings])
+    console.log(
+      `  ${timing.suite.padEnd(30)} ${String(timing.requests).padStart(2)} requests   Jev ${String(timing.jevMs).padStart(6)} ms   Decisions ${String(timing.decisionsMs).padStart(6)} ms`,
+    );
+
+  console.log("\nDisagreements and misses (expected | Jev | Decisions)");
+
+  const shown = (o: z.infer<typeof outcome>) =>
+    o.confidence === null ? o.actual : `${o.actual} ${o.confidence.toFixed(2)}`;
+
+  for (const item of cases)
+    if (
+      item.jev.actual !== item.expected ||
+      item.decisions.actual !== item.expected
+    )
+      console.log(
+        `  ${item.suite}: ${item.name} | ${item.expected} | ${shown(item.jev)} | ${shown(item.decisions)}`,
+      );
+
+  const totalIds = run(
+    "readingEvaluation:recentApproved",
+    z.array(z.string()),
+    {
+      count: 15,
+    },
+  );
+
+  const totals = totalIds.flatMap((receiptId) => {
+    const result = run(
+      "decisionsComparison:compareTotal",
+      z
+        .object({
+          expected: z.number(),
+          reader: z.number().nullable(),
+          decisions: outcome,
+          answerable: z.boolean(),
+          ms: z.number(),
+        })
+        .nullable(),
+      { receiptId },
+    );
+
+    return result ? [result] : [];
+  });
+
+  const answerable = totals.filter((total) => total.answerable);
+
+  console.log(
+    `\nPaid total, ${totals.length} receipts with several candidate amounts (${answerable.length} include the approved total)`,
+  );
+  console.log(
+    `  reader's total right           ${totals.filter((total) => total.reader === total.expected).length}/${totals.length}`,
+  );
+  console.log(
+    `  Decisions picked the paid one  ${totals.filter((total) => Number(total.decisions.actual) === total.expected).length}/${totals.length}, median ${median(totals.map((total) => total.ms))} ms`,
+  );
+
+  results.decisions = {
+    "Jev cases right": percent(
+      cases.filter((item) => item.jev.actual === item.expected).length,
+      cases.length,
+    ),
+    "Decisions cases right": percent(
+      cases.filter((item) => item.decisions.actual === item.expected).length,
+      cases.length,
+    ),
+  };
 }
 
 if (values.save) writeFileSync(values.save, JSON.stringify(results, null, 2));

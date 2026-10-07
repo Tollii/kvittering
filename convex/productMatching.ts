@@ -14,6 +14,24 @@ import {
 } from "../src/lib/domain/product-matching";
 import { productDecision } from "./products";
 
+/** Whether items[index] is one of its saved candidates, a new product, or unclear. */
+export function linkingQuestion(index: number, candidateCount: number) {
+  const criteria: Record<
+    "new_product" | "uncertain" | `candidate_${number}`,
+    string
+  > = {
+    new_product: "A clearly identified product distinct from the candidates.",
+    uncertain:
+      "Insufficient evidence to identify the same product or establish a distinct new product.",
+  };
+
+  for (let i = 0; i < candidateCount; i++)
+    criteria[`candidate_${i}`] =
+      `Exactly the same product as items[${index}].candidates[${i}].`;
+
+  return choice(`For items[${index}]: ${matchingInstructions}`, criteria);
+}
+
 export const match = internalAction({
   args: { id: v.id("receipts"), data: receiptDataValidator },
   returns: v.array(productDecision),
@@ -77,28 +95,10 @@ export const match = internalAction({
 
       try {
         const questions = Object.fromEntries(
-          unresolved.map((item, index) => {
-            const criteria: Record<
-              "new_product" | "uncertain" | `candidate_${number}`,
-              string
-            > = {
-              new_product:
-                "A clearly identified product distinct from the candidates.",
-              uncertain:
-                "Insufficient evidence to identify the same product or establish a distinct new product.",
-            };
-
-            item.candidates.forEach(
-              (_, i) =>
-                (criteria[`candidate_${i}`] =
-                  `Exactly the same product as items[${index}].candidates[${i}].`),
-            );
-
-            return [
-              `item_${index}`,
-              choice(`For items[${index}]: ${matchingInstructions}`, criteria),
-            ];
-          }),
+          unresolved.map((item, index) => [
+            `item_${index}`,
+            linkingQuestion(index, item.candidates.length),
+          ]),
         );
 
         const response = await model.systemOne({

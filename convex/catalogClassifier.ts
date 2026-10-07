@@ -6,6 +6,7 @@ import { v } from "convex/values";
 import { TypeSafeClient, noul, type Questions } from "@typesafe-ai/sdk";
 import { internalAction, env } from "./_generated/server";
 import { internal } from "./_generated/api";
+import type { JudgmentClient } from "./decisions";
 import { matchingInput } from "./catalogMatching";
 import {
   catalogDecision,
@@ -44,7 +45,7 @@ export function catalogMatchQuestion(item: number, candidate: number) {
 /** All questions are independent and use the complete, already collected candidate evidence. */
 export async function classifyCatalogProducts(
   items: Parameters<typeof classifyCatalogBatch>[0],
-  client: TypeSafeClient | null,
+  client: JudgmentClient | null,
 ): Promise<CatalogDecision[]> {
   const results: CatalogDecision[] = [];
 
@@ -62,7 +63,7 @@ async function classifyCatalogBatch(
     candidates: CatalogProduct[];
     product: CatalogProduct | null;
   }[],
-  client: TypeSafeClient | null,
+  client: JudgmentClient | null,
 ): Promise<CatalogDecision[]> {
   const prepared = items.map((item) => {
     const candidates = rankCatalogProducts(

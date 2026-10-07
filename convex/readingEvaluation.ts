@@ -8,9 +8,14 @@ import {
 } from "./_generated/server";
 import {
   classificationInputs,
+  normalizeAlias,
+  printedName,
   receiptDataValidator,
+  reconcile,
   type ReceiptData,
 } from "../src/lib/domain/receipt";
+import { classificationEvidenceValidator } from "../src/lib/domain/classification";
+import { isDecidedCategory } from "../src/lib/domain/categories";
 import { applyClassifications } from "../src/lib/domain/receipt-review";
 import {
   readingScoreValidator,
@@ -267,4 +272,130 @@ export const summarize = internalQuery({
   args: { scores: v.array(readingScoreValidator) },
   returns: readingSummaryValidator,
   handler: (_ctx, { scores }): ReadingSummary => summarizeReadings(scores),
+});
+
+/**
+ * Product lines whose category a person approved, one per printed name, with
+ * the evidence the classifier saw when the receipt was read. `read` is the
+ * category people were shown, so a mismatch marks a line someone corrected.
+ */
+export const labeledCategories = internalQuery({
+  args: { count: v.number() },
+  returns: v.array(
+    v.object({
+      evidence: classificationEvidenceValidator,
+      expected: v.string(),
+      read: v.union(v.string(), v.null()),
+    }),
+  ),
+  handler: async (ctx, args) => {
+    // Bounded: a sample of recent receipts, each with one stored reading.
+    const recent = await ctx.db.query("receipts").order("desc").take(50);
+    const seen = new Set<string>();
+    const cases = [];
+
+    for (const receipt of recent) {
+      if (!approvedByPerson(receipt)) continue;
+      const reading = await storedReading(ctx, receipt);
+
+      if (!reading) continue;
+
+      // Remembered lines skipped the model, but their evidence still tests it.
+      const evidence = new Map(
+        classificationInputs({
+          ...reading,
+          lines: reading.lines.map((line) => ({
+            ...line,
+            categoryAliasKey: null,
+            productKey: null,
+          })),
+        }).map((input) => [input.id, input.evidence]),
+      );
+
+      const read = new Map(reading.lines.map((line) => [line.id, line]));
+
+      for (const line of receipt.data.lines) {
+        const original = read.get(line.id);
+        const input = evidence.get(line.id);
+
+        if (
+          line.kind !== "product" ||
+          !isDecidedCategory(line.categoryId) ||
+          !original ||
+          !input
+        )
+          continue;
+        const key = normalizeAlias(printedName(original));
+
+        if (seen.has(key)) continue;
+        seen.add(key);
+        cases.push({
+          evidence: input,
+          expected: line.categoryId,
+          read: original.categoryId,
+        });
+      }
+    }
+
+    return cases.slice(0, Math.min(args.count, 200));
+  },
+});
+
+/**
+ * An approved receipt's images and the amounts its reading offered as the
+ * paid total: the read total, the read lines' sum, and printed summary lines.
+ */
+export const totalCase = internalQuery({
+  args: { id: v.id("receipts") },
+  returns: v.union(
+    v.object({
+      storageIds: v.array(v.id("_storage")),
+      approvedTotalOre: v.number(),
+      readTotalOre: v.union(v.number(), v.null()),
+      candidates: v.array(v.number()),
+    }),
+    v.null(),
+  ),
+  handler: async (ctx, args) => {
+    const receipt = await ctx.db.get("receipts", args.id);
+
+    if (
+      !receipt ||
+      !approvedByPerson(receipt) ||
+      receipt.data.totalOre === null
+    )
+      return null;
+    const reading = await storedReading(ctx, receipt);
+
+    if (!reading) return null;
+
+    const images = await ctx.db
+      .query("images")
+      .withIndex("by_receiptId", (q) => q.eq("receiptId", args.id))
+      .take(8);
+
+    if (!images.length) return null;
+    images.sort((a, b) => a.position - b.position);
+
+    const amounts: (number | null)[] = [
+      reading.totalOre,
+      reconcile(reading).calculated,
+      ...reading.lines
+        .filter((line) => line.kind === "summary")
+        .map((line) => line.amountOre),
+    ];
+
+    return {
+      storageIds: images.map((image) => image.storageId),
+      approvedTotalOre: receipt.data.totalOre,
+      readTotalOre: reading.totalOre,
+      candidates: [
+        ...new Set(
+          amounts.filter(
+            (amount): amount is number => amount !== null && amount > 0,
+          ),
+        ),
+      ],
+    };
+  },
 });
