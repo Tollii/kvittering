@@ -149,6 +149,30 @@ export function decisionsClient(options: {
         SystemOneResult<Questions>["answers"][string]
       > = {};
 
+      const asked = new Map(
+        Object.entries(request.questions).map(([name, question]) => [
+          name,
+          question.type === "noul" ? "predicate" : question.type,
+        ]),
+      );
+
+      const seen = new Set<string>();
+
+      // Protocol drift must fail the comparison, not count as a wrong answer.
+      for (const answer of decision.answers) {
+        const type = asked.get(answer.name);
+
+        if (
+          !type ||
+          seen.has(answer.name) ||
+          (answer.type !== "refusal" && answer.type !== type)
+        )
+          throw new Error(
+            `Decisions answered ${answer.name} unexpectedly as ${answer.type}.`,
+          );
+        seen.add(answer.name);
+      }
+
       for (const answer of decision.answers)
         if (answer.type === "predicate")
           answers[answer.name] = { type: "noul", noul: answer.probability };
