@@ -67,6 +67,19 @@ type Outcome = Infer<typeof outcomeValidator>;
 
 type Comparison = Infer<typeof comparisonValidator>;
 
+const totalComparisonValidator = v.union(
+  v.object({
+    expected: v.number(),
+    reader: v.union(v.number(), v.null()),
+    decisions: outcomeValidator,
+    answerable: v.boolean(),
+    ms: v.number(),
+  }),
+  v.null(),
+);
+
+type TotalComparison = Infer<typeof totalComparisonValidator>;
+
 type Client = { model: string; client: JudgmentClient };
 
 /** Both columns of a comparison. */
@@ -444,17 +457,8 @@ export const compareCategories = internalAction({
  */
 export const compareTotal = internalAction({
   args: { receiptId: v.id("receipts") },
-  returns: v.union(
-    v.object({
-      expected: v.number(),
-      reader: v.union(v.number(), v.null()),
-      decisions: outcomeValidator,
-      answerable: v.boolean(),
-      ms: v.number(),
-    }),
-    v.null(),
-  ),
-  handler: async (ctx, { receiptId }) => {
+  returns: totalComparisonValidator,
+  handler: async (ctx, { receiptId }): Promise<TotalComparison> => {
     const totalCase: {
       storageIds: Id<"_storage">[];
       approvedTotalOre: number;
