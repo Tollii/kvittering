@@ -177,7 +177,13 @@ function citesAmount(note: string, amountOre: Ore | null): boolean {
   const [kroner = "", ore = ""] = Ore.formatInput(amountOre).split(",");
 
   // Allow a thousands separator (space, no-break space or dot) between groups.
-  const groups = kroner.replace(/\B(?=(\d{3})+(?!\d))/g, "[\\s.]?");
+  const digits = kroner.replace("-", "");
+  const parts: string[] = [];
+
+  for (let end = digits.length; end > 0; end -= 3)
+    parts.unshift(digits.slice(Math.max(0, end - 3), end));
+
+  const groups = (kroner.startsWith("-") ? "-" : "") + parts.join("[\\s.]?");
 
   return new RegExp(`(?<![\\d.,])${groups}[.,]${ore}(?!\\d)`).test(note);
 }

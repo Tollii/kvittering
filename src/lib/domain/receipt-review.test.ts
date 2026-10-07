@@ -194,6 +194,7 @@ it("recognises a quoted paid total with a thousands separator", () => {
   const data = batteryFixture();
   present(data.lines[0]).amountOre = Ore.of(125_290);
   data.totalOre = Ore.of(125_231);
+
   for (const total of ["1 252,31", "1\u00a0252,31", "1.252,31", "1252.31"]) {
     data.issues = [`Varelinjene gir 1 222,31 kr, mens BETALT er ${total} kr.`];
     expect(canAcceptReceipt(data, false)).toBe(true);

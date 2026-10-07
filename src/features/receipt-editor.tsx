@@ -120,8 +120,15 @@ export function ReceiptEditor({
 
   const unresolvedDuplicate = !!receipt.duplicateOf && !duplicateResolved;
 
-  const { totals, tasks, remaining, confirmable, ready, productLineCount } =
-    lineReview(data, unresolvedDuplicate);
+  const {
+    totals,
+    lineBalance,
+    tasks,
+    remaining,
+    confirmable,
+    ready,
+    productLineCount,
+  } = lineReview(data, unresolvedDuplicate);
 
   const stale = receipt.revision !== revision;
 
@@ -439,7 +446,7 @@ export function ReceiptEditor({
               confirmable={confirmable}
               reviewComplete={visibleLines.length === 0}
               hasTasks={tasks.length > 0}
-              difference={totals.unknown ? null : totals.difference}
+              difference={lineBalance}
               onShowLines={showLines}
               onConfirmAll={confirmAllCategories}
             />
@@ -535,6 +542,7 @@ function lineReview(data: ReceiptData | null, unresolvedDuplicate: boolean) {
   if (!data)
     return {
       totals: null,
+      lineBalance: null,
       tasks: [],
       remaining: 0,
       confirmable: 0,
@@ -542,8 +550,12 @@ function lineReview(data: ReceiptData | null, unresolvedDuplicate: boolean) {
       productLineCount: 0,
     };
 
+  const totals = reconcile(data);
+
   return {
-    totals: reconcile(data),
+    totals,
+    // A zero difference proves nothing while a line amount is unknown.
+    lineBalance: totals.unknown ? null : totals.difference,
     tasks: reviewTasks(data, unresolvedDuplicate),
     remaining: data.lines.filter((line) => lineReviewIssues(line).length)
       .length,
