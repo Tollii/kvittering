@@ -12,6 +12,8 @@
  *                                         questions; typesafe models only answer questions
  *   npm run eval -- --replay 10 --readers openai:gpt-6-luna,anthropic:claude-haiku-5-5
  *                                         re-read the same receipts with each reader model
+ *   npm run eval -- --replay 10 --reasoning high
+ *                                         re-read with more model reasoning (low|medium|high)
  *   npm run eval -- --compare-models      compare decision models on the same product questions
  *   npm run eval -- --compare-models --models typesafe:jev-latest,anthropic:claude-haiku-5-5
  *   npm run eval -- --save base.json      store the result as a baseline
@@ -38,6 +40,7 @@ const { values } = parseArgs({
     deployment: { type: "string" },
     fixed: { type: "boolean", default: false },
     readers: { type: "string" },
+    reasoning: { type: "string" },
     "compare-models": { type: "boolean", default: false },
     models: { type: "string" },
     compare: { type: "string" },
@@ -45,6 +48,14 @@ const { values } = parseArgs({
 });
 
 const compared = values.compare?.split(",");
+
+const reasoningSchema = z.enum(["low", "medium", "high"]);
+
+type Reasoning = z.infer<typeof reasoningSchema>;
+
+const reasoning = values.reasoning
+  ? reasoningSchema.parse(values.reasoning)
+  : undefined;
 
 const replayCount = values.replay
   ? Number(values.replay)
@@ -116,7 +127,7 @@ const resultsSchema = z.record(z.string(), ratesSchema);
 type FunctionArgs =
   | Record<string, never>
   | { count: number }
-  | { receiptId: string; model?: string }
+  | { receiptId: string; model?: string; reasoning?: Reasoning }
   | { models: string[]; count?: number };
 
 const deployment = values.deployment ? ["--deployment", values.deployment] : [];
@@ -254,7 +265,11 @@ async function replay(model: string | undefined, receipts: string[]) {
       replayed[index] = await run(
         "readingEvaluation:replayOne",
         replayResultSchema,
-        model ? { receiptId, model } : { receiptId },
+        {
+          receiptId,
+          ...(model && { model }),
+          ...(reasoning && { reasoning }),
+        },
       );
     }
   };

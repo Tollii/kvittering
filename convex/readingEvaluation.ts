@@ -24,6 +24,7 @@ import {
   type ReadingSummary,
 } from "../src/lib/domain/reading-evaluation";
 import { summarizeReadings } from "../src/lib/domain/reading-summary";
+import { reasoningValidator } from "./providerConfig";
 
 /*
  * Reading quality against what people approved. A reviewed receipt keeps the
@@ -236,9 +237,13 @@ export const replayOne = internalAction({
     receiptId: v.id("receipts"),
     /** Read with this `provider:model` instead of the production reader. */
     model: v.optional(v.string()),
+    reasoning: v.optional(reasoningValidator),
   },
   returns: replayResultValidator,
-  handler: async (ctx, { receiptId, model }): Promise<ReplayResult> => {
+  handler: async (
+    ctx,
+    { receiptId, model, reasoning },
+  ): Promise<ReplayResult> => {
     const replayCase: {
       storageIds: Id<"_storage">[];
       approved: Infer<typeof receiptDataValidator>;
@@ -252,6 +257,7 @@ export const replayOne = internalAction({
       const { data } = await ctx.runAction(internal.providers.extract, {
         storageIds: replayCase.storageIds,
         ...(model && { model }),
+        ...(reasoning && { reasoning }),
       });
 
       const classification = await ctx.runAction(internal.providers.classify, {

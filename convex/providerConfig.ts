@@ -1,3 +1,4 @@
+import { v } from "convex/values";
 import { env } from "./_generated/server";
 
 /**
@@ -111,3 +112,10 @@ export function parseModel(name: string) {
 export function modelKey(name: string) {
   return apiKeys[parseModel(name).provider]();
 }
+
+/** How hard an evaluation asks a model to think; production uses its default. */
+export const reasoningValidator = v.union(
+  v.literal("low"),
+  v.literal("medium"),
+  v.literal("high"),
+);

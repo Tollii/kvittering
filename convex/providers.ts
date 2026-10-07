@@ -4,7 +4,11 @@ import { generateText, NoObjectGeneratedError, Output } from "ai";
 import { languageModel, productJudgments } from "./aiModels";
 import { v } from "convex/values";
 import { internalAction } from "./_generated/server";
-import { receiptProductModel, receiptReader } from "./providerConfig";
+import {
+  reasoningValidator,
+  receiptProductModel,
+  receiptReader,
+} from "./providerConfig";
 import { receiptDataValidator } from "../src/lib/domain/receipt";
 import { batteryFixture } from "../src/lib/mock-receipts";
 import {
@@ -28,6 +32,8 @@ export const extract = internalAction({
     generation: v.number().optional(),
     /** Evaluations read with another `provider:model` than production. */
     model: v.string().optional(),
+    /** Evaluations can ask the reader to think harder than production does. */
+    reasoning: reasoningValidator.optional(),
   },
   returns: v.object({
     data: receiptDataValidator,
@@ -73,8 +79,10 @@ export const extract = internalAction({
         args.receiptId ? { kind: "receipt", id: args.receiptId } : undefined,
       ),
       maxOutputTokens: 32000,
+      ...(args.reasoning && { reasoning: args.reasoning }),
       maxRetries: 1,
-      abortSignal: AbortSignal.timeout(120000),
+      // Extra reasoning takes longer; an action may still run ten minutes.
+      abortSignal: AbortSignal.timeout(args.reasoning ? 300000 : 120000),
       providerOptions: { openai: { store: false } },
       instructions: `${extractionInstructions}\n\n${overlapInstructions}\n\n${uncertaintyInstructions}`,
       messages: [
