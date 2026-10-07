@@ -104,7 +104,8 @@ function run<T>(fn: string, schema: z.ZodType<T>, args: FunctionArgs = {}): T {
     { encoding: "utf8", maxBuffer: 20_000_000 },
   );
 
-  return schema.parse(JSON.parse(output));
+  // `convex run` prints nothing when a function returns null.
+  return schema.parse(JSON.parse(output.trim() || "null"));
 }
 
 const median = (values: number[]) =>
