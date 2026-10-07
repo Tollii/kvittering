@@ -11,6 +11,117 @@ import {
 import { TypeSafeClient, type Questions } from "@typesafe-ai/sdk";
 import { internalAction, env } from "./_generated/server";
 import { familyQuestion } from "./productAnalysisWorker";
+import type { JudgmentClient } from "./decisions";
+
+const familyCandidates = [
+  { name: "Coca-Cola 500ml" },
+  { name: "Coca-Cola Zero 500ml" },
+  { name: "Stratos Helt Sprøtt 150g" },
+  { name: "Battery Peachberry 500ml" },
+];
+
+const familyCases = [
+  { name: "COCA-COLA10PK BX", expected: "family_0" },
+  { name: "Coca-Cola Zero 10x330ml", expected: "family_1" },
+  { name: "Coca-Cola uten sukker 1.5l", expected: "family_1" },
+  { name: "Coca-Cola Cherry 330ml", expected: "new" },
+  { name: "STRATOS SPRØTT", expected: "family_2" },
+  { name: "BATTERY WHIRL", expected: "new" },
+];
+
+/** One request per case, as the worker asks about one product at a time. */
+export async function evaluateFamilies(client: JudgmentClient, model: string) {
+  const results = [];
+
+  for (const item of familyCases) {
+    const result = await client.systemOne({
+      model,
+      state: {
+        product: {
+          name: item.name,
+          brand: null,
+          attributes: [],
+          catalog: null,
+        },
+        candidates: familyCandidates,
+      },
+      questions: { family: familyQuestion(familyCandidates) },
+    });
+
+    const answer = result.answers.family;
+
+    results.push({
+      ...item,
+      choice: answer?.type === "choice" ? answer.choice : "no answer",
+      confidence: answer?.type === "choice" ? answer.confidence : 0,
+    });
+  }
+
+  return results;
+}
+
+const attributeCases = [
+  {
+    name: "Coca-Cola Zero 500ml",
+    expectedType: "cola",
+    expectedSugar: "sugar_free",
+  },
+  {
+    name: "Pepsi Max 1.5l",
+    expectedType: "cola",
+    expectedSugar: "sugar_free",
+  },
+  {
+    name: "BATTERY WHIRL",
+    expectedType: "energy",
+    expectedSugar: "unknown",
+  },
+  {
+    name: "KYLLINGFILET 900G",
+    expectedType: "chicken",
+    expectedSugar: "unknown",
+  },
+  {
+    name: "BIGONE BBQ CHICKEN",
+    expectedType: "prepared_meal",
+    expectedSugar: "unknown",
+  },
+  { name: "VARE", expectedType: "unknown", expectedSugar: "unknown" },
+];
+
+/** All attribute cases share one request, as a receipt's products do. */
+export async function evaluateAttributeCases(
+  client: JudgmentClient,
+  model: string,
+) {
+  const questions: Questions = {};
+  attributeCases.forEach((_, index) => {
+    for (const [key, question] of Object.entries(
+      attributeQuestions(`products[${index}]`),
+    ))
+      questions[`${key}_${index}`] = question;
+  });
+
+  const response = await client.systemOne({
+    model,
+    state: { products: attributeCases.map(({ name }) => ({ name })) },
+    questions,
+  });
+
+  return attributeCases.map((item, index) => ({
+    ...item,
+    attributes: readAttributes(
+      Object.fromEntries(
+        Object.keys(attributeQuestions()).map((key) => {
+          const answer = response.answers[`${key}_${index}`];
+
+          return [key, answer?.type === "choice" ? answer : {}];
+        }),
+      ),
+      "receipt",
+    ),
+  }));
+}
 
 export const evaluate = internalAction({
   args: {},
@@ -26,54 +137,15 @@ export const evaluate = internalAction({
     if (!env.TYPESAFE_API_KEY)
       throw new Error("Produktanalysetesten er ikke tilgjengelig.");
 
-    const client = new TypeSafeClient({
-      fetch: providerFetch(ctx, "typesafe"),
-      apiKey: env.TYPESAFE_API_KEY,
-      timeout: 20000,
-      retry: { maxRetries: 0 },
-    });
-
-    const candidates = [
-      { name: "Coca-Cola 500ml" },
-      { name: "Coca-Cola Zero 500ml" },
-      { name: "Stratos Helt Sprøtt 150g" },
-      { name: "Battery Peachberry 500ml" },
-    ];
-
-    const cases = [
-      { name: "COCA-COLA10PK BX", expected: "family_0" },
-      { name: "Coca-Cola Zero 10x330ml", expected: "family_1" },
-      { name: "Coca-Cola uten sukker 1.5l", expected: "family_1" },
-      { name: "Coca-Cola Cherry 330ml", expected: "new" },
-      { name: "STRATOS SPRØTT", expected: "family_2" },
-      { name: "BATTERY WHIRL", expected: "new" },
-    ];
-
-    const results = [];
-
-    for (const item of cases) {
-      const result = await client.systemOne({
-        model: env.TYPESAFE_MODEL ?? "jev-latest",
-        state: {
-          product: {
-            name: item.name,
-            brand: null,
-            attributes: [],
-            catalog: null,
-          },
-          candidates,
-        },
-        questions: { family: familyQuestion(candidates) },
-      });
-
-      results.push({
-        ...item,
-        choice: result.answers.family.choice,
-        confidence: result.answers.family.confidence,
-      });
-    }
-
-    return results;
+    return evaluateFamilies(
+      new TypeSafeClient({
+        fetch: providerFetch(ctx, "typesafe"),
+        apiKey: env.TYPESAFE_API_KEY,
+        timeout: 20000,
+        retry: { maxRetries: 0 },
+      }),
+      env.TYPESAFE_MODEL ?? "jev-latest",
+    );
   },
 });
 
@@ -92,68 +164,14 @@ export const evaluateAttributes = internalAction({
     if (!env.TYPESAFE_API_KEY)
       throw new Error("Product analysis is unavailable.");
 
-    const cases = [
-      {
-        name: "Coca-Cola Zero 500ml",
-        expectedType: "cola",
-        expectedSugar: "sugar_free",
-      },
-      {
-        name: "Pepsi Max 1.5l",
-        expectedType: "cola",
-        expectedSugar: "sugar_free",
-      },
-      {
-        name: "BATTERY WHIRL",
-        expectedType: "energy",
-        expectedSugar: "unknown",
-      },
-      {
-        name: "KYLLINGFILET 900G",
-        expectedType: "chicken",
-        expectedSugar: "unknown",
-      },
-      {
-        name: "BIGONE BBQ CHICKEN",
-        expectedType: "prepared_meal",
-        expectedSugar: "unknown",
-      },
-      { name: "VARE", expectedType: "unknown", expectedSugar: "unknown" },
-    ];
-
-    const questions: Questions = {};
-    cases.forEach((_, index) => {
-      for (const [key, question] of Object.entries(
-        attributeQuestions(`products[${index}]`),
-      ))
-        questions[`${key}_${index}`] = question;
-    });
-
-    const client = new TypeSafeClient({
-      fetch: providerFetch(ctx, "typesafe"),
-      apiKey: env.TYPESAFE_API_KEY,
-      timeout: 30000,
-      retry: { maxRetries: 0 },
-    });
-
-    const response = await client.systemOne({
-      model: env.TYPESAFE_MODEL ?? "jev-latest",
-      state: { products: cases.map(({ name }) => ({ name })) },
-      questions,
-    });
-
-    return cases.map((item, index) => ({
-      ...item,
-      attributes: readAttributes(
-        Object.fromEntries(
-          Object.keys(attributeQuestions()).map((key) => {
-            const answer = response.answers[`${key}_${index}`];
-
-            return [key, answer?.type === "choice" ? answer : {}];
-          }),
-        ),
-        "receipt",
-      ),
-    }));
+    return evaluateAttributeCases(
+      new TypeSafeClient({
+        fetch: providerFetch(ctx, "typesafe"),
+        apiKey: env.TYPESAFE_API_KEY,
+        timeout: 30000,
+        retry: { maxRetries: 0 },
+      }),
+      env.TYPESAFE_MODEL ?? "jev-latest",
+    );
   },
 });

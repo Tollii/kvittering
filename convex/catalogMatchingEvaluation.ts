@@ -8,6 +8,97 @@ import { internalAction, env } from "./_generated/server";
 import { classifyCatalogProducts } from "./catalogClassifier";
 import { normalizeProducts } from "./kassalapp/normalize";
 import { emptyLine } from "../src/lib/domain/receipt";
+import type { JudgmentClient } from "./decisions";
+
+const catalogCases = [
+  {
+    name: "SALAT CRISPI",
+    expected: "equivalent",
+    candidates: [
+      "Salat Crispi",
+      "Crispi Salat 150g",
+      "Crispi Salat 150g pakke",
+      "Crispi Salat 150g Flowpk",
+      "Crispi Salat 150g Økologisk",
+    ],
+  },
+  {
+    name: "STRATOS SPRØTT",
+    expected: "equivalent",
+    candidates: [
+      "Stratos Helt Sprøtt 150g Nidar",
+      "Stratos Helt Sprøtt 150g Nidar pose",
+    ],
+  },
+  {
+    name: "COCA-COLA 500ML",
+    expected: "exact",
+    candidates: [
+      "Coca-Cola 500ml Flaske",
+      "Coca-Cola Light 500ml",
+      "Coca-Cola Zero 500ml",
+    ],
+  },
+  {
+    name: "BIGONE BBQ CHICKEN",
+    expected: "unresolved",
+    candidates: ["BigOne BBQ Chicken 560g", "BigOne BBQ Chicken 700g"],
+  },
+  {
+    name: "SALAT CRISPI",
+    expected: "unresolved",
+    candidates: ["Crispi Salat 150g Økologisk"],
+  },
+  {
+    name: "COCA-COLA 10PK",
+    expected: "unresolved",
+    candidates: ["Coca-Cola 15pk"],
+  },
+];
+
+/** Fixed matching cases through the production classifier, with any judgment client. */
+export async function evaluateCatalogCases(client: JudgmentClient) {
+  const results = await classifyCatalogProducts(
+    catalogCases.map((item, index) => ({
+      line: {
+        ...emptyLine(`evaluation_${index}`),
+        name: item.name,
+        manual: true,
+      },
+      product: null,
+      candidates: normalizeProducts({
+        data: item.candidates.map((name, candidate) => ({
+          id: index * 100 + candidate,
+          name,
+          ean: `7030000${index}0000${candidate}`,
+        })),
+      }),
+    })),
+    client,
+  );
+
+  return results.map((result, index) => {
+    const testCase = catalogCases[index];
+
+    if (!testCase) throw new Error("Each evaluation case needs a result.");
+
+    const actual = result.productKey
+      ? result.equivalentKeys
+        ? "equivalent"
+        : "exact"
+      : "unresolved";
+
+    return {
+      name: testCase.name,
+      expected: testCase.expected,
+      actual,
+      passed: actual === testCase.expected,
+      reason: result.reason ?? "unspecified",
+      probabilities:
+        result.candidates?.map((candidate) => candidate.probability) ?? [],
+    };
+  });
+}
 
 /** Fixed matching cases exercise the deployed classifier without changing receipts. */
 export const evaluate = internalAction({
@@ -26,68 +117,7 @@ export const evaluate = internalAction({
     if (!env.TYPESAFE_API_KEY)
       throw new Error("Product matching is unavailable.");
 
-    const cases = [
-      {
-        name: "SALAT CRISPI",
-        expected: "equivalent",
-        candidates: [
-          "Salat Crispi",
-          "Crispi Salat 150g",
-          "Crispi Salat 150g pakke",
-          "Crispi Salat 150g Flowpk",
-          "Crispi Salat 150g Økologisk",
-        ],
-      },
-      {
-        name: "STRATOS SPRØTT",
-        expected: "equivalent",
-        candidates: [
-          "Stratos Helt Sprøtt 150g Nidar",
-          "Stratos Helt Sprøtt 150g Nidar pose",
-        ],
-      },
-      {
-        name: "COCA-COLA 500ML",
-        expected: "exact",
-        candidates: [
-          "Coca-Cola 500ml Flaske",
-          "Coca-Cola Light 500ml",
-          "Coca-Cola Zero 500ml",
-        ],
-      },
-      {
-        name: "BIGONE BBQ CHICKEN",
-        expected: "unresolved",
-        candidates: ["BigOne BBQ Chicken 560g", "BigOne BBQ Chicken 700g"],
-      },
-      {
-        name: "SALAT CRISPI",
-        expected: "unresolved",
-        candidates: ["Crispi Salat 150g Økologisk"],
-      },
-      {
-        name: "COCA-COLA 10PK",
-        expected: "unresolved",
-        candidates: ["Coca-Cola 15pk"],
-      },
-    ];
-
-    const results = await classifyCatalogProducts(
-      cases.map((item, index) => ({
-        line: {
-          ...emptyLine(`evaluation_${index}`),
-          name: item.name,
-          manual: true,
-        },
-        product: null,
-        candidates: normalizeProducts({
-          data: item.candidates.map((name, candidate) => ({
-            id: index * 100 + candidate,
-            name,
-            ean: `7030000${index}0000${candidate}`,
-          })),
-        }),
-      })),
+    return evaluateCatalogCases(
       new TypeSafeClient({
         fetch: providerFetch(ctx, "typesafe"),
         apiKey: env.TYPESAFE_API_KEY,
@@ -95,27 +125,5 @@ export const evaluate = internalAction({
         retry: { maxRetries: 0 },
       }),
     );
-
-    return results.map((result, index) => {
-      const testCase = cases[index];
-
-      if (!testCase) throw new Error("Each evaluation case needs a result.");
-
-      const actual = result.productKey
-        ? result.equivalentKeys
-          ? "equivalent"
-          : "exact"
-        : "unresolved";
-
-      return {
-        name: testCase.name,
-        expected: testCase.expected,
-        actual,
-        passed: actual === testCase.expected,
-        reason: result.reason ?? "unspecified",
-        probabilities:
-          result.candidates?.map((candidate) => candidate.probability) ?? [],
-      };
-    });
   },
 });
