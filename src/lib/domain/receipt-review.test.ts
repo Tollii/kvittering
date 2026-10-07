@@ -178,6 +178,18 @@ it("settles a reader note about the sum once a corrected line balances the paid 
   expect(canAcceptReceipt(data, false)).toBe(false);
 });
 
+it("keeps a reader note that quotes the total without comparing it", () => {
+  const data = batteryFixture();
+
+  for (const note of [
+    "Varenavnet på linjen 25,31 er delvis uleselig.",
+    "Returbeløp -25,31 og 3,00 er usikre.",
+  ]) {
+    data.issues = [note];
+    expect(canAcceptReceipt(data, false)).toBe(false);
+  }
+});
+
 it("keeps a reader note about the sum while a line amount is unknown", () => {
   const data = batteryFixture();
   data.issues = ["Varelinjene gir 22,72 kr, mens BETALT er 25,31 kr."];
