@@ -20,10 +20,10 @@ import {
   readingScoreValidator,
   readingSummaryValidator,
   scoreReading,
-  summarizeReadings,
   type ReadingScore,
   type ReadingSummary,
 } from "../src/lib/domain/reading-evaluation";
+import { summarizeReadings } from "../src/lib/domain/reading-summary";
 
 /*
  * Reading quality against what people approved. A reviewed receipt keeps the
@@ -269,13 +269,6 @@ export const replayOne = internalAction({
       };
     }
   },
-});
-
-/** Add up replayed scores the same way the scorecard does. */
-export const summarize = internalQuery({
-  args: { scores: v.array(readingScoreValidator) },
-  returns: readingSummaryValidator,
-  handler: (_ctx, { scores }): ReadingSummary => summarizeReadings(scores),
 });
 
 /**

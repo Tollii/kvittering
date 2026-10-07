@@ -3,7 +3,8 @@ import { expect, it } from "vitest";
 import { Ore } from "./ore";
 import { emptyLine } from "./receipt";
 import { batteryFixture } from "../mock-receipts";
-import { scoreReading, summarizeReadings } from "./reading-evaluation";
+import { scoreReading } from "./reading-evaluation";
+import { summarizeReadings } from "./reading-summary";
 
 it("scores a reading against what a person approved", () => {
   const reading = batteryFixture();

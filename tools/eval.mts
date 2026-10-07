@@ -21,6 +21,7 @@ import { execFileSync } from "node:child_process";
 import { readFileSync, writeFileSync } from "node:fs";
 import { parseArgs } from "node:util";
 import { z } from "zod";
+import { summarizeReadings } from "../src/lib/domain/reading-summary.ts";
 
 const { values } = parseArgs({
   options: {
@@ -77,10 +78,22 @@ const scorecardSchema = z.object({
   complete: z.boolean(),
 });
 
-// Scores only travel back to readingEvaluation:summarize, which validates them.
+const scoreSchema = z.object({
+  totalCorrect: z.boolean().nullable(),
+  balanced: z.boolean(),
+  products: count,
+  amountsCorrect: count,
+  namesKept: count,
+  categorized: count,
+  categoriesCorrect: count,
+  readProducts: count,
+  categoriesUnclear: count,
+  flaggedLines: count,
+});
+
 const replayResultSchema = z.object({
   receiptId: z.string(),
-  score: z.unknown(),
+  score: scoreSchema.nullable(),
   error: z.string().optional(),
 });
 
@@ -92,8 +105,7 @@ type FunctionArgs =
   | Record<string, never>
   | { count: number }
   | { receiptId: string; model?: string }
-  | { models: string[]; count?: number }
-  | { scores: unknown[] };
+  | { models: string[]; count?: number };
 
 const deployment = values.deployment ? ["--deployment", values.deployment] : [];
 
@@ -200,9 +212,7 @@ if (ids)
       result.score ? [result.score] : [],
     );
 
-    const summary = run("readingEvaluation:summarize", summarySchema, {
-      scores,
-    });
+    const summary = summarizeReadings(scores);
 
     print(`Replayed with ${model ?? "this deployment's reader"}`, summary);
     results[model ? `replay ${model}` : "replay"] = rates(summary);
