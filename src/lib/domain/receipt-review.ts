@@ -166,6 +166,42 @@ function printedTotal(data: ReceiptData, amountOre: Ore): string | null {
   return row ? row.originalText.trim() || row.name : null;
 }
 
+/** Matches this amount as 1250,31, 1 250,31, 1.250,31 or 1250.31. */
+function amountPattern(amountOre: Ore): RegExp {
+  const [kroner = "", ore = ""] = Ore.formatInput(amountOre).split(",");
+  const negative = kroner.startsWith("-");
+  const digits = kroner.replace("-", "");
+  const parts: string[] = [];
+
+  // Allow a thousands separator (space, no-break space or dot) between groups.
+  for (let end = digits.length; end > 0; end -= 3)
+    parts.unshift(digits.slice(Math.max(0, end - 3), end));
+
+  // A positive total must not match a quoted negative amount.
+  const before = negative ? "\\d.," : "\\d.,\\-\u2212";
+
+  return new RegExp(
+    `(?<![${before}])${negative ? "-" : ""}${parts.join("[\\s.]?")}[.,]${ore}(?!\\d)`,
+    "g",
+  );
+}
+
+/**
+ * Whether a reader note compares the paid total with another amount, as a
+ * note about the sum does. Lines matching that total settle such a note. A
+ * note that quotes only the total may be about something else, such as the
+ * one line on a single-item receipt.
+ */
+function isSumNote(note: string, totalOre: Ore | null): boolean {
+  if (totalOre === null) return false;
+
+  const total = amountPattern(totalOre);
+
+  if (!total.test(note)) return false;
+
+  return /\d[.,]\d{2}(?!\d)/.test(note.replace(total, ""));
+}
+
 export type ReviewTask =
   | { kind: "duplicate" }
   | { kind: "store" }
@@ -227,7 +263,14 @@ export function assessReceipt(
 
   const receiptIssues = [
     ...new Set([
-      ...data.issues,
+      ...data.issues.filter(
+        (issue) =>
+          !(
+            totals.difference === 0 &&
+            totals.unknown === 0 &&
+            isSumNote(issue, data.totalOre)
+          ),
+      ),
       ...totals.reviewIssues.filter(isReceiptLevelIssue).map(receiptIssueText),
     ]),
   ];

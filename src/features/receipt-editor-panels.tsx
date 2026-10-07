@@ -1,4 +1,5 @@
-import { ActivityIndicator, Alert, Pressable } from "react-native";
+import { ActivityIndicator, Alert, Pressable, View } from "react-native";
+import { Ore } from "@/lib/domain/ore";
 import {
   Button,
   Copy,
@@ -52,6 +53,7 @@ export function ReceiptLineControls({
   confirmable,
   reviewComplete,
   hasTasks,
+  difference,
   onShowLines,
   onConfirmAll,
 }: Readonly<{
@@ -65,6 +67,8 @@ export function ReceiptLineControls({
   /** Review mode shows no lines. */
   reviewComplete: boolean;
   hasTasks: boolean;
+  /** Line sum minus the paid amount, or null while it or a line amount is unknown. */
+  difference: Ore | null;
   onShowLines: (lines: "review" | "all") => void;
   onConfirmAll: () => void;
 }>) {
@@ -116,11 +120,50 @@ export function ReceiptLineControls({
         </Panel>
       )}
       {allLines && (
-        <Copy accessibilityRole="header" size={19} weight="600">
-          Varelinjer
-        </Copy>
+        <View
+          style={{
+            flexDirection: "row",
+            alignItems: "center",
+            flexWrap: "wrap",
+            gap: 8,
+          }}
+        >
+          <Copy
+            accessibilityRole="header"
+            size={19}
+            weight="600"
+            style={{ flex: 1 }}
+          >
+            Varelinjer
+          </Copy>
+          {difference !== null && <LineBalance difference={difference} />}
+        </View>
       )}
     </>
+  );
+}
+
+/** Whether the lines add up to the paid amount, updated as lines are edited. */
+function LineBalance({ difference }: Readonly<{ difference: Ore }>) {
+  const colors = useTheme();
+  const color = difference === 0 ? colors.success : colors.warning;
+
+  return (
+    <View
+      accessibilityLiveRegion="polite"
+      style={{ flexDirection: "row", alignItems: "center", gap: 4 }}
+    >
+      <Icon
+        name={difference === 0 ? "checkmark.circle.fill" : "equal.circle"}
+        size={14}
+        color={color}
+      />
+      <Copy size={13} weight="600" style={{ color }}>
+        {difference === 0
+          ? "Stemmer med betalt"
+          : `Avvik ${Ore.format(difference)}`}
+      </Copy>
+    </View>
   );
 }
 

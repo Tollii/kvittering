@@ -25,6 +25,33 @@ import { useTheme } from "@/constants/theme";
 
 type Totals = ReturnType<typeof reconcile>;
 
+type DifferenceTask = Extract<ReviewTask, { kind: "difference" }>;
+
+/** The ways a person can settle a difference, most common first. */
+function differenceFixes(
+  task: DifferenceTask,
+  data: ReceiptData | null,
+  onChange: (data: ReceiptData) => void,
+  onShowLines: (lines: "review" | "all") => void,
+) {
+  return [
+    { text: "Rett en vare", onPress: () => onShowLines("all") },
+    {
+      text: `Betalt var ${Ore.format(task.calculatedOre)}`,
+      onPress: () => {
+        if (data) onChange({ ...data, totalOre: task.calculatedOre });
+      },
+    },
+    {
+      text: "Legg inn justering",
+      onPress: () => {
+        if (data) onChange(balanceWithAdjustment(data, randomUUID()));
+        onShowLines("all");
+      },
+    },
+  ];
+}
+
 /** One compact chip per open question. Tapping it jumps straight to the fix. */
 export function ReviewTaskChips({
   tasks,
@@ -98,29 +125,21 @@ export function ReviewTaskChips({
         return chip(`Avvik ${Ore.format(task.amountOre)}`, "equal.circle", () =>
           Alert.alert(
             `Avvik ${Ore.format(task.amountOre)}`,
-            `Linjene gir ${Ore.format(task.calculatedOre)}, men betalt beløp ble lest som ${Ore.format(data?.totalOre ?? null)}.${printed} Sjekk hva som står på kvitteringen.`,
+            `Varelinjene gir ${Ore.format(task.calculatedOre)}, men betalt beløp er ${Ore.format(data?.totalOre ?? null)}.${printed} Har en vare feil pris, retter du linjesummen på varen.`,
             [
-              {
-                text: `Betalt var ${Ore.format(task.calculatedOre)}`,
-                onPress: () => {
-                  if (data) onChange({ ...data, totalOre: task.calculatedOre });
-                },
-              },
-              { text: "Se alle linjer", onPress: () => onShowLines("all") },
-              {
-                text: "Legg inn justering",
-                onPress: () => {
-                  if (data) onChange(balanceWithAdjustment(data, randomUUID()));
-                  onShowLines("all");
-                },
-              },
+              ...differenceFixes(task, data, onChange, onShowLines),
               { text: "Avbryt", style: "cancel" },
             ],
           ),
         );
       }
 
-      case "receipt-issues":
+      case "receipt-issues": {
+        // Only the reader's own notes can be removed; computed checks stay until fixed.
+        const removable = task.issues.filter((issue) =>
+          data?.issues.includes(issue),
+        );
+
         return chip(
           task.issues.length === 1
             ? "1 merknad"
@@ -130,17 +149,28 @@ export function ReviewTaskChips({
             Alert.alert(
               "Merknader fra lesingen",
               task.issues.join("\n"),
-              data?.issues.length
+              data && removable.length
                 ? [
-                    { text: "Avbryt", style: "cancel" },
+                    { text: "Behold", style: "cancel" },
                     {
-                      text: "Dette stemmer",
-                      onPress: () => onChange({ ...data, issues: [] }),
+                      text:
+                        removable.length > 1
+                          ? "Fjern merknadene"
+                          : "Fjern merknaden",
+                      onPress: () =>
+                        onChange({
+                          ...data,
+                          issues: data.issues.filter(
+                            (issue) => !removable.includes(issue),
+                          ),
+                        }),
                     },
                   ]
                 : [{ text: "OK" }],
             ),
         );
+      }
+
       case "amounts":
         return chip(`${task.count} beløp mangler`, "numbers", toLines);
       case "names":
@@ -286,7 +316,17 @@ export function ReceiptSummary({
 export function PurchaseTotals({
   data,
   totals,
-}: Readonly<{ data: ReceiptData; totals: Totals }>) {
+  difference,
+  onChange,
+  onShowLines,
+}: Readonly<{
+  data: ReceiptData;
+  totals: Totals;
+  /** An open difference between the lines and the paid amount. */
+  difference: DifferenceTask | undefined;
+  onChange: (data: ReceiptData) => void;
+  onShowLines: (lines: "review" | "all") => void;
+}>) {
   const { fontScale } = useWindowDimensions();
 
   // Components appear only when present; the line sum and paid amount always do.
@@ -326,6 +366,21 @@ export function PurchaseTotals({
             ? "Betalt beløp mangler"
             : `Avvik mellom varelinjer og betalt beløp: ${Ore.format(totals.difference)}`}
         </Notice>
+      )}
+      {difference && (
+        <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8 }}>
+          {differenceFixes(difference, data, onChange, onShowLines).map(
+            (fix, index) => (
+              <Button
+                key={fix.text}
+                title={fix.text}
+                variant={index === 0 ? "tint" : "secondary"}
+                compact
+                onPress={fix.onPress}
+              />
+            ),
+          )}
+        </View>
       )}
       {rows.map((row) => (
         <View

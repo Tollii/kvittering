@@ -120,8 +120,15 @@ export function ReceiptEditor({
 
   const unresolvedDuplicate = !!receipt.duplicateOf && !duplicateResolved;
 
-  const { totals, tasks, remaining, confirmable, ready, productLineCount } =
-    lineReview(data, unresolvedDuplicate);
+  const {
+    totals,
+    lineBalance,
+    tasks,
+    remaining,
+    confirmable,
+    ready,
+    productLineCount,
+  } = lineReview(data, unresolvedDuplicate);
 
   const stale = receipt.revision !== revision;
 
@@ -146,6 +153,8 @@ export function ReceiptEditor({
   const nextPending = context?.nextPendingId
     ? { _id: context.nextPendingId }
     : undefined;
+
+  const showLines = (lines: "review" | "all") => setAllLines(lines === "all");
 
   function change(next: ReceiptData) {
     dispatch({ type: "data", data: next });
@@ -363,7 +372,7 @@ export function ReceiptEditor({
                 data={data}
                 onResolveDuplicate={() => edit({ duplicateResolved: true })}
                 onEditFields={() => setSheet("fields")}
-                onShowLines={(lines) => setAllLines(lines === "all")}
+                onShowLines={showLines}
                 onAddLine={addLine}
                 onChange={change}
               />
@@ -419,7 +428,13 @@ export function ReceiptEditor({
             pointerEvents={busy || processing ? "none" : "auto"}
             style={{ gap: 12 }}
           >
-            <PurchaseTotals data={data} totals={totals} />
+            <PurchaseTotals
+              data={data}
+              totals={totals}
+              difference={tasks.find((task) => task.kind === "difference")}
+              onChange={change}
+              onShowLines={showLines}
+            />
             <ReceiptCategorySpending data={data} />
             <ReceiptLineControls
               allLines={allLines}
@@ -431,7 +446,8 @@ export function ReceiptEditor({
               confirmable={confirmable}
               reviewComplete={visibleLines.length === 0}
               hasTasks={tasks.length > 0}
-              onShowLines={(lines) => setAllLines(lines === "all")}
+              difference={lineBalance}
+              onShowLines={showLines}
               onConfirmAll={confirmAllCategories}
             />
             <ReceiptLineList
@@ -526,6 +542,7 @@ function lineReview(data: ReceiptData | null, unresolvedDuplicate: boolean) {
   if (!data)
     return {
       totals: null,
+      lineBalance: null,
       tasks: [],
       remaining: 0,
       confirmable: 0,
@@ -533,8 +550,12 @@ function lineReview(data: ReceiptData | null, unresolvedDuplicate: boolean) {
       productLineCount: 0,
     };
 
+  const totals = reconcile(data);
+
   return {
-    totals: reconcile(data),
+    totals,
+    // A zero difference proves nothing while a line amount is unknown.
+    lineBalance: totals.unknown ? null : totals.difference,
     tasks: reviewTasks(data, unresolvedDuplicate),
     remaining: data.lines.filter((line) => lineReviewIssues(line).length)
       .length,

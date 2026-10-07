@@ -156,6 +156,63 @@ it("offers the line sum as paid, quoting a printed row with that amount", () => 
   ]);
 });
 
+it("settles a reader note about the sum once a corrected line balances the paid total", () => {
+  const data = batteryFixture();
+  present(data.lines[0]).amountOre = Ore.of(1890);
+  data.issues = [
+    "Varelinjene gir 18,31 kr, mens BETALT er 25,31 kr.",
+    "Datoen er utydelig.",
+  ];
+  expect(reviewTasks(data, false).map((task) => task.kind)).toEqual([
+    "difference",
+    "receipt-issues",
+  ]);
+
+  present(data.lines[0]).amountOre = Ore.of(2590);
+  expect(reviewTasks(data, false)).toEqual([
+    { kind: "receipt-issues", issues: ["Datoen er utydelig."] },
+  ]);
+  data.issues = ["Varelinjene gir 18.31, mens BETALT er 25.31."];
+  expect(canAcceptReceipt(data, false)).toBe(true);
+  data.issues = ["Beløpet 125,31 kr er utydelig."];
+  expect(canAcceptReceipt(data, false)).toBe(false);
+});
+
+it("keeps a reader note that quotes the total without comparing it", () => {
+  const data = batteryFixture();
+
+  for (const note of [
+    "Varenavnet på linjen 25,31 er delvis uleselig.",
+    "Returbeløp -25,31 og 3,00 er usikre.",
+  ]) {
+    data.issues = [note];
+    expect(canAcceptReceipt(data, false)).toBe(false);
+  }
+});
+
+it("keeps a reader note about the sum while a line amount is unknown", () => {
+  const data = batteryFixture();
+  data.issues = ["Varelinjene gir 22,72 kr, mens BETALT er 25,31 kr."];
+  present(data.lines[1]).amountOre = null;
+  present(data.lines[0]).amountOre = Ore.of(2331);
+  expect(reconcile(data).difference).toBe(0);
+  expect(reviewTasks(data, false)).toContainEqual({
+    kind: "receipt-issues",
+    issues: data.issues,
+  });
+});
+
+it("recognises a quoted paid total with a thousands separator", () => {
+  const data = batteryFixture();
+  present(data.lines[0]).amountOre = Ore.of(125_290);
+  data.totalOre = Ore.of(125_231);
+
+  for (const total of ["1 252,31", "1\u00a0252,31", "1.252,31", "1252.31"]) {
+    data.issues = [`Varelinjene gir 1 222,31 kr, mens BETALT er ${total} kr.`];
+    expect(canAcceptReceipt(data, false)).toBe(true);
+  }
+});
+
 it("confirms suggested categories in bulk without touching unclear or other issues", () => {
   const data = batteryFixture();
   present(data.lines[0]).issues = ["Kategorien er usikker."];
