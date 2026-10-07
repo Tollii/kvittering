@@ -82,25 +82,31 @@ async function compare<T>(
 ) {
   const results: Record<string, T> = {};
   const ms: Record<string, number> = {};
-  let requests = 0;
+  const requests: Record<string, number> = {};
 
-  for (const model of compared) {
-    requests = 0;
+  // Models run side by side; each times only its own requests.
+  await Promise.all(
+    compared.map(async (model) => {
+      requests[model.name] = 0;
 
-    const counted: JudgmentClient = {
-      systemOne(request) {
-        requests++;
+      const counted: JudgmentClient = {
+        systemOne(request) {
+          requests[model.name] = (requests[model.name] ?? 0) + 1;
 
-        return model.client.systemOne(request);
-      },
-    };
+          return model.client.systemOne(request);
+        },
+      };
 
-    const started = Date.now();
-    results[model.name] = await run(counted);
-    ms[model.name] = Date.now() - started;
-  }
+      const started = Date.now();
+      results[model.name] = await run(counted);
+      ms[model.name] = Date.now() - started;
+    }),
+  );
 
-  return { results, timing: { suite, requests, ms } };
+  return {
+    results,
+    timing: { suite, requests: Math.max(0, ...Object.values(requests)), ms },
+  };
 }
 
 const noAnswer: Outcome = { actual: "no answer", confidence: null };

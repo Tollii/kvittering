@@ -234,24 +234,32 @@ const canRead = (model: string) => !model.startsWith("typesafe:");
 const readers = compared?.filter(canRead) ??
   values.readers?.split(",") ?? [undefined];
 
+/** Receipts each model reads at once; the models also run side by side. */
+const parallel = 4;
+
 async function replay(model: string | undefined, receipts: string[]) {
-  const replayed = [];
+  const replayed: z.infer<typeof replayResultSchema>[] = [];
+  let next = 0;
 
-  // Each model reads one receipt at a time; the models run side by side.
-  for (const [index, receiptId] of receipts.entries()) {
-    const reader = model ? ` with ${model}` : "";
-    console.error(
-      `replaying ${index + 1}/${receipts.length} ${receiptId}${reader}`,
-    );
+  const worker = async () => {
+    while (next < receipts.length) {
+      const index = next;
+      next += 1;
+      const receiptId = receipts[index] ?? "";
+      const reader = model ? ` with ${model}` : "";
+      console.error(
+        `replaying ${index + 1}/${receipts.length} ${receiptId}${reader}`,
+      );
 
-    replayed.push(
-      await run(
+      replayed[index] = await run(
         "readingEvaluation:replayOne",
         replayResultSchema,
         model ? { receiptId, model } : { receiptId },
-      ),
-    );
-  }
+      );
+    }
+  };
+
+  await Promise.all(Array.from({ length: parallel }, worker));
 
   return replayed;
 }
