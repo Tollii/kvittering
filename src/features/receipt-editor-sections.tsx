@@ -14,7 +14,7 @@ import {
   Panel,
 } from "@/components/ui";
 import { ReceiptImages } from "@/features/receipt-images";
-import { type reconcile, type ReceiptData } from "@/lib/domain/receipt";
+import { reconcile, type ReceiptData } from "@/lib/domain/receipt";
 import {
   balanceWithAdjustment,
   type ReviewTask,
@@ -98,15 +98,15 @@ export function ReviewTaskChips({
         return chip(`Avvik ${Ore.format(task.amountOre)}`, "equal.circle", () =>
           Alert.alert(
             `Avvik ${Ore.format(task.amountOre)}`,
-            `Linjene gir ${Ore.format(task.calculatedOre)}, men betalt beløp ble lest som ${Ore.format(data?.totalOre ?? null)}.${printed} Sjekk hva som står på kvitteringen.`,
+            `Varelinjene gir ${Ore.format(task.calculatedOre)}, men betalt beløp er ${Ore.format(data?.totalOre ?? null)}.${printed} Har en vare feil pris, retter du linjesummen på varen.`,
             [
+              { text: "Rett en vare", onPress: () => onShowLines("all") },
               {
                 text: `Betalt var ${Ore.format(task.calculatedOre)}`,
                 onPress: () => {
                   if (data) onChange({ ...data, totalOre: task.calculatedOre });
                 },
               },
-              { text: "Se alle linjer", onPress: () => onShowLines("all") },
               {
                 text: "Legg inn justering",
                 onPress: () => {
@@ -120,27 +120,35 @@ export function ReviewTaskChips({
         );
       }
 
-      case "receipt-issues":
+      case "receipt-issues": {
+        const many = task.issues.length > 1;
+
+        // A reader note about the sum goes stale once a person fixes the lines.
+        const balanced =
+          data && reconcile(data).difference === 0
+            ? `\n\nVarelinjene stemmer nå med betalt beløp, ${Ore.format(data.totalOre)}.`
+            : "";
+
         return chip(
-          task.issues.length === 1
-            ? "1 merknad"
-            : `${task.issues.length} merknader`,
+          many ? `${task.issues.length} merknader` : "1 merknad",
           "exclamationmark.bubble",
           () =>
             Alert.alert(
               "Merknader fra lesingen",
-              task.issues.join("\n"),
+              task.issues.join("\n") + balanced,
               data?.issues.length
                 ? [
-                    { text: "Avbryt", style: "cancel" },
+                    { text: "Behold", style: "cancel" },
                     {
-                      text: "Dette stemmer",
+                      text: many ? "Fjern merknadene" : "Fjern merknaden",
                       onPress: () => onChange({ ...data, issues: [] }),
                     },
                   ]
                 : [{ text: "OK" }],
             ),
         );
+      }
+
       case "amounts":
         return chip(`${task.count} beløp mangler`, "numbers", toLines);
       case "names":

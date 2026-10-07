@@ -431,6 +431,7 @@ export function ReceiptEditor({
               confirmable={confirmable}
               reviewComplete={visibleLines.length === 0}
               hasTasks={tasks.length > 0}
+              difference={totals.difference}
               onShowLines={(lines) => setAllLines(lines === "all")}
               onConfirmAll={confirmAllCategories}
             />
