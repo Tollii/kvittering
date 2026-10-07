@@ -419,7 +419,13 @@ export function ReceiptEditor({
             pointerEvents={busy || processing ? "none" : "auto"}
             style={{ gap: 12 }}
           >
-            <PurchaseTotals data={data} totals={totals} />
+            <PurchaseTotals
+              data={data}
+              totals={totals}
+              difference={tasks.find((task) => task.kind === "difference")}
+              onChange={change}
+              onShowLines={(lines) => setAllLines(lines === "all")}
+            />
             <ReceiptCategorySpending data={data} />
             <ReceiptLineControls
               allLines={allLines}
