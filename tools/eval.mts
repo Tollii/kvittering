@@ -439,9 +439,14 @@ if (values.baseline) {
   const margin = Number(values.margin);
   const drops: string[] = [];
 
+  // A baseline saved without --readers holds the deployment reader's replay,
+  // which each named reader is then held to.
+  const earlier = (run: string) =>
+    baseline[run] ?? (run.startsWith("replay ") ? baseline.replay : undefined);
+
   for (const [run, current] of Object.entries(results))
     for (const [name, value] of Object.entries(current)) {
-      const before = baseline[run]?.[name];
+      const before = earlier(run)?.[name];
 
       if (before !== undefined && value < before - margin)
         drops.push(`${run} ${name}: ${before} → ${value}`);

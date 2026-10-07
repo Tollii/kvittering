@@ -9,7 +9,11 @@ import {
   parseModel,
   productModelName,
 } from "./providerConfig";
-import { judgmentClient, type JudgmentClient } from "./decisions";
+import {
+  judgmentClient,
+  languageDecisionModel,
+  type JudgmentClient,
+} from "./decisions";
 import { providerFetch } from "./providerTransport";
 import type { ProviderSource } from "./rateLimits";
 
@@ -62,7 +66,7 @@ export function decisionModel(
   if (provider === "openai") return createOpenAI(options).decisionModel(model);
 
   if (provider === "anthropic")
-    return createAnthropic(options).decisionModel(model);
+    return languageDecisionModel(createAnthropic(options)(model));
 
   return createTypeSafeAi(options).decisionModel(model);
 }
