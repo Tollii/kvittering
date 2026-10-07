@@ -29,6 +29,12 @@ export function receiptReader(): ReceiptReader {
   const model =
     env.RECEIPT_MODEL ?? `openai:${env.OPENAI_RECEIPT_MODEL ?? "gpt-6-luna"}`;
 
+  // TypeSafe answers questions only; it cannot read a photo.
+  if (parseModel(model).provider === "typesafe")
+    throw new ProviderConfigurationError(
+      "Kvitteringsleseren er feilkonfigurert. Kontakt support.",
+    );
+
   if (!modelKey(model))
     throw new ProviderConfigurationError(
       "Kvitteringsleseren mangler API-nøkkel. Kontakt support.",
@@ -46,9 +52,22 @@ export function productModelName() {
   return env.PRODUCT_MODEL ?? `typesafe:${env.TYPESAFE_MODEL ?? "jev-latest"}`;
 }
 
-/** Whether product judgments can run on this deployment. */
+/**
+ * Whether product judgments can run on this deployment. A malformed
+ * `PRODUCT_MODEL` skips them rather than stopping receipts from finishing.
+ */
 export function hasProductModel() {
-  return Boolean(modelKey(productModelName()));
+  try {
+    return Boolean(modelKey(productModelName()));
+  } catch (error) {
+    if (!(error instanceof ProviderConfigurationError)) throw error;
+
+    console.error("receipt.product_model_misconfigured", {
+      message: error.message,
+    });
+
+    return false;
+  }
 }
 
 /**

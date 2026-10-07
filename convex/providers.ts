@@ -37,7 +37,10 @@ export const extract = internalAction({
   handler: async (ctx, args) => {
     const started = Date.now();
 
-    const reader = receiptReader();
+    // An evaluation's model replaces the production reader, key check included.
+    const reader = args.model
+      ? { kind: "model" as const, model: args.model }
+      : receiptReader();
 
     if (reader.kind === "mock")
       return {
@@ -61,7 +64,7 @@ export const extract = internalAction({
       }),
     );
 
-    const model = args.model ?? reader.model;
+    const { model } = reader;
 
     const request = generateText({
       model: languageModel(

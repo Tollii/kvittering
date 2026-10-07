@@ -8,7 +8,7 @@
  *   npm run eval -- --replay 10 --readers openai:gpt-6-luna,anthropic:claude-haiku-5-5
  *                                         re-read the same receipts with each reader model
  *   npm run eval -- --compare-models      compare decision models on the same product questions
- *   npm run eval -- --compare-models typesafe:jev-latest,anthropic:claude-haiku-5-5
+ *   npm run eval -- --compare-models --models typesafe:jev-latest,anthropic:claude-haiku-5-5
  *   npm run eval -- --save base.json      store the result as a baseline
  *   npm run eval -- --baseline base.json  fail when a rate drops more than --margin points
  *
@@ -32,7 +32,8 @@ const { values } = parseArgs({
     deployment: { type: "string" },
     fixed: { type: "boolean", default: false },
     readers: { type: "string" },
-    "compare-models": { type: "string" },
+    "compare-models": { type: "boolean", default: false },
+    models: { type: "string" },
   },
 });
 
@@ -237,9 +238,9 @@ if (values.fixed) {
   printRates(results.fixed);
 }
 
-if (values["compare-models"] !== undefined) {
-  const models = values["compare-models"]
-    ? values["compare-models"].split(",")
+if (values["compare-models"]) {
+  const models = values.models
+    ? values.models.split(",")
     : [
         "typesafe:jev-latest",
         "openai:gpt-6-luna",
