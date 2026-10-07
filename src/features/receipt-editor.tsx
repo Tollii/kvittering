@@ -147,6 +147,8 @@ export function ReceiptEditor({
     ? { _id: context.nextPendingId }
     : undefined;
 
+  const showLines = (lines: "review" | "all") => setAllLines(lines === "all");
+
   function change(next: ReceiptData) {
     dispatch({ type: "data", data: next });
     setMessage("");
@@ -363,7 +365,7 @@ export function ReceiptEditor({
                 data={data}
                 onResolveDuplicate={() => edit({ duplicateResolved: true })}
                 onEditFields={() => setSheet("fields")}
-                onShowLines={(lines) => setAllLines(lines === "all")}
+                onShowLines={showLines}
                 onAddLine={addLine}
                 onChange={change}
               />
@@ -424,7 +426,7 @@ export function ReceiptEditor({
               totals={totals}
               difference={tasks.find((task) => task.kind === "difference")}
               onChange={change}
-              onShowLines={(lines) => setAllLines(lines === "all")}
+              onShowLines={showLines}
             />
             <ReceiptCategorySpending data={data} />
             <ReceiptLineControls
@@ -437,8 +439,8 @@ export function ReceiptEditor({
               confirmable={confirmable}
               reviewComplete={visibleLines.length === 0}
               hasTasks={tasks.length > 0}
-              difference={totals.difference}
-              onShowLines={(lines) => setAllLines(lines === "all")}
+              difference={totals.unknown ? null : totals.difference}
+              onShowLines={showLines}
               onConfirmAll={confirmAllCategories}
             />
             <ReceiptLineList

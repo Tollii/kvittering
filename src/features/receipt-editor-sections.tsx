@@ -14,7 +14,7 @@ import {
   Panel,
 } from "@/components/ui";
 import { ReceiptImages } from "@/features/receipt-images";
-import { reconcile, type ReceiptData } from "@/lib/domain/receipt";
+import { type reconcile, type ReceiptData } from "@/lib/domain/receipt";
 import {
   balanceWithAdjustment,
   type ReviewTask,
@@ -135,27 +135,35 @@ export function ReviewTaskChips({
       }
 
       case "receipt-issues": {
-        const many = task.issues.length > 1;
-
-        // A reader note about the sum goes stale once a person fixes the lines.
-        const balanced =
-          data && reconcile(data).difference === 0
-            ? `\n\nVarelinjene stemmer nå med betalt beløp, ${Ore.format(data.totalOre)}.`
-            : "";
+        // Only the reader's own notes can be removed; computed checks stay until fixed.
+        const removable = task.issues.filter((issue) =>
+          data?.issues.includes(issue),
+        );
 
         return chip(
-          many ? `${task.issues.length} merknader` : "1 merknad",
+          task.issues.length === 1
+            ? "1 merknad"
+            : `${task.issues.length} merknader`,
           "exclamationmark.bubble",
           () =>
             Alert.alert(
               "Merknader fra lesingen",
-              task.issues.join("\n") + balanced,
-              data?.issues.length
+              task.issues.join("\n"),
+              data && removable.length
                 ? [
                     { text: "Behold", style: "cancel" },
                     {
-                      text: many ? "Fjern merknadene" : "Fjern merknaden",
-                      onPress: () => onChange({ ...data, issues: [] }),
+                      text:
+                        removable.length > 1
+                          ? "Fjern merknadene"
+                          : "Fjern merknaden",
+                      onPress: () =>
+                        onChange({
+                          ...data,
+                          issues: data.issues.filter(
+                            (issue) => !removable.includes(issue),
+                          ),
+                        }),
                     },
                   ]
                 : [{ text: "OK" }],

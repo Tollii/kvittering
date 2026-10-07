@@ -67,7 +67,7 @@ export function ReceiptLineControls({
   /** Review mode shows no lines. */
   reviewComplete: boolean;
   hasTasks: boolean;
-  /** Line sum minus the paid amount, or null when the paid amount is unknown. */
+  /** Line sum minus the paid amount, or null while it or a line amount is unknown. */
   difference: Ore | null;
   onShowLines: (lines: "review" | "all") => void;
   onConfirmAll: () => void;

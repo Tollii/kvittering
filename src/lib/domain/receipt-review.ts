@@ -167,16 +167,19 @@ function printedTotal(data: ReceiptData, amountOre: Ore): string | null {
 }
 
 /**
- * Whether a reader note quotes this amount, as 150,60 or 150.60. A note that
- * quotes the paid total is about the sum, and the lines matching that total
- * settle it.
+ * Whether a reader note quotes this amount, as 1250,31, 1 250,31 or 1250.31.
+ * A note that quotes the paid total is about the sum, and the lines matching
+ * that total settle it.
  */
 function citesAmount(note: string, amountOre: Ore | null): boolean {
   if (amountOre === null) return false;
 
-  const [kroner, ore] = Ore.formatInput(amountOre).split(",");
+  const [kroner = "", ore = ""] = Ore.formatInput(amountOre).split(",");
 
-  return new RegExp(`(?<![\\d.,])${kroner}[.,]${ore}(?!\\d)`).test(note);
+  // Allow a thousands separator (space, no-break space or dot) between groups.
+  const groups = kroner.replace(/\B(?=(\d{3})+(?!\d))/g, "[\\s.]?");
+
+  return new RegExp(`(?<![\\d.,])${groups}[.,]${ore}(?!\\d)`).test(note);
 }
 
 export type ReviewTask =
@@ -242,7 +245,11 @@ export function assessReceipt(
     ...new Set([
       ...data.issues.filter(
         (issue) =>
-          !(totals.difference === 0 && citesAmount(issue, data.totalOre)),
+          !(
+            totals.difference === 0 &&
+            totals.unknown === 0 &&
+            citesAmount(issue, data.totalOre)
+          ),
       ),
       ...totals.reviewIssues.filter(isReceiptLevelIssue).map(receiptIssueText),
     ]),
