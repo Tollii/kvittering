@@ -26,6 +26,8 @@ const tokenResponse = z.object({
   expires_in: z.number().positive().optional(),
 });
 
+const tokenError = z.object({ error: z.string().optional() });
+
 export type OdaTokens = {
   accessToken: string;
   refreshToken?: string;
@@ -90,11 +92,15 @@ async function requestTokens(
     body: new URLSearchParams({ ...fields, resource: odaResource }),
   });
 
-  if (response.status === 400 || response.status === 401)
-    throw new OdaSignInExpired(`Oda token request failed: ${response.status}`);
+  if (!response.ok) {
+    const { error } = tokenError.parse(await response.json().catch(() => ({})));
 
-  if (!response.ok)
-    throw new Error(`Oda token request failed: ${response.status}`);
+    // Only a refused grant means the person must sign in again.
+    throw new (error === "invalid_grant" ? OdaSignInExpired : Error)(
+      `Oda token request failed: ${response.status} ${error ?? ""}`.trim(),
+    );
+  }
+
   const tokens = tokenResponse.parse(await response.json());
 
   return {
@@ -170,9 +176,16 @@ async function readRpc(response: Response, id: number) {
     .get("Content-Type")
     ?.includes("text/event-stream")
     ? text
-        .split("\n")
-        .filter((line) => line.startsWith("data:"))
-        .map((line) => jsonRpcResponse.parse(JSON.parse(line.slice(5))))
+        .split(/\r?\n\r?\n/)
+        .map((event) =>
+          event
+            .split(/\r?\n/)
+            .filter((line) => line.startsWith("data:"))
+            .map((line) => line.slice(5).trimStart())
+            .join("\n"),
+        )
+        .filter((data) => data.startsWith("{"))
+        .map((data) => jsonRpcResponse.parse(JSON.parse(data)))
     : [jsonRpcResponse.parse(JSON.parse(text))];
 
   const message = messages.find((candidate) => candidate.id === id);
@@ -215,8 +228,10 @@ export async function callOdaTool<Output>(
       body,
     });
 
-    if (response.status === 401)
-      throw new OdaSignInExpired("Oda rejected the access token.");
+    if (response.status === 401 || response.status === 403)
+      throw new OdaSignInExpired(
+        `Oda rejected the access token: ${response.status}`,
+      );
 
     if (!response.ok) throw new Error(`Oda MCP failed: ${response.status}`);
 

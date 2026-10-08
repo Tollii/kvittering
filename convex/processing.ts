@@ -39,17 +39,10 @@ const workflow = new WorkflowManager(components.workflow);
 
 export const processReceipt = workflow
   .define({
-    args: {
-      id: v.id("receipts"),
-      generation: v.number(),
-      /** Evidence from a store's own order data, which replaces reading images. */
-      imported: v
-        .object({ data: receiptDataValidator, provider: v.string() })
-        .optional(),
-    },
+    args: { id: v.id("receipts"), generation: v.number() },
     returns: v.null(),
   })
-  .handler(async (step, { imported, ...args }): Promise<null> => {
+  .handler(async (step, args): Promise<null> => {
     let stage = "begin";
 
     try {
@@ -60,6 +53,14 @@ export const processReceipt = workflow
 
       if (!storageIds) return null;
       stage = "extraction";
+
+      // A receipt without images was imported from a store's own order data.
+      const imported =
+        storageIds.length === 0
+          ? await step.runQuery(internal.processing.importedEvidence, {
+              id: args.id,
+            })
+          : null;
 
       const extraction: {
         data: ReceiptData;
@@ -164,6 +165,22 @@ export const begin = internalMutation({
     images.sort((a, b) => a.position - b.position);
 
     return images.map((image) => image.storageId);
+  },
+});
+
+export const importedEvidence = internalQuery({
+  args: { id: v.id("receipts") },
+  returns: v.union(
+    v.null(),
+    v.object({ data: receiptDataValidator, provider: v.string() }),
+  ),
+  handler: async (ctx, args) => {
+    const row = await ctx.db
+      .query("receiptImports")
+      .withIndex("by_receiptId", (q) => q.eq("receiptId", args.id))
+      .unique();
+
+    return row?.data ? { data: row.data, provider: row.provider } : null;
   },
 });
 

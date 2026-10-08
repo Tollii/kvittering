@@ -2,7 +2,7 @@ import type { HttpRouter } from "convex/server";
 import { httpAction } from "./_generated/server";
 import { internal } from "./_generated/api";
 import { errorDetails } from "../src/lib/diagnostics";
-import { odaCallbackUrl } from "./oda";
+import { odaCallbackUrl, signInExpiredMessage } from "./oda";
 import {
   exchangeOdaCode,
   odaAuthorizationUrl,
@@ -19,10 +19,16 @@ const page = (text: string, status = 400) =>
     headers: { ...noStore, "Content-Type": "text/plain; charset=utf-8" },
   });
 
-const back = (returnUrl: string, status: string) => {
+const back = (
+  returnUrl: string,
+  status: "connected" | "failed" | "cancelled",
+  confirmation?: string,
+) => {
   const url = new URL(returnUrl);
 
   url.searchParams.set("status", status);
+
+  if (confirmation) url.searchParams.set("confirmation", confirmation);
 
   return new Response(null, {
     status: 302,
@@ -37,16 +43,6 @@ export function registerOdaRoutes(http: HttpRouter) {
     method: "GET",
     handler: httpAction(async (ctx, request) => {
       const requestId = new URL(request.url).searchParams.get("request") ?? "";
-
-      const authorization = await ctx.runQuery(internal.oda.authorization, {
-        request: requestId,
-      });
-
-      if (!authorization || authorization.expired || authorization.started)
-        return page(
-          "Innloggingen er utløpt. Gå tilbake til Kvitto og prøv igjen.",
-        );
-
       const redirectUri = odaCallbackUrl();
 
       let clientId = await ctx.runQuery(internal.oda.registeredClient, {
@@ -67,13 +63,12 @@ export function registerOdaRoutes(http: HttpRouter) {
       if (
         !(await ctx.runMutation(internal.oda.beginAuthorization, {
           request: requestId,
+          clientId,
           state,
           verifier,
         }))
       )
-        return page(
-          "Innloggingen er utløpt. Gå tilbake til Kvitto og prøv igjen.",
-        );
+        return page(signInExpiredMessage);
 
       return new Response(null, {
         status: 302,
@@ -101,45 +96,43 @@ export function registerOdaRoutes(http: HttpRouter) {
         { state: params.get("state") ?? "" },
       );
 
-      if (!authorization)
-        return page(
-          "Innloggingen er utløpt. Gå tilbake til Kvitto og prøv igjen.",
-        );
+      if (!authorization) return page(signInExpiredMessage);
 
       const code = params.get("code");
 
-      if (!code || authorization.expired)
+      if (!code || authorization.expired) {
+        await ctx.runMutation(internal.oda.forgetAuthorization, {
+          id: authorization.id,
+        });
+
         return back(
           authorization.returnUrl,
           params.get("error") === "access_denied" ? "cancelled" : "failed",
         );
+      }
 
       try {
-        const redirectUri = odaCallbackUrl();
-
-        const clientId = await ctx.runQuery(internal.oda.registeredClient, {
-          redirectUri,
-        });
-
-        if (!clientId) throw new Error("Kvitto is not registered at Oda.");
-
         const tokens = await exchangeOdaCode({
-          clientId,
-          redirectUri,
+          clientId: authorization.clientId,
+          redirectUri: odaCallbackUrl(),
           code,
           verifier: authorization.verifier,
         });
 
-        await ctx.runMutation(internal.oda.connect, {
-          identity: authorization.identity,
-          householdId: authorization.householdId,
-          clientId,
+        const confirmation = randomToken();
+
+        await ctx.runMutation(internal.oda.holdTokens, {
+          id: authorization.id,
+          confirmation,
           ...tokens,
         });
 
-        return back(authorization.returnUrl, "connected");
+        return back(authorization.returnUrl, "connected", confirmation);
       } catch (error) {
         console.error("oda.connect_failed", errorDetails(error));
+        await ctx.runMutation(internal.oda.forgetAuthorization, {
+          id: authorization.id,
+        });
 
         return back(authorization.returnUrl, "failed");
       }
