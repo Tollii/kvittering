@@ -1,0 +1,299 @@
+/// <reference types="vite/client" />
+import { register as registerRateLimiter } from "@convex-dev/rate-limiter/test";
+import { convexTest } from "convex-test";
+import { expect, it } from "vitest";
+import { z } from "zod";
+import { internal } from "./_generated/api";
+import type { Id } from "./_generated/dataModel";
+import schema from "./schema";
+import { separateHouseholds } from "../src/lib/testing/households";
+import { date } from "../src/lib/testing/calendar";
+import { receiptFixture } from "../src/lib/testing/receipts";
+import { weeklyShopFixture } from "../src/lib/mock-receipts";
+import type { JsonValue } from "../src/lib/mcp/protocol";
+
+const modules = import.meta.glob("./**/*.ts");
+
+const toolText = z.object({
+  result: z.object({
+    content: z.array(z.object({ type: z.literal("text"), text: z.string() })),
+    isError: z.boolean().optional(),
+  }),
+});
+
+async function setup() {
+  const t = convexTest(schema, modules);
+  registerRateLimiter(t);
+  const { householdId } = await separateHouseholds(t);
+
+  const members = await t.run((ctx) => ctx.db.query("members").collect());
+
+  const memberOf = (identity: string) =>
+    members.find((member) => member.identity === identity)!;
+
+  const first = memberOf("https://test.local|first");
+  const other = memberOf("https://test.local|other");
+
+  const insertReceipt = (
+    household: Id<"households">,
+    purchaseDate: string,
+    store: string,
+  ) =>
+    t.run(async (ctx) => {
+      const { _id, _creationTime, ...fields } = receiptFixture({
+        householdId: household,
+        data: {
+          ...weeklyShopFixture(),
+          store,
+          purchaseDate: date(purchaseDate),
+        },
+      });
+
+      return ctx.db.insert("receipts", fields);
+    });
+
+  const own = await insertReceipt(householdId, "2026-09-12", "REMA 1000");
+  await insertReceipt(householdId, "2026-08-02", "KIWI");
+
+  const foreign = await insertReceipt(
+    other.householdId,
+    "2026-09-13",
+    "Other shop",
+  );
+
+  await t.mutation(internal.receiptSync.backfill, {});
+
+  const { token } = await t.action(internal.mcp.createToken, {
+    memberId: first._id,
+    label: "Claude",
+  });
+
+  const post = (body: JsonValue, headers: Record<string, string> = {}) =>
+    t.fetch("/mcp", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json",
+        ...headers,
+      },
+      body: JSON.stringify(body),
+    });
+
+  const call = async (name: string, args: Record<string, JsonValue>) => {
+    const response = await post({
+      jsonrpc: "2.0",
+      id: 1,
+      method: "tools/call",
+      params: { name, arguments: args },
+    });
+
+    expect(response.status).toBe(200);
+    const { result } = toolText.parse(await response.json());
+    const text = result.content[0]!.text;
+
+    return result.isError
+      ? { error: text }
+      : { value: z.json().parse(JSON.parse(text)) };
+  };
+
+  return { t, token, post, call, own, foreign, first };
+}
+
+it("answers only requests that carry a live token", async () => {
+  const { t, token, post, first } = await setup();
+  const ping = { jsonrpc: "2.0", id: 1, method: "ping" };
+
+  expect((await post(ping)).status).toBe(200);
+  expect((await post(ping, { Authorization: "Bearer wrong" })).status).toBe(
+    401,
+  );
+  expect((await post(ping, { Authorization: "" })).status).toBe(401);
+  expect((await post(ping, { Origin: "https://evil.example" })).status).toBe(
+    403,
+  );
+
+  const [stored] = await t.query(internal.mcp.listTokens, {
+    memberId: first._id,
+  });
+
+  await t.mutation(internal.mcp.revokeToken, { tokenId: stored!._id });
+
+  const revoked = await t.fetch("/mcp", {
+    method: "POST",
+    headers: { Authorization: `Bearer ${token}` },
+    body: JSON.stringify(ping),
+  });
+
+  expect(revoked.status).toBe(401);
+});
+
+it("loses access when the member leaves the household", async () => {
+  const { t, post, first } = await setup();
+
+  await t.run((ctx) => ctx.db.delete("members", first._id));
+
+  expect((await post({ jsonrpc: "2.0", id: 1, method: "ping" })).status).toBe(
+    401,
+  );
+});
+
+it("negotiates the protocol and lists read-only tools", async () => {
+  const { t, token, post } = await setup();
+
+  const initialized = await post({
+    jsonrpc: "2.0",
+    id: 1,
+    method: "initialize",
+    params: { protocolVersion: "2025-06-18", capabilities: {} },
+  });
+
+  expect(await initialized.json()).toMatchObject({
+    result: { protocolVersion: "2025-06-18", capabilities: { tools: {} } },
+  });
+
+  const future = await post({
+    jsonrpc: "2.0",
+    id: 2,
+    method: "initialize",
+    params: { protocolVersion: "2099-01-01" },
+  });
+
+  expect(await future.json()).toMatchObject({
+    result: { protocolVersion: "2025-11-25" },
+  });
+
+  expect(
+    (
+      await post({
+        jsonrpc: "2.0",
+        method: "notifications/initialized",
+      })
+    ).status,
+  ).toBe(202);
+
+  const malformed = await t.fetch("/mcp", {
+    method: "POST",
+    headers: { Authorization: `Bearer ${token}` },
+    body: "{",
+  });
+
+  expect(malformed.status).toBe(400);
+  expect(await malformed.json()).toMatchObject({ error: { code: -32700 } });
+
+  const listed = z
+    .object({
+      result: z.object({
+        tools: z.array(
+          z.object({
+            name: z.string(),
+            annotations: z.object({ readOnlyHint: z.literal(true) }),
+          }),
+        ),
+      }),
+    })
+    .parse(
+      await (
+        await post({ jsonrpc: "2.0", id: 3, method: "tools/list" })
+      ).json(),
+    );
+
+  expect(listed.result.tools.map((tool) => tool.name).sort()).toEqual([
+    "find_purchases",
+    "get_receipt",
+    "list_receipts",
+    "spending_summary",
+  ]);
+});
+
+it("reads only the token holder's household", async () => {
+  const { call, own, foreign } = await setup();
+
+  expect(await call("list_receipts", {})).toEqual({
+    value: {
+      items: [
+        expect.objectContaining({ receiptId: own, store: "REMA 1000" }),
+        expect.objectContaining({ store: "KIWI", purchaseDate: "2026-08-02" }),
+      ],
+      hasMore: false,
+      nextCursor: null,
+    },
+  });
+
+  expect(
+    await call("list_receipts", { from: "2026-09-01", store: "rema" }),
+  ).toMatchObject({ value: { items: [{ receiptId: own }] } });
+
+  expect(await call("get_receipt", { receiptId: foreign })).toEqual({
+    error: "No receipt with that id in this household.",
+  });
+
+  const receipt = await call("get_receipt", { receiptId: own });
+
+  const detail = z
+    .object({
+      value: z.object({
+        store: z.string(),
+        totalNok: z.number(),
+        lines: z.array(
+          z.object({
+            name: z.string(),
+            amountNok: z.number().nullable(),
+            packageSize: z.number().nullable(),
+          }),
+        ),
+      }),
+    })
+    .parse(receipt).value;
+
+  expect(detail).toMatchObject({ store: "REMA 1000", totalNok: 419.8 });
+  expect(
+    detail.lines.find((line) => line.name === "KYLLINGFILET 900G"),
+  ).toEqual({ name: "KYLLINGFILET 900G", amountNok: 149.9, packageSize: 900 });
+  expect(detail.lines.find((line) => line.name === "KAFFE EVERGOOD")).toEqual({
+    name: "KAFFE EVERGOOD",
+    amountNok: null,
+    packageSize: null,
+  });
+});
+
+it("summarizes spending with the report rules and finds purchases", async () => {
+  const { call } = await setup();
+
+  const september = await call("spending_summary", {
+    from: "2026-09-01",
+    to: "2026-09-30",
+  });
+
+  const both = await call("spending_summary", {
+    from: "2026-08-01",
+    to: "2026-09-30",
+  });
+
+  expect(september).toMatchObject({
+    value: { receipts: 1, notCounted: { linesWithoutAmount: 1 } },
+  });
+  const purchases = z.object({ value: z.object({ purchasesNok: z.number() }) });
+  expect(purchases.parse(both).value.purchasesNok).toBeCloseTo(
+    purchases.parse(september).value.purchasesNok * 2,
+  );
+
+  expect(
+    await call("spending_summary", { from: "2026-09-30", to: "2026-09-01" }),
+  ).toHaveProperty("error");
+
+  expect(
+    await call("find_purchases", {
+      text: "kaffe",
+      from: "2026-01-01",
+      to: "2026-12-31",
+    }),
+  ).toMatchObject({
+    value: {
+      items: [
+        { name: "KAFFE EVERGOOD", store: "REMA 1000" },
+        { name: "KAFFE EVERGOOD", store: "KIWI" },
+      ],
+      hasMore: false,
+    },
+  });
+});

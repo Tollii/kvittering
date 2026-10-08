@@ -85,6 +85,8 @@ import type * as kassalapp_normalize from "../kassalapp/normalize.js";
 import type * as kassalapp_transport from "../kassalapp/transport.js";
 import type * as liveActivities from "../liveActivities.js";
 import type * as liveActivityPush from "../liveActivityPush.js";
+import type * as mcp from "../mcp.js";
+import type * as mcpHttp from "../mcpHttp.js";
 import type * as modelComparison from "../modelComparison.js";
 import type * as notifications from "../notifications.js";
 import type * as oda from "../oda.js";
@@ -199,6 +201,8 @@ declare const fullApi: ApiFromModules<{
   "kassalapp/transport": typeof kassalapp_transport;
   liveActivities: typeof liveActivities;
   liveActivityPush: typeof liveActivityPush;
+  mcp: typeof mcp;
+  mcpHttp: typeof mcpHttp;
   modelComparison: typeof modelComparison;
   notifications: typeof notifications;
   oda: typeof oda;
