@@ -232,6 +232,110 @@ it("negotiates the protocol and lists read-only tools", async () => {
   ]);
 });
 
+it("serves 2026-07-28 requests without initialize", async () => {
+  const { post } = await setup();
+
+  const modern = (
+    id: number,
+    method: string,
+    params: Record<string, JsonValue> = {},
+    version = "2026-07-28",
+  ) => ({
+    jsonrpc: "2.0",
+    id,
+    method,
+    params: {
+      ...params,
+      _meta: {
+        "io.modelcontextprotocol/protocolVersion": version,
+        "io.modelcontextprotocol/clientCapabilities": {},
+      },
+    },
+  });
+
+  const headers = (method: string, version = "2026-07-28") => ({
+    "MCP-Protocol-Version": version,
+    "Mcp-Method": method,
+  });
+
+  const serverInfo = {
+    "io.modelcontextprotocol/serverInfo": { name: "kvitto" },
+  };
+
+  const discovered = await post(
+    modern(1, "server/discover"),
+    headers("server/discover"),
+  );
+
+  expect(await discovered.json()).toMatchObject({
+    result: {
+      resultType: "complete",
+      supportedVersions: [
+        "2026-07-28",
+        "2025-11-25",
+        "2025-06-18",
+        "2025-03-26",
+      ],
+      capabilities: { tools: {} },
+      _meta: serverInfo,
+    },
+  });
+
+  const called = await post(
+    modern(2, "tools/call", {
+      name: "get_receipt",
+      arguments: { receiptId: "missing" },
+    }),
+    // Clients may base64-encode the name with the =?base64?…?= sentinel.
+    {
+      ...headers("tools/call"),
+      "mcp-name": `=?base64?${btoa("get_receipt")}?=`,
+    },
+  );
+
+  expect(called.status).toBe(200);
+  expect(await called.json()).toMatchObject({
+    result: { isError: true, resultType: "complete", _meta: serverInfo },
+  });
+
+  const misrouted = await post(modern(3, "tools/list"), headers("tools/call"));
+
+  expect(misrouted.status).toBe(400);
+  expect(await misrouted.json()).toMatchObject({
+    id: 3,
+    error: { code: -32020 },
+  });
+
+  const unnamed = await post(
+    modern(4, "tools/call", { name: "get_receipt", arguments: {} }),
+    headers("tools/call"),
+  );
+
+  expect(unnamed.status).toBe(400);
+
+  const future = await post(
+    modern(5, "tools/list", {}, "2099-01-01"),
+    headers("tools/list", "2099-01-01"),
+  );
+
+  expect(future.status).toBe(400);
+  expect(await future.json()).toMatchObject({
+    error: {
+      code: -32022,
+      data: {
+        supported: ["2026-07-28", "2025-11-25", "2025-06-18", "2025-03-26"],
+        requested: "2099-01-01",
+      },
+    },
+  });
+
+  // The stateless revision removed the session handshake and ping.
+  const ping = await post(modern(6, "ping"), headers("ping"));
+
+  expect(ping.status).toBe(404);
+  expect(await ping.json()).toMatchObject({ error: { code: -32601 } });
+});
+
 it("reads only the token holder's household", async () => {
   const { call, own, foreign } = await setup();
 

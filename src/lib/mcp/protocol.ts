@@ -1,9 +1,19 @@
 import { z } from "zod";
 
-const latestVersion = "2025-11-25";
+/** Stateless revision: every request carries its version, no initialize. */
+export const modernVersion = "2026-07-28";
 
-/** The server answers with the client's version when it is listed. */
-const protocolVersions = new Set([latestVersion, "2025-06-18", "2025-03-26"]);
+const latestLegacyVersion = "2025-11-25";
+
+/** Session-era revisions that start with initialize. */
+const legacyVersions = [latestLegacyVersion, "2025-06-18", "2025-03-26"];
+
+export const supportedVersions = [modernVersion, ...legacyVersions];
+
+const metaKey = {
+  protocolVersion: "io.modelcontextprotocol/protocolVersion",
+  serverInfo: "io.modelcontextprotocol/serverInfo",
+} as const;
 
 const requestId = z.union([z.string(), z.number()]);
 
@@ -19,6 +29,10 @@ const message = z.object({
 });
 
 const initializeParams = z.object({ protocolVersion: z.string() });
+
+const modernParams = z.object({
+  _meta: z.object({ [metaKey.protocolVersion]: z.string() }),
+});
 
 const toolCallParams = z.object({
   name: z.string(),
@@ -41,30 +55,42 @@ export const errorCodes = {
   invalidRequest: -32600,
   methodNotFound: -32601,
   invalidParams: -32602,
+  headerMismatch: -32020,
+  unsupportedVersion: -32022,
 } as const;
+
+/**
+ * "modern" requests follow 2026-07-28 and name their version in _meta;
+ * "legacy" requests follow a session-era revision.
+ */
+export type Era = "legacy" | "modern";
 
 /** One message from a stateless Streamable HTTP client. */
 export type McpMessage =
   /** protocolVersion is already negotiated. */
   | { kind: "initialize"; id: RequestId; protocolVersion: string }
+  | { kind: "discover"; id: RequestId }
   | { kind: "ping"; id: RequestId }
-  | { kind: "listTools"; id: RequestId }
+  | { kind: "listTools"; id: RequestId; era: Era }
   | {
       kind: "callTool";
       id: RequestId;
+      era: Era;
       name: string;
       arguments: Record<string, JsonValue>;
     }
   | { kind: "acknowledge" }
-  | { kind: "unknownMethod"; id: RequestId; method: string }
+  | { kind: "unknownMethod"; id: RequestId; era: Era; method: string }
   | {
       kind: "invalid";
       id: RequestId | null;
       code: (typeof errorCodes)[keyof typeof errorCodes];
       message: string;
+      data?: JsonValue;
     };
 
-export function parseMcpMessage(text: string): McpMessage {
+/** Reads one POST body; headers matter only for 2026-07-28 requests. */
+export function parseMcpMessage(text: string, headers: Headers): McpMessage {
   const json = readJson(text);
 
   if (json.kind === "malformed")
@@ -97,6 +123,37 @@ export function parseMcpMessage(text: string): McpMessage {
   // Notifications need no answer.
   if (id === undefined) return { kind: "acknowledge" };
 
+  const version =
+    modernParams.safeParse(params).data?._meta[metaKey.protocolVersion];
+
+  if (version === undefined) return legacyRequest(id, method, params);
+  const mismatch = headerMismatch(headers, { version, method, params });
+
+  if (mismatch)
+    return {
+      kind: "invalid",
+      id,
+      code: errorCodes.headerMismatch,
+      message: mismatch,
+    };
+
+  if (version !== modernVersion)
+    return {
+      kind: "invalid",
+      id,
+      code: errorCodes.unsupportedVersion,
+      message: "Unsupported protocol version",
+      data: { supported: supportedVersions, requested: version },
+    };
+
+  return request(id, "modern", method, params);
+}
+
+function legacyRequest(
+  id: RequestId,
+  method: string,
+  params: JsonValue | undefined,
+): McpMessage {
   switch (method) {
     case "initialize":
       return {
@@ -110,8 +167,24 @@ export function parseMcpMessage(text: string): McpMessage {
     case "ping":
       return { kind: "ping", id };
 
+    default:
+      return request(id, "legacy", method, params);
+  }
+}
+
+/** Methods both eras share; 2026-07-28 removed initialize and ping. */
+function request(
+  id: RequestId,
+  era: Era,
+  method: string,
+  params: JsonValue | undefined,
+): McpMessage {
+  switch (method) {
+    case "server/discover":
+      return { kind: "discover", id };
+
     case "tools/list":
-      return { kind: "listTools", id };
+      return { kind: "listTools", id, era };
 
     case "tools/call": {
       const call = toolCallParams.safeParse(params);
@@ -120,6 +193,7 @@ export function parseMcpMessage(text: string): McpMessage {
         ? {
             kind: "callTool",
             id,
+            era,
             name: call.data.name,
             arguments: call.data.arguments ?? {},
           }
@@ -132,15 +206,64 @@ export function parseMcpMessage(text: string): McpMessage {
     }
 
     default:
-      return { kind: "unknownMethod", id, method };
+      return { kind: "unknownMethod", id, era, method };
+  }
+}
+
+const nameParams = z.object({ name: z.string() });
+
+/** 2026-07-28 repeats routing fields in headers; they must match the body. */
+function headerMismatch(
+  headers: Headers,
+  body: { version: string; method: string; params: JsonValue | undefined },
+): string | undefined {
+  if (headers.get("MCP-Protocol-Version") !== body.version)
+    return "MCP-Protocol-Version must match the protocolVersion in _meta.";
+
+  if (headerValue(headers.get("Mcp-Method")) !== body.method)
+    return "Mcp-Method must match the request method.";
+  const name = nameParams.safeParse(body.params).data?.name;
+
+  if (
+    body.method === "tools/call" &&
+    name !== undefined &&
+    headerValue(headers.get("Mcp-Name")) !== name
+  )
+    return "Mcp-Name must match the tool name.";
+}
+
+const base64Sentinel = /^=\?base64\?([A-Za-z0-9+/]*={0,2})\?=$/;
+
+/** Decodes the =?base64?…?= form clients use for values headers can't carry. */
+function headerValue(value: string | null): string | null {
+  const encoded = value === null ? undefined : base64Sentinel.exec(value)?.[1];
+
+  if (encoded === undefined) return value;
+
+  try {
+    return new TextDecoder("utf-8", { fatal: true }).decode(
+      Uint8Array.from(atob(encoded), (char) => char.charCodeAt(0)),
+    );
+  } catch {
+    // Handled: an undecodable value cannot match the body.
+    return null;
   }
 }
 
 function negotiatedVersion(requested: string | undefined): string {
-  return requested && protocolVersions.has(requested)
+  return requested && legacyVersions.includes(requested)
     ? requested
-    : latestVersion;
+    : latestLegacyVersion;
 }
+
+export const serverInfo = { name: "kvitto", version: "0.1.0" };
+
+/** 2026-07-28 results say they are final and name the server. */
+export const modernResult = <Result extends object>(result: Result) => ({
+  ...result,
+  resultType: "complete" as const,
+  _meta: { [metaKey.serverInfo]: serverInfo },
+});
 
 export const jsonRpcResult = <Result>(id: RequestId, result: Result) => ({
   jsonrpc: "2.0" as const,
@@ -152,4 +275,9 @@ export const jsonRpcError = (
   id: RequestId | null,
   code: number,
   message: string,
-) => ({ jsonrpc: "2.0" as const, id, error: { code, message } });
+  data?: JsonValue,
+) => ({
+  jsonrpc: "2.0" as const,
+  id,
+  error: data === undefined ? { code, message } : { code, message, data },
+});
