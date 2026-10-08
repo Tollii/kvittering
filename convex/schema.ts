@@ -391,7 +391,8 @@ export default defineSchema({
   }).index("by_redirectUri", ["redirectUri"]),
   /**
    * A store order imported as a receipt. A retry reads the order again. When
-   * the receipt is deleted, the order number stays so it is not imported again.
+   * the receipt is deleted, the order number stays so syncs do not import it
+   * again, until someone in the household signs in to the store again.
    */
   receiptImports: defineTable({
     householdId: v.id("households"),
@@ -405,6 +406,11 @@ export default defineSchema({
       "householdId",
       "provider",
       "orderNumber",
+    ])
+    .index("by_householdId_and_provider_and_receiptId", [
+      "householdId",
+      "provider",
+      "receiptId",
     ]),
   /** A member's Oda account. Tokens never leave the server. */
   odaConnections: defineTable({
