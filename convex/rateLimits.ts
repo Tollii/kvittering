@@ -6,7 +6,7 @@ import { ConvexError, v, type Infer } from "convex/values";
 import { components } from "./_generated/api";
 import { type MutationCtx } from "./_generated/server";
 import { internalMutation } from "./serverFunctions";
-import type { Doc } from "./_generated/dataModel";
+import type { Doc, Id } from "./_generated/dataModel";
 
 /** Fixed UTC windows have no rollover. Provider allowances are shared by all accounts. */
 export const providerAllowances = {
@@ -49,7 +49,26 @@ const limiter = new RateLimiter(components.rateLimiter, {
     period: MINUTE,
     capacity: 10,
   },
+  mcpBurst: { kind: "token bucket", rate: 60, period: MINUTE, capacity: 60 },
+  mcpDaily: { kind: "fixed window", rate: 2000, period: DAY, start: 0 },
 });
+
+/**
+ * Each MCP request is a bounded read; the limits stop a looping client. A
+ * refused request may still spend a burst token, which only shortens the burst.
+ */
+export async function consumeMcpQuota(
+  ctx: MutationCtx,
+  tokenId: Id<"mcpTokens">,
+): Promise<{ ok: true } | { ok: false; retryAfter: number }> {
+  for (const name of ["mcpBurst", "mcpDaily"] as const) {
+    const result = await limiter.limit(ctx, name, { key: tokenId });
+
+    if (!result.ok) return { ok: false, retryAfter: result.retryAfter };
+  }
+
+  return { ok: true };
+}
 
 /** The caller's mutation rolls back all counters if any quota or receipt write fails. */
 export async function consumeReceiptQuota(

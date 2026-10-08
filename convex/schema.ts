@@ -288,6 +288,16 @@ export default defineSchema({
   })
     .index("by_identity", ["identity"])
     .index("by_householdId", ["householdId"]),
+  /** Personal tokens for the read-only MCP endpoint; only a hash is stored. */
+  mcpTokens: defineTable({
+    identity: v.string(),
+    label: v.string(),
+    tokenHash: v.string(),
+    createdAt: v.number(),
+    revokedAt: v.number().optional(),
+  })
+    .index("by_tokenHash", ["tokenHash"])
+    .index("by_identity", ["identity"]),
   receipts: defineTable(receiptFields)
     .index("by_householdId_and_purchaseDate", [
       "householdId",

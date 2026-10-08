@@ -8,6 +8,7 @@ import {
   type ReceiptLine,
 } from "../src/lib/domain/receipt";
 import { unclearCategoryId } from "../src/lib/domain/categories";
+import { base64Url } from "./tokens";
 import { odaCatalogProduct } from "../src/lib/catalog/oda";
 import { catalogIdentity } from "../src/lib/catalog/model";
 
@@ -144,24 +145,12 @@ export async function revokeOdaToken(clientId: string, token: string) {
     throw new Error(`Oda token revocation failed: ${response.status}`);
 }
 
-/** Random URL-safe text for OAuth state and PKCE verifiers. */
-export function randomToken() {
-  return base64Url(crypto.getRandomValues(new Uint8Array(32)));
-}
-
 export async function pkceChallenge(verifier: string) {
   return base64Url(
     new Uint8Array(
       await crypto.subtle.digest("SHA-256", new TextEncoder().encode(verifier)),
     ),
   );
-}
-
-function base64Url(bytes: Uint8Array) {
-  return btoa(String.fromCharCode(...bytes))
-    .replaceAll("+", "-")
-    .replaceAll("/", "_")
-    .replaceAll("=", "");
 }
 
 const jsonRpcResponse = z.object({
