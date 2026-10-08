@@ -219,6 +219,34 @@ it("signs in at Oda once and imports a delivered order as one receipt", async ()
   await user.mutation(api.oda.sync, {});
   await t.finishAllScheduledFunctions(vi.runAllTimers);
   expect(await t.run((ctx) => ctx.db.query("receipts").collect())).toEqual([]);
+
+  // Signing in again brings it back.
+  const again = new URL(
+    await user.mutation(api.oda.start, {
+      request: "abcdef0123456789abcdef0123456789",
+      returnUrl: "kvitto://oda",
+    }),
+  );
+
+  const state = new URL(
+    (await t.fetch(`${again.pathname}${again.search}`)).headers.get(
+      "Location",
+    )!,
+  ).searchParams.get("state");
+
+  const reconnected = new URL(
+    (await t.fetch(`/oda/callback?code=code&state=${state}`)).headers.get(
+      "Location",
+    )!,
+  );
+
+  await user.mutation(api.oda.confirm, {
+    confirmation: reconnected.searchParams.get("confirmation")!,
+  });
+  await t.finishAllScheduledFunctions(vi.runAllTimers);
+  expect(await t.run((ctx) => ctx.db.query("receipts").collect())).toHaveLength(
+    1,
+  );
 });
 
 it("links Oda lines to Oda's product unless a person chose another", async () => {
