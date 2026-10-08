@@ -41,6 +41,16 @@ const connectionOf = (ctx: QueryCtx, identity: string) =>
     .withIndex("by_identity", (q) => q.eq("identity", identity))
     .unique();
 
+/** An imported receipt has no images; a retry reads its order data again. */
+export async function importedOrder(ctx: QueryCtx, receiptId: Id<"receipts">) {
+  const row = await ctx.db
+    .query("odaImports")
+    .withIndex("by_receiptId", (q) => q.eq("receiptId", receiptId))
+    .unique();
+
+  return row ? { imported: { data: row.data, provider: "oda" } } : {};
+}
+
 /** What the settings screen shows about the member's own Oda account. */
 export const status = query({
   args: {},
@@ -406,6 +416,8 @@ export const importOrders = internalMutation({
         excluded: false,
       });
 
+      await ctx.db.insert("odaImports", { receiptId: id, data });
+
       const workflowId = await startWorkflow(
         ctx,
         internal.processing.processReceipt,
@@ -506,20 +518,27 @@ export const revoke = internalAction({
 
 /** Scheduled: look for new orders on every Oda account that is still signed in. */
 export const syncAll = internalMutation({
-  args: {},
+  args: { cursor: v.optional(v.string()) },
   returns: v.null(),
-  handler: async (ctx) => {
-    const connections = await ctx.db.query("odaConnections").take(500);
+  handler: async (ctx, { cursor }) => {
+    const page = await ctx.db
+      .query("odaConnections")
+      .paginate({ numItems: 200, cursor: cursor ?? null });
 
-    for (const [index, connection] of connections.entries())
+    for (const [index, connection] of page.page.entries())
       if (!connection.expired)
         await ctx.scheduler.runAfter(
           index * 2000,
           internal.oda.syncConnection,
-          {
-            id: connection._id,
-          },
+          { id: connection._id },
         );
+
+    if (!page.isDone)
+      await ctx.scheduler.runAfter(
+        page.page.length * 2000,
+        internal.oda.syncAll,
+        { cursor: page.continueCursor },
+      );
 
     return null;
   },

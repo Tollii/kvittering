@@ -362,6 +362,11 @@ export default defineSchema({
     redirectUri: v.string(),
     clientId: v.string(),
   }).index("by_redirectUri", ["redirectUri"]),
+  /** The Oda order a receipt was imported from, kept so a retry can read it again. */
+  odaImports: defineTable({
+    receiptId: v.id("receipts"),
+    data: receiptDataValidator,
+  }).index("by_receiptId", ["receiptId"]),
   /** A member's Oda account. Tokens never leave the server. */
   odaConnections: defineTable({
     identity: v.string(),

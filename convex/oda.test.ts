@@ -135,4 +135,23 @@ it("signs in at Oda once and imports a delivered order as one receipt", async ()
     imageCount: 0,
     data: { store: "Oda", totalOre: 10000, receiptNumber: "r2fy3e" },
   });
+
+  // A retry reads the order again, since there are no images to read.
+  const id = receipts[0]!._id;
+  await t.run((ctx) =>
+    ctx.db.patch("receipts", id, { status: "failed", data: null }),
+  );
+  await user.mutation(api.receipts.retry, { id });
+  await t.finishAllScheduledFunctions(vi.runAllTimers);
+
+  expect(await t.run((ctx) => ctx.db.get("receipts", id))).toMatchObject({
+    generation: 2,
+    data: { store: "Oda", receiptNumber: "r2fy3e" },
+  });
+
+  const { revision } = (await t.run((ctx) => ctx.db.get("receipts", id)))!;
+  await user.mutation(api.receipts.remove, { id, revision });
+  expect(await t.run((ctx) => ctx.db.query("odaImports").collect())).toEqual(
+    [],
+  );
 });
