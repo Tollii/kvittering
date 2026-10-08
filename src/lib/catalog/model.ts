@@ -118,6 +118,14 @@ export function catalogIdentity(product: CatalogProduct): CatalogIdentity {
   return { key, ean, name, brand, image, weight, weightUnit, equivalence };
 }
 
+/**
+ * A store's own product, such as one from an Oda order, has no Kassalapp id to
+ * fetch details by, and Kassalapp matching does not replace a link to it.
+ */
+export function isStoreProduct(product: CatalogProduct) {
+  return !product.equivalence && product.ids.length === 0;
+}
+
 /** Product lookups accept a retailer name; provider codes are resolved on the server. */
 export const catalogLookupValidator = v.union(
   v.object({ kind: v.literal("products"), search: v.string(), store: text }),
