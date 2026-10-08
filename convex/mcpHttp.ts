@@ -6,21 +6,12 @@ import { internal } from "./_generated/api";
 import type { Id } from "./_generated/dataModel";
 import { sha256Hex } from "./tokens";
 import {
-  errorCodes,
-  jsonRpcError,
   jsonRpcResult,
-  modernResult,
   parseMcpMessage,
-  serverInfo,
-  supportedVersions,
-  type Era,
+  protocolVersion,
   type McpMessage,
 } from "../src/lib/mcp/protocol";
-import {
-  parseToolCall,
-  toolList,
-  type ParsedToolCall,
-} from "../src/lib/mcp/tools";
+import { toolList, type ParsedToolCall } from "../src/lib/mcp/tools";
 import { errorDetails } from "../src/lib/diagnostics";
 
 const instructions =
@@ -103,23 +94,16 @@ const json = <Body>(body: Body, status = 200) =>
 
 const convexMessage = z.string();
 
-/** Undefined for an unknown tool, which is a protocol error. */
 async function callTool(
   ctx: ActionCtx,
   householdId: Id<"households">,
-  message: Extract<McpMessage, { kind: "callTool" }>,
-): Promise<ToolResult | undefined> {
-  const parsed = parseToolCall(message.name, message.arguments);
-
-  if (parsed.kind === "unknown") return undefined;
-
-  if (parsed.kind === "invalid") return toolError(parsed.message);
-
+  call: ParsedToolCall,
+): Promise<ToolResult> {
   try {
-    return await runTool(ctx, householdId, parsed.call);
+    return await runTool(ctx, householdId, call);
   } catch (error) {
     console.warn("mcp.tool_failed", {
-      tool: parsed.call.name,
+      tool: call.name,
       ...errorDetails(error),
     });
 
@@ -134,11 +118,8 @@ async function callTool(
   }
 }
 
-/** Tool lists are the same for every caller and change only with a deploy. */
+/** Both answers are the same for every caller and change only with a deploy. */
 const cacheHint = { ttlMs: 60 * 60 * 1000, cacheScope: "public" as const };
-
-const eraResult = <Result extends object>(era: Era, result: Result) =>
-  era === "modern" ? modernResult(result) : result;
 
 async function respond(
   ctx: ActionCtx,
@@ -149,76 +130,38 @@ async function respond(
     case "acknowledge":
       return new Response(null, { status: 202, headers: noStore });
 
-    case "invalid":
-      return json(
-        jsonRpcError(message.id, message.code, message.message, message.data),
-        400,
-      );
-
-    case "unknownMethod":
-      return json(
-        jsonRpcError(
-          message.id,
-          errorCodes.methodNotFound,
-          `Unknown method ${message.method}.`,
-        ),
-        message.era === "modern" ? 404 : 200,
-      );
-
-    case "initialize":
-      return json(
-        jsonRpcResult(message.id, {
-          protocolVersion: message.protocolVersion,
-          capabilities: { tools: {} },
-          serverInfo,
-          instructions,
-        }),
-      );
+    case "error":
+      return json(message.body, message.status);
 
     case "discover":
       return json(
-        jsonRpcResult(
-          message.id,
-          modernResult({
-            supportedVersions,
-            capabilities: { tools: {} },
-            instructions,
-            ...cacheHint,
-          }),
-        ),
+        jsonRpcResult(message.id, {
+          supportedVersions: [protocolVersion],
+          capabilities: { tools: {} },
+          instructions,
+          ...cacheHint,
+        }),
       );
-
-    case "ping":
-      return json(jsonRpcResult(message.id, {}));
 
     case "listTools":
       return json(
+        jsonRpcResult(message.id, { tools: toolList(), ...cacheHint }),
+      );
+
+    case "toolInputError":
+      return json(jsonRpcResult(message.id, toolError(message.message)));
+
+    case "callTool":
+      return json(
         jsonRpcResult(
           message.id,
-          eraResult(message.era, { tools: toolList(), ...cacheHint }),
+          await callTool(ctx, householdId, message.call),
         ),
       );
-
-    case "callTool": {
-      const result = await callTool(ctx, householdId, message);
-
-      return json(
-        result
-          ? jsonRpcResult(message.id, eraResult(message.era, result))
-          : jsonRpcError(
-              message.id,
-              errorCodes.invalidParams,
-              `Unknown tool ${message.name}.`,
-            ),
-      );
-    }
   }
 }
 
-/**
- * Stateless Streamable HTTP: every POST carries one message and gets JSON
- * back. Serves 2026-07-28 clients and session-era clients side by side.
- */
+/** Stateless Streamable HTTP (MCP 2026-07-28): one message per POST, JSON back. */
 const endpoint = httpAction(async (ctx, request) => {
   // Browsers send Origin; MCP clients call from their own servers or processes.
   if (request.headers.get("Origin"))

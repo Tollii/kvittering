@@ -11,7 +11,7 @@ import { date } from "../src/lib/testing/calendar";
 import { receiptFixture } from "../src/lib/testing/receipts";
 import { weeklyShopFixture } from "../src/lib/mock-receipts";
 import { updateReceiptReadModel } from "./receiptReadModel";
-import type { JsonValue } from "../src/lib/mcp/protocol";
+import type { JsonValue } from "../src/lib/mcp/tools";
 
 const modules = import.meta.glob("./**/*.ts");
 
@@ -88,13 +88,36 @@ async function setup() {
       body: JSON.stringify(body),
     });
 
+  /** A 2026-07-28 request with the headers that must match its body. */
+  const request = (
+    method: string,
+    params: { name?: string; arguments?: Record<string, JsonValue> } = {},
+    headers: Record<string, string> = {},
+  ) =>
+    post(
+      {
+        jsonrpc: "2.0",
+        id: 1,
+        method,
+        params: {
+          ...params,
+          _meta: {
+            "io.modelcontextprotocol/protocolVersion": "2026-07-28",
+            "io.modelcontextprotocol/clientCapabilities": {},
+          },
+        },
+      },
+      {
+        "MCP-Protocol-Version": "2026-07-28",
+        "Mcp-Method": method,
+        // Only tools/call reads it.
+        "Mcp-Name": params.name ?? "",
+        ...headers,
+      },
+    );
+
   const call = async (name: string, args: Record<string, JsonValue>) => {
-    const response = await post({
-      jsonrpc: "2.0",
-      id: 1,
-      method: "tools/call",
-      params: { name, arguments: args },
-    });
+    const response = await request("tools/call", { name, arguments: args });
 
     expect(response.status).toBe(200);
     const { result } = toolText.parse(await response.json());
@@ -109,6 +132,7 @@ async function setup() {
     t,
     token,
     post,
+    request,
     call,
     own,
     foreign,
@@ -119,17 +143,19 @@ async function setup() {
 }
 
 it("answers only requests that carry a live token", async () => {
-  const { t, token, post, first } = await setup();
-  const ping = { jsonrpc: "2.0", id: 1, method: "ping" };
+  const { t, token, request, first } = await setup();
 
-  expect((await post(ping)).status).toBe(200);
-  expect((await post(ping, { Authorization: "Bearer wrong" })).status).toBe(
+  expect((await request("tools/list")).status).toBe(200);
+  expect(
+    (await request("tools/list", {}, { Authorization: "Bearer wrong" })).status,
+  ).toBe(401);
+  expect((await request("tools/list", {}, { Authorization: "" })).status).toBe(
     401,
   );
-  expect((await post(ping, { Authorization: "" })).status).toBe(401);
-  expect((await post(ping, { Origin: "https://evil.example" })).status).toBe(
-    403,
-  );
+  expect(
+    (await request("tools/list", {}, { Origin: "https://evil.example" }))
+      .status,
+  ).toBe(403);
 
   const [stored] = await t.query(internal.mcp.listTokens, {
     memberId: first._id,
@@ -140,54 +166,103 @@ it("answers only requests that carry a live token", async () => {
   const revoked = await t.fetch("/mcp", {
     method: "POST",
     headers: { Authorization: `Bearer ${token}` },
-    body: JSON.stringify(ping),
+    body: "{}",
   });
 
   expect(revoked.status).toBe(401);
 });
 
 it("loses access when the member leaves the household", async () => {
-  const { t, post, first } = await setup();
+  const { t, request, first } = await setup();
 
   await t.run((ctx) => ctx.db.delete("members", first._id));
 
-  expect((await post({ jsonrpc: "2.0", id: 1, method: "ping" })).status).toBe(
-    401,
-  );
+  expect((await request("tools/list")).status).toBe(401);
 });
 
-it("negotiates the protocol and lists read-only tools", async () => {
-  const { t, token, post } = await setup();
+it("serves stateless 2026-07-28 requests and lists read-only tools", async () => {
+  const { t, token, post, request } = await setup();
 
-  const initialized = await post({
-    jsonrpc: "2.0",
-    id: 1,
-    method: "initialize",
-    params: { protocolVersion: "2025-06-18", capabilities: {} },
+  const serverInfo = {
+    "io.modelcontextprotocol/serverInfo": { name: "kvitto" },
+  };
+
+  expect(await (await request("server/discover")).json()).toMatchObject({
+    result: {
+      resultType: "complete",
+      supportedVersions: ["2026-07-28"],
+      capabilities: { tools: {} },
+      _meta: serverInfo,
+    },
   });
 
-  expect(await initialized.json()).toMatchObject({
-    result: { protocolVersion: "2025-06-18", capabilities: { tools: {} } },
+  const listed = z
+    .object({
+      result: z.object({
+        resultType: z.literal("complete"),
+        cacheScope: z.literal("public"),
+        tools: z.array(
+          z.object({
+            name: z.string(),
+            annotations: z.object({ readOnlyHint: z.literal(true) }),
+          }),
+        ),
+      }),
+    })
+    .parse(await (await request("tools/list")).json());
+
+  expect(listed.result.tools.map((tool) => tool.name).sort()).toEqual([
+    "find_purchases",
+    "get_receipt",
+    "list_receipts",
+    "spending_summary",
+  ]);
+
+  // Clients may base64-encode header values with the =?base64?…?= sentinel.
+  const encoded = await request(
+    "tools/call",
+    { name: "get_receipt", arguments: { receiptId: "missing" } },
+    { "Mcp-Name": `=?base64?${btoa("get_receipt")}?=` },
+  );
+
+  expect(encoded.status).toBe(200);
+  expect(await encoded.json()).toMatchObject({
+    result: { isError: true, resultType: "complete", _meta: serverInfo },
   });
 
-  const future = await post({
+  const misrouted = await request("tools/list", {}, { "Mcp-Method": "ping" });
+
+  expect(misrouted.status).toBe(400);
+  expect(await misrouted.json()).toMatchObject({ error: { code: -32020 } });
+
+  const unknownTool = await request("tools/call", { name: "delete_all" });
+
+  expect(unknownTool.status).toBe(400);
+  expect(await unknownTool.json()).toMatchObject({ error: { code: -32602 } });
+
+  // The stateless revision removed the session handshake and ping.
+  const ping = await request("ping");
+
+  expect(ping.status).toBe(404);
+  expect(await ping.json()).toMatchObject({ error: { code: -32601 } });
+
+  const sessionEra = await post({
     jsonrpc: "2.0",
     id: 2,
     method: "initialize",
-    params: { protocolVersion: "2099-01-01" },
+    params: { protocolVersion: "2025-11-25", capabilities: {} },
   });
 
-  expect(await future.json()).toMatchObject({
-    result: { protocolVersion: "2025-11-25" },
+  expect(sessionEra.status).toBe(400);
+  expect(await sessionEra.json()).toMatchObject({
+    error: {
+      code: -32022,
+      data: { supported: ["2026-07-28"], requested: "2025-11-25" },
+    },
   });
 
   expect(
-    (
-      await post({
-        jsonrpc: "2.0",
-        method: "notifications/initialized",
-      })
-    ).status,
+    (await post({ jsonrpc: "2.0", method: "notifications/cancelled" })).status,
   ).toBe(202);
 
   const methodless = await post({ jsonrpc: "2.0", id: 4 });
@@ -206,134 +281,6 @@ it("negotiates the protocol and lists read-only tools", async () => {
 
   expect(malformed.status).toBe(400);
   expect(await malformed.json()).toMatchObject({ error: { code: -32700 } });
-
-  const listed = z
-    .object({
-      result: z.object({
-        tools: z.array(
-          z.object({
-            name: z.string(),
-            annotations: z.object({ readOnlyHint: z.literal(true) }),
-          }),
-        ),
-      }),
-    })
-    .parse(
-      await (
-        await post({ jsonrpc: "2.0", id: 3, method: "tools/list" })
-      ).json(),
-    );
-
-  expect(listed.result.tools.map((tool) => tool.name).sort()).toEqual([
-    "find_purchases",
-    "get_receipt",
-    "list_receipts",
-    "spending_summary",
-  ]);
-});
-
-it("serves 2026-07-28 requests without initialize", async () => {
-  const { post } = await setup();
-
-  const modern = (
-    id: number,
-    method: string,
-    params: Record<string, JsonValue> = {},
-    version = "2026-07-28",
-  ) => ({
-    jsonrpc: "2.0",
-    id,
-    method,
-    params: {
-      ...params,
-      _meta: {
-        "io.modelcontextprotocol/protocolVersion": version,
-        "io.modelcontextprotocol/clientCapabilities": {},
-      },
-    },
-  });
-
-  const headers = (method: string, version = "2026-07-28") => ({
-    "MCP-Protocol-Version": version,
-    "Mcp-Method": method,
-  });
-
-  const serverInfo = {
-    "io.modelcontextprotocol/serverInfo": { name: "kvitto" },
-  };
-
-  const discovered = await post(
-    modern(1, "server/discover"),
-    headers("server/discover"),
-  );
-
-  expect(await discovered.json()).toMatchObject({
-    result: {
-      resultType: "complete",
-      supportedVersions: [
-        "2026-07-28",
-        "2025-11-25",
-        "2025-06-18",
-        "2025-03-26",
-      ],
-      capabilities: { tools: {} },
-      _meta: serverInfo,
-    },
-  });
-
-  const called = await post(
-    modern(2, "tools/call", {
-      name: "get_receipt",
-      arguments: { receiptId: "missing" },
-    }),
-    // Clients may base64-encode the name with the =?base64?…?= sentinel.
-    {
-      ...headers("tools/call"),
-      "mcp-name": `=?base64?${btoa("get_receipt")}?=`,
-    },
-  );
-
-  expect(called.status).toBe(200);
-  expect(await called.json()).toMatchObject({
-    result: { isError: true, resultType: "complete", _meta: serverInfo },
-  });
-
-  const misrouted = await post(modern(3, "tools/list"), headers("tools/call"));
-
-  expect(misrouted.status).toBe(400);
-  expect(await misrouted.json()).toMatchObject({
-    id: 3,
-    error: { code: -32020 },
-  });
-
-  const unnamed = await post(
-    modern(4, "tools/call", { name: "get_receipt", arguments: {} }),
-    headers("tools/call"),
-  );
-
-  expect(unnamed.status).toBe(400);
-
-  const future = await post(
-    modern(5, "tools/list", {}, "2099-01-01"),
-    headers("tools/list", "2099-01-01"),
-  );
-
-  expect(future.status).toBe(400);
-  expect(await future.json()).toMatchObject({
-    error: {
-      code: -32022,
-      data: {
-        supported: ["2026-07-28", "2025-11-25", "2025-06-18", "2025-03-26"],
-        requested: "2099-01-01",
-      },
-    },
-  });
-
-  // The stateless revision removed the session handshake and ping.
-  const ping = await post(modern(6, "ping"), headers("ping"));
-
-  expect(ping.status).toBe(404);
-  expect(await ping.json()).toMatchObject({ error: { code: -32601 } });
 });
 
 it("reads only the token holder's household", async () => {
@@ -485,12 +432,11 @@ it("pages through more receipts than one read covers", async () => {
 });
 
 it("rate limits a looping client", async () => {
-  const { post } = await setup();
-  const ping = { jsonrpc: "2.0", id: 1, method: "ping" };
+  const { request } = await setup();
   const statuses: number[] = [];
 
-  for (let request = 0; request < 61; request++)
-    statuses.push((await post(ping)).status);
+  for (let attempt = 0; attempt < 61; attempt++)
+    statuses.push((await request("tools/list")).status);
 
   expect(statuses.slice(0, 60).every((status) => status === 200)).toBe(true);
   expect(statuses[60]).toBe(429);

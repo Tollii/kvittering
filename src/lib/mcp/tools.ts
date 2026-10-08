@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { CalendarDate } from "../domain/calendar";
-import type { JsonValue } from "./protocol";
+
+export type JsonValue = z.infer<ReturnType<typeof z.json>>;
 
 /** Long enough for a year-over-year question, small enough for one bounded read. */
 export const maxSummaryDays = 732;

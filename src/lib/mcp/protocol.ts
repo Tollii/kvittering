@@ -1,14 +1,11 @@
 import { z } from "zod";
+import { parseToolCall, type JsonValue, type ParsedToolCall } from "./tools";
 
-/** Stateless revision: every request carries its version, no initialize. */
-export const modernVersion = "2026-07-28";
-
-const latestLegacyVersion = "2025-11-25";
-
-/** Session-era revisions that start with initialize. */
-const legacyVersions = [latestLegacyVersion, "2025-06-18", "2025-03-26"];
-
-export const supportedVersions = [modernVersion, ...legacyVersions];
+/**
+ * The stateless revision: every request names its version in _meta, and
+ * there is no initialize handshake or session.
+ */
+export const protocolVersion = "2026-07-28";
 
 const metaKey = {
   protocolVersion: "io.modelcontextprotocol/protocolVersion",
@@ -19,8 +16,6 @@ const requestId = z.union([z.string(), z.number()]);
 
 export type RequestId = z.infer<typeof requestId>;
 
-export type JsonValue = z.infer<ReturnType<typeof z.json>>;
-
 const message = z.object({
   jsonrpc: z.literal("2.0"),
   id: requestId.optional(),
@@ -28,14 +23,11 @@ const message = z.object({
   params: z.json().optional(),
 });
 
-const initializeParams = z.object({ protocolVersion: z.string() });
-
-const modernParams = z.object({
-  _meta: z.object({ [metaKey.protocolVersion]: z.string() }),
-});
-
-const toolCallParams = z.object({
-  name: z.string(),
+const requestParams = z.object({
+  _meta: z.object({ [metaKey.protocolVersion]: z.string() }).optional(),
+  /** Session-era clients name their version in initialize instead. */
+  protocolVersion: z.string().optional(),
+  name: z.string().optional(),
   arguments: z.record(z.string(), z.json()).optional(),
 });
 
@@ -50,7 +42,7 @@ function readJson(text: string): JsonBody {
   }
 }
 
-export const errorCodes = {
+const errorCodes = {
   parse: -32700,
   invalidRequest: -32600,
   methodNotFound: -32601,
@@ -59,176 +51,139 @@ export const errorCodes = {
   unsupportedVersion: -32022,
 } as const;
 
-/**
- * "modern" requests follow 2026-07-28 and name their version in _meta;
- * "legacy" requests follow a session-era revision.
- */
-export type Era = "legacy" | "modern";
-
-/** One message from a stateless Streamable HTTP client. */
+/** One message from a Streamable HTTP client, with its answer decided. */
 export type McpMessage =
-  /** protocolVersion is already negotiated. */
-  | { kind: "initialize"; id: RequestId; protocolVersion: string }
   | { kind: "discover"; id: RequestId }
-  | { kind: "ping"; id: RequestId }
-  | { kind: "listTools"; id: RequestId; era: Era }
-  | {
-      kind: "callTool";
-      id: RequestId;
-      era: Era;
-      name: string;
-      arguments: Record<string, JsonValue>;
-    }
+  | { kind: "listTools"; id: RequestId }
+  | { kind: "callTool"; id: RequestId; call: ParsedToolCall }
+  /** Bad tool arguments are a tool result the model can correct. */
+  | { kind: "toolInputError"; id: RequestId; message: string }
   | { kind: "acknowledge" }
-  | { kind: "unknownMethod"; id: RequestId; era: Era; method: string }
-  | {
-      kind: "invalid";
-      id: RequestId | null;
-      code: (typeof errorCodes)[keyof typeof errorCodes];
-      message: string;
-      data?: JsonValue;
-    };
+  | { kind: "error"; status: number; body: JsonRpcError };
 
-/** Reads one POST body; headers matter only for 2026-07-28 requests. */
+type JsonRpcError = ReturnType<typeof jsonRpcError>;
+
+const failure = (
+  status: number,
+  ...error: Parameters<typeof jsonRpcError>
+): McpMessage => ({ kind: "error", status, body: jsonRpcError(...error) });
+
+/** Reads one POST body and checks the routing headers that must match it. */
 export function parseMcpMessage(text: string, headers: Headers): McpMessage {
   const json = readJson(text);
 
   if (json.kind === "malformed")
-    return {
-      kind: "invalid",
-      id: null,
-      code: errorCodes.parse,
-      message: "Body is not JSON.",
-    };
+    return failure(400, null, errorCodes.parse, "Body is not JSON.");
   const parsed = message.safeParse(json.value);
 
   if (!parsed.success)
-    return {
-      kind: "invalid",
-      id: null,
-      code: errorCodes.invalidRequest,
-      message: "Send one JSON-RPC 2.0 message per request.",
-    };
-  const { id, method, params } = parsed.data;
+    return failure(
+      400,
+      null,
+      errorCodes.invalidRequest,
+      "Send one JSON-RPC 2.0 message per request.",
+    );
+  const { id, method } = parsed.data;
 
   // This server sends no requests, so every message must name a method.
   if (method === undefined)
-    return {
-      kind: "invalid",
-      id: id ?? null,
-      code: errorCodes.invalidRequest,
-      message: "A JSON-RPC request needs a method.",
-    };
+    return failure(
+      400,
+      id ?? null,
+      errorCodes.invalidRequest,
+      "A JSON-RPC request needs a method.",
+    );
 
   // Notifications need no answer.
   if (id === undefined) return { kind: "acknowledge" };
+  const params = requestParams.safeParse(parsed.data.params ?? {});
 
-  const version =
-    modernParams.safeParse(params).data?._meta[metaKey.protocolVersion];
-
-  if (version === undefined) return legacyRequest(id, method, params);
-  const mismatch = headerMismatch(headers, { version, method, params });
-
-  if (mismatch)
-    return {
-      kind: "invalid",
+  if (!params.success)
+    return failure(
+      400,
       id,
-      code: errorCodes.headerMismatch,
-      message: mismatch,
-    };
+      errorCodes.invalidParams,
+      "params must be an object.",
+    );
 
-  if (version !== modernVersion)
-    return {
-      kind: "invalid",
+  const requested =
+    params.data._meta?.[metaKey.protocolVersion] ?? params.data.protocolVersion;
+
+  if (requested !== protocolVersion)
+    return failure(
+      400,
       id,
-      code: errorCodes.unsupportedVersion,
-      message: "Unsupported protocol version",
-      data: { supported: supportedVersions, requested: version },
-    };
+      errorCodes.unsupportedVersion,
+      "Unsupported protocol version",
+      { supported: [protocolVersion], requested: requested ?? null },
+    );
+  const mismatch = headerMismatch(headers, method, params.data.name);
 
-  return request(id, "modern", method, params);
-}
+  if (mismatch) return failure(400, id, errorCodes.headerMismatch, mismatch);
 
-function legacyRequest(
-  id: RequestId,
-  method: string,
-  params: JsonValue | undefined,
-): McpMessage {
-  switch (method) {
-    case "initialize":
-      return {
-        kind: "initialize",
-        id,
-        protocolVersion: negotiatedVersion(
-          initializeParams.safeParse(params).data?.protocolVersion,
-        ),
-      };
-
-    case "ping":
-      return { kind: "ping", id };
-
-    default:
-      return request(id, "legacy", method, params);
-  }
-}
-
-/** Methods both eras share; 2026-07-28 removed initialize and ping. */
-function request(
-  id: RequestId,
-  era: Era,
-  method: string,
-  params: JsonValue | undefined,
-): McpMessage {
   switch (method) {
     case "server/discover":
       return { kind: "discover", id };
 
     case "tools/list":
-      return { kind: "listTools", id, era };
+      return { kind: "listTools", id };
 
-    case "tools/call": {
-      const call = toolCallParams.safeParse(params);
-
-      return call.success
-        ? {
-            kind: "callTool",
-            id,
-            era,
-            name: call.data.name,
-            arguments: call.data.arguments ?? {},
-          }
-        : {
-            kind: "invalid",
-            id,
-            code: errorCodes.invalidParams,
-            message: "tools/call needs a tool name.",
-          };
-    }
+    case "tools/call":
+      return toolCall(id, params.data);
 
     default:
-      return { kind: "unknownMethod", id, era, method };
+      return failure(
+        404,
+        id,
+        errorCodes.methodNotFound,
+        `Unknown method ${method}.`,
+      );
   }
 }
 
-const nameParams = z.object({ name: z.string() });
+function toolCall(
+  id: RequestId,
+  params: z.infer<typeof requestParams>,
+): McpMessage {
+  if (params.name === undefined)
+    return failure(
+      400,
+      id,
+      errorCodes.invalidParams,
+      "tools/call needs a tool name.",
+    );
+  const parsed = parseToolCall(params.name, params.arguments ?? {});
 
-/** 2026-07-28 repeats routing fields in headers; they must match the body. */
+  switch (parsed.kind) {
+    case "parsed":
+      return { kind: "callTool", id, call: parsed.call };
+
+    case "invalid":
+      return { kind: "toolInputError", id, message: parsed.message };
+
+    case "unknown":
+      return failure(
+        400,
+        id,
+        errorCodes.invalidParams,
+        `Unknown tool ${params.name}.`,
+      );
+  }
+}
+
+/** Requests repeat routing fields in headers so proxies need not read the body. */
 function headerMismatch(
   headers: Headers,
-  body: { version: string; method: string; params: JsonValue | undefined },
+  method: string,
+  name: string | undefined,
 ): string | undefined {
-  if (headers.get("MCP-Protocol-Version") !== body.version)
+  if (headers.get("MCP-Protocol-Version") !== protocolVersion)
     return "MCP-Protocol-Version must match the protocolVersion in _meta.";
 
-  if (headerValue(headers.get("Mcp-Method")) !== body.method)
+  if (headerValue(headers.get("Mcp-Method")) !== method)
     return "Mcp-Method must match the request method.";
-  const name = nameParams.safeParse(body.params).data?.name;
 
-  if (
-    body.method === "tools/call" &&
-    name !== undefined &&
-    headerValue(headers.get("Mcp-Name")) !== name
-  )
+  if (method === "tools/call" && headerValue(headers.get("Mcp-Name")) !== name)
     return "Mcp-Name must match the tool name.";
 }
 
@@ -250,34 +205,25 @@ function headerValue(value: string | null): string | null {
   }
 }
 
-function negotiatedVersion(requested: string | undefined): string {
-  return requested && legacyVersions.includes(requested)
-    ? requested
-    : latestLegacyVersion;
-}
+const serverInfo = { name: "kvitto", version: "0.1.0" };
 
-export const serverInfo = { name: "kvitto", version: "0.1.0" };
-
-/** 2026-07-28 results say they are final and name the server. */
-export const modernResult = <Result extends object>(result: Result) => ({
-  ...result,
-  resultType: "complete" as const,
-  _meta: { [metaKey.serverInfo]: serverInfo },
-});
-
-export const jsonRpcResult = <Result>(id: RequestId, result: Result) => ({
+/** Results say they are final and name the server. */
+export const jsonRpcResult = <Result extends object>(
+  id: RequestId,
+  result: Result,
+) => ({
   jsonrpc: "2.0" as const,
   id,
-  result,
+  result: {
+    ...result,
+    resultType: "complete" as const,
+    _meta: { [metaKey.serverInfo]: serverInfo },
+  },
 });
 
-export const jsonRpcError = (
+const jsonRpcError = (
   id: RequestId | null,
   code: number,
   message: string,
   data?: JsonValue,
-) => ({
-  jsonrpc: "2.0" as const,
-  id,
-  error: data === undefined ? { code, message } : { code, message, data },
-});
+) => ({ jsonrpc: "2.0" as const, id, error: { code, message, data } });
