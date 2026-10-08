@@ -32,8 +32,11 @@ const authorizationLifetimeMs = 10 * 60 * 1000;
 
 const syncIntervalMs = 60 * 1000;
 
-/** How long one sync may hold the connection before another may start. */
-const syncLeaseMs = 5 * 60 * 1000;
+/**
+ * How long one sync may hold the connection before another may start: longer
+ * than Convex lets an action run, so two syncs never overlap.
+ */
+const syncLeaseMs = 15 * 60 * 1000;
 
 const tokensValidator = {
   accessToken: v.string(),
@@ -338,18 +341,20 @@ export const claimSync = internalMutation({
   args: { id: v.id("odaConnections") },
   returns: v.union(
     v.null(),
-    v.object({ clientId: v.string(), ...tokensValidator }),
+    v.object({ lease: v.number(), clientId: v.string(), ...tokensValidator }),
   ),
   handler: async (ctx, args) => {
     const row = await ctx.db.get("odaConnections", args.id);
     const now = Date.now();
 
     if (!row || row.expired || (row.syncingUntil ?? 0) > now) return null;
-    await ctx.db.patch("odaConnections", args.id, {
-      syncingUntil: now + syncLeaseMs,
-    });
+
+    const lease = now + syncLeaseMs;
+
+    await ctx.db.patch("odaConnections", args.id, { syncingUntil: lease });
 
     return {
+      lease,
       clientId: row.clientId,
       accessToken: row.accessToken,
       accessExpiresAt: row.accessExpiresAt,
@@ -358,11 +363,27 @@ export const claimSync = internalMutation({
   },
 });
 
+/**
+ * The connection while this sync still holds it. A new sign-in replaces the
+ * lease, and then the old sync's results are dropped.
+ */
+async function leased(
+  ctx: MutationCtx,
+  id: Id<"odaConnections">,
+  lease: number,
+) {
+  const row = await ctx.db.get("odaConnections", id);
+
+  return row?.syncingUntil === lease ? row : null;
+}
+
+const leaseValidator = { id: v.id("odaConnections"), lease: v.number() };
+
 export const saveTokens = internalMutation({
-  args: { id: v.id("odaConnections"), ...tokensValidator },
+  args: { ...leaseValidator, ...tokensValidator },
   returns: v.null(),
-  handler: async (ctx, { id, ...tokens }) => {
-    const row = await ctx.db.get("odaConnections", id);
+  handler: async (ctx, { id, lease, ...tokens }) => {
+    const row = await leased(ctx, id, lease);
 
     if (row)
       await ctx.db.patch("odaConnections", id, {
@@ -375,10 +396,10 @@ export const saveTokens = internalMutation({
 });
 
 export const recordFailure = internalMutation({
-  args: { id: v.id("odaConnections"), error: v.string(), expired: v.boolean() },
+  args: { ...leaseValidator, error: v.string(), expired: v.boolean() },
   returns: v.null(),
   handler: async (ctx, args) => {
-    if (await ctx.db.get("odaConnections", args.id))
+    if (await leased(ctx, args.id, args.lease))
       await ctx.db.patch("odaConnections", args.id, {
         error: args.error,
         expired: args.expired,
@@ -393,14 +414,14 @@ export const recordFailure = internalMutation({
 /** Create a receipt for each order the household does not have yet. */
 export const importOrders = internalMutation({
   args: {
-    id: v.id("odaConnections"),
+    ...leaseValidator,
     orders: v.array(
       v.object({ orderNumber: v.string(), data: receiptDataValidator }),
     ),
   },
   returns: v.null(),
   handler: async (ctx, args) => {
-    const connection = await ctx.db.get("odaConnections", args.id);
+    const connection = await leased(ctx, args.id, args.lease);
 
     if (!connection) return null;
 
@@ -410,8 +431,13 @@ export const importOrders = internalMutation({
       .unique();
 
     // A paused receipt service also pauses imports; the next sync picks them up.
-    if (!member || !(await featureEnabled(ctx, "receiptProcessing")))
+    if (!member || !(await featureEnabled(ctx, "receiptProcessing"))) {
+      await ctx.db.patch("odaConnections", args.id, {
+        syncingUntil: undefined,
+      });
+
       return null;
+    }
 
     let imported = 0;
 
@@ -480,6 +506,8 @@ export const syncConnection = internalAction({
 
     if (!connection) return null;
 
+    const held = { ...args, lease: connection.lease };
+
     try {
       let { accessToken } = connection;
 
@@ -492,7 +520,7 @@ export const syncConnection = internalAction({
           connection.refreshToken,
         );
 
-        await ctx.runMutation(internal.oda.saveTokens, { ...args, ...tokens });
+        await ctx.runMutation(internal.oda.saveTokens, { ...held, ...tokens });
         accessToken = tokens.accessToken;
       }
 
@@ -504,7 +532,7 @@ export const syncConnection = internalAction({
       );
 
       await ctx.runMutation(internal.oda.importOrders, {
-        ...args,
+        ...held,
         orders: deliveredOrders(orders).map((order) => ({
           orderNumber: order.orderNumber,
           data: orderReceipt(order),
@@ -519,7 +547,7 @@ export const syncConnection = internalAction({
         errorType: errorDetails(error).errorType,
       });
       await ctx.runMutation(internal.oda.recordFailure, {
-        ...args,
+        ...held,
         expired,
         error: expired
           ? "Innloggingen hos Oda er utløpt. Logg inn på nytt."
