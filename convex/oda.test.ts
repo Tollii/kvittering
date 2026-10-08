@@ -4,7 +4,7 @@ import { register } from "@convex-dev/workflow/test";
 import { convexTest } from "convex-test";
 import { afterEach, expect, it, vi } from "vitest";
 import { z } from "zod";
-import { api } from "./_generated/api";
+import { api, internal } from "./_generated/api";
 import schema from "./schema";
 
 const modules = import.meta.glob("./**/*.ts");
@@ -29,6 +29,8 @@ const order = {
   ],
 };
 
+let refreshes = 0;
+
 const rpcRequest = z.object({ id: z.number().optional(), method: z.string() });
 
 /** Oda's OAuth server and MCP endpoint, answering as they do in production. */
@@ -36,12 +38,23 @@ async function oda(url: string, init?: RequestInit) {
   if (url === "https://oda.com/o/register/")
     return Response.json({ client_id: "kvitto-client" }, { status: 201 });
 
-  if (url === "https://oda.com/o/token/")
+  if (url === "https://oda.com/o/token/") {
+    // Like Oda, each refresh replaces the refresh token and refuses the old one.
+    const used = z
+      .instanceof(URLSearchParams)
+      .parse(init?.body)
+      .get("refresh_token");
+
+    if (used !== null && used !== `refresh-${refreshes}`)
+      return Response.json({ error: "invalid_grant" }, { status: 400 });
+    refreshes += used === null ? 0 : 1;
+
     return Response.json({
       access_token: "access",
-      refresh_token: "refresh",
+      refresh_token: `refresh-${refreshes}`,
       expires_in: 3600,
     });
+  }
 
   if (url !== "https://oda.com/mcp") throw new Error(`Unexpected ${url}`);
 
@@ -112,10 +125,27 @@ it("signs in at Oda once and imports a delivered order as one receipt", async ()
     `/oda/callback?code=code&state=${signIn.searchParams.get("state")}`,
   );
 
-  expect(callback.headers.get("Location")).toBe(
-    "kvitto://oda?status=connected",
-  );
+  const answer = new URL(callback.headers.get("Location")!);
+  expect(answer.searchParams.get("status")).toBe("connected");
+  const confirmation = answer.searchParams.get("confirmation")!;
 
+  // Only the person who started the sign-in can finish it, so a forwarded
+  // sign-in link cannot put someone else's Oda orders in this household.
+  const stranger = t.withIdentity({
+    subject: "stranger",
+    issuer: "https://test.local",
+  });
+
+  await stranger.mutation(api.households.create, {
+    name: "Elsewhere",
+    invitation: "fedcba9876543210fedcba9876543210",
+  });
+  await expect(
+    stranger.mutation(api.oda.confirm, { confirmation }),
+  ).rejects.toThrow("Innloggingen hos Oda er utløpt");
+  expect(await user.query(api.oda.status, {})).toBeNull();
+
+  await user.mutation(api.oda.confirm, { confirmation });
   await t.finishAllScheduledFunctions(vi.runAllTimers);
   await user.mutation(api.oda.sync, {});
   vi.advanceTimersByTime(2 * 60 * 1000);
@@ -136,6 +166,22 @@ it("signs in at Oda once and imports a delivered order as one receipt", async ()
     data: { store: "Oda", totalOre: 10000, receiptNumber: "r2fy3e" },
   });
 
+  // Two syncs at once refresh the sign-in only once, so it stays valid.
+  const [connection] = await t.run((ctx) =>
+    ctx.db.query("odaConnections").collect(),
+  );
+
+  await t.run((ctx) =>
+    ctx.db.patch("odaConnections", connection!._id, { accessExpiresAt: 0 }),
+  );
+  await Promise.all([
+    t.action(internal.oda.syncConnection, { id: connection!._id }),
+    t.action(internal.oda.syncConnection, { id: connection!._id }),
+  ]);
+  expect(await user.query(api.oda.status, {})).toMatchObject({
+    expired: false,
+  });
+
   // A retry reads the order again, since there are no images to read.
   const id = receipts[0]!._id;
   await t.run((ctx) =>
@@ -151,7 +197,10 @@ it("signs in at Oda once and imports a delivered order as one receipt", async ()
 
   const { revision } = (await t.run((ctx) => ctx.db.get("receipts", id)))!;
   await user.mutation(api.receipts.remove, { id, revision });
-  expect(await t.run((ctx) => ctx.db.query("odaImports").collect())).toEqual(
-    [],
-  );
+
+  // A deleted order stays deleted.
+  vi.advanceTimersByTime(2 * 60 * 1000);
+  await user.mutation(api.oda.sync, {});
+  await t.finishAllScheduledFunctions(vi.runAllTimers);
+  expect(await t.run((ctx) => ctx.db.query("receipts").collect())).toEqual([]);
 });

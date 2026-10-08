@@ -31,36 +31,16 @@ export function OdaSettings() {
   const [message, setMessage] = useState("");
   const blocked = !online || busy !== null;
 
-  async function run(operation: NonNullable<typeof busy>) {
+  async function run(
+    operation: NonNullable<typeof busy>,
+    action: () => Promise<string>,
+  ) {
     setBusy(operation);
     setError("");
     setMessage("");
 
     try {
-      if (operation === "signIn") {
-        const returnUrl = Linking.createURL("oda");
-
-        const url = await releaseMutation(client, api.oda.start, {
-          request: randomUUID(),
-          returnUrl,
-        });
-
-        const result = await WebBrowser.openAuthSessionAsync(url, returnUrl);
-
-        if (result.type !== "success") return;
-
-        const outcome = new URL(result.url).searchParams.get("status");
-
-        if (outcome === "connected")
-          setMessage("Oda er koblet til. Bestillingene hentes nå.");
-        else if (outcome === "failed")
-          setError("Innloggingen hos Oda mislyktes. Prøv igjen.");
-      } else if (operation === "sync") {
-        await releaseMutation(client, api.oda.sync, {});
-        setMessage("Ser etter nye bestillinger.");
-      } else {
-        await releaseMutation(client, api.oda.disconnect, {});
-      }
+      setMessage(await action());
     } catch (cause) {
       setError(
         failureMessage(cause, `oda.${operation}`, "Kunne ikke fullføre."),
@@ -70,13 +50,40 @@ export function OdaSettings() {
     }
   }
 
+  async function signInAtOda() {
+    const returnUrl = Linking.createURL("oda");
+
+    const url = await releaseMutation(client, api.oda.start, {
+      request: randomUUID(),
+      returnUrl,
+    });
+
+    const result = await WebBrowser.openAuthSessionAsync(url, returnUrl);
+
+    if (result.type !== "success") return "";
+
+    const answer = new URL(result.url).searchParams;
+    const confirmation = answer.get("confirmation");
+
+    if (answer.get("status") === "connected" && confirmation) {
+      await releaseMutation(client, api.oda.confirm, { confirmation });
+
+      return "Oda er koblet til. Bestillingene hentes nå.";
+    }
+
+    if (answer.get("status") === "failed")
+      setError("Innloggingen hos Oda mislyktes. Prøv igjen.");
+
+    return "";
+  }
+
   const signIn = (title: string) => (
     <Button
       title={title}
       icon="cart"
       disabled={blocked}
       busy={busy === "signIn"}
-      onPress={() => void run("signIn")}
+      onPress={() => void run("signIn", signInAtOda)}
     />
   );
 
@@ -126,7 +133,13 @@ export function OdaSettings() {
                   icon="arrow.clockwise"
                   disabled={blocked}
                   busy={busy === "sync"}
-                  onPress={() => void run("sync")}
+                  onPress={() =>
+                    void run("sync", async () => {
+                      await releaseMutation(client, api.oda.sync, {});
+
+                      return "Ser etter nye bestillinger.";
+                    })
+                  }
                 />
               </View>
             )}
@@ -145,7 +158,14 @@ export function OdaSettings() {
                       {
                         text: "Koble fra",
                         style: "destructive",
-                        onPress: () => void run("disconnect"),
+                        onPress: () =>
+                          void run("disconnect", () =>
+                            releaseMutation(
+                              client,
+                              api.oda.disconnect,
+                              {},
+                            ).then(() => ""),
+                          ),
                       },
                     ],
                   )

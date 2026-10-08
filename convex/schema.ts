@@ -351,22 +351,51 @@ export default defineSchema({
     householdId: v.id("households"),
     returnUrl: v.string(),
     expiresAt: v.number(),
-    state: v.string().optional(),
-    verifier: v.string().optional(),
+    /** Set when the browser reaches Oda. */
+    signIn: v
+      .object({ clientId: v.string(), state: v.string(), verifier: v.string() })
+      .optional(),
+    /** Set when Oda has sent the browser back, so its answer is used once. */
+    answered: v.boolean().optional(),
+    /**
+     * Oda's tokens, held until the app that started the sign-in confirms it
+     * with this secret, so a forwarded sign-in link connects nobody.
+     */
+    pending: v
+      .object({
+        confirmation: v.string(),
+        accessToken: v.string(),
+        accessExpiresAt: v.number(),
+        refreshToken: v.string().optional(),
+      })
+      .optional(),
   })
     .index("by_request", ["request"])
-    .index("by_state", ["state"])
+    .index("by_state", ["signIn.state"])
+    .index("by_confirmation", ["pending.confirmation"])
     .index("by_identity", ["identity"]),
   /** Kvitto's OAuth registration at Oda for each callback URL. */
   odaClients: defineTable({
     redirectUri: v.string(),
     clientId: v.string(),
   }).index("by_redirectUri", ["redirectUri"]),
-  /** The Oda order a receipt was imported from, kept so a retry can read it again. */
-  odaImports: defineTable({
-    receiptId: v.id("receipts"),
-    data: receiptDataValidator,
-  }).index("by_receiptId", ["receiptId"]),
+  /**
+   * A store order imported as a receipt. A retry reads the order again. When
+   * the receipt is deleted, the order number stays so it is not imported again.
+   */
+  receiptImports: defineTable({
+    householdId: v.id("households"),
+    provider: v.literal("oda"),
+    orderNumber: v.string(),
+    receiptId: v.id("receipts").optional(),
+    data: receiptDataValidator.optional(),
+  })
+    .index("by_receiptId", ["receiptId"])
+    .index("by_householdId_and_provider_and_orderNumber", [
+      "householdId",
+      "provider",
+      "orderNumber",
+    ]),
   /** A member's Oda account. Tokens never leave the server. */
   odaConnections: defineTable({
     identity: v.string(),
@@ -379,5 +408,7 @@ export default defineSchema({
     lastSyncAt: v.number().optional(),
     importedCount: v.number(),
     error: v.string().optional(),
+    /** One sync at a time, since a refresh replaces the refresh token. */
+    syncingUntil: v.number().optional(),
   }).index("by_identity", ["identity"]),
 });

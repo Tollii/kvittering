@@ -1,10 +1,10 @@
 import { v } from "convex/values";
-import { start as startWorkflow } from "@convex-dev/workflow";
 import {
   env,
   internalAction,
   internalQuery,
   query,
+  type MutationCtx,
   type QueryCtx,
 } from "./_generated/server";
 import { internal } from "./_generated/api";
@@ -13,8 +13,8 @@ import { internalMutation } from "./serverFunctions";
 import { clientMutation as mutation } from "./clientFunctions";
 import { requireMember } from "./access";
 import { userError } from "./userErrors";
-import { trackWorkflow } from "./retention";
 import { featureEnabled } from "./featureFlags";
+import { beginUploadedReceipt } from "./receiptUploadCompletion";
 import { receiptDataValidator } from "../src/lib/domain/receipt";
 import { errorDetails } from "../src/lib/diagnostics";
 import {
@@ -32,24 +32,29 @@ const authorizationLifetimeMs = 10 * 60 * 1000;
 
 const syncIntervalMs = 60 * 1000;
 
+/**
+ * How long one sync may hold the connection before another may start: longer
+ * than Convex lets an action run, so two syncs never overlap.
+ */
+const syncLeaseMs = 15 * 60 * 1000;
+
+const tokensValidator = {
+  accessToken: v.string(),
+  accessExpiresAt: v.number(),
+  refreshToken: v.optional(v.string()),
+};
+
+export const signInExpiredMessage =
+  "Innloggingen er utløpt. Gå tilbake til Kvitto og prøv igjen.";
+
 export const odaCallbackUrl = () => `${env.CONVEX_SITE_URL}/oda/callback`;
 
 /** A member's own Oda account, if they connected one. */
-const connectionOf = (ctx: QueryCtx, identity: string) =>
+const connectionOf = (ctx: QueryCtx | MutationCtx, identity: string) =>
   ctx.db
     .query("odaConnections")
     .withIndex("by_identity", (q) => q.eq("identity", identity))
     .unique();
-
-/** An imported receipt has no images; a retry reads its order data again. */
-export async function importedOrder(ctx: QueryCtx, receiptId: Id<"receipts">) {
-  const row = await ctx.db
-    .query("odaImports")
-    .withIndex("by_receiptId", (q) => q.eq("receiptId", receiptId))
-    .unique();
-
-  return row ? { imported: { data: row.data, provider: "oda" } } : {};
-}
 
 /** What the settings screen shows about the member's own Oda account. */
 export const status = query({
@@ -106,6 +111,62 @@ export const start = mutation({
     });
 
     return `${env.CONVEX_SITE_URL}/oda/authorize?request=${args.request}`;
+  },
+});
+
+/**
+ * Finish signing in from the app that started it. The confirmation reaches
+ * only the browser that signed in at Oda, so a forwarded sign-in link cannot
+ * connect someone else's Oda account to this household.
+ */
+export const confirm = mutation({
+  args: { confirmation: v.string() },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    const member = await requireMember(ctx);
+
+    const row = await ctx.db
+      .query("odaAuthorizations")
+      .withIndex("by_confirmation", (q) =>
+        q.eq("pending.confirmation", args.confirmation),
+      )
+      .unique();
+
+    if (
+      !row?.pending ||
+      !row.signIn ||
+      row.identity !== member.identity ||
+      row.expiresAt < Date.now()
+    )
+      throw userError("Innloggingen hos Oda er utløpt. Prøv igjen.");
+    await ctx.db.delete("odaAuthorizations", row._id);
+
+    const { confirmation: _, ...tokens } = row.pending;
+    const existing = await connectionOf(ctx, member.identity);
+
+    const fields = {
+      householdId: member.householdId,
+      clientId: row.signIn.clientId,
+      ...tokens,
+      expired: false,
+      error: undefined,
+      syncingUntil: undefined,
+    };
+
+    let id = existing?._id;
+
+    if (id) await ctx.db.patch("odaConnections", id, fields);
+    else
+      id = await ctx.db.insert("odaConnections", {
+        ...fields,
+        identity: member.identity,
+        importedCount: 0,
+      });
+
+    console.info("oda.connected", { connectionId: id });
+    await ctx.scheduler.runAfter(0, internal.oda.syncConnection, { id });
+
+    return null;
   },
 });
 
@@ -172,53 +233,37 @@ export const disconnect = mutation({
   },
 });
 
-export const authorization = internalQuery({
-  args: { request: v.string() },
-  returns: v.union(
-    v.null(),
-    v.object({ expired: v.boolean(), started: v.boolean() }),
-  ),
-  handler: async (ctx, args) => {
-    const row = await ctx.db
-      .query("odaAuthorizations")
-      .withIndex("by_request", (q) => q.eq("request", args.request))
-      .unique();
-
-    return row
-      ? { expired: row.expiresAt < Date.now(), started: !!row.state }
-      : null;
-  },
-});
-
-/** Attach OAuth state and the PKCE verifier once; a second visit is refused. */
+/** Attach the OAuth sign-in once; a second visit to the link is refused. */
 export const beginAuthorization = internalMutation({
-  args: { request: v.string(), state: v.string(), verifier: v.string() },
+  args: {
+    request: v.string(),
+    clientId: v.string(),
+    state: v.string(),
+    verifier: v.string(),
+  },
   returns: v.boolean(),
-  handler: async (ctx, args) => {
+  handler: async (ctx, { request, ...signIn }) => {
     const row = await ctx.db
       .query("odaAuthorizations")
-      .withIndex("by_request", (q) => q.eq("request", args.request))
+      .withIndex("by_request", (q) => q.eq("request", request))
       .unique();
 
-    if (!row || row.state || row.expiresAt < Date.now()) return false;
-    await ctx.db.patch("odaAuthorizations", row._id, {
-      state: args.state,
-      verifier: args.verifier,
-    });
+    if (!row || row.signIn || row.expiresAt < Date.now()) return false;
+    await ctx.db.patch("odaAuthorizations", row._id, { signIn });
 
     return true;
   },
 });
 
-/** Use up the sign-in that `state` belongs to. */
+/** Take Oda's answer for the sign-in that `state` belongs to, once. */
 export const completeAuthorization = internalMutation({
   args: { state: v.string() },
   returns: v.union(
     v.null(),
     v.object({
-      identity: v.string(),
-      householdId: v.id("households"),
+      id: v.id("odaAuthorizations"),
       returnUrl: v.string(),
+      clientId: v.string(),
       verifier: v.string(),
       expired: v.boolean(),
     }),
@@ -226,19 +271,45 @@ export const completeAuthorization = internalMutation({
   handler: async (ctx, args) => {
     const row = await ctx.db
       .query("odaAuthorizations")
-      .withIndex("by_state", (q) => q.eq("state", args.state))
+      .withIndex("by_state", (q) => q.eq("signIn.state", args.state))
       .unique();
 
-    if (!row?.verifier) return null;
-    await ctx.db.delete("odaAuthorizations", row._id);
+    if (!row?.signIn || row.answered) return null;
+    await ctx.db.patch("odaAuthorizations", row._id, { answered: true });
 
     return {
-      identity: row.identity,
-      householdId: row.householdId,
+      id: row._id,
       returnUrl: row.returnUrl,
-      verifier: row.verifier,
+      clientId: row.signIn.clientId,
+      verifier: row.signIn.verifier,
       expired: row.expiresAt < Date.now(),
     };
+  },
+});
+
+/** Hold Oda's tokens until the app confirms the sign-in. */
+export const holdTokens = internalMutation({
+  args: {
+    id: v.id("odaAuthorizations"),
+    confirmation: v.string(),
+    ...tokensValidator,
+  },
+  returns: v.null(),
+  handler: async (ctx, { id, ...pending }) => {
+    await ctx.db.patch("odaAuthorizations", id, { pending });
+
+    return null;
+  },
+});
+
+export const forgetAuthorization = internalMutation({
+  args: { id: v.id("odaAuthorizations") },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    if (await ctx.db.get("odaAuthorizations", args.id))
+      await ctx.db.delete("odaAuthorizations", args.id);
+
+    return null;
   },
 });
 
@@ -265,81 +336,54 @@ export const saveClient = internalMutation({
   },
 });
 
-const tokensValidator = {
-  accessToken: v.string(),
-  accessExpiresAt: v.number(),
-  refreshToken: v.optional(v.string()),
-};
-
-/** Save the member's Oda account and import their recent orders. */
-export const connect = internalMutation({
-  args: {
-    identity: v.string(),
-    householdId: v.id("households"),
-    clientId: v.string(),
-    ...tokensValidator,
-  },
-  returns: v.null(),
-  handler: async (ctx, { identity, householdId, clientId, ...tokens }) => {
-    const existing = await ctx.db
-      .query("odaConnections")
-      .withIndex("by_identity", (q) => q.eq("identity", identity))
-      .unique();
-
-    const fields = {
-      householdId,
-      clientId,
-      ...tokens,
-      expired: false,
-      error: undefined,
-    };
-
-    const id = existing
-      ? existing._id
-      : await ctx.db.insert("odaConnections", {
-          ...fields,
-          identity,
-          importedCount: 0,
-        });
-
-    if (existing) await ctx.db.patch("odaConnections", id, fields);
-    console.info("oda.connected", { connectionId: id });
-    await ctx.scheduler.runAfter(0, internal.oda.syncConnection, { id });
-
-    return null;
-  },
-});
-
-export const connection = internalQuery({
+/** Claim the connection for one sync and return its tokens, or null. */
+export const claimSync = internalMutation({
   args: { id: v.id("odaConnections") },
   returns: v.union(
     v.null(),
-    v.object({
-      clientId: v.string(),
-      expired: v.boolean(),
-      ...tokensValidator,
-    }),
+    v.object({ lease: v.number(), clientId: v.string(), ...tokensValidator }),
   ),
   handler: async (ctx, args) => {
     const row = await ctx.db.get("odaConnections", args.id);
+    const now = Date.now();
 
-    return row
-      ? {
-          clientId: row.clientId,
-          expired: row.expired,
-          accessToken: row.accessToken,
-          accessExpiresAt: row.accessExpiresAt,
-          refreshToken: row.refreshToken,
-        }
-      : null;
+    if (!row || row.expired || (row.syncingUntil ?? 0) > now) return null;
+
+    const lease = now + syncLeaseMs;
+
+    await ctx.db.patch("odaConnections", args.id, { syncingUntil: lease });
+
+    return {
+      lease,
+      clientId: row.clientId,
+      accessToken: row.accessToken,
+      accessExpiresAt: row.accessExpiresAt,
+      refreshToken: row.refreshToken,
+    };
   },
 });
 
+/**
+ * The connection while this sync still holds it. A new sign-in replaces the
+ * lease, and then the old sync's results are dropped.
+ */
+async function leased(
+  ctx: MutationCtx,
+  id: Id<"odaConnections">,
+  lease: number,
+) {
+  const row = await ctx.db.get("odaConnections", id);
+
+  return row?.syncingUntil === lease ? row : null;
+}
+
+const leaseValidator = { id: v.id("odaConnections"), lease: v.number() };
+
 export const saveTokens = internalMutation({
-  args: { id: v.id("odaConnections"), ...tokensValidator },
+  args: { ...leaseValidator, ...tokensValidator },
   returns: v.null(),
-  handler: async (ctx, { id, ...tokens }) => {
-    const row = await ctx.db.get("odaConnections", id);
+  handler: async (ctx, { id, lease, ...tokens }) => {
+    const row = await leased(ctx, id, lease);
 
     if (row)
       await ctx.db.patch("odaConnections", id, {
@@ -352,14 +396,15 @@ export const saveTokens = internalMutation({
 });
 
 export const recordFailure = internalMutation({
-  args: { id: v.id("odaConnections"), error: v.string(), expired: v.boolean() },
+  args: { ...leaseValidator, error: v.string(), expired: v.boolean() },
   returns: v.null(),
   handler: async (ctx, args) => {
-    if (await ctx.db.get("odaConnections", args.id))
+    if (await leased(ctx, args.id, args.lease))
       await ctx.db.patch("odaConnections", args.id, {
         error: args.error,
         expired: args.expired,
         lastSyncAt: Date.now(),
+        syncingUntil: undefined,
       });
 
     return null;
@@ -369,12 +414,14 @@ export const recordFailure = internalMutation({
 /** Create a receipt for each order the household does not have yet. */
 export const importOrders = internalMutation({
   args: {
-    id: v.id("odaConnections"),
-    receipts: v.array(receiptDataValidator),
+    ...leaseValidator,
+    orders: v.array(
+      v.object({ orderNumber: v.string(), data: receiptDataValidator }),
+    ),
   },
   returns: v.null(),
   handler: async (ctx, args) => {
-    const connection = await ctx.db.get("odaConnections", args.id);
+    const connection = await leased(ctx, args.id, args.lease);
 
     if (!connection) return null;
 
@@ -384,57 +431,58 @@ export const importOrders = internalMutation({
       .unique();
 
     // A paused receipt service also pauses imports; the next sync picks them up.
-    if (!member || !(await featureEnabled(ctx, "receiptProcessing")))
+    if (!member || !(await featureEnabled(ctx, "receiptProcessing"))) {
+      await ctx.db.patch("odaConnections", args.id, {
+        syncingUntil: undefined,
+      });
+
       return null;
+    }
 
     let imported = 0;
 
-    for (const data of args.receipts) {
-      const clientId = `oda-${data.receiptNumber}`;
-
-      const existing = await ctx.db
-        .query("receipts")
-        .withIndex("by_householdId_and_clientId", (q) =>
-          q.eq("householdId", member.householdId).eq("clientId", clientId),
+    for (const { orderNumber, data } of args.orders) {
+      const known = await ctx.db
+        .query("receiptImports")
+        .withIndex("by_householdId_and_provider_and_orderNumber", (q) =>
+          q
+            .eq("householdId", member.householdId)
+            .eq("provider", "oda")
+            .eq("orderNumber", orderNumber),
         )
         .unique();
 
-      if (existing) continue;
+      if (known) continue;
 
       const id: Id<"receipts"> = await ctx.db.insert("receipts", {
         householdId: member.householdId,
         uploadedBy: member.identity,
         uploaderName: member.name,
-        clientId,
+        clientId: `oda-${orderNumber}`,
         imageCount: 0,
-        status: "uploaded",
+        status: "uploading",
         revision: 0,
-        generation: 1,
+        generation: 0,
         data: null,
         provider: "pending",
         duplicateResolved: false,
         excluded: false,
       });
 
-      await ctx.db.insert("odaImports", { receiptId: id, data });
-
-      const workflowId = await startWorkflow(
-        ctx,
-        internal.processing.processReceipt,
-        { id, generation: 1, imported: { data, provider: "oda" } },
-        {
-          onComplete: internal.retention.workflowCompleted,
-          context: { component: "processing", receiptId: id },
-        },
-      );
-
-      await trackWorkflow(ctx, workflowId, "processing", id);
+      await ctx.db.insert("receiptImports", {
+        householdId: member.householdId,
+        provider: "oda",
+        orderNumber,
+        receiptId: id,
+        data,
+      });
+      await beginUploadedReceipt(ctx, id, 0);
       imported += 1;
     }
 
     console.info("oda.orders_imported", {
       connectionId: args.id,
-      orderCount: args.receipts.length,
+      orderCount: args.orders.length,
       imported,
     });
     await ctx.db.patch("odaConnections", args.id, {
@@ -442,6 +490,7 @@ export const importOrders = internalMutation({
       lastSyncAt: Date.now(),
       importedCount: connection.importedCount + imported,
       error: undefined,
+      syncingUntil: undefined,
     });
 
     return null;
@@ -453,9 +502,11 @@ export const syncConnection = internalAction({
   args: { id: v.id("odaConnections") },
   returns: v.null(),
   handler: async (ctx, args) => {
-    const connection = await ctx.runQuery(internal.oda.connection, args);
+    const connection = await ctx.runMutation(internal.oda.claimSync, args);
 
-    if (!connection || connection.expired) return null;
+    if (!connection) return null;
+
+    const held = { ...args, lease: connection.lease };
 
     try {
       let { accessToken } = connection;
@@ -469,7 +520,7 @@ export const syncConnection = internalAction({
           connection.refreshToken,
         );
 
-        await ctx.runMutation(internal.oda.saveTokens, { ...args, ...tokens });
+        await ctx.runMutation(internal.oda.saveTokens, { ...held, ...tokens });
         accessToken = tokens.accessToken;
       }
 
@@ -481,8 +532,11 @@ export const syncConnection = internalAction({
       );
 
       await ctx.runMutation(internal.oda.importOrders, {
-        ...args,
-        receipts: deliveredOrders(orders).map(orderReceipt),
+        ...held,
+        orders: deliveredOrders(orders).map((order) => ({
+          orderNumber: order.orderNumber,
+          data: orderReceipt(order),
+        })),
       });
     } catch (error) {
       const expired = error instanceof OdaSignInExpired;
@@ -493,7 +547,7 @@ export const syncConnection = internalAction({
         errorType: errorDetails(error).errorType,
       });
       await ctx.runMutation(internal.oda.recordFailure, {
-        ...args,
+        ...held,
         expired,
         error: expired
           ? "Innloggingen hos Oda er utløpt. Logg inn på nytt."
@@ -525,13 +579,11 @@ export const syncAll = internalMutation({
       .query("odaConnections")
       .paginate({ numItems: 200, cursor: cursor ?? null });
 
+    // An expired or busy connection is skipped when its sync starts.
     for (const [index, connection] of page.page.entries())
-      if (!connection.expired)
-        await ctx.scheduler.runAfter(
-          index * 2000,
-          internal.oda.syncConnection,
-          { id: connection._id },
-        );
+      await ctx.scheduler.runAfter(index * 2000, internal.oda.syncConnection, {
+        id: connection._id,
+      });
 
     if (!page.isDone)
       await ctx.scheduler.runAfter(
