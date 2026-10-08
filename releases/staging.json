@@ -1,4 +1,12 @@
 {
   "deployment": "courteous-jay-215",
-  "recoveryClient": null
+  "recoveryClient": {
+    "build": "18",
+    "sourceCommit": "f0db00ec0d47c19f81227f1f120db07000ca0024",
+    "verifiedAt": "2026-10-08T19:53:00Z",
+    "verifiedBy": "Andreas (confirmed in the Kvitto project thread)",
+    "evidence": "https://appstoreconnect.apple.com/apps/6813602733/testflight/ios",
+    "availableToTesters": true,
+    "pendingUploadUpgradePassed": true
+  }
 }
