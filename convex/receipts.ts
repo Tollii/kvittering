@@ -12,6 +12,7 @@ import {
   receiptImageLimitMessage,
 } from "../src/lib/domain/receipt-images";
 import { trackWorkflow } from "./retention";
+import { importedOrder } from "./oda";
 import { consumeReceiptQuota } from "./rateLimits";
 import { notifyReceiptActivities } from "./liveActivities";
 
@@ -211,7 +212,7 @@ export const retry = mutation({
     const workflowId = await start(
       ctx,
       internal.processing.processReceipt,
-      { id, generation },
+      { id, generation, ...(await importedOrder(ctx, id)) },
       {
         onComplete: internal.retention.workflowCompleted,
         context: { component: "processing", receiptId: id },

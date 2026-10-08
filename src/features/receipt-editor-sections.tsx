@@ -254,12 +254,14 @@ export function ReceiptSummary({
             </Copy>
           </View>
           <View style={{ flexDirection: "row", gap: 6 }}>
-            <ReceiptImages
-              receipt={receipt}
-              compact
-              color={colors.onHero}
-              background={colors.heroControl}
-            />
+            {receipt.imageCount > 0 && (
+              <ReceiptImages
+                receipt={receipt}
+                compact
+                color={colors.onHero}
+                background={colors.heroControl}
+              />
+            )}
             <IconButton
               name="pencil"
               label="Rediger kvitteringsdetaljer"

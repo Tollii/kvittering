@@ -20,6 +20,18 @@ triggers.register("receipts", async (ctx, change) => {
   );
 });
 
+// A deleted receipt takes the Oda order it was imported from with it.
+triggers.register("receipts", async (ctx, change) => {
+  if (change.operation !== "delete") return;
+
+  const imported = await ctx.db
+    .query("odaImports")
+    .withIndex("by_receiptId", (q) => q.eq("receiptId", change.id))
+    .unique();
+
+  if (imported) await ctx.db.delete("odaImports", imported._id);
+});
+
 export const mutation = customMutation(rawMutation, customCtx(triggers.wrapDB));
 
 export const internalMutation = customMutation(

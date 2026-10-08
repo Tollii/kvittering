@@ -14,6 +14,7 @@ import { api } from "../../convex/_generated/api";
 import { Button, Copy, Icon, Notice, Row, Screen } from "@/components/ui";
 import { useHousehold } from "@/features/household-context";
 import { BudgetSettings } from "@/features/budget-settings";
+import { OdaSettings } from "@/features/oda-settings";
 import { NotificationSettings } from "@/features/notifications";
 import { useTheme } from "@/constants/theme";
 import { failureMessage } from "@/lib/failure-message";
@@ -190,6 +191,9 @@ export default function Settings() {
             icon="checkmark.circle"
             onPress={() => router.push("/corrections")}
           />
+        </FormSection>
+        <FormSection title="Oda">
+          <OdaSettings />
         </FormSection>
         <FormSection title="Budsjett">
           <BudgetSettings />
