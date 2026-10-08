@@ -1,7 +1,6 @@
 import { z } from "zod";
 import { CalendarDate } from "../domain/calendar";
-
-export type JsonValue = z.infer<ReturnType<typeof z.json>>;
+import type { JsonValue } from "./json";
 
 /** Long enough for a year-over-year question, small enough for one bounded read. */
 export const maxSummaryDays = 732;
@@ -107,6 +106,21 @@ export function toolList() {
     annotations: { readOnlyHint: true, openWorldHint: false },
   }));
 }
+
+export type ToolResult = {
+  content: { type: "text"; text: string }[];
+  isError?: true;
+};
+
+export const toolResult = <Value>(value: Value): ToolResult => ({
+  content: [{ type: "text", text: JSON.stringify(value) }],
+});
+
+/** An error the model can read and correct, not a protocol error. */
+export const toolError = (message: string): ToolResult => ({
+  content: [{ type: "text", text: message }],
+  isError: true,
+});
 
 export type ToolCallParse =
   | { kind: "parsed"; call: ParsedToolCall }

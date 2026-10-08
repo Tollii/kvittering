@@ -1,5 +1,11 @@
 import { z } from "zod";
-import { parseToolCall, type JsonValue, type ParsedToolCall } from "./tools";
+import type { JsonValue } from "./json";
+import {
+  parseToolCall,
+  toolError,
+  toolList,
+  type ParsedToolCall,
+} from "./tools";
 
 /**
  * The stateless revision: every request names its version in _meta, and
@@ -11,6 +17,14 @@ const metaKey = {
   protocolVersion: "io.modelcontextprotocol/protocolVersion",
   serverInfo: "io.modelcontextprotocol/serverInfo",
 } as const;
+
+const serverInfo = { name: "kvitto", version: "0.1.0" };
+
+const instructions =
+  "Kvitto holds a Norwegian household's grocery receipts. Use spending_summary for totals, list_receipts and get_receipt for individual shops, and find_purchases to look for an item. Item names are often abbreviated Norwegian receipt text. Report purchases, never consumption, and say when data is incomplete.";
+
+/** Discovery and the tool list are the same for every caller until a deploy. */
+const cacheHint = { ttlMs: 60 * 60 * 1000, cacheScope: "public" as const };
 
 const requestId = z.union([z.string(), z.number()]);
 
@@ -24,12 +38,15 @@ const message = z.object({
 });
 
 const requestParams = z.object({
-  _meta: z.object({ [metaKey.protocolVersion]: z.string() }).optional(),
-  /** Session-era clients name their version in initialize instead. */
-  protocolVersion: z.string().optional(),
+  _meta: z
+    .object({ [metaKey.protocolVersion]: z.string().optional() })
+    .optional(),
   name: z.string().optional(),
   arguments: z.record(z.string(), z.json()).optional(),
 });
+
+/** Session-era clients name their version here, in initialize. */
+const initializeParams = z.object({ protocolVersion: z.string() });
 
 type JsonBody = { kind: "json"; value: JsonValue } | { kind: "malformed" };
 
@@ -51,22 +68,39 @@ const errorCodes = {
   unsupportedVersion: -32022,
 } as const;
 
+type JsonRpcBody =
+  | ReturnType<typeof jsonRpcResult>
+  | ReturnType<typeof jsonRpcError>;
+
 /** One message from a Streamable HTTP client, with its answer decided. */
 export type McpMessage =
-  | { kind: "discover"; id: RequestId }
-  | { kind: "listTools"; id: RequestId }
-  | { kind: "callTool"; id: RequestId; call: ParsedToolCall }
-  /** Bad tool arguments are a tool result the model can correct. */
-  | { kind: "toolInputError"; id: RequestId; message: string }
   | { kind: "acknowledge" }
-  | { kind: "error"; status: number; body: JsonRpcError };
+  | { kind: "answer"; status: number; body: JsonRpcBody }
+  /** The one answer that needs the household's data. */
+  | { kind: "callTool"; id: RequestId; call: ParsedToolCall };
 
-type JsonRpcError = ReturnType<typeof jsonRpcError>;
+const answer = <Result extends object>(
+  id: RequestId,
+  result: Result,
+): McpMessage => ({
+  kind: "answer",
+  status: 200,
+  body: jsonRpcResult(id, result),
+});
 
-const failure = (
+function failure(
   status: number,
-  ...error: Parameters<typeof jsonRpcError>
-): McpMessage => ({ kind: "error", status, body: jsonRpcError(...error) });
+  id: RequestId | null,
+  code: (typeof errorCodes)[keyof typeof errorCodes],
+  message: string,
+  data?: JsonValue,
+): McpMessage {
+  return {
+    kind: "answer",
+    status,
+    body: jsonRpcError(id, code, message, data),
+  };
+}
 
 /** Reads one POST body and checks the routing headers that must match it. */
 export function parseMcpMessage(text: string, headers: Headers): McpMessage {
@@ -96,40 +130,55 @@ export function parseMcpMessage(text: string, headers: Headers): McpMessage {
 
   // Notifications need no answer.
   if (id === undefined) return { kind: "acknowledge" };
+
+  if (method === "initialize")
+    return unsupportedVersion(
+      id,
+      initializeParams.safeParse(parsed.data.params).data?.protocolVersion ??
+        "",
+    );
   const params = requestParams.safeParse(parsed.data.params ?? {});
 
   if (!params.success)
+    return failure(400, id, errorCodes.invalidParams, "Invalid params.");
+  const requested = params.data._meta?.[metaKey.protocolVersion];
+
+  if (requested === undefined)
     return failure(
       400,
       id,
       errorCodes.invalidParams,
-      "params must be an object.",
+      `Requests need _meta["${metaKey.protocolVersion}"].`,
     );
 
-  const requested =
-    params.data._meta?.[metaKey.protocolVersion] ?? params.data.protocolVersion;
+  if (requested !== protocolVersion) return unsupportedVersion(id, requested);
+  const { name } = params.data;
 
-  if (requested !== protocolVersion)
+  if (method === "tools/call" && name === undefined)
     return failure(
       400,
       id,
-      errorCodes.unsupportedVersion,
-      "Unsupported protocol version",
-      { supported: [protocolVersion], requested: requested ?? null },
+      errorCodes.invalidParams,
+      "tools/call needs a tool name.",
     );
-  const mismatch = headerMismatch(headers, method, params.data.name);
+  const mismatch = headerMismatch(headers, { requested, method, name });
 
   if (mismatch) return failure(400, id, errorCodes.headerMismatch, mismatch);
 
   switch (method) {
     case "server/discover":
-      return { kind: "discover", id };
+      return answer(id, {
+        supportedVersions: [protocolVersion],
+        capabilities: { tools: {} },
+        instructions,
+        ...cacheHint,
+      });
 
     case "tools/list":
-      return { kind: "listTools", id };
+      return answer(id, { tools: toolList(), ...cacheHint });
 
     case "tools/call":
-      return toolCall(id, params.data);
+      return toolCall(id, name ?? "", params.data.arguments ?? {});
 
     default:
       return failure(
@@ -141,32 +190,40 @@ export function parseMcpMessage(text: string, headers: Headers): McpMessage {
   }
 }
 
+/** Names the supported version, so an older client can explain why it failed. */
+const unsupportedVersion = (id: RequestId, requested: string) =>
+  failure(
+    400,
+    id,
+    errorCodes.unsupportedVersion,
+    "Unsupported protocol version",
+    {
+      supported: [protocolVersion],
+      requested,
+    },
+  );
+
 function toolCall(
   id: RequestId,
-  params: z.infer<typeof requestParams>,
+  name: string,
+  input: Record<string, JsonValue>,
 ): McpMessage {
-  if (params.name === undefined)
-    return failure(
-      400,
-      id,
-      errorCodes.invalidParams,
-      "tools/call needs a tool name.",
-    );
-  const parsed = parseToolCall(params.name, params.arguments ?? {});
+  const parsed = parseToolCall(name, input);
 
   switch (parsed.kind) {
     case "parsed":
       return { kind: "callTool", id, call: parsed.call };
 
+    // Bad arguments are a tool result the model can correct.
     case "invalid":
-      return { kind: "toolInputError", id, message: parsed.message };
+      return answer(id, toolError(parsed.message));
 
     case "unknown":
       return failure(
         400,
         id,
         errorCodes.invalidParams,
-        `Unknown tool ${params.name}.`,
+        `Unknown tool ${name}.`,
       );
   }
 }
@@ -174,29 +231,30 @@ function toolCall(
 /** Requests repeat routing fields in headers so proxies need not read the body. */
 function headerMismatch(
   headers: Headers,
-  method: string,
-  name: string | undefined,
+  body: { requested: string; method: string; name: string | undefined },
 ): string | undefined {
-  if (headers.get("MCP-Protocol-Version") !== protocolVersion)
+  if (headers.get("MCP-Protocol-Version") !== body.requested)
     return "MCP-Protocol-Version must match the protocolVersion in _meta.";
 
-  if (headerValue(headers.get("Mcp-Method")) !== method)
+  // Only names may use the base64 form; the method must be sent as is.
+  if (headers.get("Mcp-Method") !== body.method)
     return "Mcp-Method must match the request method.";
 
-  if (method === "tools/call" && headerValue(headers.get("Mcp-Name")) !== name)
+  if (body.method === "tools/call" && nameHeader(headers) !== body.name)
     return "Mcp-Name must match the tool name.";
 }
 
 const base64Sentinel = /^=\?base64\?([A-Za-z0-9+/]*={0,2})\?=$/;
 
-/** Decodes the =?base64?…?= form clients use for values headers can't carry. */
-function headerValue(value: string | null): string | null {
+/** Decodes the =?base64?…?= form clients use for names headers can't carry. */
+function nameHeader(headers: Headers): string | null {
+  const value = headers.get("Mcp-Name");
   const encoded = value === null ? undefined : base64Sentinel.exec(value)?.[1];
 
   if (encoded === undefined) return value;
 
   try {
-    return new TextDecoder("utf-8", { fatal: true }).decode(
+    return new TextDecoder().decode(
       Uint8Array.from(atob(encoded), (char) => char.charCodeAt(0)),
     );
   } catch {
@@ -204,8 +262,6 @@ function headerValue(value: string | null): string | null {
     return null;
   }
 }
-
-const serverInfo = { name: "kvitto", version: "0.1.0" };
 
 /** Results say they are final and name the server. */
 export const jsonRpcResult = <Result extends object>(

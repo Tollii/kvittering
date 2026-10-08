@@ -8,25 +8,15 @@ import { sha256Hex } from "./tokens";
 import {
   jsonRpcResult,
   parseMcpMessage,
-  protocolVersion,
   type McpMessage,
 } from "../src/lib/mcp/protocol";
-import { toolList, type ParsedToolCall } from "../src/lib/mcp/tools";
+import {
+  toolError,
+  toolResult,
+  type ParsedToolCall,
+  type ToolResult,
+} from "../src/lib/mcp/tools";
 import { errorDetails } from "../src/lib/diagnostics";
-
-const instructions =
-  "Kvitto holds a Norwegian household's grocery receipts. Use spending_summary for totals, list_receipts and get_receipt for individual shops, and find_purchases to look for an item. Item names are often abbreviated Norwegian receipt text. Report purchases, never consumption, and say when data is incomplete.";
-
-type ToolResult = { content: { type: "text"; text: string }[]; isError?: true };
-
-const toolResult = <Value>(value: Value): ToolResult => ({
-  content: [{ type: "text", text: JSON.stringify(value) }],
-});
-
-const toolError = (message: string): ToolResult => ({
-  content: [{ type: "text", text: message }],
-  isError: true,
-});
 
 async function runTool(
   ctx: ActionCtx,
@@ -118,9 +108,6 @@ async function callTool(
   }
 }
 
-/** Both answers are the same for every caller and change only with a deploy. */
-const cacheHint = { ttlMs: 60 * 60 * 1000, cacheScope: "public" as const };
-
 async function respond(
   ctx: ActionCtx,
   householdId: Id<"households">,
@@ -130,26 +117,8 @@ async function respond(
     case "acknowledge":
       return new Response(null, { status: 202, headers: noStore });
 
-    case "error":
+    case "answer":
       return json(message.body, message.status);
-
-    case "discover":
-      return json(
-        jsonRpcResult(message.id, {
-          supportedVersions: [protocolVersion],
-          capabilities: { tools: {} },
-          instructions,
-          ...cacheHint,
-        }),
-      );
-
-    case "listTools":
-      return json(
-        jsonRpcResult(message.id, { tools: toolList(), ...cacheHint }),
-      );
-
-    case "toolInputError":
-      return json(jsonRpcResult(message.id, toolError(message.message)));
 
     case "callTool":
       return json(

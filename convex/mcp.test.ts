@@ -11,7 +11,7 @@ import { date } from "../src/lib/testing/calendar";
 import { receiptFixture } from "../src/lib/testing/receipts";
 import { weeklyShopFixture } from "../src/lib/mock-receipts";
 import { updateReceiptReadModel } from "./receiptReadModel";
-import type { JsonValue } from "../src/lib/mcp/tools";
+import type { JsonValue } from "../src/lib/mcp/json";
 
 const modules = import.meta.glob("./**/*.ts");
 
@@ -88,33 +88,40 @@ async function setup() {
       body: JSON.stringify(body),
     });
 
+  const body = (
+    method: string,
+    params: { name?: string; arguments?: Record<string, JsonValue> } = {},
+  ) => ({
+    jsonrpc: "2.0",
+    id: 1,
+    method,
+    params: {
+      ...params,
+      _meta: {
+        "io.modelcontextprotocol/protocolVersion": "2026-07-28",
+        "io.modelcontextprotocol/clientCapabilities": {},
+      },
+    },
+  });
+
   /** A 2026-07-28 request with the headers that must match its body. */
   const request = (
     method: string,
     params: { name?: string; arguments?: Record<string, JsonValue> } = {},
     headers: Record<string, string> = {},
-  ) =>
-    post(
-      {
-        jsonrpc: "2.0",
-        id: 1,
-        method,
-        params: {
-          ...params,
-          _meta: {
-            "io.modelcontextprotocol/protocolVersion": "2026-07-28",
-            "io.modelcontextprotocol/clientCapabilities": {},
-          },
-        },
-      },
-      {
-        "MCP-Protocol-Version": "2026-07-28",
-        "Mcp-Method": method,
-        // Only tools/call reads it.
-        "Mcp-Name": params.name ?? "",
-        ...headers,
-      },
-    );
+  ) => {
+    const routing = new Headers({
+      "MCP-Protocol-Version": "2026-07-28",
+      "Mcp-Method": method,
+    });
+
+    if (params.name !== undefined) routing.set("Mcp-Name", params.name);
+
+    return post(body(method, params), {
+      ...Object.fromEntries(routing),
+      ...headers,
+    });
+  };
 
   const call = async (name: string, args: Record<string, JsonValue>) => {
     const response = await request("tools/call", { name, arguments: args });
@@ -132,6 +139,7 @@ async function setup() {
     t,
     token,
     post,
+    body,
     request,
     call,
     own,
@@ -218,22 +226,16 @@ it("serves stateless 2026-07-28 requests and lists read-only tools", async () =>
     "spending_summary",
   ]);
 
-  // Clients may base64-encode header values with the =?base64?…?= sentinel.
-  const encoded = await request(
-    "tools/call",
-    { name: "get_receipt", arguments: { receiptId: "missing" } },
-    { "Mcp-Name": `=?base64?${btoa("get_receipt")}?=` },
-  );
-
-  expect(encoded.status).toBe(200);
-  expect(await encoded.json()).toMatchObject({
+  expect(
+    await (
+      await request("tools/call", {
+        name: "get_receipt",
+        arguments: { receiptId: "missing" },
+      })
+    ).json(),
+  ).toMatchObject({
     result: { isError: true, resultType: "complete", _meta: serverInfo },
   });
-
-  const misrouted = await request("tools/list", {}, { "Mcp-Method": "ping" });
-
-  expect(misrouted.status).toBe(400);
-  expect(await misrouted.json()).toMatchObject({ error: { code: -32020 } });
 
   const unknownTool = await request("tools/call", { name: "delete_all" });
 
@@ -245,6 +247,14 @@ it("serves stateless 2026-07-28 requests and lists read-only tools", async () =>
 
   expect(ping.status).toBe(404);
   expect(await ping.json()).toMatchObject({ error: { code: -32601 } });
+
+  const unversioned = await post(
+    { jsonrpc: "2.0", id: 3, method: "tools/list", params: {} },
+    { "MCP-Protocol-Version": "2026-07-28", "Mcp-Method": "tools/list" },
+  );
+
+  expect(unversioned.status).toBe(400);
+  expect(await unversioned.json()).toMatchObject({ error: { code: -32602 } });
 
   const sessionEra = await post({
     jsonrpc: "2.0",
@@ -281,6 +291,62 @@ it("serves stateless 2026-07-28 requests and lists read-only tools", async () =>
 
   expect(malformed.status).toBe(400);
   expect(await malformed.json()).toMatchObject({ error: { code: -32700 } });
+});
+
+it("runs a tool only when the routing headers match the body", async () => {
+  const { post, body, own } = await setup();
+
+  const readOwn = body("tools/call", {
+    name: "get_receipt",
+    arguments: { receiptId: own },
+  });
+
+  const routing = {
+    "MCP-Protocol-Version": "2026-07-28",
+    "Mcp-Method": "tools/call",
+    "Mcp-Name": "get_receipt",
+  };
+
+  const encode = (text: string) =>
+    `=?base64?${btoa(String.fromCharCode(...new TextEncoder().encode(text)))}?=`;
+
+  expect((await post(readOwn, routing)).status).toBe(200);
+  expect(
+    (
+      await post(readOwn, {
+        ...routing,
+        "Mcp-Name": encode("get_receipt"),
+      })
+    ).status,
+  ).toBe(200);
+
+  const mismatches: Record<string, string>[] = [
+    { ...routing, "Mcp-Name": "list_receipts" },
+    { "MCP-Protocol-Version": "2026-07-28", "Mcp-Method": "tools/call" },
+    { "Mcp-Method": "tools/call", "Mcp-Name": "get_receipt" },
+    { ...routing, "MCP-Protocol-Version": "2025-11-25" },
+    { ...routing, "Mcp-Method": "tools/list" },
+    // Only names may be base64-encoded.
+    { ...routing, "Mcp-Method": encode("tools/call") },
+    { ...routing, "Mcp-Name": "=?base64?@@?=" },
+  ];
+
+  for (const headers of mismatches) {
+    const response = await post(readOwn, headers);
+
+    expect(response.status).toBe(400);
+    expect(await response.json()).toMatchObject({ error: { code: -32020 } });
+  }
+
+  // A non-ASCII name decodes and reaches the tool lookup.
+  const unknown = await post(body("tools/call", { name: "kjøp" }), {
+    ...routing,
+    "Mcp-Name": encode("kjøp"),
+  });
+
+  expect(await unknown.json()).toMatchObject({
+    error: { code: -32602, message: "Unknown tool kjøp." },
+  });
 });
 
 it("reads only the token holder's household", async () => {
