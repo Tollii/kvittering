@@ -39,10 +39,17 @@ const workflow = new WorkflowManager(components.workflow);
 
 export const processReceipt = workflow
   .define({
-    args: { id: v.id("receipts"), generation: v.number() },
+    args: {
+      id: v.id("receipts"),
+      generation: v.number(),
+      /** Evidence from a store's own order data, which replaces reading images. */
+      imported: v
+        .object({ data: receiptDataValidator, provider: v.string() })
+        .optional(),
+    },
     returns: v.null(),
   })
-  .handler(async (step, args): Promise<null> => {
+  .handler(async (step, { imported, ...args }): Promise<null> => {
     let stage = "begin";
 
     try {
@@ -58,15 +65,17 @@ export const processReceipt = workflow
         data: ReceiptData;
         provider: string;
         durationMs: number;
-      } = await step.runAction(
-        internal.providers.extract,
-        { storageIds, receiptId: args.id, generation: args.generation },
-        // Receipt IDs are diagnostic metadata; older journals do not include them.
-        {
-          unstableArgs: true,
-          retry: { maxAttempts: 3, initialBackoffMs: 2000, base: 2 },
-        },
-      );
+      } = imported
+        ? { ...imported, durationMs: 0 }
+        : await step.runAction(
+            internal.providers.extract,
+            { storageIds, receiptId: args.id, generation: args.generation },
+            // Receipt IDs are diagnostic metadata; older journals do not include them.
+            {
+              unstableArgs: true,
+              retry: { maxAttempts: 3, initialBackoffMs: 2000, base: 2 },
+            },
+          );
 
       stage = "aliases";
 

@@ -7,10 +7,13 @@ import { httpAction, env } from "./_generated/server";
 import { internal } from "./_generated/api";
 import { authComponent, createAuth } from "./auth";
 import { errorDetails } from "../src/lib/diagnostics";
+import { registerOdaRoutes } from "./odaHttp";
 
 const http = httpRouter();
 
 authComponent.registerRoutes(http, createAuth);
+
+registerOdaRoutes(http);
 
 const acceptedImageTypes = new Set(["image/jpeg", "image/png", "image/webp"]);
 

@@ -344,4 +344,35 @@ export default defineSchema({
     name: v.optional(v.string()),
     confirmedBy: v.string(),
   }).index("by_householdId_and_key", ["householdId", "key"]),
+  /** A sign-in at Oda in progress, keyed by a secret only the app knows. */
+  odaAuthorizations: defineTable({
+    request: v.string(),
+    identity: v.string(),
+    householdId: v.id("households"),
+    returnUrl: v.string(),
+    expiresAt: v.number(),
+    state: v.string().optional(),
+    verifier: v.string().optional(),
+  })
+    .index("by_request", ["request"])
+    .index("by_state", ["state"])
+    .index("by_identity", ["identity"]),
+  /** Kvitto's OAuth registration at Oda for each callback URL. */
+  odaClients: defineTable({
+    redirectUri: v.string(),
+    clientId: v.string(),
+  }).index("by_redirectUri", ["redirectUri"]),
+  /** A member's Oda account. Tokens never leave the server. */
+  odaConnections: defineTable({
+    identity: v.string(),
+    householdId: v.id("households"),
+    clientId: v.string(),
+    accessToken: v.string(),
+    accessExpiresAt: v.number(),
+    refreshToken: v.string().optional(),
+    expired: v.boolean(),
+    lastSyncAt: v.number().optional(),
+    importedCount: v.number(),
+    error: v.string().optional(),
+  }).index("by_identity", ["identity"]),
 });

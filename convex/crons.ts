@@ -33,4 +33,6 @@ for (const component of ["processing", "analysis"] as const)
     { component },
   );
 
+crons.interval("sync Oda orders", { hours: 6 }, internal.oda.syncAll, {});
+
 export default crons;

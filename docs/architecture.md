@@ -56,6 +56,8 @@ Better Auth owns accounts and sessions. Provider linking requires an authenticat
 
 Shared catalog requests and provider caches can cross households; receipt data and saved corrections cannot. Provider calls run on the backend, with persisted allowance consumed before network I/O. Admission and scheduling of new optional paid work share a transaction. Provider attempts have deployment, user, and household limits with server-resolved attribution; retries keep the same source. Legacy journaled calls retain their accepted arguments and deployment limits. Retries and uncertain outcomes still cost requests. Request caps and billing alerts are not exact monetary ceilings.
 
+Oda order import signs in through Oda's own OAuth server and MCP endpoint; Kvitto never sees the password, and the tokens stay in the backend. A delivered order becomes a receipt without images: it skips image reading and enters the same classification, matching, and duplicate checks. Oda does not itemize discounts, deposits, or delivery, so the difference to the charged total stays visible as one adjustment line.
+
 Service flags control availability, not authorization. The client uses a scoped persisted fallback for offline presentation; server writes check current values. Legacy release-policy reads and writes adapt to the same flag store, rather than maintaining another writable copy. Version policy remains separate from service availability.
 
 Optional metadata represents absence. Provider nulls are normalized at the boundary, while unknown amounts, explicit no-match decisions, and clear commands retain distinct null meanings. Review old client writes and stored workflow arguments when changing these contracts; successful schema validation only checks part of compatibility.
