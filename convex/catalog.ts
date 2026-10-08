@@ -21,6 +21,7 @@ import { requireMember, requireReceipt } from "./access";
 import { ensureRequest as enqueueRequest } from "./catalogQueue";
 import type { Doc } from "./_generated/dataModel";
 import { retailerCode } from "../src/lib/catalog/matching";
+import { isOdaCatalogKey } from "../src/lib/catalog/oda";
 
 /** The provider id to fetch details by; equivalence groups have none. */
 function providerId(record: Doc<"catalogProducts"> | null): number | null {
@@ -54,11 +55,11 @@ async function ensureMemberRequest(ctx: MutationCtx, request: CatalogRequest) {
   return enqueueRequest(ctx, request, { payer, interactive: true });
 }
 
-/** Equivalent identities have no provider SKU from which to fetch details. */
-function equivalentResponse(
+/** Equivalent identities and Oda products have no Kassalapp SKU from which to fetch details. */
+function storedResponse(
   record: Doc<"catalogProducts"> | null,
 ): CatalogResponse | null {
-  return record?.product.equivalence
+  return record && (record.product.equivalence || isOdaCatalogKey(record.key))
     ? {
         ...emptyCatalogResponse(),
         status: "ready",
@@ -144,9 +145,9 @@ export const product = mutation({
       .withIndex("by_key", (q) => q.eq("key", key))
       .unique();
 
-    const equivalent = equivalentResponse(record);
+    const stored = storedResponse(record);
 
-    if (equivalent) return equivalent;
+    if (stored) return stored;
     const id = providerId(record);
 
     if (!record || id === null) return missingProduct;
@@ -260,9 +261,9 @@ export const observe = query({
     }
 
     const { request, record } = await lookupContext(ctx, lookup);
-    const equivalent = equivalentResponse(record);
+    const stored = storedResponse(record);
 
-    if (equivalent) return equivalent;
+    if (stored) return stored;
 
     if (!request)
       return {

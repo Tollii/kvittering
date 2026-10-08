@@ -35,6 +35,7 @@ import {
   lineEvidenceKey,
   exactPhysicalStore,
 } from "../src/lib/catalog/matching";
+import { isOdaCatalogKey } from "../src/lib/catalog/oda";
 import { normalizeSearch } from "../src/lib/catalog/policy";
 import { matchingKey } from "../src/lib/domain/product-matching";
 import { isDecidedCategory } from "../src/lib/domain/categories";
@@ -322,8 +323,11 @@ async function lineMatchingInput(
     line,
     search: productSearch(line.name).slice(0, 120),
     store: retailerCode(store) ?? undefined,
+    // The store's own product needs no compatibility check against a renamed line.
     product:
-      record && compatibleCatalogProduct(line, record.product)
+      record &&
+      (isOdaCatalogKey(record.key) ||
+        compatibleCatalogProduct(line, record.product))
         ? record.product
         : null,
   };

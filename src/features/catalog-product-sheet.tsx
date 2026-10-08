@@ -21,6 +21,7 @@ import type { CatalogIdentity, CatalogProduct } from "@/lib/catalog/model";
 import { catalogInsights } from "@/lib/catalog/insights";
 import { productSearch, rankCatalogProducts } from "@/lib/catalog/matching";
 import { catalogImageSources } from "@/lib/catalog/images";
+import { isOdaCatalogKey } from "@/lib/catalog/oda";
 import { useTheme } from "@/constants/theme";
 import { useHousehold } from "./household-context";
 
@@ -279,7 +280,9 @@ export function CatalogProductSheet({
         </Copy>
       )}
       <Copy size={12} muted>
-        Produktdata fra Kassalapp
+        {isOdaCatalogKey(product.key)
+          ? "Produktdata fra Oda"
+          : "Produktdata fra Kassalapp"}
         {query.data?.fetchedAt
           ? ` · hentet ${CalendarDate.format(CalendarDate.ofInstant(query.data.fetchedAt))}`
           : ""}

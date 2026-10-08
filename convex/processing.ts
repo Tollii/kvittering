@@ -2,6 +2,7 @@ import { isReceiptBeingRead } from "../src/lib/domain/receipt-state";
 import { notifyReceiptActivities } from "./liveActivities";
 import { linkCatalogProduct } from "./catalogLinks";
 import { compatibleCatalogProduct } from "../src/lib/catalog/matching";
+import { odaCatalogProduct } from "../src/lib/catalog/oda";
 import { commitReceiptChange } from "./receiptChanges";
 import { v, type Infer, type ObjectType } from "convex/values";
 import { errorDetails } from "../src/lib/diagnostics";
@@ -365,7 +366,46 @@ async function decidedProductId(
   return usable ? product._id : null;
 }
 
-/** Link one extracted product line: first by saved mapping, then by the matching decision. */
+/**
+ * The store's own product for an imported line, saved to the catalog. A person's
+ * choice for the same receipt name wins; earlier automatic links do not.
+ */
+async function storeProduct(
+  ctx: MutationCtx,
+  householdId: Id<"households">,
+  retailer: string,
+  line: ReceiptLine,
+) {
+  const reference = line.productReference;
+
+  const product =
+    reference?.kind === "catalog" ? odaCatalogProduct(reference.product) : null;
+
+  if (!product) return null;
+
+  const mapping = await findMapping(ctx, householdId, retailer, line);
+
+  if (mapping?.confirmedBy) return null;
+
+  const existing = await ctx.db
+    .query("catalogProducts")
+    .withIndex("by_key", (q) => q.eq("key", product.key))
+    .unique();
+
+  const values = {
+    key: product.key,
+    product,
+    fetchedAt: Date.now(),
+    detailsFetchedAt: Date.now(),
+  };
+
+  if (existing) await ctx.db.patch("catalogProducts", existing._id, values);
+  else await ctx.db.insert("catalogProducts", values);
+
+  return product;
+}
+
+/** Link one extracted product line: first by the store's own product or a saved mapping, then by the matching decision. */
 async function linkExtractedLine(
   ctx: MutationCtx,
   householdId: Id<"households">,
@@ -374,6 +414,17 @@ async function linkExtractedLine(
   matches: ProductDecision[] | undefined,
 ) {
   line.receiptName ??= line.name;
+
+  const store = await storeProduct(ctx, householdId, retailer, line);
+
+  if (store) {
+    Object.assign(
+      line,
+      await linkCatalogProduct(ctx, householdId, retailer, line, store, null),
+    );
+
+    return;
+  }
 
   const mapped = await linkMappedLine(ctx, householdId, retailer, line);
 

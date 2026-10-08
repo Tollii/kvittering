@@ -166,6 +166,20 @@ it("signs in at Oda once and imports a delivered order as one receipt", async ()
     data: { store: "Oda", totalOre: 10000, receiptNumber: "r2fy3e" },
   });
 
+  // The line links to Oda's own product, which Kassalapp may not have.
+  expect(receipts[0]!.data!.lines[0]).toMatchObject({
+    productReference: {
+      kind: "catalog",
+      product: { key: "oda:430", name: "Tine Lettmelk 1% fett" },
+    },
+  });
+  expect(
+    await user.mutation(api.catalog.product, { key: "oda:430" }),
+  ).toMatchObject({
+    status: "ready",
+    products: [{ url: "https://oda.com/no/products/430/" }],
+  });
+
   // Two syncs at once refresh the sign-in only once, so it stays valid.
   const [connection] = await t.run((ctx) =>
     ctx.db.query("odaConnections").collect(),
