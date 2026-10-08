@@ -12,6 +12,7 @@ import { lineEvidenceKey } from "../src/lib/catalog/matching";
 const modules = import.meta.glob("./**/*.ts");
 
 afterEach(() => {
+  orders.splice(1);
   vi.useRealTimers();
   vi.unstubAllEnvs();
   vi.unstubAllGlobals();
@@ -30,6 +31,9 @@ const order = {
     },
   ],
 };
+
+/** The delivered orders Oda's MCP API returns. */
+const orders = [order];
 
 let refreshes = 0;
 
@@ -68,9 +72,7 @@ async function oda(url: string, init?: RequestInit) {
     message.method === "initialize"
       ? { protocolVersion: "2025-06-18", capabilities: {} }
       : {
-          content: [
-            { type: "text", text: JSON.stringify({ orders: [order] }) },
-          ],
+          content: [{ type: "text", text: JSON.stringify({ orders }) }],
         };
 
   return new Response(
@@ -220,7 +222,13 @@ it("signs in at Oda once and imports a delivered order as one receipt", async ()
   await t.finishAllScheduledFunctions(vi.runAllTimers);
   expect(await t.run((ctx) => ctx.db.query("receipts").collect())).toEqual([]);
 
-  // Signing in again brings it back.
+  // A later order is imported as usual.
+  orders.push({ ...order, orderNumber: "k4mz8q" });
+  vi.advanceTimersByTime(2 * 60 * 1000);
+  await user.mutation(api.oda.sync, {});
+  await t.finishAllScheduledFunctions(vi.runAllTimers);
+
+  // Signing in again brings the deleted order back, without a second copy of the later one.
   const again = new URL(
     await user.mutation(api.oda.start, {
       request: "abcdef0123456789abcdef0123456789",
@@ -244,9 +252,11 @@ it("signs in at Oda once and imports a delivered order as one receipt", async ()
     confirmation: reconnected.searchParams.get("confirmation")!,
   });
   await t.finishAllScheduledFunctions(vi.runAllTimers);
-  expect(await t.run((ctx) => ctx.db.query("receipts").collect())).toHaveLength(
-    1,
-  );
+  expect(
+    (await t.run((ctx) => ctx.db.query("receipts").collect()))
+      .map((receipt) => receipt.clientId)
+      .sort(),
+  ).toEqual(["oda-k4mz8q", "oda-r2fy3e"]);
 });
 
 it("links Oda lines to Oda's product unless a person chose another", async () => {
