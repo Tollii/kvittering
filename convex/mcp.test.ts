@@ -190,6 +190,14 @@ it("negotiates the protocol and lists read-only tools", async () => {
     ).status,
   ).toBe(202);
 
+  const methodless = await post({ jsonrpc: "2.0", id: 4 });
+
+  expect(methodless.status).toBe(400);
+  expect(await methodless.json()).toMatchObject({
+    id: 4,
+    error: { code: -32600 },
+  });
+
   const malformed = await t.fetch("/mcp", {
     method: "POST",
     headers: { Authorization: `Bearer ${token}` },

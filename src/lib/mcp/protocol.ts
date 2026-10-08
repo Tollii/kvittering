@@ -55,7 +55,6 @@ export type McpMessage =
       name: string;
       arguments: Record<string, JsonValue>;
     }
-  /** Notifications and client responses need no answer. */
   | { kind: "acknowledge" }
   | { kind: "unknownMethod"; id: RequestId; method: string }
   | {
@@ -86,7 +85,17 @@ export function parseMcpMessage(text: string): McpMessage {
     };
   const { id, method, params } = parsed.data;
 
-  if (id === undefined || method === undefined) return { kind: "acknowledge" };
+  // This server sends no requests, so every message must name a method.
+  if (method === undefined)
+    return {
+      kind: "invalid",
+      id: id ?? null,
+      code: errorCodes.invalidRequest,
+      message: "A JSON-RPC request needs a method.",
+    };
+
+  // Notifications need no answer.
+  if (id === undefined) return { kind: "acknowledge" };
 
   switch (method) {
     case "initialize":
