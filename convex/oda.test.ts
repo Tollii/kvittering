@@ -6,6 +6,8 @@ import { afterEach, expect, it, vi } from "vitest";
 import { z } from "zod";
 import { api, internal } from "./_generated/api";
 import schema from "./schema";
+import { matchingKey } from "../src/lib/domain/product-matching";
+import { lineEvidenceKey } from "../src/lib/catalog/matching";
 
 const modules = import.meta.glob("./**/*.ts");
 
@@ -177,7 +179,7 @@ it("signs in at Oda once and imports a delivered order as one receipt", async ()
     await user.mutation(api.catalog.product, { key: "oda:430" }),
   ).toMatchObject({
     status: "ready",
-    products: [{ url: "https://oda.com/no/products/430/" }],
+    products: [{ key: "oda:430", name: "Tine Lettmelk 1% fett" }],
   });
 
   // Two syncs at once refresh the sign-in only once, so it stays valid.
@@ -217,4 +219,115 @@ it("signs in at Oda once and imports a delivered order as one receipt", async ()
   await user.mutation(api.oda.sync, {});
   await t.finishAllScheduledFunctions(vi.runAllTimers);
   expect(await t.run((ctx) => ctx.db.query("receipts").collect())).toEqual([]);
+});
+
+it("links Oda lines to Oda's product unless a person chose another", async () => {
+  vi.useFakeTimers();
+  vi.stubEnv("RECEIPT_PROVIDER", "mock");
+  vi.stubGlobal("fetch", vi.fn(oda));
+  const t = convexTest(schema, modules);
+  registerRateLimiter(t);
+  register(t);
+
+  const user = t.withIdentity({
+    subject: "owner",
+    issuer: "https://test.local",
+  });
+
+  await user.mutation(api.households.create, {
+    name: "Home",
+    invitation: "0123456789abcdef0123456789abcdef",
+  });
+
+  const kassalapp = {
+    key: "ean:7038010009457",
+    name: "Tine Lettmelk 1% fett",
+    ids: [5],
+    categories: [],
+    nutrition: [],
+    allergens: [],
+    labels: [],
+  };
+
+  const { connection, mapping } = await t.run(async (ctx) => {
+    const member = (await ctx.db.query("members").first())!;
+
+    await ctx.db.insert("catalogProducts", {
+      key: kassalapp.key,
+      product: kassalapp,
+      fetchedAt: 0,
+    });
+
+    return {
+      connection: await ctx.db.insert("odaConnections", {
+        identity: member.identity,
+        householdId: member.householdId,
+        clientId: "kvitto-client",
+        accessToken: "access",
+        accessExpiresAt: Date.now() + 3600_000,
+        expired: false,
+        importedCount: 0,
+      }),
+      // An earlier automatic Kassalapp link for the same name.
+      mapping: await ctx.db.insert("productMappings", {
+        householdId: member.householdId,
+        retailer: matchingKey("Oda"),
+        key: matchingKey("Tine Lettmelk 1% fett"),
+        productId: null,
+        reference: {
+          kind: "catalog",
+          product: { key: kassalapp.key, name: kassalapp.name },
+          provenance: "automatic",
+        },
+        confirmedBy: null,
+      }),
+    };
+  });
+
+  const line = async () => {
+    const [receipt] = await t.run((ctx) => ctx.db.query("receipts").collect());
+
+    return { receipt: receipt!, line: receipt!.data!.lines[0]! };
+  };
+
+  await t.action(internal.oda.syncConnection, { id: connection });
+  await t.finishAllScheduledFunctions(vi.runAllTimers);
+  const imported = await line();
+  expect(imported.line.catalogProduct?.key).toBe("oda:430");
+
+  // Kassalapp matching is the fallback and does not replace Oda's product.
+  await t.mutation(internal.catalogMatching.apply, {
+    id: imported.receipt._id,
+    generation: imported.receipt.generation,
+    store: "Oda",
+    decisions: [
+      {
+        lineId: imported.line.id,
+        evidenceKey: lineEvidenceKey(imported.line),
+        productKey: kassalapp.key,
+        categoryId: null,
+        categoryConfidence: 0,
+      },
+    ],
+  });
+  expect((await line()).line.catalogProduct?.key).toBe("oda:430");
+
+  // A product a person chose for the name wins when the order is read again.
+  await t.run(async (ctx) => {
+    await ctx.db.patch("productMappings", mapping, {
+      confirmedBy: "owner",
+      reference: {
+        kind: "catalog",
+        product: { key: kassalapp.key, name: kassalapp.name },
+        provenance: "manual",
+      },
+    });
+    await ctx.db.patch("receipts", imported.receipt._id, {
+      status: "failed",
+      data: null,
+    });
+  });
+  await user.mutation(api.receipts.retry, { id: imported.receipt._id });
+  await t.finishAllScheduledFunctions(vi.runAllTimers);
+  expect((await line()).line.catalogProduct?.key).toBe(kassalapp.key);
 });

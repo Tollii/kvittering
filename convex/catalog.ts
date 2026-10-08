@@ -21,7 +21,6 @@ import { requireMember, requireReceipt } from "./access";
 import { ensureRequest as enqueueRequest } from "./catalogQueue";
 import type { Doc } from "./_generated/dataModel";
 import { retailerCode } from "../src/lib/catalog/matching";
-import { isOdaCatalogKey } from "../src/lib/catalog/oda";
 
 /** The provider id to fetch details by; equivalence groups have none. */
 function providerId(record: Doc<"catalogProducts"> | null): number | null {
@@ -59,7 +58,7 @@ async function ensureMemberRequest(ctx: MutationCtx, request: CatalogRequest) {
 function storedResponse(
   record: Doc<"catalogProducts"> | null,
 ): CatalogResponse | null {
-  return record && (record.product.equivalence || isOdaCatalogKey(record.key))
+  return record && providerId(record) === null
     ? {
         ...emptyCatalogResponse(),
         status: "ready",

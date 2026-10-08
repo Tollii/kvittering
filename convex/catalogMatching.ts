@@ -26,6 +26,7 @@ import { findMapping } from "./products";
 import { linkCatalogProduct, resolveCatalogMatch } from "./catalogLinks";
 import {
   catalogProductValidator,
+  isStoreProduct,
   type CatalogRequest,
 } from "../src/lib/catalog/model";
 import {
@@ -35,7 +36,6 @@ import {
   lineEvidenceKey,
   exactPhysicalStore,
 } from "../src/lib/catalog/matching";
-import { isOdaCatalogKey } from "../src/lib/catalog/oda";
 import { normalizeSearch } from "../src/lib/catalog/policy";
 import { matchingKey } from "../src/lib/domain/product-matching";
 import { isDecidedCategory } from "../src/lib/domain/categories";
@@ -323,14 +323,28 @@ async function lineMatchingInput(
     line,
     search: productSearch(line.name).slice(0, 120),
     store: retailerCode(store) ?? undefined,
-    // The store's own product needs no compatibility check against a renamed line.
+    // A store's own product is still searched, so its candidates inform the category.
     product:
       record &&
-      (isOdaCatalogKey(record.key) ||
-        compatibleCatalogProduct(line, record.product))
+      !isStoreProduct(record.product) &&
+      compatibleCatalogProduct(line, record.product)
         ? record.product
         : null,
   };
+}
+
+/** Kassalapp is the fallback for lines the store's own product data did not link. */
+async function linkedToStoreProduct(ctx: QueryCtx, line: ReceiptLine) {
+  const key = line.catalogProduct?.key;
+
+  const record = key
+    ? await ctx.db
+        .query("catalogProducts")
+        .withIndex("by_key", (q) => q.eq("key", key))
+        .unique()
+    : null;
+
+  return !!record && isStoreProduct(record.product);
 }
 
 /** Counts the decisions for each reason, for the evaluation log. */
@@ -427,7 +441,12 @@ export const apply = internalMutation({
       if (decision.productKey) {
         const product = await resolveCatalogMatch(ctx, line, decision);
 
-        if (product && line.catalogProduct?.key !== product.key && data.store) {
+        if (
+          product &&
+          line.catalogProduct?.key !== product.key &&
+          data.store &&
+          !(await linkedToStoreProduct(ctx, line))
+        ) {
           Object.assign(
             line,
             await linkCatalogProduct(

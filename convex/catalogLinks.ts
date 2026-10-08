@@ -80,6 +80,37 @@ export async function resolveCatalogMatch(
   return product;
 }
 
+/**
+ * Save a store's own product to the shared catalog. Records are shared between
+ * households, so an unchanged product is not written again.
+ */
+export async function saveStoreProduct(
+  ctx: MutationCtx,
+  product: CatalogProduct,
+) {
+  const existing = await ctx.db
+    .query("catalogProducts")
+    .withIndex("by_key", (q) => q.eq("key", product.key))
+    .unique();
+
+  if (
+    existing &&
+    existing.product.name === product.name &&
+    existing.product.brand === product.brand
+  )
+    return;
+
+  const values = {
+    key: product.key,
+    product,
+    fetchedAt: Date.now(),
+    detailsFetchedAt: Date.now(),
+  };
+
+  if (existing) await ctx.db.patch("catalogProducts", existing._id, values);
+  else await ctx.db.insert("catalogProducts", values);
+}
+
 export async function linkCatalogProduct(
   ctx: MutationCtx,
   householdId: Id<"households">,

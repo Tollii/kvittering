@@ -2,7 +2,6 @@ import { isReceiptBeingRead } from "../src/lib/domain/receipt-state";
 import { notifyReceiptActivities } from "./liveActivities";
 import { linkCatalogProduct } from "./catalogLinks";
 import { compatibleCatalogProduct } from "../src/lib/catalog/matching";
-import { odaCatalogProduct } from "../src/lib/catalog/oda";
 import { commitReceiptChange } from "./receiptChanges";
 import { v, type Infer, type ObjectType } from "convex/values";
 import { errorDetails } from "../src/lib/diagnostics";
@@ -292,18 +291,15 @@ async function findDuplicate(
 
 /**
  * Link a line through the household's saved mapping for its receipt name.
- * Returns null when there is no mapping or the mapped product is not compatible.
+ * Returns null when the mapped product is not compatible.
  */
 async function linkMappedLine(
   ctx: MutationCtx,
   householdId: Id<"households">,
   retailer: string,
   line: ReceiptLine,
+  mapping: Doc<"productMappings">,
 ): Promise<ReceiptLine | null> {
-  const mapping = await findMapping(ctx, householdId, retailer, line);
-
-  if (!mapping) return null;
-
   if (mapping.reference?.kind === "catalog") {
     const reference = mapping.reference;
 
@@ -366,46 +362,31 @@ async function decidedProductId(
   return usable ? product._id : null;
 }
 
-/**
- * The store's own product for an imported line, saved to the catalog. A person's
- * choice for the same receipt name wins; earlier automatic links do not.
- */
-async function storeProduct(
+/** Keep the catalog link an imported line arrived with, from the store's own order data. */
+async function linkImportedLine(
   ctx: MutationCtx,
   householdId: Id<"households">,
   retailer: string,
   line: ReceiptLine,
-) {
+): Promise<ReceiptLine | null> {
   const reference = line.productReference;
 
-  const product =
-    reference?.kind === "catalog" ? odaCatalogProduct(reference.product) : null;
+  if (reference?.kind !== "catalog") return null;
 
-  if (!product) return null;
-
-  const mapping = await findMapping(ctx, householdId, retailer, line);
-
-  if (mapping?.confirmedBy) return null;
-
-  const existing = await ctx.db
+  const record = await ctx.db
     .query("catalogProducts")
-    .withIndex("by_key", (q) => q.eq("key", product.key))
+    .withIndex("by_key", (q) => q.eq("key", reference.product.key))
     .unique();
 
-  const values = {
-    key: product.key,
-    product,
-    fetchedAt: Date.now(),
-    detailsFetchedAt: Date.now(),
-  };
-
-  if (existing) await ctx.db.patch("catalogProducts", existing._id, values);
-  else await ctx.db.insert("catalogProducts", values);
-
-  return product;
+  return record
+    ? linkCatalogProduct(ctx, householdId, retailer, line, record.product, null)
+    : null;
 }
 
-/** Link one extracted product line: first by the store's own product or a saved mapping, then by the matching decision. */
+/**
+ * Link one extracted product line. A person's saved choice comes first, then the
+ * store's own product, then an automatic mapping, then the matching decision.
+ */
 async function linkExtractedLine(
   ctx: MutationCtx,
   householdId: Id<"households">,
@@ -415,21 +396,19 @@ async function linkExtractedLine(
 ) {
   line.receiptName ??= line.name;
 
-  const store = await storeProduct(ctx, householdId, retailer, line);
+  const mapping = await findMapping(ctx, householdId, retailer, line);
+  const confirmed = mapping?.confirmedBy ? mapping : null;
 
-  if (store) {
-    Object.assign(
-      line,
-      await linkCatalogProduct(ctx, householdId, retailer, line, store, null),
-    );
+  const linked =
+    (confirmed &&
+      (await linkMappedLine(ctx, householdId, retailer, line, confirmed))) ??
+    (await linkImportedLine(ctx, householdId, retailer, line)) ??
+    (mapping &&
+      !confirmed &&
+      (await linkMappedLine(ctx, householdId, retailer, line, mapping)));
 
-    return;
-  }
-
-  const mapped = await linkMappedLine(ctx, householdId, retailer, line);
-
-  if (mapped) {
-    Object.assign(line, mapped);
+  if (linked) {
+    Object.assign(line, linked);
 
     return;
   }
