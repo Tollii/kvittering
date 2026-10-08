@@ -87,10 +87,10 @@ const convex = (args: string[]) =>
   });
 
 if (operation === "client" || values.stage === "enforcement") {
+  // The deploy key selects staging. With --deployment, the CLI sends the deploy
+  // key to the management API, which rejects it.
   const ready = convex([
     "run",
-    "--deployment",
-    stagingDeployment,
     "--inline-query",
     'return (await ctx.db.query("receiptReadModel").withIndex("by_name", q => q.eq("name", "receipts-v1")).unique())?.ready === true;',
   ]);
