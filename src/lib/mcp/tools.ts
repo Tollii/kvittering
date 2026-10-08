@@ -20,7 +20,9 @@ const date = z
 const cursor = z
   .string()
   .optional()
-  .describe("nextCursor from the previous page. Omit for the first page.");
+  .describe(
+    "nextCursor from the previous page, with the same other arguments. Omit for the first page.",
+  );
 
 const listReceipts = z.object({
   from: date.optional(),
@@ -64,7 +66,7 @@ const purchaseRules =
 
 export const mcpTools = {
   list_receipts: {
-    description: `List the household's receipts, newest purchase first, with store, date, total and status. Pages hold at most 50 receipts; pass nextCursor to continue, and keep going while hasMore is true. Receipts in "needs_review" may still have reading errors. ${purchaseRules}`,
+    description: `List the household's receipts, newest purchase first, with store, date, total and status. Each page reads up to 100 receipts and can hold fewer, or none when filtering by store, while hasMore is true; pass nextCursor to continue until hasMore is false. Receipts in "needs_review" may still have reading errors. ${purchaseRules}`,
     arguments: listReceipts,
   },
   get_receipt: {
@@ -72,7 +74,7 @@ export const mcpTools = {
     arguments: getReceipt,
   },
   spending_summary: {
-    description: `Total purchases and spending by category for a period of up to ${maxSummaryDays} days, using the same rules as the app's reports. Receipts still being read, without a date, or excluded by the household are not in the totals; the counts say how many. ${purchaseRules}`,
+    description: `Total purchases and spending by category for a period of up to ${maxSummaryDays} days, using the same rules as the app's reports. Receipts still being read and receipts the household excluded are left out. "included" counts receipts that are in the totals but uncertain: not yet reviewed, suspected duplicates (in purchasesNok but not in byCategory), or without a printed total (missing from paidNok). "notIncluded" counts what the totals miss: receipts in another currency and lines whose amount could not be read. ${purchaseRules}`,
     arguments: spendingSummary,
   },
   find_purchases: {
@@ -91,7 +93,7 @@ export type ParsedToolCall = {
   [Name in McpToolName]: { name: Name; arguments: McpToolArguments[Name] };
 }[McpToolName];
 
-export function isMcpToolName(name: string): name is McpToolName {
+function isMcpToolName(name: string): name is McpToolName {
   return Object.hasOwn(mcpTools, name);
 }
 

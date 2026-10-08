@@ -45,6 +45,7 @@ export const errorCodes = {
 
 /** One message from a stateless Streamable HTTP client. */
 export type McpMessage =
+  /** protocolVersion is already negotiated. */
   | { kind: "initialize"; id: RequestId; protocolVersion: string }
   | { kind: "ping"; id: RequestId }
   | { kind: "listTools"; id: RequestId }
@@ -92,8 +93,9 @@ export function parseMcpMessage(text: string): McpMessage {
       return {
         kind: "initialize",
         id,
-        protocolVersion:
-          initializeParams.safeParse(params).data?.protocolVersion ?? "",
+        protocolVersion: negotiatedVersion(
+          initializeParams.safeParse(params).data?.protocolVersion,
+        ),
       };
 
     case "ping":
@@ -125,8 +127,10 @@ export function parseMcpMessage(text: string): McpMessage {
   }
 }
 
-export function negotiatedVersion(requested: string): string {
-  return protocolVersions.has(requested) ? requested : latestVersion;
+function negotiatedVersion(requested: string | undefined): string {
+  return requested && protocolVersions.has(requested)
+    ? requested
+    : latestVersion;
 }
 
 export const jsonRpcResult = <Result>(id: RequestId, result: Result) => ({

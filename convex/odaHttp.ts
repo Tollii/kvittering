@@ -7,9 +7,9 @@ import {
   exchangeOdaCode,
   odaAuthorizationUrl,
   pkceChallenge,
-  randomToken,
   registerOdaClient,
 } from "./odaApi";
+import { randomToken } from "./tokens";
 
 const noStore = { "Cache-Control": "no-store" };
 

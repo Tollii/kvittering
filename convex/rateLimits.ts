@@ -53,7 +53,10 @@ const limiter = new RateLimiter(components.rateLimiter, {
   mcpDaily: { kind: "fixed window", rate: 2000, period: DAY, start: 0 },
 });
 
-/** Each MCP request is a bounded read; the limits stop a looping client. */
+/**
+ * Each MCP request is a bounded read; the limits stop a looping client. A
+ * refused request may still spend a burst token, which only shortens the burst.
+ */
 export async function consumeMcpQuota(
   ctx: MutationCtx,
   tokenId: Id<"mcpTokens">,

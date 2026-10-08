@@ -4,12 +4,11 @@ import type { HttpRouter } from "convex/server";
 import { httpAction, type ActionCtx } from "./_generated/server";
 import { internal } from "./_generated/api";
 import type { Id } from "./_generated/dataModel";
-import { sha256 } from "./mcp";
+import { sha256Hex } from "./tokens";
 import {
   errorCodes,
   jsonRpcError,
   jsonRpcResult,
-  negotiatedVersion,
   parseMcpMessage,
   type McpMessage,
 } from "../src/lib/mcp/protocol";
@@ -166,7 +165,7 @@ async function respond(
     case "initialize":
       return json(
         jsonRpcResult(message.id, {
-          protocolVersion: negotiatedVersion(message.protocolVersion),
+          protocolVersion: message.protocolVersion,
           capabilities: { tools: {} },
           serverInfo: { name: "kvitto", version: "0.1.0" },
           instructions,
@@ -196,13 +195,13 @@ const endpoint = httpAction(async (ctx, request) => {
       headers: { ...noStore, Allow: "POST" },
     });
 
-  const bearer = /^Bearer (\S+)$/.exec(
+  const bearer = /^Bearer (\S+)$/i.exec(
     request.headers.get("Authorization") ?? "",
   )?.[1];
 
   const access = bearer
     ? await ctx.runMutation(internal.mcp.authorize, {
-        tokenHash: await sha256(bearer),
+        tokenHash: await sha256Hex(bearer),
       })
     : ({ kind: "denied" } as const);
 

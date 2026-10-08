@@ -2,110 +2,104 @@ import { ConvexError, v } from "convex/values";
 import { z } from "zod";
 import { paginationOptsValidator } from "convex/server";
 import { components, internal } from "./_generated/api";
-import { env, internalAction, internalQuery } from "./_generated/server";
+import {
+  env,
+  internalAction,
+  internalQuery,
+  type ActionCtx,
+} from "./_generated/server";
+import { randomToken, sha256Hex } from "./tokens";
 import type { Doc } from "./_generated/dataModel";
 import { internalMutation } from "./serverFunctions";
 import { consumeMcpQuota } from "./rateLimits";
 import { categoryOf } from "../src/lib/domain/categories";
 import { maxSummaryDays } from "../src/lib/mcp/tools";
 import { calendarDateValidator } from "../src/lib/domain/calendar";
-import { reconcile, type ReceiptLine } from "../src/lib/domain/receipt";
+import { lineValidator, type ReceiptLine } from "../src/lib/domain/receipt";
+import { receiptStatusValidator } from "../src/lib/domain/receipt-state";
+import { Ore } from "../src/lib/domain/ore";
 import {
+  addCategoryTotals,
   addSpendingTotals,
   emptySpendingTotals,
+  receiptListItem,
 } from "../src/lib/domain/receipt-summary";
 
-/** Stored amounts are whole øre; tools speak kroner. */
 const accountUser = z.object({ _id: z.string() });
 
-const nok = (amount: number) => amount / 100;
+/** Stored amounts are whole øre; tools speak kroner. */
+const nok = (amount: number) => Ore.toKroner(Ore.of(amount));
 
 const nullableNok = (amount: number | null) =>
   amount === null ? null : nok(amount);
 
-export async function sha256(text: string) {
-  const digest = await crypto.subtle.digest(
-    "SHA-256",
-    new TextEncoder().encode(text),
-  );
-
-  return Array.from(new Uint8Array(digest), (byte) =>
-    byte.toString(16).padStart(2, "0"),
-  ).join("");
-}
-
 /**
  * Creates a token for one member and returns it once. Run from the CLI:
- * `npx convex run mcp:createToken '{"email":"…","label":"Claude"}'`.
+ * `npx convex run mcp:createToken '{"member":{"email":"…"},"label":"Claude"}'`.
  * Actions have unseeded randomness, unlike mutations.
  */
 export const createToken = internalAction({
   args: {
     label: v.string(),
-    email: v.optional(v.string()),
-    memberId: v.optional(v.id("members")),
+    member: v.union(
+      v.object({ email: v.string() }),
+      v.object({ memberId: v.id("members") }),
+    ),
   },
   returns: v.object({ token: v.string(), member: v.string() }),
   handler: async (ctx, args) => {
-    let identity: string | null = null;
-
-    if (args.email) {
-      // The component types adapter results as `any`; only the id is needed.
-      const user: unknown = await ctx.runQuery(
-        components.betterAuth.adapter.findOne,
-        { model: "user", where: [{ field: "email", value: args.email }] },
-      );
-
-      const account = accountUser.safeParse(user);
-
-      if (!account.success) throw new ConvexError("No account has that email.");
-
-      // Convex identities from Better Auth are the site URL and the user id.
-      identity = `${env.CONVEX_SITE_URL}|${account.data._id}`;
-    }
-
-    const bytes = crypto.getRandomValues(new Uint8Array(32));
-
-    const token = `kvitto_mcp_${btoa(String.fromCharCode(...bytes))
-      .replaceAll("+", "-")
-      .replaceAll("/", "_")
-      .replaceAll("=", "")}`;
+    const token = `kvitto_mcp_${randomToken()}`;
 
     const member: string = await ctx.runMutation(internal.mcp.storeToken, {
-      identity: identity ?? undefined,
-      memberId: args.memberId,
+      member:
+        "email" in args.member
+          ? { identity: await identityForEmail(ctx, args.member.email) }
+          : args.member,
       label: args.label,
-      tokenHash: await sha256(token),
+      tokenHash: await sha256Hex(token),
     });
 
     return { token, member };
   },
 });
 
+async function identityForEmail(ctx: ActionCtx, email: string) {
+  // The component types adapter results as `any`; only the id is needed.
+  const user: unknown = await ctx.runQuery(
+    components.betterAuth.adapter.findOne,
+    { model: "user", where: [{ field: "email", value: email }] },
+  );
+
+  const account = accountUser.safeParse(user);
+
+  if (!account.success) throw new ConvexError("No account has that email.");
+
+  // Convex identities from Better Auth are the site URL and the user id.
+  return `${env.CONVEX_SITE_URL}|${account.data._id}`;
+}
+
 export const storeToken = internalMutation({
   args: {
-    identity: v.optional(v.string()),
-    memberId: v.optional(v.id("members")),
+    member: v.union(
+      v.object({ identity: v.string() }),
+      v.object({ memberId: v.id("members") }),
+    ),
     label: v.string(),
     tokenHash: v.string(),
   },
   returns: v.string(),
   handler: async (ctx, args) => {
-    const { identity, memberId } = args;
+    const target = args.member;
 
-    const member = memberId
-      ? await ctx.db.get("members", memberId)
-      : identity
-        ? await ctx.db
+    const member =
+      "memberId" in target
+        ? await ctx.db.get("members", target.memberId)
+        : await ctx.db
             .query("members")
-            .withIndex("by_identity", (q) => q.eq("identity", identity))
-            .unique()
-        : null;
+            .withIndex("by_identity", (q) => q.eq("identity", target.identity))
+            .unique();
 
-    if (!member)
-      throw new ConvexError(
-        "Pass the email or memberId of a household member.",
-      );
+    if (!member) throw new ConvexError("That account has no household.");
 
     await ctx.db.insert("mcpTokens", {
       identity: member.identity,
@@ -191,17 +185,40 @@ export const authorize = internalMutation({
   },
 });
 
-const receiptListItem = v.object({
+const nullableNumber = v.union(v.number(), v.null());
+
+const nullableString = v.union(v.string(), v.null());
+
+const receiptFields = {
   receiptId: v.id("receipts"),
-  store: v.union(v.string(), v.null()),
-  purchaseDate: v.union(v.string(), v.null()),
-  status: v.string(),
-  totalNok: v.union(v.number(), v.null()),
-  purchasesNok: v.number(),
+  store: nullableString,
+  purchaseDate: nullableString,
+  status: receiptStatusValidator,
   excluded: v.boolean(),
+};
+
+const listedReceipt = v.object({
+  ...receiptFields,
+  totalNok: nullableNumber,
+  purchasesNok: v.number(),
 });
 
-const page = <T extends ReturnType<typeof v.object>>(item: T) =>
+const lineFields = {
+  kind: lineValidator.fields.kind,
+  name: v.string(),
+  printedText: v.string(),
+  amountNok: nullableNumber,
+  quantity: nullableNumber,
+  unit: nullableString,
+  unitPriceNok: nullableNumber,
+  packageSize: nullableNumber,
+  packageUnit: nullableString,
+  brand: nullableString,
+  category: nullableString,
+  product: nullableString,
+};
+
+const page = <Item extends ReturnType<typeof v.object>>(item: Item) =>
   v.object({
     items: v.array(item),
     hasMore: v.boolean(),
@@ -216,7 +233,7 @@ export const listReceipts = internalQuery({
     store: v.optional(v.string()),
     paginationOpts: paginationOptsValidator,
   },
-  returns: page(receiptListItem),
+  returns: page(listedReceipt),
   handler: async (ctx, args) => {
     const result = await ctx.db
       .query("receiptSummaries")
@@ -251,9 +268,9 @@ export const listReceipts = internalQuery({
           store: summary.store,
           purchaseDate: summary.purchaseDate,
           status: summary.status,
+          excluded: summary.excluded,
           totalNok: nullableNok(summary.totalOre),
           purchasesNok: nok(summary.spendingOre),
-          excluded: summary.excluded,
         })),
       hasMore: !result.isDone,
       nextCursor: result.isDone ? null : result.continueCursor,
@@ -278,31 +295,68 @@ function lineView(line: ReceiptLine) {
   };
 }
 
+const receiptDetail = v.object({
+  ...receiptFields,
+  unresolvedDuplicate: v.boolean(),
+  branch: nullableString,
+  purchaseTime: nullableString,
+  currency: nullableString,
+  totalNok: nullableNumber,
+  purchasesNok: v.number(),
+  lines: v.array(v.object(lineFields)),
+});
+
 export const getReceipt = internalQuery({
   args: { householdId: v.id("households"), receiptId: v.string() },
-  returns: v.any(),
+  returns: v.union(receiptDetail, v.null()),
   handler: async (ctx, args) => {
     const id = ctx.db.normalizeId("receipts", args.receiptId);
     const receipt = id ? await ctx.db.get("receipts", id) : null;
 
     if (!receipt || receipt.householdId !== args.householdId) return null;
     const data = receipt.data;
+    // The list's rules: excluded receipts and unread receipts add nothing.
+    const listed = receiptListItem(receipt);
 
     return {
       receiptId: receipt._id,
+      store: listed.store,
+      purchaseDate: listed.purchaseDate,
       status: receipt.status,
       excluded: receipt.excluded,
       unresolvedDuplicate: !!receipt.duplicateOf && !receipt.duplicateResolved,
-      store: data?.store ?? null,
       branch: data?.branch ?? null,
-      purchaseDate: data?.purchaseDate ?? null,
       purchaseTime: data?.purchaseTime ?? null,
       currency: data?.currency ?? null,
-      totalNok: data ? nullableNok(data.totalOre) : null,
-      purchasesNok: data ? nok(reconcile(data).productSpending) : null,
+      totalNok: nullableNok(listed.totalOre),
+      purchasesNok: nok(listed.spendingOre),
       lines: data?.lines.map(lineView) ?? [],
     };
   },
+});
+
+const spendingSummaryResult = v.object({
+  from: v.string(),
+  to: v.string(),
+  receipts: v.number(),
+  purchasesNok: v.number(),
+  discountsNok: v.number(),
+  paidNok: v.number(),
+  depositsNok: v.number(),
+  returnsNok: v.number(),
+  byCategory: v.array(
+    v.object({ category: v.string(), purchasesNok: v.number() }),
+  ),
+  uncategorizedNok: v.number(),
+  included: v.object({
+    receiptsNeedingReview: v.number(),
+    suspectedDuplicateReceipts: v.number(),
+    receiptsWithoutPrintedTotal: v.number(),
+  }),
+  notIncluded: v.object({
+    foreignCurrencyReceipts: v.number(),
+    linesWithoutAmount: v.number(),
+  }),
 });
 
 export const spendingSummary = internalQuery({
@@ -311,7 +365,7 @@ export const spendingSummary = internalQuery({
     from: calendarDateValidator,
     to: calendarDateValidator,
   },
-  returns: v.any(),
+  returns: v.union(spendingSummaryResult, v.null()),
   handler: async (ctx, args) => {
     const state = await ctx.db
       .query("receiptReadModel")
@@ -332,18 +386,24 @@ export const spendingSummary = internalQuery({
 
     const totals = days.reduce(
       (sum, day) => addSpendingTotals(sum, day.totals),
-      {
-        ...emptySpendingTotals,
-      },
+      { ...emptySpendingTotals },
     );
 
-    const categories = new Map<string, number>();
+    // Daily categories follow the comparison rules: no suspected duplicates.
+    const categoryTotals = days.reduce<Record<string, number>>(
+      (sum, day) => addCategoryTotals(sum, day.categories),
+      {},
+    );
 
-    for (const day of days)
-      for (const [id, amount] of Object.entries(day.categories)) {
-        const name = categoryOf(id).name;
-        categories.set(name, (categories.get(name) ?? 0) + amount);
-      }
+    const byName = new Map<string, number>();
+
+    for (const [id, amount] of Object.entries(categoryTotals)) {
+      const name = categoryOf(id).name;
+
+      byName.set(name, (byName.get(name) ?? 0) + amount);
+    }
+
+    const categorized = Ore.sum([...byName.values()].map(Ore.of));
 
     return {
       from: args.from,
@@ -354,13 +414,19 @@ export const spendingSummary = internalQuery({
       paidNok: nok(totals.paid),
       depositsNok: nok(totals.deposits),
       returnsNok: nok(totals.returns),
-      byCategory: [...categories]
-        .map(([category, amount]) => ({ category, purchasesNok: amount / 100 }))
+      byCategory: [...byName]
+        .map(([category, amount]) => ({ category, purchasesNok: nok(amount) }))
         .sort((a, b) => b.purchasesNok - a.purchasesNok),
-      notCounted: {
-        provisionalReceipts: totals.provisional,
-        unconvertedReceipts: totals.unconverted,
-        receiptsWithoutTotal: totals.unknownTotals,
+      uncategorizedNok: nok(
+        Ore.subtract(totals.comparisonProducts, categorized),
+      ),
+      included: {
+        receiptsNeedingReview: totals.provisional,
+        suspectedDuplicateReceipts: totals.receipts - totals.comparisonReceipts,
+        receiptsWithoutPrintedTotal: totals.unknownTotals,
+      },
+      notIncluded: {
+        foreignCurrencyReceipts: totals.unconverted,
         linesWithoutAmount: totals.unknownAmounts,
       },
     };
@@ -375,7 +441,7 @@ export const findPurchases = internalQuery({
     to: calendarDateValidator,
     paginationOpts: paginationOptsValidator,
   },
-  returns: v.any(),
+  returns: page(v.object({ ...receiptFields, ...lineFields })),
   handler: async (ctx, args) => {
     // Newest first answers "when did we last buy" from the first page.
     const result = await ctx.db

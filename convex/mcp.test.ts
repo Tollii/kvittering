@@ -10,6 +10,7 @@ import { separateHouseholds } from "../src/lib/testing/households";
 import { date } from "../src/lib/testing/calendar";
 import { receiptFixture } from "../src/lib/testing/receipts";
 import { weeklyShopFixture } from "../src/lib/mock-receipts";
+import { updateReceiptReadModel } from "./receiptReadModel";
 import type { JsonValue } from "../src/lib/mcp/protocol";
 
 const modules = import.meta.glob("./**/*.ts");
@@ -38,10 +39,12 @@ async function setup() {
     household: Id<"households">,
     purchaseDate: string,
     store: string,
+    status: "reviewed" | "needs_review" = "reviewed",
   ) =>
     t.run(async (ctx) => {
       const { _id, _creationTime, ...fields } = receiptFixture({
         householdId: household,
+        status,
         data: {
           ...weeklyShopFixture(),
           store,
@@ -49,7 +52,13 @@ async function setup() {
         },
       });
 
-      return ctx.db.insert("receipts", fields);
+      const id = await ctx.db.insert("receipts", fields);
+      const receipt = await ctx.db.get("receipts", id);
+
+      // Raw inserts skip the triggers that keep the summaries current.
+      if (receipt) await updateReceiptReadModel(ctx, receipt);
+
+      return id;
     });
 
   const own = await insertReceipt(householdId, "2026-09-12", "REMA 1000");
@@ -64,7 +73,7 @@ async function setup() {
   await t.mutation(internal.receiptSync.backfill, {});
 
   const { token } = await t.action(internal.mcp.createToken, {
-    memberId: first._id,
+    member: { memberId: first._id },
     label: "Claude",
   });
 
@@ -96,7 +105,17 @@ async function setup() {
       : { value: z.json().parse(JSON.parse(text)) };
   };
 
-  return { t, token, post, call, own, foreign, first };
+  return {
+    t,
+    token,
+    post,
+    call,
+    own,
+    foreign,
+    first,
+    insertReceipt,
+    householdId,
+  };
 }
 
 it("answers only requests that carry a live token", async () => {
@@ -270,7 +289,7 @@ it("summarizes spending with the report rules and finds purchases", async () => 
   });
 
   expect(september).toMatchObject({
-    value: { receipts: 1, notCounted: { linesWithoutAmount: 1 } },
+    value: { receipts: 1, notIncluded: { linesWithoutAmount: 1 } },
   });
   const purchases = z.object({ value: z.object({ purchasesNok: z.number() }) });
   expect(purchases.parse(both).value.purchasesNok).toBeCloseTo(
@@ -296,4 +315,71 @@ it("summarizes spending with the report rules and finds purchases", async () => 
       hasMore: false,
     },
   });
+});
+
+it("counts receipts awaiting review in the totals and says so", async () => {
+  const { call, insertReceipt, householdId } = await setup();
+
+  await insertReceipt(householdId, "2026-09-20", "MENY", "needs_review");
+
+  // Each weekly shop: products 355.00 kr less 42.20 kr of discounts.
+  expect(
+    await call("spending_summary", { from: "2026-09-01", to: "2026-09-30" }),
+  ).toMatchObject({
+    value: {
+      receipts: 2,
+      purchasesNok: 625.6,
+      included: { receiptsNeedingReview: 1, suspectedDuplicateReceipts: 0 },
+      notIncluded: { linesWithoutAmount: 2 },
+    },
+  });
+});
+
+it("pages through more receipts than one read covers", async () => {
+  const { call, insertReceipt, householdId } = await setup();
+
+  for (let day = 1; day <= 120; day++)
+    await insertReceipt(
+      householdId,
+      `2025-${String(Math.ceil(day / 28)).padStart(2, "0")}-${String(((day - 1) % 28) + 1).padStart(2, "0")}`,
+      "COOP",
+    );
+
+  const page = z.object({
+    value: z.object({
+      items: z.array(z.object({ receiptId: z.string() })),
+      hasMore: z.boolean(),
+      nextCursor: z.string().nullable(),
+    }),
+  });
+
+  const seen: string[] = [];
+  let cursor: string | null = null;
+  let pages = 0;
+
+  do {
+    const result: z.infer<typeof page>["value"] = page.parse(
+      await call("list_receipts", cursor ? { cursor } : {}),
+    ).value;
+
+    seen.push(...result.items.map((item) => item.receiptId));
+    cursor = result.nextCursor;
+    pages++;
+  } while (cursor);
+
+  expect(pages).toBeGreaterThan(1);
+  expect(seen).toHaveLength(122);
+  expect(new Set(seen).size).toBe(122);
+});
+
+it("rate limits a looping client", async () => {
+  const { post } = await setup();
+  const ping = { jsonrpc: "2.0", id: 1, method: "ping" };
+  const statuses: number[] = [];
+
+  for (let request = 0; request < 61; request++)
+    statuses.push((await post(ping)).status);
+
+  expect(statuses.slice(0, 60).every((status) => status === 200)).toBe(true);
+  expect(statuses[60]).toBe(429);
 });

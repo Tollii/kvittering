@@ -115,6 +115,7 @@ import type * as releasePolicy from "../releasePolicy.js";
 import type * as retention from "../retention.js";
 import type * as serverFunctions from "../serverFunctions.js";
 import type * as spotlight from "../spotlight.js";
+import type * as tokens from "../tokens.js";
 import type * as userErrors from "../userErrors.js";
 
 import type {
@@ -231,6 +232,7 @@ declare const fullApi: ApiFromModules<{
   retention: typeof retention;
   serverFunctions: typeof serverFunctions;
   spotlight: typeof spotlight;
+  tokens: typeof tokens;
   userErrors: typeof userErrors;
 }>;
 
