@@ -58,7 +58,7 @@ if (process.env.CONVEX_DEPLOY_KEY !== 'prod:courteous-jay-215|redacted-test-valu
 fs.appendFileSync(${JSON.stringify(calls)}, args[0] + '\\n');
 if (args[0] === 'run') {
   if (!args.includes('--inline-query') || args.includes('--push')) process.exit(93);
-  if (args[args.indexOf('--deployment') + 1] !== 'courteous-jay-215') process.exit(92);
+  if (args.includes('--deployment')) process.exit(92);
   console.log(${JSON.stringify(String(ready))});
 }
 `,
