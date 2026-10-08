@@ -166,6 +166,17 @@ export const confirm = mutation({
         importedCount: 0,
       });
 
+    // Signing in again is deliberate, so orders deleted earlier may come back.
+    const imports = await ctx.db
+      .query("receiptImports")
+      .withIndex("by_householdId_and_provider_and_orderNumber", (q) =>
+        q.eq("householdId", member.householdId).eq("provider", "oda"),
+      )
+      .take(500);
+
+    for (const row of imports)
+      if (!row.receiptId) await ctx.db.delete("receiptImports", row._id);
+
     console.info("oda.connected", { connectionId: id });
     await ctx.scheduler.runAfter(0, internal.oda.syncConnection, { id });
 
