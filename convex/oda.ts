@@ -16,6 +16,9 @@ import { userError } from "./userErrors";
 import { featureEnabled } from "./featureFlags";
 import { beginUploadedReceipt } from "./receiptUploadCompletion";
 import { receiptDataValidator } from "../src/lib/domain/receipt";
+import { catalogProductValidator } from "../src/lib/catalog/model";
+import { odaCatalogProduct } from "../src/lib/catalog/oda";
+import { saveStoreProduct } from "./catalogLinks";
 import { errorDetails } from "../src/lib/diagnostics";
 import {
   callOdaTool,
@@ -416,7 +419,11 @@ export const importOrders = internalMutation({
   args: {
     ...leaseValidator,
     orders: v.array(
-      v.object({ orderNumber: v.string(), data: receiptDataValidator }),
+      v.object({
+        orderNumber: v.string(),
+        data: receiptDataValidator,
+        products: v.array(catalogProductValidator),
+      }),
     ),
   },
   returns: v.null(),
@@ -441,7 +448,7 @@ export const importOrders = internalMutation({
 
     let imported = 0;
 
-    for (const { orderNumber, data } of args.orders) {
+    for (const { orderNumber, data, products } of args.orders) {
       const known = await ctx.db
         .query("receiptImports")
         .withIndex("by_householdId_and_provider_and_orderNumber", (q) =>
@@ -453,6 +460,8 @@ export const importOrders = internalMutation({
         .unique();
 
       if (known) continue;
+
+      for (const product of products) await saveStoreProduct(ctx, product);
 
       const id: Id<"receipts"> = await ctx.db.insert("receipts", {
         householdId: member.householdId,
@@ -536,6 +545,9 @@ export const syncConnection = internalAction({
         orders: deliveredOrders(orders).map((order) => ({
           orderNumber: order.orderNumber,
           data: orderReceipt(order),
+          products: order.products.map((item) =>
+            odaCatalogProduct(item.product),
+          ),
         })),
       });
     } catch (error) {

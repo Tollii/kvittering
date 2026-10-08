@@ -291,18 +291,15 @@ async function findDuplicate(
 
 /**
  * Link a line through the household's saved mapping for its receipt name.
- * Returns null when there is no mapping or the mapped product is not compatible.
+ * Returns null when the mapped product is not compatible.
  */
 async function linkMappedLine(
   ctx: MutationCtx,
   householdId: Id<"households">,
   retailer: string,
   line: ReceiptLine,
+  mapping: Doc<"productMappings">,
 ): Promise<ReceiptLine | null> {
-  const mapping = await findMapping(ctx, householdId, retailer, line);
-
-  if (!mapping) return null;
-
   if (mapping.reference?.kind === "catalog") {
     const reference = mapping.reference;
 
@@ -365,7 +362,31 @@ async function decidedProductId(
   return usable ? product._id : null;
 }
 
-/** Link one extracted product line: first by saved mapping, then by the matching decision. */
+/** Keep the catalog link an imported line arrived with, from the store's own order data. */
+async function linkImportedLine(
+  ctx: MutationCtx,
+  householdId: Id<"households">,
+  retailer: string,
+  line: ReceiptLine,
+): Promise<ReceiptLine | null> {
+  const reference = line.productReference;
+
+  if (reference?.kind !== "catalog") return null;
+
+  const record = await ctx.db
+    .query("catalogProducts")
+    .withIndex("by_key", (q) => q.eq("key", reference.product.key))
+    .unique();
+
+  return record
+    ? linkCatalogProduct(ctx, householdId, retailer, line, record.product, null)
+    : null;
+}
+
+/**
+ * Link one extracted product line. A person's saved choice comes first, then the
+ * store's own product, then an automatic mapping, then the matching decision.
+ */
 async function linkExtractedLine(
   ctx: MutationCtx,
   householdId: Id<"households">,
@@ -375,10 +396,19 @@ async function linkExtractedLine(
 ) {
   line.receiptName ??= line.name;
 
-  const mapped = await linkMappedLine(ctx, householdId, retailer, line);
+  const mapping = await findMapping(ctx, householdId, retailer, line);
+  const confirmed = mapping?.confirmedBy ? mapping : null;
 
-  if (mapped) {
-    Object.assign(line, mapped);
+  const linked =
+    (confirmed &&
+      (await linkMappedLine(ctx, householdId, retailer, line, confirmed))) ??
+    (await linkImportedLine(ctx, householdId, retailer, line)) ??
+    (mapping &&
+      !confirmed &&
+      (await linkMappedLine(ctx, householdId, retailer, line, mapping)));
+
+  if (linked) {
+    Object.assign(line, linked);
 
     return;
   }

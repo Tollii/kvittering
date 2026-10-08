@@ -8,6 +8,8 @@ import {
   type ReceiptLine,
 } from "../src/lib/domain/receipt";
 import { unclearCategoryId } from "../src/lib/domain/categories";
+import { odaCatalogProduct } from "../src/lib/catalog/oda";
+import { catalogIdentity } from "../src/lib/catalog/model";
 
 /**
  * Oda's official MCP server, the same one AI assistants connect to. A person
@@ -344,6 +346,12 @@ export function orderReceipt(order: OdaOrder): ReceiptData {
       brand: item.product.brand ?? null,
       manual: false,
       categoryId: unclearCategoryId,
+      // Processing keeps this link unless a person chose another product for the name.
+      productReference: {
+        kind: "catalog",
+        product: catalogIdentity(odaCatalogProduct(item.product)),
+        provenance: "automatic",
+      },
     };
   });
 
