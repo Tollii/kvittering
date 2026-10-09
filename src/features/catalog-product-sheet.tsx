@@ -25,38 +25,6 @@ import { catalogSource } from "@/lib/catalog/oda";
 import { useTheme } from "@/constants/theme";
 import { useHousehold } from "./household-context";
 
-export function CatalogProductPicker({
-  name,
-  store,
-  onSelect,
-  onClose,
-}: Readonly<{
-  name: string;
-  store: string;
-  onSelect: (product: CatalogProduct | null) => void;
-  onClose: () => void;
-}>) {
-  const [search, setSearch] = useState(productSearch(name));
-
-  return (
-    <Sheet
-      title="Finn produkt"
-      visible
-      onClose={onClose}
-      header={<CatalogSearchField value={search} onChange={setSearch} />}
-    >
-      <CatalogSearchResults
-        search={search}
-        store={store}
-        onSelect={(product) => {
-          onSelect(product);
-          onClose();
-        }}
-      />
-    </Sheet>
-  );
-}
-
 function CatalogSearchField({
   value,
   onChange,
@@ -170,8 +138,9 @@ function CatalogSearchResults({
 }
 
 /**
- * Shows a linked product. Changing the link searches in the same sheet, because
- * replacing one presented iOS sheet with another makes the transition stutter.
+ * Shows a linked product, or searches for one when the line has none. Changing
+ * the link searches in this same sheet: replacing one presented iOS sheet with
+ * another makes the transition stutter, so the one Sheet stays mounted.
  */
 export function CatalogProductSheet({
   product,
@@ -180,13 +149,50 @@ export function CatalogProductSheet({
   onSelect,
   onClose,
 }: Readonly<{
-  product: CatalogIdentity;
+  product: CatalogIdentity | null;
   name: string;
   store: string;
   onSelect: (product: CatalogProduct | null) => void;
   onClose: () => void;
 }>) {
-  const [search, setSearch] = useState<string | null>(null);
+  const [search, setSearch] = useState(product ? null : productSearch(name));
+
+  return (
+    <Sheet
+      title={search === null ? "Produktinformasjon" : "Finn produkt"}
+      visible
+      onClose={onClose}
+      header={
+        search !== null && (
+          <CatalogSearchField value={search} onChange={setSearch} />
+        )
+      }
+    >
+      {search === null ? (
+        product && (
+          <CatalogProductDetails
+            product={product}
+            onChange={() => setSearch(productSearch(name))}
+          />
+        )
+      ) : (
+        <CatalogSearchResults
+          search={search}
+          store={store}
+          onSelect={(choice) => {
+            onSelect(choice);
+            onClose();
+          }}
+        />
+      )}
+    </Sheet>
+  );
+}
+
+function CatalogProductDetails({
+  product,
+  onChange,
+}: Readonly<{ product: CatalogIdentity; onChange: () => void }>) {
   const productLookup = useFeatureFlag("productLookup");
   const query = useCatalogProduct(product.key);
   const full = query.data?.products[0];
@@ -207,27 +213,8 @@ export function CatalogProductSheet({
     (item) => item.id === product.key,
   );
 
-  if (search !== null)
-    return (
-      <Sheet
-        title="Finn produkt"
-        visible
-        onClose={onClose}
-        header={<CatalogSearchField value={search} onChange={setSearch} />}
-      >
-        <CatalogSearchResults
-          search={search}
-          store={store}
-          onSelect={(choice) => {
-            onSelect(choice);
-            onClose();
-          }}
-        />
-      </Sheet>
-    );
-
   return (
-    <Sheet title="Produktinformasjon" visible onClose={onClose}>
+    <>
       {product.equivalence && (
         <Notice>
           Koblet til tilsvarende produkter. Bildet viser ett eksempel. Nøyaktig
@@ -269,7 +256,7 @@ export function CatalogProductSheet({
       <Button
         title="Endre produktkobling"
         variant="secondary"
-        onPress={() => setSearch(productSearch(name))}
+        onPress={onChange}
       />
       {query.isFetching && !full && <Loading />}
       {(query.isError || query.data?.status === "error") && (
@@ -335,7 +322,7 @@ export function CatalogProductSheet({
           ? ` · hentet ${CalendarDate.format(CalendarDate.ofInstant(query.data.fetchedAt))}`
           : ""}
       </Copy>
-    </Sheet>
+    </>
   );
 }
 

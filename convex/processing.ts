@@ -2,6 +2,8 @@ import { isReceiptBeingRead } from "../src/lib/domain/receipt-state";
 import { notifyReceiptActivities } from "./liveActivities";
 import { linkCatalogProduct } from "./catalogLinks";
 import { compatibleCatalogProduct } from "../src/lib/catalog/matching";
+import { catalogIdentity } from "../src/lib/catalog/model";
+import { withProductReference } from "../src/lib/domain/product-reference";
 import { commitReceiptChange } from "./receiptChanges";
 import { v, type Infer, type ObjectType } from "convex/values";
 import { errorDetails } from "../src/lib/diagnostics";
@@ -362,11 +364,12 @@ async function decidedProductId(
   return usable ? product._id : null;
 }
 
-/** Keep the catalog link an imported line arrived with, from the store's own order data. */
+/**
+ * Keep the catalog link an imported line arrived with, from the store's own order
+ * data. It is a fallback, so no mapping is saved: the next order brings its own.
+ */
 async function linkImportedLine(
   ctx: MutationCtx,
-  householdId: Id<"households">,
-  retailer: string,
   line: ReceiptLine,
 ): Promise<ReceiptLine | null> {
   const reference = line.productReference;
@@ -379,7 +382,11 @@ async function linkImportedLine(
     .unique();
 
   return record
-    ? linkCatalogProduct(ctx, householdId, retailer, line, record.product, null)
+    ? withProductReference(line, {
+        kind: "catalog",
+        product: catalogIdentity(record.product),
+        provenance: "automatic",
+      })
     : null;
 }
 
@@ -402,7 +409,7 @@ async function linkExtractedLine(
   const linked =
     (mapping &&
       (await linkMappedLine(ctx, householdId, retailer, line, mapping))) ??
-    (await linkImportedLine(ctx, householdId, retailer, line));
+    (await linkImportedLine(ctx, line));
 
   if (linked) {
     Object.assign(line, linked);

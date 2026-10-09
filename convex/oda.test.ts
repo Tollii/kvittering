@@ -344,4 +344,30 @@ it("links Oda lines to Oda's product until Kassalapp finds one", async () => {
   await user.mutation(api.receipts.retry, { id: imported.receipt._id });
   await t.finishAllScheduledFunctions(vi.runAllTimers);
   expect((await line()).line.catalogProduct?.key).toBe(kassalapp.key);
+
+  // A product a person chose for the name wins over both.
+  const chosen = { ...kassalapp, key: "ean:7038010009464", ids: [6] };
+  await t.run(async (ctx) => {
+    await ctx.db.insert("catalogProducts", {
+      key: chosen.key,
+      product: chosen,
+      fetchedAt: 0,
+    });
+    const mapping = (await ctx.db.query("productMappings").unique())!;
+    await ctx.db.patch("productMappings", mapping._id, {
+      confirmedBy: "owner",
+      reference: {
+        kind: "catalog",
+        product: { key: chosen.key, name: chosen.name },
+        provenance: "manual",
+      },
+    });
+    await ctx.db.patch("receipts", imported.receipt._id, {
+      status: "failed",
+      data: null,
+    });
+  });
+  await user.mutation(api.receipts.retry, { id: imported.receipt._id });
+  await t.finishAllScheduledFunctions(vi.runAllTimers);
+  expect((await line()).line.catalogProduct?.key).toBe(chosen.key);
 });

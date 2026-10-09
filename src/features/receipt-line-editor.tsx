@@ -40,10 +40,7 @@ import {
   lineReviewIssues,
 } from "@/lib/domain/receipt-review";
 import { CategoryPicker } from "./category-picker";
-import {
-  CatalogProductPicker,
-  CatalogProductSheet,
-} from "./catalog-product-sheet";
+import { CatalogProductSheet } from "./catalog-product-sheet";
 import { useTheme } from "@/constants/theme";
 import { priceSignalLabel, type PriceSignal } from "@/lib/domain/price-signals";
 import { tapFeedback } from "@/lib/haptics";
@@ -111,9 +108,7 @@ export function ReceiptLineEditor({
   const [productOpen, setProductOpen] = useState(false);
   const [details, setDetails] = useState(false);
 
-  const [catalogScreen, setCatalogScreen] = useState<
-    "search" | "details" | null
-  >(null);
+  const [catalogOpen, setCatalogOpen] = useState(false);
 
   const catalogProduct = linkedCatalogProduct(line, productChoice);
 
@@ -165,9 +160,7 @@ export function ReceiptLineEditor({
             tapFeedback();
             onChange(confirmLineCategory(line, categoryId));
           }}
-          onOpenCatalog={() =>
-            setCatalogScreen(catalogProduct ? "details" : "search")
-          }
+          onOpenCatalog={() => setCatalogOpen(true)}
         />
       )}
       {categoryOpen && (
@@ -186,21 +179,13 @@ export function ReceiptLineEditor({
           onClose={() => setCategoryOpen(false)}
         />
       )}
-      {catalogScreen === "search" && (
-        <CatalogProductPicker
-          name={line.name}
-          store={retailer}
-          onSelect={(product) => onProduct(catalogChoice(product))}
-          onClose={() => setCatalogScreen(null)}
-        />
-      )}
-      {catalogScreen === "details" && catalogProduct && (
+      {catalogOpen && (
         <CatalogProductSheet
-          product={catalogProduct}
+          product={catalogProduct ?? null}
           name={line.name}
           store={retailer}
           onSelect={(product) => onProduct(catalogChoice(product))}
-          onClose={() => setCatalogScreen(null)}
+          onClose={() => setCatalogOpen(false)}
         />
       )}
       {/* The open editor shows missing fields in its inputs and reader issues in a notice. */}
