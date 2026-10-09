@@ -120,7 +120,7 @@ export function catalogIdentity(product: CatalogProduct): CatalogIdentity {
 
 /**
  * A store's own product, such as one from an Oda order, has no Kassalapp id to
- * fetch details by, and Kassalapp matching does not replace a link to it.
+ * fetch details by. It is a fallback that Kassalapp matching replaces.
  */
 export function isStoreProduct(product: CatalogProduct) {
   return !product.equivalence && product.ids.length === 0;

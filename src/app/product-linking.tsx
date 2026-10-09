@@ -17,7 +17,7 @@ import {
 } from "@/components/ui";
 import { useProductLinkingQueue } from "@/features/product-linking-queue";
 import { ProductLinkingOptions } from "@/features/product-linking-options";
-import { CatalogProductPicker } from "@/features/catalog-product-sheet";
+import { CatalogProductSheet } from "@/features/catalog-product-sheet";
 import { useHousehold } from "@/features/household-context";
 import { useReleaseMutation } from "@/lib/releases/requests";
 import { errorFeedback, successFeedback } from "@/lib/haptics";
@@ -242,8 +242,9 @@ export default function ProductLinking() {
             }
           />
           {searchKey === itemKey && (
-            <CatalogProductPicker
+            <CatalogProductSheet
               key={`search:${itemKey}`}
+              product={null}
               name={item.line.name}
               store={item.store}
               onClose={() => setSearchKey(undefined)}
