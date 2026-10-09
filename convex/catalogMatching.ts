@@ -323,7 +323,7 @@ async function lineMatchingInput(
     line,
     search: productSearch(line.name).slice(0, 120),
     store: retailerCode(store) ?? undefined,
-    // A store's own product is still searched, so its candidates inform the category.
+    // A store's own product is only a fallback, so Kassalapp is searched and replaces it.
     product:
       record &&
       !isStoreProduct(record.product) &&
@@ -331,20 +331,6 @@ async function lineMatchingInput(
         ? record.product
         : null,
   };
-}
-
-/** Kassalapp is the fallback for lines the store's own product data did not link. */
-async function linkedToStoreProduct(ctx: QueryCtx, line: ReceiptLine) {
-  const key = line.catalogProduct?.key;
-
-  const record = key
-    ? await ctx.db
-        .query("catalogProducts")
-        .withIndex("by_key", (q) => q.eq("key", key))
-        .unique()
-    : null;
-
-  return !!record && isStoreProduct(record.product);
 }
 
 /** Counts the decisions for each reason, for the evaluation log. */
@@ -441,12 +427,7 @@ export const apply = internalMutation({
       if (decision.productKey) {
         const product = await resolveCatalogMatch(ctx, line, decision);
 
-        if (
-          product &&
-          line.catalogProduct?.key !== product.key &&
-          data.store &&
-          !(await linkedToStoreProduct(ctx, line))
-        ) {
+        if (product && line.catalogProduct?.key !== product.key && data.store) {
           Object.assign(
             line,
             await linkCatalogProduct(

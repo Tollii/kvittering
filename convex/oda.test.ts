@@ -6,7 +6,6 @@ import { afterEach, expect, it, vi } from "vitest";
 import { z } from "zod";
 import { api, internal } from "./_generated/api";
 import schema from "./schema";
-import { matchingKey } from "../src/lib/domain/product-matching";
 import { lineEvidenceKey } from "../src/lib/catalog/matching";
 
 const modules = import.meta.glob("./**/*.ts");
@@ -259,7 +258,7 @@ it("signs in at Oda once and imports a delivered order as one receipt", async ()
   ).toEqual(["oda-k4mz8q", "oda-r2fy3e"]);
 });
 
-it("links Oda lines to Oda's product unless a person chose another", async () => {
+it("links Oda lines to Oda's product until Kassalapp finds one", async () => {
   vi.useFakeTimers();
   vi.stubEnv("RECEIPT_PROVIDER", "mock");
   vi.stubGlobal("fetch", vi.fn(oda));
@@ -287,7 +286,7 @@ it("links Oda lines to Oda's product unless a person chose another", async () =>
     labels: [],
   };
 
-  const { connection, mapping } = await t.run(async (ctx) => {
+  const connection = await t.run(async (ctx) => {
     const member = (await ctx.db.query("members").first())!;
 
     await ctx.db.insert("catalogProducts", {
@@ -296,30 +295,15 @@ it("links Oda lines to Oda's product unless a person chose another", async () =>
       fetchedAt: 0,
     });
 
-    return {
-      connection: await ctx.db.insert("odaConnections", {
-        identity: member.identity,
-        householdId: member.householdId,
-        clientId: "kvitto-client",
-        accessToken: "access",
-        accessExpiresAt: Date.now() + 3600_000,
-        expired: false,
-        importedCount: 0,
-      }),
-      // An earlier automatic Kassalapp link for the same name.
-      mapping: await ctx.db.insert("productMappings", {
-        householdId: member.householdId,
-        retailer: matchingKey("Oda"),
-        key: matchingKey("Tine Lettmelk 1% fett"),
-        productId: null,
-        reference: {
-          kind: "catalog",
-          product: { key: kassalapp.key, name: kassalapp.name },
-          provenance: "automatic",
-        },
-        confirmedBy: null,
-      }),
-    };
+    return ctx.db.insert("odaConnections", {
+      identity: member.identity,
+      householdId: member.householdId,
+      clientId: "kvitto-client",
+      accessToken: "access",
+      accessExpiresAt: Date.now() + 3600_000,
+      expired: false,
+      importedCount: 0,
+    });
   });
 
   const line = async () => {
@@ -333,7 +317,7 @@ it("links Oda lines to Oda's product unless a person chose another", async () =>
   const imported = await line();
   expect(imported.line.catalogProduct?.key).toBe("oda:430");
 
-  // Kassalapp matching is the fallback and does not replace Oda's product.
+  // Oda's product has no image or barcode, so a Kassalapp match replaces it.
   await t.mutation(internal.catalogMatching.apply, {
     id: imported.receipt._id,
     generation: imported.receipt.generation,
@@ -348,23 +332,15 @@ it("links Oda lines to Oda's product unless a person chose another", async () =>
       },
     ],
   });
-  expect((await line()).line.catalogProduct?.key).toBe("oda:430");
+  expect((await line()).line.catalogProduct?.key).toBe(kassalapp.key);
 
-  // A product a person chose for the name wins when the order is read again.
-  await t.run(async (ctx) => {
-    await ctx.db.patch("productMappings", mapping, {
-      confirmedBy: "owner",
-      reference: {
-        kind: "catalog",
-        product: { key: kassalapp.key, name: kassalapp.name },
-        provenance: "manual",
-      },
-    });
-    await ctx.db.patch("receipts", imported.receipt._id, {
+  // Reading the order again keeps the Kassalapp product remembered for the name.
+  await t.run((ctx) =>
+    ctx.db.patch("receipts", imported.receipt._id, {
       status: "failed",
       data: null,
-    });
-  });
+    }),
+  );
   await user.mutation(api.receipts.retry, { id: imported.receipt._id });
   await t.finishAllScheduledFunctions(vi.runAllTimers);
   expect((await line()).line.catalogProduct?.key).toBe(kassalapp.key);

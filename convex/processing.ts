@@ -384,8 +384,9 @@ async function linkImportedLine(
 }
 
 /**
- * Link one extracted product line. A person's saved choice comes first, then the
- * store's own product, then an automatic mapping, then the matching decision.
+ * Link one extracted product line: first by saved mapping, then by the store's own
+ * product, then by the matching decision. Kassalapp matching may later replace
+ * the store's product, which has less product data.
  */
 async function linkExtractedLine(
   ctx: MutationCtx,
@@ -397,15 +398,11 @@ async function linkExtractedLine(
   line.receiptName ??= line.name;
 
   const mapping = await findMapping(ctx, householdId, retailer, line);
-  const confirmed = mapping?.confirmedBy ? mapping : null;
 
   const linked =
-    (confirmed &&
-      (await linkMappedLine(ctx, householdId, retailer, line, confirmed))) ??
-    (await linkImportedLine(ctx, householdId, retailer, line)) ??
     (mapping &&
-      !confirmed &&
-      (await linkMappedLine(ctx, householdId, retailer, line, mapping)));
+      (await linkMappedLine(ctx, householdId, retailer, line, mapping))) ??
+    (await linkImportedLine(ctx, householdId, retailer, line));
 
   if (linked) {
     Object.assign(line, linked);

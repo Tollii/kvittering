@@ -37,6 +37,52 @@ export function CatalogProductPicker({
   onClose: () => void;
 }>) {
   const [search, setSearch] = useState(productSearch(name));
+
+  return (
+    <Sheet
+      title="Finn produkt"
+      visible
+      onClose={onClose}
+      header={<CatalogSearchField value={search} onChange={setSearch} />}
+    >
+      <CatalogSearchResults
+        search={search}
+        store={store}
+        onSelect={(product) => {
+          onSelect(product);
+          onClose();
+        }}
+      />
+    </Sheet>
+  );
+}
+
+function CatalogSearchField({
+  value,
+  onChange,
+}: Readonly<{ value: string; onChange: (value: string) => void }>) {
+  return (
+    <Field
+      label="Søk i produktkatalogen"
+      value={value}
+      onChangeText={onChange}
+      autoCorrect={false}
+      autoCapitalize="none"
+      clearButtonMode="while-editing"
+      hint="Skriv minst 3 tegn for å søke."
+    />
+  );
+}
+
+function CatalogSearchResults({
+  search,
+  store,
+  onSelect,
+}: Readonly<{
+  search: string;
+  store: string;
+  onSelect: (product: CatalogProduct | null) => void;
+}>) {
   const productLookup = useFeatureFlag("productLookup");
   const query = useCatalogSearch(search, { kind: "products", store });
   const [showWithoutBarcode, setShowWithoutBarcode] = useState(false);
@@ -50,22 +96,7 @@ export function CatalogProductPicker({
   const { online } = useHousehold();
 
   return (
-    <Sheet
-      title="Finn produkt"
-      visible
-      onClose={onClose}
-      header={
-        <Field
-          label="Søk i produktkatalogen"
-          value={search}
-          onChangeText={setSearch}
-          autoCorrect={false}
-          autoCapitalize="none"
-          clearButtonMode="while-editing"
-          hint="Skriv minst 3 tegn for å søke."
-        />
-      }
-    >
+    <>
       {!productLookup && (
         <Notice>
           Produktkatalogen er midlertidig satt på pause. Lagrede opplysninger
@@ -107,10 +138,7 @@ export function CatalogProductPicker({
                   ]
                     .filter(Boolean)
                     .join(" · ")}
-                  onPress={() => {
-                    onSelect(product);
-                    onClose();
-                  }}
+                  onPress={() => onSelect(product)}
                 />
               </View>
             </View>
@@ -133,29 +161,32 @@ export function CatalogProductPicker({
           icon="magnifyingglass"
         />
       )}
-      <Row
-        title="Ingen av produktene passer"
-        onPress={() => {
-          onSelect(null);
-          onClose();
-        }}
-      />
+      <Row title="Ingen av produktene passer" onPress={() => onSelect(null)} />
       <Copy muted size={12}>
         Produktdata fra Kassalapp
       </Copy>
-    </Sheet>
+    </>
   );
 }
 
+/**
+ * Shows a linked product. Changing the link searches in the same sheet, because
+ * replacing one presented iOS sheet with another makes the transition stutter.
+ */
 export function CatalogProductSheet({
   product,
-  onChange,
+  name,
+  store,
+  onSelect,
   onClose,
 }: Readonly<{
   product: CatalogIdentity;
-  onChange: () => void;
+  name: string;
+  store: string;
+  onSelect: (product: CatalogProduct | null) => void;
   onClose: () => void;
 }>) {
+  const [search, setSearch] = useState<string | null>(null);
   const productLookup = useFeatureFlag("productLookup");
   const query = useCatalogProduct(product.key);
   const full = query.data?.products[0];
@@ -175,6 +206,25 @@ export function CatalogProductSheet({
   const purchases = catalogInsights(receipts).products.find(
     (item) => item.id === product.key,
   );
+
+  if (search !== null)
+    return (
+      <Sheet
+        title="Finn produkt"
+        visible
+        onClose={onClose}
+        header={<CatalogSearchField value={search} onChange={setSearch} />}
+      >
+        <CatalogSearchResults
+          search={search}
+          store={store}
+          onSelect={(choice) => {
+            onSelect(choice);
+            onClose();
+          }}
+        />
+      </Sheet>
+    );
 
   return (
     <Sheet title="Produktinformasjon" visible onClose={onClose}>
@@ -219,7 +269,7 @@ export function CatalogProductSheet({
       <Button
         title="Endre produktkobling"
         variant="secondary"
-        onPress={onChange}
+        onPress={() => setSearch(productSearch(name))}
       />
       {query.isFetching && !full && <Loading />}
       {(query.isError || query.data?.status === "error") && (

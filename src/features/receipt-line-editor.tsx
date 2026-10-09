@@ -197,8 +197,10 @@ export function ReceiptLineEditor({
       {catalogScreen === "details" && catalogProduct && (
         <CatalogProductSheet
           product={catalogProduct}
+          name={line.name}
+          store={retailer}
+          onSelect={(product) => onProduct(catalogChoice(product))}
           onClose={() => setCatalogScreen(null)}
-          onChange={() => setCatalogScreen("search")}
         />
       )}
       {/* The open editor shows missing fields in its inputs and reader issues in a notice. */}
