@@ -6,6 +6,7 @@ Kvitto captures household grocery receipts and explains purchases. It uses Expo 
 
 - [Architecture](docs/architecture.md): responsibility boundaries, data flow, and reasons behind the design.
 - [Design principles](docs/principles.md): domain modeling and test design.
+- [Design system](docs/design-system/README.md): visual foundations, components, screen patterns, and Norwegian copy.
 - [Verification](docs/verification.md): current CI checks, test fixtures, and device-test procedures.
 - [Open work](plans/README.md): unresolved findings and design decisions.
 - [Release review](.agents/skills/release-review/SKILL.md): assess installed-client compatibility.
