@@ -59,35 +59,7 @@ export default function Settings() {
       <Stack.Screen
         options={{
           title: "Husstanden",
-          headerRight:
-            Platform.OS === "ios"
-              ? undefined
-              : // Drawn like the iOS toolbar's glass capsule.
-                () => (
-                  <Pressable
-                    accessibilityRole="button"
-                    onPress={() => router.back()}
-                    style={(state) => [
-                      {
-                        marginRight: 16,
-                        minHeight: 36,
-                        paddingHorizontal: 14,
-                        borderRadius: 18,
-                        justifyContent: "center",
-                        backgroundColor: colors.heroControl,
-                      },
-                      pressed(state),
-                    ]}
-                  >
-                    <Copy
-                      size={15}
-                      weight="600"
-                      style={{ color: colors.onHero }}
-                    >
-                      Ferdig
-                    </Copy>
-                  </Pressable>
-                ),
+          headerRight: Platform.OS === "ios" ? undefined : () => <DoneButton />,
         }}
       />
       {Platform.OS === "ios" && (
@@ -250,5 +222,37 @@ export default function Settings() {
         </FormSection>
       </NativeForm>
     </Screen>
+  );
+}
+
+const doneHeight = 36;
+
+/** The web stand-in for the iOS toolbar's glass "Ferdig" capsule, inside a 44-point target. */
+function DoneButton() {
+  const colors = useTheme();
+
+  return (
+    <Pressable
+      accessibilityRole="button"
+      onPress={() => router.back()}
+      style={(state) => [
+        { minHeight: 44, justifyContent: "center", marginRight: 16 },
+        pressed(state),
+      ]}
+    >
+      <View
+        style={{
+          height: doneHeight,
+          borderRadius: doneHeight / 2,
+          paddingHorizontal: 14,
+          justifyContent: "center",
+          backgroundColor: colors.heroControl,
+        }}
+      >
+        <Copy size={15} weight="600" style={{ color: colors.onHero }}>
+          Ferdig
+        </Copy>
+      </View>
+    </Pressable>
   );
 }
