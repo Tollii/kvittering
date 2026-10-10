@@ -112,8 +112,8 @@ export function Icon({
 }
 
 /**
- * @deprecated Use `Press`. Kept until the category picker, the line editor,
- * and capture review move to it.
+ * Superseded by `Press`; kept only until the category picker, the line
+ * editor, and capture review move to it.
  */
 export const pressed = (state: PressableStateCallbackType): ViewStyle =>
   state.pressed ? { opacity: motion.highlightOpacity } : { opacity: 1 };
