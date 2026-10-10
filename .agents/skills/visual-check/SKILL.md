@@ -19,9 +19,9 @@ The iOS references for each screen are the simulator screenshots linked from the
 npm run visual:start
 ```
 
-This starts a disposable local Convex backend with the mock receipt provider and email sign-up, exports the web build, and serves it at `http://127.0.0.1:8081`. It prints the URL when ready. The first start in a session takes about a minute; later starts take about 20 seconds, because unchanged functions are not deployed again. Each start resets the data to the `reviewed-receipts` fixture from `tools/e2e/fixtures/`: one household with three reviewed receipts from September 2026. Choose another fixture with `VISUAL_FIXTURE=<name>`, or start without data with `VISUAL_FIXTURE=`. When a branch changes the schema, update the fixtures in the same change. `VISUAL_RESET=1` also deletes the database before the start. Logs are in `build/visual/`.
+This starts a disposable local Convex backend with the mock receipt provider and email sign-up, exports the web build, and serves it at `http://127.0.0.1:8081`. It prints the URL when ready. Later starts in a session are faster, because unchanged functions and packages are not deployed again. Each start resets the data to the `reviewed-receipts` fixture from `tools/e2e/fixtures/`: one household with three reviewed receipts. Choose another fixture with `VISUAL_FIXTURE=<name>`, or start without data with `VISUAL_FIXTURE=`. When a branch changes the schema, update the fixtures in the same change. `VISUAL_RESET=1` also deletes the database before the start. Logs are in `build/visual/`.
 
-The export is static. After an app change, run `npm run visual:build`, which re-exports in seconds and keeps the data; rerun `npm run visual:start` after a backend change or to reset the data.
+The export is static. After an app change, run `tools/visual/build.sh`, which re-exports quickly and keeps the data; rerun `npm run visual:start` after a backend change or to reset the data.
 
 The environment's setup script provides Chromium, ffmpeg, and unzip. The helper needs ffmpeg to shrink recordings to a size the PR can link, so if it is missing, report that and stop.
 
@@ -43,7 +43,7 @@ await App.run("add-receipt", async (app) => {
 });
 ```
 
-[app.mts](../../../tools/visual/app.mts) opens an iPhone 15-sized page in Norwegian and records video by default. The browser clock starts at 24 September 2026, just after the fixture's purchases, so month views match the references; pass `now: null` to `App.run` for the real time. `tap`, `see`, and `type` find the first visible element with this test ID, accessibility label, or exact visible text, as Maestro flows do. `app.page` is the Playwright page for anything else. `signIn` signs in to the seeded fixture account, so the flow starts with the fixture's data. `signUp` creates a new account and household, so the flow starts empty. The mock provider always returns the same example receipt (Eksempelbutikk).
+[app.mts](../../../tools/visual/app.mts) opens an iPhone 15-sized page in Norwegian and records video by default. The browser clock starts at `fixtureTime`, just after the fixture's purchases, so month views show the same month as the references. The backend keeps the real time, so a flow that creates receipts can mix the two months; pass `now: null` to `App.run` when it matters. `tap`, `see`, and `type` find the first visible element with this test ID, accessibility label, or exact visible text, as Maestro flows do. `app.page` is the Playwright page for anything else. `signIn` signs in to the seeded fixture account, so the flow starts with the fixture's data. `signUp` creates a new account and household, so the flow starts empty. The mock provider always returns the same example receipt (Eksempelbutikk).
 
 `App.run` saves numbered screenshots, `flow.mp4`, and a `flow.gif` preview in `build/visual/media/<name>/`, prints that directory, and on failure saves `failed.png` first. Browser errors print to stderr. Open the screenshots and check that each shows what its caption will claim before you publish them; a capture of an error or loading screen proves nothing.
 

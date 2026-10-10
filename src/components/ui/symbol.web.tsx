@@ -13,8 +13,9 @@ import regular from "expo-symbols/androidWeights/regular";
 import medium from "expo-symbols/androidWeights/medium";
 import semiBold from "expo-symbols/androidWeights/semiBold";
 
-const material = new Map<SFSymbol, AndroidSymbol>([
+const material = new Map<string, AndroidSymbol>([
   ["arrow.clockwise", "refresh"],
+  ["arrow.clockwise.circle", "refresh"],
   ["arrow.down", "arrow_downward"],
   ["arrow.right", "arrow_forward"],
   ["arrow.up", "arrow_upward"],
@@ -74,6 +75,7 @@ const material = new Map<SFSymbol, AndroidSymbol>([
   ["textformat", "text_fields"],
   ["trash", "delete"],
   ["tray", "inbox"],
+  ["tray.full", "inbox"],
   ["wifi.slash", "wifi_off"],
   ["xmark", "close"],
 ]);
@@ -86,18 +88,11 @@ const weights = new Map<SymbolViewProps["weight"], typeof light>([
 
 const reported = new Set<string>();
 
-/** The closest Material Symbol, ignoring variants such as `.fill` or `.circle`. */
+/** The matching Material Symbol; a `.fill` variant uses the outline glyph. */
 function materialName(symbol: SFSymbol) {
-  for (
-    let name: string = symbol;
-    name;
-    name = name.slice(0, Math.max(0, name.lastIndexOf(".")))
-  ) {
-    // SAFETY: Map.get accepts any key; a prefix that is no symbol returns undefined.
-    const match = material.get(name as SFSymbol);
+  const match = material.get(symbol.replace(/\.fill$/, ""));
 
-    if (match) return match;
-  }
+  if (match) return match;
 
   if (!reported.has(symbol)) {
     reported.add(symbol);

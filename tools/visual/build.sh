@@ -10,12 +10,16 @@ port="${VISUAL_PORT:-8081}"
 mkdir -p "$out"
 
 # The export inlines EXPO_PUBLIC_* values, and Metro's cache can keep an
-# earlier export's values, so clear it only when they change. The site
-# routes are proxied through the web server.
+# earlier export's values, so clear it when they, the .env files, the bundler
+# config, or the packages change. The site routes are proxied through the web
+# server.
 values="EXPO_PUBLIC_CONVEX_URL=http://127.0.0.1:3210
 EXPO_PUBLIC_CONVEX_SITE_URL=http://127.0.0.1:$port"
+inputs="$values
+$(git ls-files -co --exclude-standard metro.config.js package-lock.json ".env*" |
+  while read -r file; do [[ -f "$file" ]] && echo "$file $(git hash-object "$file")"; done)"
 clear=()
-if [[ "$(cat "$out/web.env" 2>/dev/null)" != "$values" ]]; then clear=(--clear); fi
+if [[ "$(cat "$out/web.env" 2>/dev/null)" != "$inputs" ]]; then clear=(--clear); fi
 
 echo "▸ Exporting the web build" >&2
 rm -rf "$out/web.next"
@@ -25,6 +29,6 @@ if ! env $values EXPO_OFFLINE=1 EXPO_NO_TELEMETRY=1 SENTRY_DISABLE_AUTO_UPLOAD=t
   tail -n 40 "$out/export.log" >&2
   exit 1
 fi
-echo "$values" >"$out/web.env"
+echo "$inputs" >"$out/web.env"
 rm -rf "$out/web"
 mv "$out/web.next" "$out/web"

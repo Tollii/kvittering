@@ -75,9 +75,17 @@ convex() {
   env -u CONVEX_DEPLOYMENT npx convex "$@" --env-file "$env_file" 2>>"$out/convex-cli.log"
 }
 
-# Skip the deploy when this backend already runs these functions.
+# Skip the deploy when this backend already runs these functions, the shared
+# code they bundle, and these packages.
+# Deleted files are still listed until staged, so hash only those that exist.
 deployed="$state/deployed"
-stamp="$( (echo "$web_origin"; git ls-files -co --exclude-standard convex ":!convex/_generated" | sort | xargs sha1sum) | sha1sum)"
+stamp="$(
+  echo "$web_origin"
+  git ls-files -co --exclude-standard convex src/lib package-lock.json ":!convex/_generated" |
+    while read -r file; do [[ -f "$file" ]] && echo "$file $(git hash-object "$file")"; done |
+    sort
+)"
+stamp="$(git hash-object --stdin <<<"$stamp")"
 if [[ -f "$deployed" && "$(cat "$deployed")" == "$stamp" ]]; then
   echo "$env_file"
   exit 0

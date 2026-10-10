@@ -10,6 +10,9 @@ import { mainTabs, useInboxBadge } from "@/features/main-tabs";
 
 const barHeight = 62;
 
+// Over the camera the iOS bar is glass on the dark viewfinder.
+const cameraTab = "index";
+
 function barBottom(inset: number) {
   return inset > 0 ? inset - 12 : 12;
 }
@@ -19,8 +22,7 @@ function TabBar({ state, navigation }: Readonly<BottomTabBarProps>) {
   const insets = useSafeAreaInsets();
   const badge = useInboxBadge();
 
-  // Over the camera the iOS bar is glass on the dark viewfinder.
-  const camera = state.routes[state.index]?.name === "index";
+  const camera = state.routes[state.index]?.name === cameraTab;
 
   return (
     <View
@@ -130,16 +132,13 @@ export default function TabLayout() {
 
   return (
     <Tabs
-      // A top position puts the bar first in the page, so browser flows that
-      // tap "Innboks" find the tab before a screen title with the same text.
       tabBar={(props) => <TabBar {...props} />}
       screenOptions={({ navigation, route }) => ({
         headerShown: false,
-        tabBarPosition: "top",
         sceneStyle: {
           paddingBottom: barHeight + barBottom(insets.bottom),
           backgroundColor:
-            route.name === "index"
+            route.name === cameraTab
               ? colors.cameraBackground
               : colors.background,
           // Without native screens, other tabs stay laid out behind this one.

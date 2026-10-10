@@ -36,6 +36,19 @@ const isolation = {
   "Cross-Origin-Embedder-Policy": "require-corp",
 };
 
+function coverScreen(path: string) {
+  const html = readFileSync(path, "utf8").replace(
+    'name="viewport" content="',
+    'name="viewport" content="viewport-fit=cover, ',
+  );
+
+  // Without it, safe areas are zero and screenshots drift from iOS unnoticed.
+  if (!html.includes("viewport-fit=cover"))
+    throw new Error(`${path} has no viewport meta tag to extend.`);
+
+  return html;
+}
+
 function file(path: string) {
   try {
     return statSync(path).isFile() ? path : undefined;
@@ -76,20 +89,30 @@ createServer((request, response) => {
       (file(requested) ?? file(join(requested, "index.html")))) ||
     join(root, "index.html");
 
-  response.writeHead(200, {
+  const headers = {
     "Content-Type": types.get(extname(path)) ?? "application/octet-stream",
     "Cache-Control": "no-store",
     ...isolation,
-  });
+  };
 
-  if (extname(path) === ".html")
-    response.end(
-      readFileSync(path, "utf8").replace(
-        'name="viewport" content="',
-        'name="viewport" content="viewport-fit=cover, ',
-      ),
-    );
-  else createReadStream(path).pipe(response);
+  if (extname(path) !== ".html") {
+    response.writeHead(200, headers);
+    // The file can vanish while tools/visual/build.sh swaps the directory.
+    createReadStream(path)
+      .on("error", () => response.destroy())
+      .pipe(response);
+
+    return;
+  }
+
+  try {
+    const html = coverScreen(path);
+    response.writeHead(200, headers).end(html);
+  } catch (error) {
+    // A missing shell is a build swap in progress; a missing viewport tag is a
+    // template change. Either way, report it instead of serving a drifted page.
+    response.writeHead(503, { "Retry-After": "1" }).end(String(error));
+  }
 }).listen(port, "127.0.0.1", () => {
   console.log(`Serving ${root} at http://127.0.0.1:${port}`);
 });
