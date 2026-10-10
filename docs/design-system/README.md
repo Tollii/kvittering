@@ -33,6 +33,8 @@ The [Kvitto design system on claude.ai](https://claude.ai/artifact/N6izBtD3XSNnF
 
 The [design engineering](../../.agents/skills/emil-design-eng/SKILL.md), [Apple design](../../.agents/skills/apple-design/SKILL.md), and [Expo animation](../../.agents/skills/animate-expo/SKILL.md) skills, with their siblings for reviewing, auditing, and stress-testing UI, are Emil Kowalski's, vendored unchanged. Use them to judge interaction and motion; several speak in web terms, so translate CSS to React Native and Reanimated. Where they and these pages differ, these pages win. Their recipes sometimes install a package with `npx expo install`; a new native package needs a new TestFlight build, so prefer what the app already ships.
 
+The [make-interfaces-feel-better](../../.agents/skills/make-interfaces-feel-better/SKILL.md) skill is Andreas's own refinement checklist for typography, surfaces, icons, motion and rendering cost, vendored from the personal skills on the Mac so cloud threads see the same one. It works within whatever system it finds, so here it works within these pages.
+
 ## Changing the system
 
 When a screen needs something the system does not have, add it to the shared component or the theme, use it from every place that needs it, and describe it on the page it belongs to in the same change. Where the app once did the same thing in more than one way, these pages now state the one way; a new exception needs a reason written next to it.
