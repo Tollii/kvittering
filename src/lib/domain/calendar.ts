@@ -206,9 +206,16 @@ export const CalendarMonth = {
   last: (month: CalendarMonth): CalendarDate =>
     CalendarMonth.day(month, CalendarMonth.days(month)),
 
-  /** "september 2026". */
+  /** "september 2026", for use inside a sentence. */
   format: (month: CalendarMonth): string =>
     monthLabel.format(CalendarDate.toNoon(CalendarMonth.first(month))),
+
+  /** "September 2026", for a label that stands alone, such as a heading or a menu item. */
+  title(month: CalendarMonth): string {
+    const label = CalendarMonth.format(month);
+
+    return label.charAt(0).toLocaleUpperCase("nb-NO") + label.slice(1);
+  },
 
   /** Every date of the month in order. */
   dates: (month: CalendarMonth): CalendarDate[] =>

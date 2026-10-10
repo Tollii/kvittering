@@ -97,7 +97,7 @@ export function ReceiptCard({
             )}
           </View>
           {busy ? (
-            <ActivityIndicator color={colors.accent} />
+            <ActivityIndicator color={colors.primary} />
           ) : (
             !stacked &&
             receipt.data && (

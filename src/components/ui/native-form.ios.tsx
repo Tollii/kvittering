@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Form, Host, RNHostView, Section, VStack } from "@expo/ui/swift-ui";
 import {
   frame,
+  listRowBackground,
   onGeometryChange,
   scrollContentBackground,
 } from "@expo/ui/swift-ui/modifiers";
@@ -20,11 +21,13 @@ export function NativeForm({ children }: NativeFormProps) {
 }
 
 export function FormSection({ title, children }: FormSectionProps) {
+  const colors = useTheme();
   // Measure the native row before text can establish an unconstrained width.
   const [width, setWidth] = useState(0);
 
   return (
-    <Section title={title}>
+    // The theme's card colour on every row, where the system would draw its grey.
+    <Section title={title} modifiers={[listRowBackground(colors.surface)]}>
       <VStack
         modifiers={[
           frame({ maxWidth: Infinity, alignment: "leading" }),

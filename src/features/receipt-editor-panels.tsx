@@ -1,4 +1,4 @@
-import { ActivityIndicator, Alert, Pressable, View } from "react-native";
+import { ActivityIndicator, Alert, View } from "react-native";
 import { Ore } from "@/lib/domain/ore";
 import {
   Button,
@@ -9,7 +9,6 @@ import {
   Panel,
   Row,
   Segments,
-  pressed,
 } from "@/components/ui";
 import type { ReceiptData } from "@/lib/domain/receipt";
 import type { Receipt } from "@/lib/domain/insights";
@@ -87,29 +86,12 @@ export function ReceiptLineControls({
         />
       )}
       {!allLines && confirmable > 1 && (
-        <Pressable
-          accessibilityRole="button"
+        <Button
+          title={`Bekreft alle ${confirmable} foreslåtte kategorier`}
+          variant="tint"
+          icon="checkmark.circle"
           onPress={onConfirmAll}
-          style={(state) => [
-            {
-              flexDirection: "row",
-              alignItems: "center",
-              gap: 10,
-              padding: 12,
-              borderRadius: 14,
-              borderCurve: "continuous",
-              backgroundColor: colors.surface,
-              borderWidth: 1.5,
-              borderColor: colors.primary,
-            },
-            pressed(state),
-          ]}
-        >
-          <Icon name="checkmark.circle" size={20} />
-          <Copy weight="600" style={{ color: colors.primary, flex: 1 }}>
-            Bekreft alle {confirmable} foreslåtte kategorier
-          </Copy>
-        </Pressable>
+        />
       )}
       {!allLines && reviewComplete && (
         <Panel style={{ alignItems: "center", paddingVertical: 24 }}>
@@ -233,7 +215,7 @@ export function ReceiptPlaceholder({
 
   return (
     <Panel style={{ alignItems: "center", paddingVertical: 28, gap: 8 }}>
-      {processing && <ActivityIndicator color={colors.accent} />}
+      {processing && <ActivityIndicator color={colors.primary} />}
       <Copy weight="600" size={18}>
         {processing ? "Kvitteringen leses" : "Ingen resultater ennå"}
       </Copy>

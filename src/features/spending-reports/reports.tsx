@@ -3,12 +3,14 @@ import { CalendarDate, CalendarMonth } from "@/lib/domain/calendar";
 import { Ore } from "@/lib/domain/ore";
 import { type ComponentProps, type ReactNode } from "react";
 import { View } from "react-native";
-import { Copy, Empty, Icon, Notice, Panel, Row } from "@/components/ui";
+import { Copy, Empty, Icon, List, Notice, Row } from "@/components/ui";
 import { SpendingBars } from "@/components/spending-details";
-import { FamilyPurchases, familySummary } from "@/components/family-purchases";
-import { SpendingCalendar } from "@/components/spending-calendar";
+import {
+  FamilyPurchases,
+  familySummary,
+} from "@/features/spending-reports/family-purchases";
+import { SpendingCalendar } from "@/features/spending-reports/spending-calendar";
 import { openReceipt } from "@/components/receipt-card";
-import { useTheme } from "@/constants/theme";
 import { isCategoryUncertain } from "@/lib/domain/receipt-issues";
 import {
   priceSignalLabel,
@@ -62,7 +64,6 @@ export function useSpendingReports({
   onAccounting,
   onClose,
 }: ReportProps) {
-  const colors = useTheme();
   const pricier = surprises.filter((signal) => signal.ratio > 1);
 
   const uncertainCategories = totals.selected.reduce(
@@ -144,28 +145,21 @@ export function useSpendingReports({
               icon="tag"
             />
           )}
-          {historyComplete && surprises.length > 0 && (
-            <Panel style={{ gap: 0, paddingVertical: 4 }}>
-              {surprises.map((signal, index) => (
-                <View
+          {historyComplete && (
+            <List>
+              {surprises.map((signal) => (
+                <Row
                   key={`${signal.receipt._id}:${signal.line.id}`}
-                  style={{
-                    borderTopWidth: index ? 1 : 0,
-                    borderTopColor: colors.line,
+                  title={signal.name}
+                  detail={`${CalendarDate.format(signal.receipt.data?.purchaseDate)} · vanlig ${Ore.format(Ore.round(signal.typicalUnitPrice))}`}
+                  value={priceSignalLabel(signal)}
+                  onPress={() => {
+                    onClose();
+                    openReceipt(signal.receipt);
                   }}
-                >
-                  <Row
-                    title={signal.name}
-                    detail={`${CalendarDate.format(signal.receipt.data?.purchaseDate)} · vanlig ${Ore.format(Ore.round(signal.typicalUnitPrice))}`}
-                    value={priceSignalLabel(signal)}
-                    onPress={() => {
-                      onClose();
-                      openReceipt(signal.receipt);
-                    }}
-                  />
-                </View>
+                />
               ))}
-            </Panel>
+            </List>
           )}
         </>
       ),
@@ -212,23 +206,25 @@ export function useSpendingReports({
             Betalt beløp inkluderer pant. Dagligvaresummen viser varekjøp etter
             rabatter.
           </Copy>
-          <Row
-            title="Betalt"
-            value={Ore.format(totals.paid)}
-            onPress={() => onAccounting("paid")}
-          />
-          {[
-            { name: "Rabatter", amount: totals.discounts },
-            { name: "Pant betalt", amount: totals.deposits },
-            { name: "Pant returnert", amount: totals.returns },
-          ].map((item) => (
+          <List>
             <Row
-              key={item.name}
-              title={item.name}
-              value={Ore.format(item.amount)}
-              onPress={() => onAccounting(item.name)}
+              title="Betalt"
+              value={Ore.format(totals.paid)}
+              onPress={() => onAccounting("paid")}
             />
-          ))}
+            {[
+              { name: "Rabatter", amount: totals.discounts },
+              { name: "Pant betalt", amount: totals.deposits },
+              { name: "Pant returnert", amount: totals.returns },
+            ].map((item) => (
+              <Row
+                key={item.name}
+                title={item.name}
+                value={Ore.format(item.amount)}
+                onPress={() => onAccounting(item.name)}
+              />
+            ))}
+          </List>
         </>
       ),
     },
@@ -251,10 +247,12 @@ export function useSpendingReports({
                   dagligvaresummen.
                 </Copy>
               )}
-              <Row
-                title={`${coverage.unlinkedCount} varer uten produktkobling`}
-                onPress={() => onAccounting("unlinked")}
-              />
+              <List>
+                <Row
+                  title={`${coverage.unlinkedCount} varer uten produktkobling`}
+                  onPress={() => onAccounting("unlinked")}
+                />
+              </List>
               {totals.unknownTotals + totals.unknownAmounts > 0 && (
                 <Notice tone="warning">Beløp mangler</Notice>
               )}
@@ -277,18 +275,20 @@ export function useSpendingReports({
                 },
               ].map((item) =>
                 item.receipts.length > 0 ? (
-                  <View key={item.label}>
+                  <View key={item.label} style={{ gap: 8 }}>
                     <Notice tone="warning">{item.label}</Notice>
-                    {item.receipts.map((receipt) => (
-                      <Row
-                        key={receipt._id}
-                        title={receipt.data?.store ?? "Kvittering"}
-                        onPress={() => {
-                          onClose();
-                          openReceipt(receipt);
-                        }}
-                      />
-                    ))}
+                    <List>
+                      {item.receipts.map((receipt) => (
+                        <Row
+                          key={receipt._id}
+                          title={receipt.data?.store ?? "Kvittering"}
+                          onPress={() => {
+                            onClose();
+                            openReceipt(receipt);
+                          }}
+                        />
+                      ))}
+                    </List>
                   </View>
                 ) : null,
               )}

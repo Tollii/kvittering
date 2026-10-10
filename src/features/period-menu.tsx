@@ -1,6 +1,6 @@
 import { View } from "react-native";
 import { CalendarMonth } from "@/lib/domain/calendar";
-import { Copy, Icon } from "./ui";
+import { Copy, Icon } from "@/components/ui";
 import { useTheme } from "@/constants/theme";
 
 export type PeriodMenuProps = Readonly<{
@@ -26,7 +26,7 @@ export function PeriodMenu({ value }: PeriodMenuProps) {
     >
       <Icon name="calendar" size={18} color={colors.onHero} />
       <Copy size={17} style={{ color: colors.onHero }}>
-        {CalendarMonth.format(value)}
+        {CalendarMonth.title(value)}
       </Copy>
     </View>
   );

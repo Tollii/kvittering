@@ -11,12 +11,13 @@ import { useConvex } from "convex/react";
 import * as Clipboard from "expo-clipboard";
 import { randomUUID } from "expo-crypto";
 import { api } from "../../convex/_generated/api";
-import { Button, Copy, Icon, Notice, Row, Screen } from "@/components/ui";
+import { Button, Copy, Icon, List, Notice, Row, Screen } from "@/components/ui";
 import { useHousehold } from "@/features/household-context";
+import { OfflineNotice } from "@/features/offline-notice";
 import { BudgetSettings } from "@/features/budget-settings";
 import { OdaSettings } from "@/features/oda-settings";
 import { NotificationSettings } from "@/features/notifications";
-import { useTheme } from "@/constants/theme";
+import { radius, useTheme } from "@/constants/theme";
 import { failureMessage } from "@/lib/failure-message";
 
 export default function Settings() {
@@ -62,27 +63,29 @@ export default function Settings() {
           </Stack.Toolbar.Button>
         </Stack.Toolbar>
       )}
+      <OfflineNotice />
       <NativeForm>
         <FormSection title={household.name}>
           <HouseholdNameSettings />
-          <View>
-            {details?.members.map((member, index) => (
-              <View
-                key={member._id}
-                style={{
-                  borderTopWidth: index ? 1 : 0,
-                  borderTopColor: colors.line,
-                }}
-              >
-                <Row title={member.name} icon="person" />
-              </View>
-            ))}
-            {!details && (
-              <Copy muted style={{ paddingVertical: 10 }}>
-                Koble til nettet for å se medlemmene.
-              </Copy>
-            )}
-          </View>
+          {details ? (
+            <List
+              // The form row already is the card, so the rows sit flush in it.
+              style={{
+                backgroundColor: "transparent",
+                borderRadius: 0,
+                paddingHorizontal: 0,
+                paddingVertical: 0,
+              }}
+            >
+              {details.members.map((member) => (
+                <Row key={member._id} title={member.name} icon="person" />
+              ))}
+            </List>
+          ) : (
+            <Copy muted style={{ paddingVertical: 10 }}>
+              Koble til nettet for å se medlemmene.
+            </Copy>
+          )}
         </FormSection>
         {!full && (
           <FormSection title="Inviter partneren din">
@@ -93,7 +96,7 @@ export default function Settings() {
                   alignItems: "center",
                   gap: 10,
                   padding: 12,
-                  borderRadius: 12,
+                  borderRadius: radius.tile,
                   borderCurve: "continuous",
                   backgroundColor: colors.surfaceRaised,
                   borderWidth: 1,

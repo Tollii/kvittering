@@ -202,13 +202,6 @@ export function SignIn() {
                 variant="secondary"
                 title="Opprett konto med e-post"
                 disabled={busy}
-                style={{
-                  minHeight: 56,
-                  borderRadius: 28,
-                  backgroundColor: "transparent",
-                  borderWidth: 1,
-                  borderColor: colors.line,
-                }}
                 onPress={() => setEmailMode("register")}
               />
             )}
@@ -236,7 +229,6 @@ export function SignIn() {
                   autoComplete="name"
                   textContentType="name"
                   editable={!busy}
-                  style={{ borderRadius: 14 }}
                 />
               )}
               <Field
@@ -250,7 +242,6 @@ export function SignIn() {
                 autoComplete="email"
                 textContentType="emailAddress"
                 editable={!busy}
-                style={{ borderRadius: 14 }}
               />
               <Field
                 label="Passord"
@@ -265,14 +256,12 @@ export function SignIn() {
                 onSubmitEditing={() => void submit()}
                 hint={register ? "Minst 12 tegn" : undefined}
                 editable={!busy}
-                style={{ borderRadius: 14 }}
               />
             </View>
             <Button
               title={register ? "Opprett konto" : "Logg inn"}
               testID="sign-in-submit"
               busy={pending === "email"}
-              style={{ minHeight: 56, borderRadius: 28 }}
               disabled={busy || !canSubmit}
               onPress={() => void submit()}
             />

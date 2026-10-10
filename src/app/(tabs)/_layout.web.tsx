@@ -40,7 +40,6 @@ function TabBar({ state, navigation }: Readonly<BottomTabBarProps>) {
         backgroundColor: camera ? colors.heroTrack : colors.surface,
         borderWidth: StyleSheet.hairlineWidth,
         borderColor: camera ? colors.heroControl : colors.line,
-        boxShadow: `0 8px 24px ${colors.shadow}`,
       }}
     >
       {state.routes.map((route, index) => {

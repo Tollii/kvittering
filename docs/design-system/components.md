@@ -2,32 +2,44 @@
 
 Shared presentation components live in [`src/components/ui`](../../src/components/ui) and are imported from `@/components/ui`. Reach for these before styling a `View` or `Pressable` yourself; when a screen needs something they cannot express, extend the component rather than copying its styles. The source owns props and exact styles; this page explains purpose, variants, and states.
 
+## Where components live
+
+A component's folder says how far it reaches, so a reader knows what a change touches:
+
+- [`src/components/ui`](../../src/components/ui) is the catalogue: presentation only, no household data, used anywhere. Everything on this page below lives here unless it says otherwise.
+- [`src/components`](../../src/components) holds domain components that more than one screen shares: `ReceiptCard` and its status helpers, `SpendingBars` and `SpendingDetails`, `MoneyField`, `ReceiptTip`, and the monument artwork.
+- [`src/features`](../../src/features) holds screens' own parts, next to the screen or sheet that uses them: the receipt editor's sections, the spending reports with their calendar, family purchases and store map, the period menu of Forbruk, and the context menu of Historikk.
+
+When a second screen needs a feature's component, move it up to `src/components` in the same change; when it needs new styling, extend the `ui` component it is built from.
+
 ## Text and icons
 
 **`Copy`** ([typography](../../src/components/ui/typography.tsx)) is the only text component. It takes `size`, `weight`, and `muted`, and sets line height, tracking, and tabular numerals. See [typography](foundations.md#typography) for the size of each role.
 
+**`Amount`** is the large number a screen or sheet leads with, and `detail` is its one-line explanation under it, such as "3 kjøp" or "12 poster i perioden". `hero` puts it on a `SummaryBand` in `onHero`; otherwise it sits on paper at the top of a sheet or a detail view.
+
 **`Icon`** renders an SF Symbol, `primary` by default, hidden from VoiceOver. Label the control that contains it instead. The web build shows the closest Material Symbol from [symbol.web.tsx](../../src/components/ui/symbol.web.tsx); a new symbol needs an entry there, or browser checks show a question mark and log an error.
 
-**`pressed(state)`** is the shared press style. Use it on any custom `Pressable`.
+**`pressed(state)`** and **`faded(disabled)`** are the shared press and disabled styles. Use both on any custom `Pressable`.
 
 ## Actions
 
 **`Button`** ([controls](../../src/components/ui/controls.tsx)) is a full-width-capable action with an optional leading SF Symbol.
 
-| Variant     | Look                               | Use                                                                           |
-| ----------- | ---------------------------------- | ----------------------------------------------------------------------------- |
-| `primary`   | `primary` fill, `onPrimary` text   | The one main action on a screen or sheet: "Lagre og godkjenn", "Logg inn".    |
-| `secondary` | `muted` fill, `text`               | Alternatives: "Forkast importen", "Vis flere kvitteringer".                   |
-| `tint`      | `primarySoft` fill, `primary` text | A supporting action that should still read as cobalt: "Kopier", "Prøv igjen". |
-| `danger`    | `dangerSoft` fill, `danger` text   | Destructive actions such as "Slett kvittering". Confirm with an alert.        |
+| Variant     | Look                               | Use                                                                                             |
+| ----------- | ---------------------------------- | ----------------------------------------------------------------------------------------------- |
+| `primary`   | `primary` fill, `onPrimary` text   | The one main action on a screen or sheet: "Lagre og godkjenn", "Logg inn".                      |
+| `secondary` | `muted` fill, `text`               | Alternatives: "Forkast importen", "Vis flere kvitteringer", and `compact` for "Vis alle 8".     |
+| `tint`      | `primarySoft` fill, `primary` text | A supporting action that should still read as cobalt: "Kopier", "Prøv igjen", "Bekreft alle …". |
+| `danger`    | `dangerSoft` fill, `danger` text   | Destructive actions such as "Slett kvittering". Confirm with an alert.                          |
 
-States: `disabled` fades the button; `busy` shows a spinner in place of the icon, or before the title when there is no icon, and disables the button while keeping the title. `compact` is the shorter size for inline and footer use.
+States: `disabled` fades the button; `busy` shows a spinner in place of the icon, or before the title when there is no icon, and disables the button while keeping the title. `compact` is the shorter size for inline and footer use. A "show more" control under a list is a `compact` `secondary` button, not a row.
 
 **`IconButton`** is an icon-only control with a required Norwegian `label`. `filled` adds the muted disc, or pass a colour such as `heroControl` on the hero.
 
 **`SettingsButton`** ([layout](../../src/components/ui/layout.tsx)) opens household settings. Every tab places it at the top right; `surface="camera"` adapts it to the viewfinder.
 
-**`Chip`** shows a short status or opens a picker. Tones are `muted`, `primary`, `accent`, `success`, and `warning`. A chip with `onPress` grows to a full touch target and shows a chevron, unless `trailing="none"` marks it as an action rather than a dropdown. A chip without `onPress` is read as text.
+**`Chip`** shows a short status or opens a picker. Tones are `muted`, `success`, and `warning`. A chip with `onPress` grows to a full touch target and shows a chevron, unless `trailing="none"` marks it as an action rather than a dropdown. A chip without `onPress` is read as text.
 
 ## Inputs
 
@@ -43,18 +55,15 @@ States: `disabled` fades the button; `busy` shows a spinner in place of the icon
 
 ## Surfaces
 
-**`Panel`** ([surfaces](../../src/components/ui/surfaces.tsx)) is the card. Tones:
+**`Panel`** ([surfaces](../../src/components/ui/surfaces.tsx)) is the card. `surface` is the default card on `background`; `plain` is a quieter `surfaceRaised` card for a group nested inside another card, such as product search inside the line editor.
 
-- `surface`: the default card on `background`.
-- `plain`: a quieter `surfaceRaised` card, for a nested group such as product search inside the line editor.
-- `soft`: a `primarySoft` card. Nothing uses it today.
-- `primary`: the cobalt `hero`. With `borderRadius: 0` it forms the summary band under a hero header.
+**`List`** is the card that holds a list. It draws a `line` divider between its children and renders nothing when it has none, so every list in the app, rows, spending bars, receipt lines, and the receipts of a month in Historikk, sits in one of these and looks the same. Give it `Row`s or other full-width elements directly, one per row; a fragment or a string is not a row, and the caller needs no index bookkeeping or empty guard.
 
-For a list inside a card, set `gap: 0` and `paddingVertical: 4`, and give each row after the first a 1-point `line` top border.
+**`Row`** is the list item: an optional `IconTile`, a title, detail text, a trailing value, and a chevron when tappable. `selected` swaps the chevron for a checkmark. Large text moves the value under the title (see [accessibility](foundations.md#accessibility)).
 
-**`Row`** is the list item: an optional icon tile, a title, detail text, a trailing value, and a chevron when tappable. `selected` swaps the chevron for a checkmark. Large text moves the value under the title (see [accessibility](foundations.md#accessibility)).
+**`IconTile`** is the soft cobalt tile behind an icon: a 32-point squircle with the `tile` radius in a `Row` and the upload queue, where it can hold a spinner instead, or the 64-point `circle` that `Empty` leads with.
 
-**`SectionTitle`** heads a group with an optional text action on the right, such as "Start" in the inbox.
+**`SectionTitle`** heads a group with optional detail text under it and an optional text action on the right, such as "Start" in the inbox. Historikk uses the detail for the month's count and total.
 
 **`Disclosure`** is a card that expands in place for secondary detail, such as "Om kvitteringen" or "Slik er endringen beregnet".
 
@@ -62,11 +71,11 @@ For a list inside a card, set `gap: 0` and `paddingVertical: 4`, and give each r
 
 ## Feedback and states
 
-**`Notice`** is an inline message with an icon. Tones: `info` (soft cobalt), `warning`, `error` (marked as an alert), and `success`. Pass `icon="wifi.slash"` for the offline notice; [screen states](patterns.md#states-every-data-screen-handles) say where it goes.
+**`Notice`** is an inline message with an icon. Tones: `info` (soft cobalt), `warning`, `error` (marked as an alert), and `success`. [Screen states](patterns.md#states-every-data-screen-handles) say where the offline notice goes. `title` adds a bold first line above the message, and `onPress` makes the notice a button with a trailing chevron, as the pending-receipts notice on Forbruk that opens Innboks. `OfflineNotice` ([offline notice](../../src/features/offline-notice.tsx)) is the "Uten nett" notice that reads the household's connection itself; a screen renders it first instead of checking `online`.
 
 **`Loading`** is a centred spinner with a Norwegian status, "Henter …" by default. Name what is loading: "Henter kvittering …".
 
-**`Empty`** is a card with an icon disc, title, message, and optional actions, for an empty state anywhere but a tab root, such as "Ingen treff" or "Ingen rettelser ennå". **`IllustratedEmpty`** ([artwork](../../src/components/monument-artwork.tsx)) puts the monument artwork on an empty tab root: "Ingen kvitteringer til kontroll" in the inbox and "Historikken begynner her" in history.
+**`Empty`** is a card with an icon disc, title, message, and optional actions, for an empty state anywhere but a tab root, such as "Ingen treff" or "Ingen rettelser ennå". **`IllustratedEmpty`** ([artwork](../../src/components/monument-artwork.tsx)) puts the monument artwork on an empty tab root with a screen-title-sized heading: "Ingen kvitteringer til kontroll" in the inbox and "Historikken begynner her" in history.
 
 **`ReceiptTip`** ([receipt tip](../../src/components/receipt-tip.tsx)) shows a native TipKit tip, such as the widget suggestion on Forbruk. It renders nothing where TipKit is unavailable.
 
@@ -75,13 +84,15 @@ For a list inside a card, set `gap: 0` and `paddingVertical: 4`, and give each r
 **`Screen`** ([layout](../../src/components/ui/layout.tsx)) is the page frame. It provides the safe area, keyboard avoidance, scrolling, a maximum content width, and three optional regions:
 
 - `title` and `subtitle` draw the cobalt hero header with the arch mark; `settings` adds `SettingsButton` and `headerRight` adds other icon buttons.
-- `summary` sits under the header, edge to edge, for a cobalt summary band.
+- `summary` takes a `SummaryBand`, which sits under the header edge to edge.
 - `footer` pins an action bar to the bottom, above the home indicator, on `surface` with a hairline top border.
 
 Pass `insetTop={false}` when a native stack header already covers the top inset.
 
+**`SummaryBand`** is the cobalt band with a screen's key number: the month menu and total on Forbruk, the paid amount and status chips on a receipt, the current item in Koble produkter. It owns the hero fill and padding; screens put an `Amount size="hero"` and `onHero` text inside it.
+
 **`Sheet`** is a bottom sheet with a title, a close button ("Lukk"), optional fixed `header` and `footer`, and scrolling content. On iOS it is a native sheet with medium and large detents and a drag indicator. Set `dismissible={false}` while closing would lose work or leave an invalid value: while a save is busy, or while the paid amount is invalid in Kvitteringsdetaljer.
 
-**`NativeForm`** and **`FormSection`** ([native form](../../src/components/ui/native-form.ios.tsx)) render a SwiftUI grouped form on iOS for settings-style screens and field sheets, with React Native content inside each section.
+**`NativeForm`** and **`FormSection`** ([native form](../../src/components/ui/native-form.ios.tsx)) render a SwiftUI grouped form on iOS for settings-style screens and field sheets, with React Native content inside each section. Each section takes the theme's `surface` as its row background, so settings cards match every other card in both colour schemes.
 
-**Native menus.** `PeriodMenu` ([period menu](../../src/components/period-menu.ios.tsx)) and `ReceiptContextMenu` ([context menu](../../src/components/receipt-context-menu.ios.tsx)) use SwiftUI menus on iOS; each has a plain fallback for other platforms in the same folder, drawn to look like the iOS control at rest.
+**Native menus.** `PeriodMenu` ([period menu](../../src/features/period-menu.ios.tsx)) and `ReceiptContextMenu` ([context menu](../../src/features/receipt-context-menu.ios.tsx)) use SwiftUI menus on iOS; each has a plain fallback for other platforms in the same folder, drawn to look like the iOS control at rest.

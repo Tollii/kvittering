@@ -2,7 +2,7 @@ import { CalendarDate } from "@/lib/domain/calendar";
 import { Ore } from "@/lib/domain/ore";
 import { Pressable, View, useWindowDimensions } from "react-native";
 import { useTheme } from "@/constants/theme";
-import { Copy, Panel, Row, Sheet } from "./ui";
+import { Amount, Copy, List, Row, Sheet, pressed } from "./ui";
 import { openReceipt, receiptStatusLabel } from "./receipt-card";
 import { contributionKey, type SpendingGroup } from "@/lib/domain/insights";
 
@@ -23,7 +23,7 @@ export function SpendingBars<
   const maximum = Math.max(1, ...rows.map((row) => Math.abs(row.amountOre)));
 
   return (
-    <View>
+    <List>
       {rows.map((row, index) => {
         const share =
           total && total > 0
@@ -38,15 +38,15 @@ export function SpendingBars<
             accessibilityRole="button"
             accessibilityLabel={`${row.name}, ${Ore.format(row.amountOre)}${shareLabel}`}
             onPress={() => onSelect(row)}
-            style={({ pressed }) => ({
-              minHeight: 62,
-              borderBottomWidth: 1,
-              borderBottomColor: colors.line,
-              gap: 6,
-              justifyContent: "center",
-              paddingVertical: 10,
-              opacity: pressed ? 0.6 : 1,
-            })}
+            style={(state) => [
+              {
+                minHeight: 60,
+                gap: 6,
+                justifyContent: "center",
+                paddingVertical: 10,
+              },
+              pressed(state),
+            ]}
           >
             <View
               style={{
@@ -95,7 +95,7 @@ export function SpendingBars<
           </Pressable>
         );
       })}
-    </View>
+    </List>
   );
 }
 
@@ -106,49 +106,38 @@ export function SpendingDetails({
   selected: SpendingGroup | null;
   onClose: () => void;
 }>) {
-  const colors = useTheme();
-
   return (
     <Sheet title={selected?.name ?? ""} visible={!!selected} onClose={onClose}>
       {selected && (
         <>
-          <Copy size={34} weight="800">
+          <Amount
+            detail={`${selected.contributions.length} ${selected.contributions.length === 1 ? "post" : "poster"} i perioden`}
+          >
             {Ore.format(selected.amountOre)}
-          </Copy>
-          <Copy size={13} muted>
-            {selected.contributions.length}{" "}
-            {selected.contributions.length === 1 ? "post" : "poster"} i perioden
-          </Copy>
-          <Panel style={{ gap: 0, paddingVertical: 4 }}>
-            {selected.contributions.map((contribution, index) => (
-              <View
+          </Amount>
+          <List>
+            {selected.contributions.map((contribution) => (
+              <Row
                 key={contributionKey(contribution)}
-                style={{
-                  borderTopWidth: index ? 1 : 0,
-                  borderTopColor: colors.line,
+                title={
+                  contribution.line?.name ||
+                  contribution.receipt.data?.store ||
+                  "Kvittering"
+                }
+                detail={`${CalendarDate.format(contribution.receipt.data?.purchaseDate)} · ${contribution.line ? (contribution.receipt.data?.store ?? "") : receiptStatusLabel(contribution.receipt)}`}
+                value={Ore.format(contribution.amountOre)}
+                onPress={() => {
+                  onClose();
+                  openReceipt(contribution.receipt);
                 }}
-              >
-                <Row
-                  title={
-                    contribution.line?.name ||
-                    contribution.receipt.data?.store ||
-                    "Kvittering"
-                  }
-                  detail={`${CalendarDate.format(contribution.receipt.data?.purchaseDate)} · ${contribution.line ? (contribution.receipt.data?.store ?? "") : receiptStatusLabel(contribution.receipt)}`}
-                  value={Ore.format(contribution.amountOre)}
-                  onPress={() => {
-                    onClose();
-                    openReceipt(contribution.receipt);
-                  }}
-                />
-              </View>
+              />
             ))}
             {!selected.contributions.length && (
               <Copy muted style={{ paddingVertical: 10 }}>
                 Ingen kjøp i denne perioden.
               </Copy>
             )}
-          </Panel>
+          </List>
         </>
       )}
     </Sheet>

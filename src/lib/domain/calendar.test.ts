@@ -80,4 +80,13 @@ describe("CalendarMonth", () => {
     expect(CalendarMonth.shift(CalendarMonth.of(2026, 11), 3)).toBe("2027-02");
     expect(CalendarMonth.year(february)).toBe(2024);
   });
+
+  it("capitalises a month that stands alone", () => {
+    expect(CalendarMonth.format(CalendarMonth.of(2026, 9))).toBe(
+      "september 2026",
+    );
+    expect(CalendarMonth.title(CalendarMonth.of(2026, 9))).toBe(
+      "September 2026",
+    );
+  });
 });

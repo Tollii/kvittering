@@ -31,7 +31,8 @@ export default createLiveActivity(
         </VStack>
       ),
       compactLeading: (
-        <Image systemName="receipt" modifiers={[foregroundStyle("#7488FF")]} />
+        // The Dynamic Island is always black, so this is the dark scheme's `primary`.
+        <Image systemName="receipt" modifiers={[foregroundStyle("#A5B7FF")]} />
       ),
       compactTrailing: <Text>{`${props.completed}/${props.total}`}</Text>,
       minimal: <Image systemName="receipt" />,

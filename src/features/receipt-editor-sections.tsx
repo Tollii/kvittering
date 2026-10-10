@@ -5,13 +5,16 @@ import { Alert, View, useWindowDimensions } from "react-native";
 import { router } from "expo-router";
 import { randomUUID } from "expo-crypto";
 import {
+  Amount,
   Button,
   Chip,
   Copy,
   Icon,
   IconButton,
+  List,
   Notice,
   Panel,
+  SummaryBand,
 } from "@/components/ui";
 import { ReceiptImages } from "@/features/receipt-images";
 import { type reconcile, type ReceiptData } from "@/lib/domain/receipt";
@@ -213,104 +216,88 @@ export function ReceiptSummary({
   const { fontScale } = useWindowDimensions();
 
   return (
-    <Panel
-      tone="primary"
-      style={{
-        padding: 0,
-        gap: 0,
-        borderRadius: 0,
-      }}
-    >
-      <View style={{ padding: 20, gap: 12 }}>
+    <SummaryBand style={{ gap: 12 }}>
+      <View
+        style={{
+          flexDirection: "row",
+          alignItems: "flex-start",
+          flexWrap: "wrap",
+          gap: 8,
+        }}
+      >
         <View
           style={{
-            flexDirection: "row",
-            alignItems: "flex-start",
-            flexWrap: "wrap",
-            gap: 8,
+            flex: 1,
+            minWidth: fontScale > 1.3 ? "100%" : undefined,
+            gap: 4,
           }}
         >
-          <View
-            style={{
-              flex: 1,
-              minWidth: fontScale > 1.3 ? "100%" : undefined,
-              gap: 4,
-            }}
-          >
-            <Copy size={13} weight="600" style={{ color: colors.onHeroMuted }}>
-              {CalendarDate.format(data?.purchaseDate)}
-              {data?.purchaseDate && data.purchaseTime
-                ? ` kl. ${data.purchaseTime}`
-                : ""}
-              {data?.branch ? ` · ${data.branch}` : ""}
-            </Copy>
-            <Copy
-              size={36}
-              weight="600"
-              selectable
-              style={{ color: colors.onHero }}
-            >
-              {Ore.format(data?.totalOre ?? null)}
-            </Copy>
-          </View>
-          <View style={{ flexDirection: "row", gap: 6 }}>
-            {receipt.imageCount > 0 && (
-              <ReceiptImages
-                receipt={receipt}
-                compact
-                color={colors.onHero}
-                background={colors.heroControl}
-              />
-            )}
-            <IconButton
-              name="pencil"
-              label="Rediger kvitteringsdetaljer"
-              filled={colors.heroControl}
-              size={17}
-              color={colors.onHero}
-              disabled={!data || busy}
-              onPress={onEditFields}
-            />
-          </View>
-        </View>
-        <View
-          style={{
-            flexDirection: "row",
-            gap: 6,
-            flexWrap: "wrap",
-            alignItems: "center",
-          }}
-        >
-          <Chip
-            label={dirty ? "Ulagrede endringer" : receiptStatusLabel(receipt)}
-            tone={
-              dirty
-                ? "warning"
-                : receipt.status === "reviewed"
-                  ? "success"
-                  : "muted"
-            }
-            icon={
-              receipt.status === "reviewed"
-                ? "checkmark.seal"
-                : processing
-                  ? "hourglass"
-                  : receipt.status === "failed"
-                    ? "exclamationmark.triangle"
-                    : "doc.text.magnifyingglass"
-            }
-          />
-          {excluded && <Chip label="Utelatt" icon="eye.slash" />}
-          {!approved && chips}
-        </View>
-        {receipt.status === "reviewed" && !dirty && !excluded && (
-          <Copy size={14} style={{ color: colors.onHeroMuted }}>
-            Kvitteringen er med i forbruket. Du trenger ikke kontrollere hver
-            vare. Produktkobling er valgfritt.
+          <Copy size={13} weight="600" style={{ color: colors.onHeroMuted }}>
+            {CalendarDate.format(data?.purchaseDate)}
+            {data?.purchaseDate && data.purchaseTime
+              ? ` kl. ${data.purchaseTime}`
+              : ""}
+            {data?.branch ? ` · ${data.branch}` : ""}
           </Copy>
-        )}
+          <Amount hero>{Ore.format(data?.totalOre ?? null)}</Amount>
+        </View>
+        <View style={{ flexDirection: "row", gap: 6 }}>
+          {receipt.imageCount > 0 && (
+            <ReceiptImages
+              receipt={receipt}
+              compact
+              color={colors.onHero}
+              background={colors.heroControl}
+            />
+          )}
+          <IconButton
+            name="pencil"
+            label="Rediger kvitteringsdetaljer"
+            filled={colors.heroControl}
+            size={17}
+            color={colors.onHero}
+            disabled={!data || busy}
+            onPress={onEditFields}
+          />
+        </View>
       </View>
-    </Panel>
+      <View
+        style={{
+          flexDirection: "row",
+          gap: 6,
+          flexWrap: "wrap",
+          alignItems: "center",
+        }}
+      >
+        <Chip
+          label={dirty ? "Ulagrede endringer" : receiptStatusLabel(receipt)}
+          tone={
+            dirty
+              ? "warning"
+              : receipt.status === "reviewed"
+                ? "success"
+                : "muted"
+          }
+          icon={
+            receipt.status === "reviewed"
+              ? "checkmark.seal"
+              : processing
+                ? "hourglass"
+                : receipt.status === "failed"
+                  ? "exclamationmark.triangle"
+                  : "doc.text.magnifyingglass"
+          }
+        />
+        {excluded && <Chip label="Utelatt" icon="eye.slash" />}
+        {!approved && chips}
+      </View>
+      {receipt.status === "reviewed" && !dirty && !excluded && (
+        <Copy size={14} style={{ color: colors.onHeroMuted }}>
+          Kvitteringen er med i forbruket. Du trenger ikke kontrollere hver
+          vare. Produktkobling er valgfritt.
+        </Copy>
+      )}
+    </SummaryBand>
   );
 }
 
@@ -510,18 +497,7 @@ export function ReceiptLineList({
   lines: ReceiptData["lines"];
   renderLine: (line: ReceiptData["lines"][number]) => ReactNode;
 }) {
-  const colors = useTheme();
-
   return lines.length ? (
-    <Panel style={{ gap: 0, paddingVertical: 2 }}>
-      {lines.map((line, index) => (
-        <View
-          key={line.id}
-          style={{ borderTopWidth: index ? 1 : 0, borderTopColor: colors.line }}
-        >
-          {renderLine(line)}
-        </View>
-      ))}
-    </Panel>
+    <List style={{ paddingVertical: 2 }}>{lines.map(renderLine)}</List>
   ) : null;
 }
