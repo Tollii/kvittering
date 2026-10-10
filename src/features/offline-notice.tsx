@@ -3,8 +3,8 @@ import { useHousehold } from "./household-context";
 
 /**
  * The "Uten nett" notice that every screen reading household data shows
- * first while offline. `detail` says when queued work will land, for a
- * screen whose actions wait for the network instead of failing.
+ * first while offline. `detail` explains the disabled controls on a screen
+ * whose every action needs the server.
  */
 export function OfflineNotice({ detail }: Readonly<{ detail?: string }>) {
   const { online } = useHousehold();

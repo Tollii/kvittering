@@ -31,7 +31,7 @@ A typical screen, top to bottom:
 
 - **Loading:** `Loading` with a named object, or keep the cached content and show a notice that more is coming.
 - **Empty:** `IllustratedEmpty` on an empty tab root; `Empty` everywhere else.
-- **Offline:** `OfflineNotice` at the top of every screen that reads or writes household data: the four tabs, the receipt, Forbruksanalyse, Rettelser, Koble produkter, and settings. Content from the local cache stays readable, and actions that need the server are disabled rather than hidden. A screen whose actions queue, such as Koble produkter, passes a `detail` line saying when they will land.
+- **Offline:** `OfflineNotice` at the top of every screen that reads or writes household data: the four tabs, the receipt, Forbruksanalyse, Rettelser, Koble produkter, and settings. Content from the local cache stays readable, and actions that need the server are disabled rather than hidden. A screen whose every action needs the server, such as Koble produkter, passes a `detail` line that says so, so the disabled controls are explained.
 - **Error:** `Notice tone="error"` near the action that failed, with the message from `failureMessage`.
 - **Partial data:** reports say when they are provisional ("foreløpige") or incomplete instead of showing a total as final.
 
