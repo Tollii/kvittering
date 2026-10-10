@@ -28,8 +28,11 @@ const problems: string[] = [];
 for (const document of documents) {
   const text = withoutFencedCode(readFileSync(document, "utf8"));
 
-  for (const match of text.matchAll(/\]\(([^)\s]+)(?:\s+"[^"]*")?\)/g)) {
-    const target = match[1] ?? "";
+  // Markdown links and the `src` of embedded HTML images.
+  for (const match of text.matchAll(
+    /\]\(([^)\s]+)(?:\s+"[^"]*")?\)|\bsrc="([^"]+)"/g,
+  )) {
+    const target = match[1] ?? match[2] ?? "";
 
     // URLs and absolute paths to a contributor's machine are outside the repository.
     if (/^[a-z]+:/i.test(target) || target.startsWith("/")) continue;
