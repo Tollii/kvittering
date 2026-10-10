@@ -10,6 +10,8 @@ Code and configuration own exact values and feature behavior. Documentation shou
 
 ## UI changes
 
+Before building or changing anything a person sees, read the [design system](docs/design-system/README.md) and the page your change touches. Update that page when a convention it states changes.
+
 Reviewers judge a UI change from its PR, so any change that alters what a person sees needs before and after screenshots there, plus a short video for multi-step flows. On a Mac with Xcode, verify the change and capture the media on the iOS Simulator, because it runs the real native app. Where no simulator is available, as in cloud sessions, use the [visual-check](.agents/skills/visual-check/SKILL.md) skill instead. Then add the `simulator-check` label to the PR: a scheduled task on the user's Mac runs [simulator-check](.agents/skills/simulator-check/SKILL.md) for labeled PRs and adds simulator media. Add the label again after pushing a later change that alters what a person sees. The web build approximates iOS, so name in the PR any native-only path it could not show, such as the camera, Keychain, widgets, or system icons.
 
 ## Tests
