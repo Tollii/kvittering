@@ -3,7 +3,14 @@ import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { parseEnv } from "node:util";
 import { z } from "zod";
-import { loadFixture, resolveTables } from "./fixtures.mts";
+import {
+  hasReceiptReference,
+  loadFixture,
+  receiptIds,
+  resolveReceiptReferences,
+  resolveTables,
+  withoutReceiptReferences,
+} from "./fixtures.mts";
 
 const site = "http://127.0.0.1:3211";
 
@@ -133,8 +140,37 @@ if (fixture) {
     householdId: household._id,
   });
 
-  for (const [table, rows] of Object.entries(tables)) {
-    if (table !== "households") importTable(table, rows);
+  // The deployment assigns receipt ids, so rows that refer to a receipt wait
+  // for the receipts to be imported and read back. A referencing receipt is
+  // imported again with its own id and the references in place.
+  const receipts = tables.receipts ?? [];
+  importTable("receipts", receipts.map(withoutReceiptReferences));
+
+  const ids = receiptIds(
+    z
+      .array(z.object({ _id: z.string(), clientId: z.string() }))
+      .length(receipts.length)
+      .parse(
+        JSON.parse(
+          convex(["data", "receipts", "--format", "json", "--limit", "1000"]),
+        ),
+      ),
+  );
+
+  const resolved = resolveReceiptReferences(tables, ids);
+
+  if (receipts.some(hasReceiptReference))
+    importTable(
+      "receipts",
+      (resolved.receipts ?? []).map((row) => ({
+        _id: ids.get(z.string().parse(row.clientId)),
+        ...row,
+      })),
+    );
+
+  for (const [table, rows] of Object.entries(resolved)) {
+    if (table !== "households" && table !== "receipts")
+      importTable(table, rows);
   }
 
   writeFileSync(

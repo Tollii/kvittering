@@ -64,9 +64,19 @@ function appendTables(
   }
 }
 
-/** Replace complete placeholder values; never interpolate fixture text as code. */
+type Tables = z.infer<typeof tablesSchema>;
+
+type Row = Tables[string][number];
+
+const receiptReference = z.string().regex(/^\$\{RECEIPT:[a-z][a-z0-9-]*\}$/);
+
+/**
+ * Replace complete placeholder values; never interpolate fixture text as code.
+ * A `${RECEIPT:<clientId>}` value stays for `resolveReceiptReferences`, because
+ * the deployment assigns receipt ids on import.
+ */
 export function resolveTables(
-  tables: z.infer<typeof tablesSchema>,
+  tables: Tables,
   identity: { userId: string; householdId: string; issuer: string },
 ) {
   const references = new Map([
@@ -87,4 +97,54 @@ export function resolveTables(
   );
 
   return tablesSchema.parse(JSON.parse(json));
+}
+
+/** Whether a row still refers to another receipt by its fixture client id. */
+export function hasReceiptReference(row: Row): boolean {
+  return Object.values(row).some(
+    (value) => receiptReference.safeParse(value).success,
+  );
+}
+
+/** The row without its receipt references, for the import that assigns the ids. */
+export function withoutReceiptReferences(row: Row): Row {
+  return Object.fromEntries(
+    Object.entries(row).filter(
+      ([, value]) => !receiptReference.safeParse(value).success,
+    ),
+  );
+}
+
+/** Replace `${RECEIPT:<clientId>}` values with the ids the deployment assigned. */
+export function resolveReceiptReferences(
+  tables: Tables,
+  ids: ReadonlyMap<string, string>,
+) {
+  const json = JSON.stringify(tables).replace(
+    /"\$\{RECEIPT:([a-z][a-z0-9-]*)\}"/g,
+    (_match, clientId: string) => {
+      const id = ids.get(clientId);
+
+      if (!id) throw new Error(`Unknown fixture receipt: ${clientId}`);
+
+      return JSON.stringify(id);
+    },
+  );
+
+  return tablesSchema.parse(JSON.parse(json));
+}
+
+/** Receipt ids by fixture client id, from the documents a deployment holds. */
+export function receiptIds(
+  rows: readonly { _id: string; clientId: string }[],
+): Map<string, string> {
+  const ids = new Map<string, string>();
+
+  for (const row of rows) {
+    if (ids.has(row.clientId))
+      throw new Error(`Fixture receipts share the client id ${row.clientId}.`);
+    ids.set(row.clientId, row._id);
+  }
+
+  return ids;
 }
