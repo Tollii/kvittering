@@ -142,6 +142,8 @@ export function CategoryPicker({
 
   const groupName = categoryGroups.find(([id]) => id === group)?.[1];
 
+  if (group && !groupName) throw new Error("Velg en kjent kategorigruppe.");
+
   return (
     <Sheet
       title="Velg kategori"
@@ -183,7 +185,7 @@ export function CategoryPicker({
       {query || group ? (
         <>
           <SectionTitle
-            title={query ? `${results.length} treff` : (groupName ?? "")}
+            title={groupName ?? `${results.length} treff`}
             action={query ? undefined : "Alle kategorier"}
             onAction={() => setGroup(null)}
           />

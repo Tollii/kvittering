@@ -100,7 +100,8 @@ export function ReceiptLineControls({
             allLines ? balanceLabel(difference) : suggestionLabel(confirmable)
           }
           action={!allLines && confirmable > 1 ? "Bekreft alle" : undefined}
-          onAction={onConfirmAll}
+          actionLabel={`Bekreft alle ${confirmable} foreslåtte kategorier`}
+          onAction={!allLines && confirmable > 1 ? onConfirmAll : undefined}
         />
       )}
     </>

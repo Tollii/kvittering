@@ -63,7 +63,7 @@ States: `disabled` fades the button; `busy` shows a spinner in place of the icon
 
 **`IconTile`** is the soft cobalt tile behind an icon: a 32-point squircle with the `tile` radius in a `Row` and the upload queue, where it can hold a spinner instead, or the 64-point `circle` that `Empty` leads with.
 
-**`SectionTitle`** heads a group with optional detail text under it and an optional text action on the right, such as "Start" in the inbox. Historikk uses the detail for the month's count and total.
+**`SectionTitle`** heads a group with optional detail text under it and an optional text action on the right, such as "Start" in the inbox or "Bekreft alle" over the review lines; `actionLabel` names the object for VoiceOver when the short action text does not. Historikk uses the detail for the month's count and total.
 
 **`Disclosure`** is a card that expands in place for secondary detail, such as "Om kvitteringen" or "Slik er endringen beregnet".
 

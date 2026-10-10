@@ -26,9 +26,7 @@ import {
   parseCategoryId,
 } from "@/lib/domain/categories";
 import { failureMessage } from "@/lib/failure-message";
-
-const plural = (count: number, one: string, many: string) =>
-  `${count} ${count === 1 ? one : many}`;
+import { plural } from "@/lib/domain/receipt-review";
 
 /** Corrections record ids as stored, which may predate the current categories. */
 const categoryName = (id: string | null) => {

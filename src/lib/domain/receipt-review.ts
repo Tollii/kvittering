@@ -310,6 +310,37 @@ export function reviewTasks(
     : [{ kind: "receipt-issues", issues: [parsed.issue.message] }];
 }
 
+export const plural = (count: number, one: string, many: string) =>
+  `${count} ${count === 1 ? one : many}`;
+
+/** The short, plain-language name of what a task asks for. */
+export function reviewTaskLabel(task: ReviewTask): string {
+  switch (task.kind) {
+    case "duplicate":
+      return "Mulig duplikat";
+    case "store":
+      return "Butikk mangler";
+    case "total":
+      return "Betalt beløp mangler";
+    case "date":
+      return "Dato mangler";
+    case "currency":
+      return "Valuta må sjekkes";
+    case "difference":
+      return "Beløpene stemmer ikke";
+    case "no-lines":
+      return "Ingen varer lest";
+    case "receipt-issues":
+      return plural(task.issues.length, "merknad", "merknader");
+    case "amounts":
+      return `${task.count} beløp mangler`;
+    case "names":
+      return `${task.count} navn mangler`;
+    case "line-issues":
+      return plural(task.count, "vare å sjekke", "varer å sjekke");
+  }
+}
+
 /** Short, plain-language summary of what a receipt still needs, for lists. */
 export function reviewSummary(
   data: ReceiptData | null,
@@ -317,33 +348,5 @@ export function reviewSummary(
 ): string[] {
   if (!data) return [];
 
-  const plural = (count: number, one: string, many: string) =>
-    `${count} ${count === 1 ? one : many}`;
-
-  return reviewTasks(data, unresolvedDuplicate).map((task) => {
-    switch (task.kind) {
-      case "duplicate":
-        return "Mulig duplikat";
-      case "store":
-        return "Butikk mangler";
-      case "total":
-        return "Betalt beløp mangler";
-      case "date":
-        return "Dato mangler";
-      case "currency":
-        return "Valuta må sjekkes";
-      case "difference":
-        return "Beløpene stemmer ikke";
-      case "no-lines":
-        return "Ingen varer lest";
-      case "receipt-issues":
-        return plural(task.issues.length, "merknad", "merknader");
-      case "amounts":
-        return `${task.count} beløp mangler`;
-      case "names":
-        return `${task.count} navn mangler`;
-      case "line-issues":
-        return plural(task.count, "vare å sjekke", "varer å sjekke");
-    }
-  });
+  return reviewTasks(data, unresolvedDuplicate).map(reviewTaskLabel);
 }

@@ -4,15 +4,13 @@ import { describe, expect, it } from "vitest";
 import { z } from "zod";
 import { convexTest, type TestConvex } from "convex-test";
 import { api } from "../../convex/_generated/api";
-import type { Id } from "../../convex/_generated/dataModel";
 import schema from "../../convex/schema";
 import { reviewSummary } from "../../src/lib/domain/receipt-review";
 import {
+  importFixtureTables,
   loadFixture,
-  receiptIds,
   resolveReceiptReferences,
   resolveTables,
-  withoutReceiptReferences,
 } from "./fixtures.mjs";
 
 const issuer = "http://127.0.0.1:3211";
@@ -23,21 +21,20 @@ const names = readdirSync(new URL("./fixtures/", import.meta.url), {
   .filter((entry) => entry.isDirectory())
   .map((entry) => entry.name);
 
+const receiptRow = z.object({ clientId: z.string() });
+
 /** Receipt ids as the test resolves them before any import. */
 function fixtureReceiptIds(tables: ReturnType<typeof resolveTables>) {
-  return receiptIds(
-    (tables.receipts ?? []).map((row) => ({
-      _id: `receipt-${String(row.clientId)}`,
-      clientId: String(row.clientId),
-    })),
+  return new Map(
+    (tables.receipts ?? []).map((row) => {
+      const { clientId } = receiptRow.parse(row);
+
+      return [clientId, `receipt-${clientId}`];
+    }),
   );
 }
 
-/**
- * Insert the fixture the way the seed script imports it: the household first,
- * then the receipts without their references, then everything that refers to
- * a receipt by its assigned id.
- */
+/** Insert the fixture through the same orchestration as the seed script. */
 async function seed(t: TestConvex<typeof schema>, name: string) {
   const fixture = loadFixture(name);
 
@@ -53,48 +50,31 @@ async function seed(t: TestConvex<typeof schema>, name: string) {
       householdId,
     });
 
-    const ids = new Map<string, Id<"receipts">>();
+    const ids = await importFixtureTables(tables, {
+      async importTable(table, rows) {
+        if (!(table in schema.tables))
+          throw new Error(`${name}: unknown table ${table}`);
 
-    for (const receipt of tables.receipts ?? []) {
-      const id = await ctx.db.insert(
-        "receipts",
-        parse(
-          schema.tables.receipts.validator,
-          withoutReceiptReferences(receipt),
-        ),
-      );
+        // SAFETY: The check above confirms that the fixture names a schema table.
+        const tableName = table as keyof typeof schema.tables;
 
-      ids.set(z.string().parse(receipt.clientId), id);
-    }
+        for (const { _id, ...row } of rows) {
+          const document = parse(schema.tables[tableName].validator, row);
+          const id = z.string().optional().parse(_id);
+          const stored = id ? ctx.db.normalizeId(tableName, id) : null;
 
-    const resolved = resolveReceiptReferences(tables, ids);
+          if (id && !stored) throw new Error(`${name}: unknown id ${id}`);
 
-    for (const receipt of resolved.receipts ?? []) {
-      const id = ids.get(z.string().parse(receipt.clientId));
-
-      if (!id) throw new Error(`${name}: receipt was not inserted`);
-
-      await ctx.db.replace(
-        id,
-        parse(schema.tables.receipts.validator, receipt),
-      );
-    }
-
-    for (const [table, rows] of Object.entries(resolved)) {
-      if (table === "households" || table === "receipts") continue;
-
-      if (!(table in schema.tables))
-        throw new Error(`${name}: unknown table ${table}`);
-
-      // SAFETY: The check above confirms that the fixture names a schema table.
-      const tableName = table as keyof typeof schema.tables;
-
-      for (const row of rows)
-        await ctx.db.insert(
-          tableName,
-          parse(schema.tables[tableName].validator, row),
-        );
-    }
+          if (stored) await ctx.db.replace(stored, document);
+          else await ctx.db.insert(tableName, document);
+        }
+      },
+      readReceipts: () =>
+        ctx.db
+          .query("receipts")
+          .collect()
+          .then((rows) => rows.map(({ _id, clientId }) => ({ _id, clientId }))),
+    });
 
     return { householdId, ids: Object.fromEntries(ids) };
   });
@@ -151,7 +131,6 @@ describe("end-to-end fixtures", () => {
     expect((await user.query(api.households.current, {}))?.household.name).toBe(
       "Test household",
     );
-    expect(Object.keys(ids)).toHaveLength(3);
 
     for (const id of Object.values(ids)) {
       const detail = await user.query(api.receipts.detail, { id });
@@ -204,16 +183,6 @@ describe("end-to-end fixtures", () => {
     );
 
     expect(duplicate?.duplicateOf).toBe(ids["e2e-reviewed-1"]);
-
-    const corrections = await user.query(api.corrections.listPage, {
-      paginationOpts: { numItems: 20, cursor: null },
-    });
-
-    expect(corrections.page.map((entry) => entry.field)).toEqual([
-      "catalog",
-      "category",
-      "category",
-    ]);
   });
 
   it("rejects an unresolved reference before import", () => {

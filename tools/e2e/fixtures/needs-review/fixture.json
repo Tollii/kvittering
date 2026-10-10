@@ -364,7 +364,7 @@
         "name": "EVERGOOD KAFFE",
         "field": "catalog",
         "previous": null,
-        "expected": "kassalapp:7039010019729",
+        "expected": "ean:7039010019729",
         "evidence": {
           "id": "coffee",
           "kind": "product",

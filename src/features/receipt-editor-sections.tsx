@@ -137,7 +137,8 @@ export function PurchaseTotals({
   const { fontScale } = useWindowDimensions();
 
   // Components appear only when present; the line sum and paid amount always do.
-  const rows: { label: string; amount: Ore | null }[] = [
+  // The next-step notice names an open difference; the paid row only marks it.
+  const rows: { label: string; amount: Ore | null; paid?: boolean }[] = [
     ...[
       { label: "Varer før rabatt", amount: totals.products },
       { label: "Rabatter", amount: totals.discounts },
@@ -148,10 +149,9 @@ export function PurchaseTotals({
       { label: "Andre justeringer", amount: totals.adjustments },
     ].filter((row) => row.amount !== 0),
     { label: "Sum av linjene", amount: totals.calculated },
-    { label: "Betalt", amount: data.totalOre },
+    { label: "Betalt", amount: data.totalOre, paid: true },
   ];
 
-  // The next-step notice names the open difference; the paid row only marks it.
   const paidUnsettled = totals.difference !== 0;
 
   return (
@@ -185,11 +185,9 @@ export function PurchaseTotals({
           </Copy>
           <Copy
             size={14}
-            weight={row.label === "Betalt" ? "700" : "500"}
+            weight={row.paid ? "700" : "500"}
             style={
-              row.label === "Betalt" && paidUnsettled
-                ? { color: colors.warning }
-                : undefined
+              row.paid && paidUnsettled ? { color: colors.warning } : undefined
             }
           >
             {Ore.format(row.amount)}
