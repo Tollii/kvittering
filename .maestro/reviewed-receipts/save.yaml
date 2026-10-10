@@ -14,7 +14,7 @@ name: Save a receipt edit and read it after clearing local app data
 - assertNotVisible: "Kvitteringsdetaljer"
 - tapOn: "Lagre og godkjenn"
 - extendedWaitUntil:
-    visible: "Til innboksen"
+    visible: "Til kvitteringene"
     timeout: 30000
 # Clear the device cache and draft before reading the saved server value.
 - runFlow: history.yaml

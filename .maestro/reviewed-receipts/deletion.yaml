@@ -7,7 +7,7 @@ name: Delete one receipt and retain the other household receipts
 - assertVisible: "Slette kvitteringen[?]"
 - tapOn: "Slett"
 - extendedWaitUntil:
-    visible: "Historikk"
+    visible: "Kvitteringer"
     timeout: 30000
 - assertVisible: "KIWI.*"
 - assertVisible: "Coop Extra.*"
@@ -15,9 +15,9 @@ name: Delete one receipt and retain the other household receipts
 - stopApp
 - launchApp
 - extendedWaitUntil:
-    visible: "Historikk"
+    visible: "Kvitteringer"
     timeout: 30000
-- tapOn: "Historikk"
+- tapOn: "Kvitteringer"
 - assertVisible: "KIWI.*"
 - assertVisible: "Coop Extra.*"
 - assertNotVisible: "REMA 1000.*"

@@ -8,7 +8,7 @@ A component's folder says how far it reaches, so a reader knows what a change to
 
 - [`src/components/ui`](../../src/components/ui) is the catalogue: presentation only, no household data, used anywhere. Everything on this page below lives here unless it says otherwise.
 - [`src/components`](../../src/components) holds domain components that more than one screen shares: `ReceiptCard` and its status helpers, `SpendingBars` and `SpendingDetails`, `MoneyField`, `ReceiptTip`, and the monument artwork.
-- [`src/features`](../../src/features) holds screens' own parts, next to the screen or sheet that uses them: the receipt editor's sections and its next-step notice, the inbox's upload queue card, the spending reports with their calendar, family purchases and store map, the period menu of Forbruk, and the context menu of Historikk.
+- [`src/features`](../../src/features) holds screens' own parts, next to the screen or sheet that uses them: the receipt editor's sections and its next-step notice, the pending receipts of Kvitteringer with their upload queue card, the spending reports with their calendar, family purchases and store map, the period menu of Forbruk, and the context menu of Kvitteringer.
 
 When a second screen needs a feature's component, move it up to `src/components` in the same change; when it needs new styling, extend the `ui` component it is built from.
 
@@ -63,19 +63,19 @@ States: `disabled` fades the button; `busy` shows a spinner in place of the icon
 
 **`IconTile`** is the soft cobalt tile behind an icon: a 32-point squircle with the `tile` radius in a `Row` and the upload queue, where it can hold a spinner instead, or the 64-point `circle` that `Empty` leads with.
 
-**`SectionTitle`** heads a group with optional detail text under it and an optional text action on the right, such as "Start" in the inbox or "Bekreft alle" over the review lines; `actionLabel` names the object for VoiceOver when the short action text does not. Historikk uses the detail for the month's count and total.
+**`SectionTitle`** heads a group with optional detail text under it and an optional text action on the right, such as "Start" over the receipts to review or "Bekreft alle" over the review lines; `actionLabel` names the object for VoiceOver when the short action text does not. Kvitteringer uses the detail for the month's count and total.
 
 **`Disclosure`** is a card that expands in place for secondary detail, such as "Om kvitteringen" or "Slik er endringen beregnet".
 
-**`ReceiptCard`** ([receipt card](../../src/components/receipt-card.tsx)) summarises a receipt in the inbox: store, date and branch, total, and a coloured status line (warning for review, danger for failure) followed by what needs attention. A receipt still being processed shows a spinner in place of the total; `compact`, used for those receipts in the inbox, tightens the padding and drops an empty status line.
+**`ReceiptCard`** ([receipt card](../../src/components/receipt-card.tsx)) summarises a receipt that waits for a person or is still on its way in: store, date and branch, total, and a coloured status line (warning for review, danger for failure) followed by what needs attention. A receipt still being processed shows a spinner in place of the total; `compact`, used for those receipts under "Under behandling", tightens the padding and drops an empty status line.
 
 ## Feedback and states
 
-**`Notice`** is an inline message with an icon. Tones: `info` (soft cobalt), `warning`, `error` (marked as an alert), and `success`. [Screen states](patterns.md#states-every-data-screen-handles) say where the offline notice goes. `title` adds a bold first line above the message, and `onPress` makes the notice a button with a trailing chevron, as the pending-receipts notice on Forbruk that opens Innboks and the next-step notice on a receipt under review, whose title is the open question and whose message says how to settle it. `OfflineNotice` ([offline notice](../../src/features/offline-notice.tsx)) is the "Uten nett" notice that reads the household's connection itself; a screen renders it first instead of checking `online`.
+**`Notice`** is an inline message with an icon. Tones: `info` (soft cobalt), `warning`, `error` (marked as an alert), and `success`. [Screen states](patterns.md#states-every-data-screen-handles) say where the offline notice goes. `title` adds a bold first line above the message, and `onPress` makes the notice a button with a trailing chevron, as the pending-receipts notice on Forbruk that opens Kvitteringer and the next-step notice on a receipt under review, whose title is the open question and whose message says how to settle it. `OfflineNotice` ([offline notice](../../src/features/offline-notice.tsx)) is the "Uten nett" notice that reads the household's connection itself; a screen renders it first instead of checking `online`.
 
 **`Loading`** is a centred spinner with a Norwegian status, "Henter …" by default. Name what is loading: "Henter kvittering …".
 
-**`Empty`** is a card with an icon disc, title, message, and optional actions, for an empty state anywhere but a tab root, such as "Ingen treff" or "Ingen rettelser ennå". **`IllustratedEmpty`** ([artwork](../../src/components/monument-artwork.tsx)) puts the monument artwork on an empty tab root with a screen-title-sized heading: "Ingen kvitteringer til kontroll" in the inbox and "Historikken begynner her" in history.
+**`Empty`** is a card with an icon disc, title, message, and optional actions, for an empty state anywhere but a tab root, such as "Ingen treff" or "Ingen rettelser ennå". **`IllustratedEmpty`** ([artwork](../../src/components/monument-artwork.tsx)) puts the monument artwork on an empty tab root with a screen-title-sized heading, as "Kvitteringene samles her" on Kvitteringer.
 
 **`ReceiptTip`** ([receipt tip](../../src/components/receipt-tip.tsx)) shows a native TipKit tip, such as the widget suggestion on Forbruk. It renders nothing where TipKit is unavailable.
 

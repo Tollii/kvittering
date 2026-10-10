@@ -33,11 +33,17 @@ import {
   Sheet,
 } from "@/components/ui";
 import { IllustratedEmpty } from "@/components/monument-artwork";
-import { openReceipt } from "@/components/receipt-card";
+import { openReceipt, statusLabels } from "@/components/receipt-card";
 import { SpendingBars } from "@/components/spending-details";
 import { OfflineNotice } from "@/features/offline-notice";
+import {
+  PendingReceipts,
+  usePendingReceipts,
+} from "@/features/pending-receipts";
+import { isReceiptProcessing } from "@/lib/domain/receipt-state";
+import type { receiptListItem } from "@/lib/domain/receipt-summary";
 
-export default function History() {
+export default function Receipts() {
   const { fontScale } = useWindowDimensions();
   const [search, setSearch] = useState("");
   const [tab, setTab] = useState<"receipts" | "products">("receipts");
@@ -56,7 +62,19 @@ export default function History() {
     tab === "products",
   );
 
-  const filtered = history.results;
+  const pending = usePendingReceipts();
+
+  // Receipts still on their way in sit under "Under behandling" until they are read.
+  const filtered = history.results.filter(
+    (receipt) => !isReceiptProcessing(receipt.status),
+  );
+
+  const pinned = tab === "receipts" && !search.trim();
+
+  const pendingShown =
+    pinned &&
+    pending.attention.length + pending.working.length + pending.queue.length >
+      0;
 
   const completeReceipts =
     tab === "products" ? completeProducts : history.status === "Exhausted";
@@ -66,25 +84,6 @@ export default function History() {
       ? !completeProducts
       : history.status === "LoadingFirstPage";
 
-  const sorted = [...filtered].sort(
-    (a, b) =>
-      CalendarDate.compare(b.purchaseDate, a.purchaseDate) ||
-      b._creationTime - a._creationTime,
-  );
-
-  const months = new Map<CalendarMonth | "unknown", typeof sorted>();
-
-  for (const receipt of sorted) {
-    const key = receipt.purchaseDate
-      ? CalendarDate.month(receipt.purchaseDate)
-      : "unknown";
-
-    months.set(key, [...(months.get(key) ?? []), receipt]);
-  }
-
-  const monthTitle = (key: CalendarMonth | "unknown") =>
-    key === "unknown" ? "Uten dato" : CalendarMonth.title(key);
-
   const allProducts = productHistory(receipts);
   const products = allProducts.filter((product) => matches(product.name));
   const selected = allProducts.find((product) => product.key === selectedKey);
@@ -92,7 +91,7 @@ export default function History() {
 
   return (
     <Screen
-      title={Platform.OS === "ios" ? undefined : "Historikk"}
+      title={Platform.OS === "ios" ? undefined : "Kvitteringer"}
       settings={Platform.OS !== "ios"}
       insetTop={Platform.OS !== "ios"}
     >
@@ -129,6 +128,7 @@ export default function History() {
         ]}
       />
       <OfflineNotice />
+      {pinned && <PendingReceipts {...pending} />}
       {!completeReceipts && (
         <Notice>
           {tab === "products" || term
@@ -140,44 +140,15 @@ export default function History() {
         <Loading />
       ) : (
         <>
-          {tab === "receipts" &&
-            [...months.entries()].map(([key, items]) => {
-              const total = Ore.sum(
-                items.map((receipt) => receipt.spendingOre),
-              );
-
-              return (
-                <View key={key} style={{ gap: 4 }}>
-                  <SectionTitle
-                    title={monthTitle(key)}
-                    detail={`${items.length} ${items.length === 1 ? "kvittering" : "kvitteringer"} · ${Ore.format(total)}`}
-                  />
-                  <List>
-                    {items.map((receipt) => (
-                      <ReceiptContextMenu
-                        key={receipt._id}
-                        receiptId={receipt._id}
-                        store={receipt.store || "Ny kvittering"}
-                        amount={Ore.format(receipt.totalOre)}
-                        date={CalendarDate.format(receipt.purchaseDate)}
-                      >
-                        <Row
-                          title={receipt.store || "Ny kvittering"}
-                          detail={CalendarDate.format(receipt.purchaseDate)}
-                          value={Ore.format(receipt.totalOre)}
-                          onPress={() =>
-                            router.push({
-                              pathname: "/receipt/[id]",
-                              params: { id: receipt._id },
-                            })
-                          }
-                        />
-                      </ReceiptContextMenu>
-                    ))}
-                  </List>
-                </View>
-              );
-            })}
+          {tab === "receipts" && <ReceiptMonths receipts={filtered} />}
+          {tab === "products" && (
+            <SectionTitle
+              title="Varer"
+              detail="En koblet vare samler kjøpene på tvers av navn og butikker."
+              action="Koble produkter"
+              onAction={() => router.push("/product-linking")}
+            />
+          )}
           {tab === "products" && (
             <List>
               {products.map((product) => (
@@ -195,11 +166,7 @@ export default function History() {
             (search.trim() || tab === "products" ? (
               <Empty title="Ingen treff" icon="magnifyingglass" />
             ) : (
-              <IllustratedEmpty
-                scene="history"
-                title="Historikken begynner her"
-                message="Lagrede kvitteringer vises her når de er behandlet."
-              />
+              !pendingShown && <NoReceipts />
             ))}
         </>
       )}
@@ -281,5 +248,102 @@ export default function History() {
         )}
       </Sheet>
     </Screen>
+  );
+}
+
+/** Name the state of a receipt that is not plainly reviewed, so the list says what the pinned section does. */
+function rowDetail(
+  receipt: Pick<
+    ReturnType<typeof receiptListItem>,
+    "purchaseDate" | "status" | "excluded"
+  >,
+) {
+  const date = CalendarDate.format(receipt.purchaseDate);
+
+  if (receipt.excluded) return `${date} · Utelatt fra forbruk`;
+
+  return receipt.status === "reviewed"
+    ? date
+    : `${date} · ${statusLabels[receipt.status]}`;
+}
+
+/** Receipts by purchase month, newest first, with each month's count and spending. */
+function ReceiptMonths({
+  receipts,
+}: Readonly<{ receipts: ReturnType<typeof receiptListItem>[] }>) {
+  const sorted = [...receipts].sort(
+    (a, b) =>
+      CalendarDate.compare(b.purchaseDate, a.purchaseDate) ||
+      b._creationTime - a._creationTime,
+  );
+
+  const months = new Map<CalendarMonth | "unknown", typeof sorted>();
+
+  for (const receipt of sorted) {
+    const key = receipt.purchaseDate
+      ? CalendarDate.month(receipt.purchaseDate)
+      : "unknown";
+
+    months.set(key, [...(months.get(key) ?? []), receipt]);
+  }
+
+  const monthTitle = (key: CalendarMonth | "unknown") =>
+    key === "unknown" ? "Uten dato" : CalendarMonth.title(key);
+
+  return (
+    <>
+      {[...months.entries()].map(([key, items]) => {
+        const total = Ore.sum(items.map((receipt) => receipt.spendingOre));
+
+        return (
+          <View key={key} style={{ gap: 4 }}>
+            <SectionTitle
+              title={monthTitle(key)}
+              detail={`${items.length} ${items.length === 1 ? "kvittering" : "kvitteringer"} · ${Ore.format(total)}`}
+            />
+            <List>
+              {items.map((receipt) => (
+                <ReceiptContextMenu
+                  key={receipt._id}
+                  receiptId={receipt._id}
+                  store={receipt.store || "Ny kvittering"}
+                  amount={Ore.format(receipt.totalOre)}
+                  date={CalendarDate.format(receipt.purchaseDate)}
+                >
+                  <Row
+                    title={receipt.store || "Ny kvittering"}
+                    detail={rowDetail(receipt)}
+                    value={Ore.format(receipt.totalOre)}
+                    onPress={() =>
+                      router.push({
+                        pathname: "/receipt/[id]",
+                        params: { id: receipt._id },
+                      })
+                    }
+                  />
+                </ReceiptContextMenu>
+              ))}
+            </List>
+          </View>
+        );
+      })}
+    </>
+  );
+}
+
+function NoReceipts() {
+  return (
+    <>
+      <IllustratedEmpty
+        scene="monument"
+        title="Kvitteringene samles her"
+        message="En kvittering vises her så snart du har lagret den."
+      />
+      <Button
+        title="Ny kvittering"
+        icon="camera"
+        onPress={() => router.navigate("/")}
+      />
+    </>
   );
 }

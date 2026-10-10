@@ -44,24 +44,20 @@ export default function TabLayout() {
           sf={{ default: "camera", selected: "camera.fill" }}
         />
       </NativeTabs.Trigger>
-      <NativeTabs.Trigger name="inbox">
-        <NativeTabs.Trigger.Label>Innboks</NativeTabs.Trigger.Label>
+      <NativeTabs.Trigger name="spending">
+        <NativeTabs.Trigger.Label>Forbruk</NativeTabs.Trigger.Label>
+        <NativeTabs.Trigger.Icon sf="chart.bar.xaxis" />
+      </NativeTabs.Trigger>
+      <NativeTabs.Trigger name="receipts">
+        <NativeTabs.Trigger.Label>Kvitteringer</NativeTabs.Trigger.Label>
         <NativeTabs.Trigger.Icon
-          sf={{ default: "tray", selected: "tray.fill" }}
+          sf={{ default: "doc.text", selected: "doc.text.fill" }}
         />
         {pending > 0 && (
           <NativeTabs.Trigger.Badge>
             {attention?.capped ? `${pending}+` : String(pending)}
           </NativeTabs.Trigger.Badge>
         )}
-      </NativeTabs.Trigger>
-      <NativeTabs.Trigger name="spending">
-        <NativeTabs.Trigger.Label>Forbruk</NativeTabs.Trigger.Label>
-        <NativeTabs.Trigger.Icon sf="chart.bar.xaxis" />
-      </NativeTabs.Trigger>
-      <NativeTabs.Trigger name="history">
-        <NativeTabs.Trigger.Label>Historikk</NativeTabs.Trigger.Label>
-        <NativeTabs.Trigger.Icon sf="magnifyingglass" />
       </NativeTabs.Trigger>
     </NativeTabs>
   );

@@ -28,7 +28,7 @@ it("describes a stale snapshot and unsaved work without copying receipt values",
 
 it("uses route templates without accepting receipt identifiers or search parameters", () => {
   expect(diagnosticScreen(["receipt", "[id]"])).toBe("receipt/[id]");
-  expect(diagnosticScreen(["(tabs)", "history"])).toBe("(tabs)/history");
+  expect(diagnosticScreen(["(tabs)", "receipts"])).toBe("(tabs)/receipts");
   expect(diagnosticScreen(["receipt", "PRIVATE_RECEIPT_ID"])).toBe("unknown");
   expect(diagnosticScreen(["settings?token=PRIVATE"])).toBe("unknown");
 });

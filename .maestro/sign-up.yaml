@@ -48,8 +48,7 @@ name: Sign up and start a household
     timeout: 30000
 - tapOn: "Start med mine kvitteringer"
 - extendedWaitUntil:
-    visible: "Innboks"
+    visible: "Kvitteringer"
     timeout: 30000
-- tapOn: "Innboks"
-- tapOn: "Historikk"
-- assertVisible: "Historikken begynner her"
+- tapOn: "Kvitteringer"
+- assertVisible: "Kvitteringene samles her"

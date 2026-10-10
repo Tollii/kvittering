@@ -2,7 +2,7 @@ appId: no.tolnes.kvitto
 name: Inspect spending on drinks in one receipt
 ---
 - runFlow: ../shared/sign-in.yml
-- tapOn: "Historikk"
+- tapOn: "Kvitteringer"
 - extendedWaitUntil:
     visible: "KIWI.*"
     timeout: 30000

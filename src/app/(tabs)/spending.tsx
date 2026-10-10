@@ -315,7 +315,7 @@ function Spending({ initialMonth }: Readonly<{ initialMonth: CalendarMonth }>) {
                   {changeText(change, comparison.partial)}
                 </Copy>
               </View>
-              <MonumentArtwork scene="inbox" compact />
+              <MonumentArtwork scene="nave" compact />
             </View>
             {pace && <BudgetPaceBar pace={pace} colors={colors} />}
           </SummaryBand>
@@ -573,7 +573,7 @@ function PendingReceiptsNotice({
           ? "Én kvittering venter på kontroll"
           : `${pending.length} kvitteringer venter på kontroll`
       }
-      onPress={() => router.navigate("/inbox")}
+      onPress={() => router.navigate("/receipts")}
     >
       {(firstPending ? receiptNeeds(firstPending) : [])
         .slice(0, 2)

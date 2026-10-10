@@ -254,9 +254,9 @@ export function ReceiptFooter({
         <View style={{ flexDirection: "row", gap: 8 }}>
           <View style={{ flex: 1 }}>
             <Button
-              title="Til innboksen"
+              title="Til kvitteringene"
               variant="secondary"
-              onPress={() => router.dismissTo("/(tabs)/inbox")}
+              onPress={() => router.dismissTo("/(tabs)/receipts")}
             />
           </View>
           {nextPending && (

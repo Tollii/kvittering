@@ -1,8 +1,7 @@
 const screens = new Set([
   "",
   "(tabs)",
-  "(tabs)/history",
-  "(tabs)/inbox",
+  "(tabs)/receipts",
   "(tabs)/spending",
   "receipt/[id]",
   "analysis",

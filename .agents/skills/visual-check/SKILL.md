@@ -23,7 +23,7 @@ The environment's setup script provides Chromium, ffmpeg, and unzip. The helper 
 
 ## Drive a flow
 
-Write a flow as `tools/visual/flows/<name>.mts` and run it with `node tools/visual/flows/<name>.mts`. There are two worked examples. In [history.mts](../../../tools/visual/flows/history.mts), the seeded member signs in and opens the history. In [add-receipt.mts](../../../tools/visual/flows/add-receipt.mts), a new member signs up, picks a synthetic receipt photo, saves it, and opens the processed receipt from the inbox.
+Write a flow as `tools/visual/flows/<name>.mts` and run it with `node tools/visual/flows/<name>.mts`. There are two worked examples. In [receipts.mts](../../../tools/visual/flows/receipts.mts), the seeded member signs in and opens Kvitteringer. In [add-receipt.mts](../../../tools/visual/flows/add-receipt.mts), a new member signs up, picks a synthetic receipt photo, saves it, and opens the processed receipt from Kvitteringer.
 
 ```ts
 import { App, receiptPhoto } from "../app.mts";
@@ -33,9 +33,9 @@ await App.run("add-receipt", async (app) => {
   const photo = await receiptPhoto("build/visual/receipt.jpg");
   await app.chooseFiles([photo], () => app.tap("Velg fra bilder"));
   await app.tap("Lagre kvittering");
-  await app.tap("Innboks");
+  await app.tap("Kvitteringer");
   await app.see("Eksempelbutikk", 60_000);
-  await app.screenshot("inbox");
+  await app.screenshot("receipts");
 });
 ```
 

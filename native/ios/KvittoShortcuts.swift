@@ -1,14 +1,14 @@
 import AppIntents
 import UIKit
 
-struct OpenInboxIntent: AppIntent {
-  static let title: LocalizedStringResource = "Åpne innboks"
-  static let description = IntentDescription("Åpner kvitteringer som trenger kontroll i Kvitto.")
+struct OpenReceiptsIntent: AppIntent {
+  static let title: LocalizedStringResource = "Åpne kvitteringer"
+  static let description = IntentDescription("Åpner kvitteringene i Kvitto, med dem som trenger kontroll øverst.")
   static let openAppWhenRun = true
 
   @MainActor
   func perform() async throws -> some IntentResult {
-    await UIApplication.shared.open(URL(string: "kvitto:///(tabs)/inbox")!)
+    await UIApplication.shared.open(URL(string: "kvitto:///(tabs)/receipts")!)
     return .result()
   }
 }
@@ -111,6 +111,6 @@ struct KvittoShortcuts: AppShortcutsProvider {
     AppShortcut(intent: FindLatestReceiptIntent(), phrases: ["Finn siste kvittering i \(.applicationName)", "Find my latest receipt in \(.applicationName)"], shortTitle: "Finn kvittering", systemImageName: "doc.text.magnifyingglass")
     AppShortcut(intent: ShowMonthlyPurchasesIntent(), phrases: ["Vis kjøp i \(.applicationName)", "Vis kjøp for \(\.$month) i \(.applicationName)", "Show purchases in \(.applicationName)"], shortTitle: "Vis månedens kjøp", systemImageName: "chart.bar.xaxis")
     AppShortcut(intent: ScanReceiptIntent(), phrases: ["Skann kvittering med \(.applicationName)", "Scan a receipt with \(.applicationName)"], shortTitle: "Skann kvittering", systemImageName: "doc.viewfinder")
-    AppShortcut(intent: OpenInboxIntent(), phrases: ["Åpne innboksen i \(.applicationName)", "Open inbox in \(.applicationName)"], shortTitle: "Åpne innboks", systemImageName: "tray")
+    AppShortcut(intent: OpenReceiptsIntent(), phrases: ["Åpne kvitteringene i \(.applicationName)", "Open receipts in \(.applicationName)"], shortTitle: "Åpne kvitteringer", systemImageName: "doc.text")
   }
 }

@@ -140,7 +140,7 @@ describe("end-to-end fixtures", () => {
     }
   });
 
-  it("gives the inbox the review states that needs-review claims", async () => {
+  it("gives Til kontroll the review states that needs-review claims", async () => {
     const t = convexTest(schema, import.meta.glob("../../convex/**/*.ts"));
     const { ids } = await seed(t, "needs-review");
     const user = fixtureUser(t);

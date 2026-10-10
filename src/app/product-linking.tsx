@@ -258,8 +258,8 @@ export default function ProductLinking() {
           icon="checkmark.circle"
         >
           <Button
-            title="Tilbake til Innboks"
-            onPress={() => router.dismissTo("/inbox")}
+            title="Tilbake til kvitteringene"
+            onPress={() => router.dismissTo("/receipts")}
           />
         </Empty>
       )}

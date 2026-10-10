@@ -4,14 +4,15 @@ How the components combine into screens, and how the screens connect. Routes liv
 
 ## Navigation
 
-Four native tabs (`src/app/(tabs)/_layout.tsx`), each with an SF Symbol; Kamera and Innboks switch to the filled symbol when selected:
+Three native tabs (`src/app/(tabs)/_layout.tsx`), each with an SF Symbol; Kamera and Kvitteringer switch to the filled symbol when selected:
 
-| Tab       | Symbol            | Purpose                                                                                       |
-| --------- | ----------------- | --------------------------------------------------------------------------------------------- |
-| Kamera    | `camera`          | Capture or import a receipt. The app opens here.                                              |
-| Innboks   | `tray`            | Receipts that need review or are still processing. The badge counts only what needs a person. |
-| Forbruk   | `chart.bar.xaxis` | Monthly spending, breakdowns, and reports.                                                    |
-| Historikk | `magnifyingglass` | Search every saved receipt and product.                                                       |
+| Tab          | Symbol            | Purpose                                                                                                                                                       |
+| ------------ | ----------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Kamera       | `camera`          | Capture or import a receipt. The app opens here.                                                                                                              |
+| Forbruk      | `chart.bar.xaxis` | Monthly spending, breakdowns, and reports.                                                                                                                    |
+| Kvitteringer | `doc.text`        | Every receipt and product, searchable. Receipts that need a person or are still on their way in are pinned on top; the badge counts only what needs a person. |
+
+There is no separate inbox. A receipt that needs review is a state of a receipt, so it is shown where the receipts are, pinned above the months, rather than in a tab of its own that is empty on most days.
 
 Above the tabs, the root stack ([root layout](../../src/app/_layout.tsx)) pushes detail screens, such as the receipt, with a cobalt native header and a back chevron without text. Household settings open as a modal with "Ferdig". Choices, details, and short edits open as a `Sheet` over the current screen rather than a new page; confirmations and destructive choices use a system alert.
 
@@ -21,17 +22,17 @@ On iOS, header and toolbar actions are native toolbar items, such as the receipt
 
 A typical screen, top to bottom:
 
-1. **Header.** Cobalt. A tab root draws the `Screen title` hero with the arch mark, a large left-aligned title, and the settings button. A pushed or modal screen uses the native stack header, so it gets the system back button, title, and toolbar items. Historikk is the one tab root on the native header, because the native search bar lives there; it keeps the settings button in the same place as a toolbar item. Kamera has no header.
+1. **Header.** Cobalt. A tab root draws the `Screen title` hero with the arch mark, a large left-aligned title, and the settings button. A pushed or modal screen uses the native stack header, so it gets the system back button, title, and toolbar items. Kvitteringer is the one tab root on the native header, because the native search bar lives there; it keeps the settings button in the same place as a toolbar item. Kamera has no header.
 2. **Summary band** (optional). A `SummaryBand` below the header with the screen's key number: the month menu and total on Forbruk, the paid amount and status chips on a receipt, the current item in Koble produkter. Text on it uses `onHero` and `onHeroMuted`; controls on it use `heroControl` discs.
 3. **Status notices.** The offline notice first, then loading or partial-data notices.
-4. **Content** on warm paper: `SectionTitle` groups, `Panel` cards, `List` cards for rows and bars, and `Segments` to switch views. Nothing sits bare between cards; a list that needs a heading gets a `SectionTitle`, as the months in Historikk do.
+4. **Content** on warm paper: `SectionTitle` groups, `Panel` cards, `List` cards for rows and bars, and `Segments` to switch views. Nothing sits bare between cards; a list that needs a heading gets a `SectionTitle`, as the months in Kvitteringer do.
 5. **Footer** (optional). A pinned action bar with the screen's primary action and a one-line status above it, as on the receipt.
 
 ### States every data screen handles
 
 - **Loading:** `Loading` with a named object, or keep the cached content and show a notice that more is coming.
 - **Empty:** `IllustratedEmpty` on an empty tab root; `Empty` everywhere else.
-- **Offline:** `OfflineNotice` at the top of every screen that reads or writes household data: the four tabs, the receipt, Forbruksanalyse, Rettelser, Koble produkter, and settings. Content from the local cache stays readable, and actions that need the server are disabled rather than hidden. A screen whose every action needs the server, such as Koble produkter, passes a `detail` line that says so, so the disabled controls are explained.
+- **Offline:** `OfflineNotice` at the top of every screen that reads or writes household data: the three tabs, the receipt, Forbruksanalyse, Rettelser, Koble produkter, and settings. Content from the local cache stays readable, and actions that need the server are disabled rather than hidden. A screen whose every action needs the server, such as Koble produkter, passes a `detail` line that says so, so the disabled controls are explained.
 - **Error:** `Notice tone="error"` near the action that failed, with the message from `failureMessage`.
 - **Partial data:** reports say when they are provisional ("foreløpige") or incomplete instead of showing a total as final.
 
@@ -51,16 +52,16 @@ Sign-in is a full-screen form outside the tabs ([sign-in](../../src/features/sig
 
 1. Kamera is a full-bleed viewfinder with controls on overlay discs; importing from Bilder or Filer sits beside the shutter.
 2. Each photo opens a review sheet ([capture review](../../src/features/capture-review.tsx)) where pages can be combined into one receipt before saving. Shared images and PDFs from other apps arrive in the same sheet. The footer holds the one primary action, "Lagre kvittering"; the one secondary button, "Legg til flere bilder", returns to the camera, where both the shutter and the import buttons are.
-3. Saving returns to the camera at once. A note follows the upload and fades when it lands; processing continues in Innboks and a Live Activity, never on a blocking screen. In Innboks the upload is an [upload queue card](../../src/features/upload-queue-card.tsx) with its progress and, after a failure, "Prøv igjen" as its one button.
+3. Saving returns to the camera at once. A note follows the upload and fades when it lands; processing continues under "Under behandling" at the top of Kvitteringer and in a Live Activity, never on a blocking screen. There the upload is an [upload queue card](../../src/features/upload-queue-card.tsx) with its progress and, after a failure, "Prøv igjen" as its one button.
 
 ### Review
 
 Every review screen offers one next action. Status reads as text and chips; the controls that compete with the next action are gone or moved behind the "Flere handlinger" menu.
 
-1. Innboks lists receipts that need a person first and receipts still processing below them. The "Til kontroll" title's detail says that a swipe left approves a receipt without open questions; "Start" opens the first one.
+1. Kvitteringer pins the receipts that need a person under "Til kontroll" above the months ([pending receipts](../../src/features/pending-receipts.tsx)), and the uploads and readings still in progress under "Under behandling" below them. The "Til kontroll" title's detail says that a swipe left approves a receipt without open questions; "Start" opens the first one. The pinned sections show only on the receipts view without a search. In the months, a receipt that is not plainly reviewed names its state after the date, such as "Til kontroll", so the list and the pinned section agree; receipts still on their way in stay out of the months until they are read.
 2. The receipt screen leads with the summary band: amount and status chip. Under the notices, a warning `Notice` ([review next step](../../src/features/review-next-step.tsx)) names the first open question as its title, says in one sentence how to settle it, and names the questions after it under "Deretter". Tapping it jumps straight to the fix: the Kvitteringsdetaljer sheet for the store, amount, date, or currency; the review lines; or an alert for a duplicate, a difference, or the reader's notes. The purchase overview only marks the paid amount in `warning` while it is unsettled; it repeats neither the question nor the fixes.
 3. The line list is headed by a `SectionTitle`: "Varer å sjekke" in review mode, with "Bekreft alle" as its action when more than one category suggestion is waiting; "Varelinjer" with the balance against the paid amount in the all-lines view. In review mode a product line shows its category suggestion as a chip and one `tint` "Bekreft" button, and a reader's note gets one "Dette stemmer" button; the line header expands the editor. Product linking is optional, so its control appears in the all-lines view only.
-4. The footer always says what is left and owns the one primary action: "Godkjenn kvittering", "Lagre og godkjenn", or "Lagre for senere". The navigation bar has no second save button, only the "Flere handlinger" menu. After approval the footer offers the next receipt when one is waiting.
+4. The footer always says what is left and owns the one primary action: "Godkjenn kvittering", "Lagre og godkjenn", or "Lagre for senere". The navigation bar has no second save button, only the "Flere handlinger" menu. After approval the footer offers the next receipt when one is waiting, and "Til kvitteringene" goes back to the list.
 5. The category picker ([category picker](../../src/features/category-picker.tsx)) is a sheet with the search field in its header and the remember toggle in its footer. The suggestion, the most-used categories, and the groups are `List` cards under `SectionTitle`s; a group opens as a list with "Alle kategorier" as the title's action to go back, and a search without a match shows `Empty`.
 6. Unsaved changes survive restarts, and leaving asks before discarding them.
 
@@ -74,7 +75,7 @@ Forbruk shows one month at a time, chosen from the summary band. Breakdowns swit
 
 ### Find a purchase
 
-Historikk searches from the native search bar and switches between receipts and products with `Segments`. Receipts group by month; a long press opens a context menu; a product opens its price history in a sheet.
+Kvitteringer searches from the native search bar and switches between receipts and products with `Segments`. Receipts group by month; a long press opens a context menu; a product opens its price history in a sheet. The products view is headed by "Varer" with "Koble produkter" as its action, the one entry to product linking.
 
 ### Household settings
 
