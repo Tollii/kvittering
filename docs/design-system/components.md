@@ -8,7 +8,7 @@ Shared presentation components live in [`src/components/ui`](../../src/component
 
 **`Icon`** renders an SF Symbol, `primary` by default, hidden from VoiceOver. Label the control that contains it instead.
 
-**`pressed(state)`** is the shared press style (opacity 0.72). Use it on any custom `Pressable`.
+**`pressed(state)`** is the shared press style. Use it on any custom `Pressable`.
 
 ## Actions
 
@@ -21,25 +21,25 @@ Shared presentation components live in [`src/components/ui`](../../src/component
 | `tint`      | `primarySoft` fill, `primary` text | A supporting action that should still read as cobalt: "Kopier", "Prøv igjen". |
 | `danger`    | `dangerSoft` fill, `danger` text   | Destructive actions such as "Slett kvittering". Confirm with an alert.        |
 
-States: `disabled` fades the button; `busy` replaces the icon with a spinner and disables it while keeping the title, so the button does not change width. `compact` lowers the height from 50 to 44 for inline and footer use.
+States: `disabled` fades the button; `busy` replaces the icon with a spinner and disables it while keeping the title, so the button does not change width. `compact` is the shorter size for inline and footer use.
 
-**`IconButton`** is a 44-point icon-only control with a required Norwegian `label`. `filled` adds the muted disc, or pass a colour such as `heroControl` on the hero.
+**`IconButton`** is an icon-only control with a required Norwegian `label`. `filled` adds the muted disc, or pass a colour such as `heroControl` on the hero.
 
 **`SettingsButton`** ([layout](../../src/components/ui/layout.tsx)) opens household settings. Every tab places it at the top right; `surface="camera"` adapts it to the viewfinder.
 
-**`Chip`** shows a short status or opens a picker. Tones are `muted`, `primary`, `accent`, `success`, and `warning`. A chip with `onPress` grows to 44 points and shows a chevron, unless `trailing="none"` marks it as an action rather than a dropdown. A chip without `onPress` is read as text.
+**`Chip`** shows a short status or opens a picker. Tones are `muted`, `primary`, `accent`, `success`, and `warning`. A chip with `onPress` grows to a full touch target and shows a chevron, unless `trailing="none"` marks it as an action rather than a dropdown. A chip without `onPress` is read as text.
 
 ## Inputs
 
-**`Field`** is a labelled text input. The label sits above in 13 / 600 secondary; the border turns `primary` on focus; `hint` adds a caption below. On iOS it adds a keyboard toolbar with "Ferdig". Use the label as the accessibility label, and keep placeholders for examples, not instructions.
+**`Field`** is a labelled text input. The label sits above in secondary text; the border turns `primary` on focus; `hint` adds a caption below. On iOS it adds a keyboard toolbar with "Ferdig". Use the label as the accessibility label, and keep placeholders for examples, not instructions.
 
 **`MoneyField`** ([money field](../../src/components/money-field.tsx)) is a `Field` for kroner. It keeps the typed text, parses it with a comma decimal, and reports a Norwegian error message instead of changing the amount when the text is invalid.
 
 **`Toggle`** is a labelled `Switch` with optional detail text, tinted `primary`.
 
-**`Segments`** switches between two to four views of the same content, such as Kvitteringer / Varer. On iOS it is the native segmented control; above a font scale of 1.3, and off iOS, it draws a custom control that stacks vertically at large sizes.
+**`Segments`** switches between two to four views of the same content, such as Kvitteringer / Varer. On iOS it is the native segmented control; at large text sizes, and off iOS, it draws its own control (see [accessibility](foundations.md#accessibility)).
 
-**`Select`** ([selection](../../src/components/ui/selection.tsx)) is a `Row` that opens a `Sheet` with options, a checkmark on the current one, and search when there are more than twelve.
+**`Select`** ([selection](../../src/components/ui/selection.tsx)) is a `Row` that opens a `Sheet` with options, a checkmark on the current one, and search when the list is long.
 
 ## Surfaces
 
@@ -52,27 +52,27 @@ States: `disabled` fades the button; `busy` replaces the icon with a spinner and
 
 For a list inside a card, set `gap: 0` and `paddingVertical: 4`, and give each row after the first a 1-point `line` top border.
 
-**`Row`** is the list item: an optional icon tile, a title, detail text, a trailing value, and a chevron when tappable. `selected` swaps the chevron for a checkmark. At large text the value moves under the title.
+**`Row`** is the list item: an optional icon tile, a title, detail text, a trailing value, and a chevron when tappable. `selected` swaps the chevron for a checkmark. Large text moves the value under the title (see [accessibility](foundations.md#accessibility)).
 
 **`SectionTitle`** heads a group with an optional text action on the right, such as "Start" in the inbox.
 
 **`Disclosure`** is a card that expands in place for secondary detail, such as "Om kvitteringen" or "Slik er endringen beregnet".
 
-**`ReceiptCard`** ([receipt card](../../src/components/receipt-card.tsx)) summarises a receipt in the inbox: store, date and branch, total, and a coloured status line (warning for review, danger for failure) followed by what needs attention. `compact` is used for receipts still being processed and shows a spinner in place of the total.
+**`ReceiptCard`** ([receipt card](../../src/components/receipt-card.tsx)) summarises a receipt in the inbox: store, date and branch, total, and a coloured status line (warning for review, danger for failure) followed by what needs attention. A receipt still being processed shows a spinner in place of the total; `compact`, used for those receipts in the inbox, tightens the padding and drops an empty status line.
 
 ## Feedback and states
 
-**`Notice`** is an inline message with an icon. Tones: `info` (soft cobalt), `warning`, `error` (announced as an alert), and `success`. Pass `icon="wifi.slash"` for the offline notice "Uten nett", which every data screen shows at the top.
+**`Notice`** is an inline message with an icon. Tones: `info` (soft cobalt), `warning`, `error` (marked as an alert), and `success`. Pass `icon="wifi.slash"` for the offline notice; [screen states](patterns.md#states-every-data-screen-handles) say where it goes.
 
 **`Loading`** is a centred spinner with a Norwegian status, "Henter …" by default. Name what is loading: "Henter kvittering …".
 
-**`Empty`** is a card with an icon disc, title, message, and optional actions, for an empty filtered result such as "Ingen treff". **`IllustratedEmpty`** ([artwork](../../src/components/monument-artwork.tsx)) uses the monument artwork for a first-run empty tab: "Ingen kvitteringer til kontroll" in the inbox and "Historikken begynner her" in history.
+**`Empty`** is a card with an icon disc, title, message, and optional actions, for an empty state anywhere but a tab root, such as "Ingen treff" or "Ingen rettelser ennå". **`IllustratedEmpty`** ([artwork](../../src/components/monument-artwork.tsx)) puts the monument artwork on an empty tab root: "Ingen kvitteringer til kontroll" in the inbox and "Historikken begynner her" in history.
 
 **`ReceiptTip`** ([receipt tip](../../src/components/receipt-tip.tsx)) shows a native TipKit tip, such as the widget suggestion on Forbruk. It renders nothing where TipKit is unavailable.
 
 ## Containers
 
-**`Screen`** ([layout](../../src/components/ui/layout.tsx)) is the page frame. It provides the safe area, keyboard avoidance, scrolling, the 760-point content width, and three optional regions:
+**`Screen`** ([layout](../../src/components/ui/layout.tsx)) is the page frame. It provides the safe area, keyboard avoidance, scrolling, a maximum content width, and three optional regions:
 
 - `title` and `subtitle` draw the cobalt hero header with the arch mark; `settings` adds `SettingsButton` and `headerRight` adds other icon buttons.
 - `summary` sits under the header, edge to edge, for a cobalt summary band.
@@ -80,7 +80,7 @@ For a list inside a card, set `gap: 0` and `paddingVertical: 4`, and give each r
 
 Pass `insetTop={false}` when a native stack header already covers the top inset.
 
-**`Sheet`** is a bottom sheet with a title, a close button ("Lukk"), optional fixed `header` and `footer`, and scrolling content. On iOS it is a native sheet with medium and large detents and a drag indicator; at large text it opens at full height. Set `dismissible={false}` while closing would lose work or leave an invalid value: while a save is busy, or while the paid amount is invalid in Kvitteringsdetaljer.
+**`Sheet`** is a bottom sheet with a title, a close button ("Lukk"), optional fixed `header` and `footer`, and scrolling content. On iOS it is a native sheet with medium and large detents and a drag indicator. Set `dismissible={false}` while closing would lose work or leave an invalid value: while a save is busy, or while the paid amount is invalid in Kvitteringsdetaljer.
 
 **`NativeForm`** and **`FormSection`** ([native form](../../src/components/ui/native-form.ios.tsx)) render a SwiftUI grouped form on iOS for settings-style screens and field sheets, with React Native content inside each section.
 

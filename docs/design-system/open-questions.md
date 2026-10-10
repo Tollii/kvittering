@@ -4,7 +4,7 @@ These are places where the app does the same thing in more than one way. Each re
 
 ## Two kinds of screen header
 
-Innboks and Forbruk draw their own cobalt header through `Screen title` ([layout](../../src/components/ui/layout.tsx)): a 24-point title with the arch mark, the settings button, and room for a summary band. Historikk on iOS, the receipt, Forbruksanalyse, Rettelser, Koble produkter, and settings use the native stack header, coloured `hero` in the [root layout](../../src/app/_layout.tsx), with a centred system title and native search or toolbar items, so Historikk's title sits centred where Innboks and Forbruk have a large left-aligned one. Kamera has no header. Should tab roots share one header style, and which?
+Innboks and Forbruk draw their own cobalt header through `Screen title` ([layout](../../src/components/ui/layout.tsx)): a 24-point title with the arch mark, the settings button, and room for a summary band. Historikk on iOS, the receipt, Forbruksanalyse, Rettelser, Koble produkter, and settings use the native stack header, coloured `hero` in the [root layout](../../src/app/_layout.tsx) and again by Historikk's stack layout and the Koble produkter screen, with a centred system title and native search or toolbar items, so Historikk's title sits centred where Innboks and Forbruk have a large left-aligned one. Kamera has no header. Should tab roots share one header style, and which?
 
 ## Lists in cards or on paper
 
@@ -32,7 +32,7 @@ The [authentication layout](../../src/features/authentication-layout.tsx) uses t
 
 ## Unused and duplicate tokens
 
-In [theme](../../src/constants/theme.ts), `primaryStrong`, `shadow`, `scrim`, and `radius.sheet` have no users, and `Panel tone="soft"` has none either. `accent` and `accentSoft` equal `primary` and `primarySoft` in both schemes, and screens use the two pairs interchangeably for spinners and progress. Remove the unused ones, or give `accent` its own role?
+In [theme](../../src/constants/theme.ts), `primaryStrong`, `shadow`, `scrim`, and `radius.sheet` have no users, and neither have `Panel tone="soft"` or the `primary` and `accent` tones of `Chip`. `accent` and `accentSoft` equal `primary` and `primarySoft` in both schemes; spinners and upload progress use `accent`, everything else `primary`. Remove the unused ones, or give `accent` its own role?
 
 ## Colours that bypass the theme
 
@@ -40,7 +40,7 @@ The camera shutter draws its ring and disc with the named colour `"white"` (`src
 
 ## Amounts have no type scale
 
-Large amounts appear at 36 / 600 in hero bands, 34 / 800 in detail sheets and analysis, 30 / 800 in the product-history sheet and family purchases, and 30 / 700 and 23 / 700 in store spending. Should amounts have two or three named sizes?
+Large amounts appear at 36 / 600 in hero bands, 34 / 800 in detail sheets and analysis, 30 / 800 in the product-history sheet and family purchases, and 30 / 700 in store spending. Should amounts have two or three named sizes?
 
 ## Summary bands are rebuilt per screen
 
@@ -57,6 +57,18 @@ The pending-receipts banner on Forbruk (`src/app/(tabs)/spending.tsx`) is a pres
 ## Empty-state titles
 
 `Empty` titles are 20 / 700; `IllustratedEmpty` titles are 25 / 600. Is the difference intended?
+
+## Offline notice on some screens
+
+Kamera, Innboks, Forbruk, the receipt, and the catalogue product sheet show "Uten nett". Historikk, Forbruksanalyse, Rettelser, and settings show none, and Koble produkter says "Koble til nettet for å lagre produktvalg." instead. Should every screen that reads or writes household data show the same notice?
+
+## Failed uploads in two colours
+
+A failed upload shows a `warning` retry icon in the upload note on Kamera and a `danger` icon and progress bar in the Innboks queue. Which status colour does a failed upload take?
+
+## The app sometimes says "vi"
+
+The app addresses the person as "du" and the household as "dere", but a few explanations speak as "vi": the notes on Rettelser ("Vi lagrer …") and Forbruksanalyse ("Vi trenger …"). Should the app ever speak as "vi"?
 
 ## Confirmation titles mix verb forms
 

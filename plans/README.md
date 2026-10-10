@@ -2,6 +2,14 @@
 
 Keep only unresolved findings and active plans here. Current contracts belong in [architecture](../docs/architecture.md), procedures in their guide, and completed change evidence in Git or the pull request. The technical simplification plans 001–019 and product changes 1–7 are complete; their historical reports are available in Git history.
 
+## Design-system open questions
+
+Status: OPEN. [Open questions](../docs/design-system/open-questions.md) lists places where the app does the same thing in more than one way, such as two header styles and sign-in following the system instead of the theme. Settle one by changing the code and removing its question.
+
+## Forbruksanalyse header while analysis is paused
+
+Status: DEFECT. With spending analysis paused, `src/app/analysis.tsx` renders `Screen title="Forbruksanalyse"` without a stack title, so iOS shows the route name "analysis" in the native header above a second cobalt title. Give that branch the native "Forbruksanalyse" title, as the normal branch does.
+
 ## Discount allocation across several products
 
 Status: NEEDS INVESTIGATION. The 18 September 2026 review observed a Coca-Cola offer spread across unrelated products after it was classified as a receipt discount. Current `spendingLines` in `src/lib/domain/receipt.ts` still allocates receipt discounts across all products and links an item discount through one `relatedLineId`. This establishes a representation limit, not a measured current extraction failure rate.

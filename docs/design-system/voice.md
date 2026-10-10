@@ -11,7 +11,7 @@ Every visible string is Norwegian Bokmål. Copy lives in the components that sho
 
 ## Address
 
-Use **du** for the person using the app: "Alle kvitteringene dine er behandlet", "Dine ulagrede endringer blir fjernet." Use **dere** for the household's shopping: "Se hvor dere handler, og hva dere bruker per butikk", "Hvilket produkt kjøpte dere?" The app does not speak as "vi".
+Use **du** for the person using the app: "Alle kvitteringene dine er behandlet", "Dine ulagrede endringer blir fjernet." Use **dere** for the household's shopping: "Se hvor dere handler, og hva dere bruker per butikk", "Hvilket produkt kjøpte dere?" The app rarely speaks as "vi"; see [open questions](open-questions.md#the-app-sometimes-says-vi).
 
 ## Mechanics
 
@@ -51,21 +51,21 @@ Show errors through `failureMessage(cause, operation, fallback)` ([failure messa
 
 Use these words for these things, and keep them consistent across screens and notifications.
 
-| Word                      | Meaning                                                                            |
-| ------------------------- | ---------------------------------------------------------------------------------- |
-| Kvitto                    | The app.                                                                           |
-| kvittering                | A receipt, the main object.                                                        |
-| husstand, husstanden      | The household that shares receipts.                                                |
-| innboks                   | Receipts that need a person or are still being processed.                          |
-| til kontroll, kontrollere | A receipt that needs review; reviewing it.                                         |
-| godkjenne, godkjent       | Approving the receipt's facts. Approval does not confirm category suggestions.     |
-| kontrollert               | The status of a reviewed receipt; "Godkjent automatisk" when no person was needed. |
-| linje                     | A line on a receipt.                                                               |
-| vare                      | An item as bought.                                                                 |
-| produkt, produktkobling   | A catalogue product, and linking a line to it.                                     |
-| kategori                  | Spending category of a line.                                                       |
-| forbruk                   | Spending in reports. It means purchases, not what was consumed.                    |
-| utelatt                   | A receipt left out of spending ("Utelat fra forbruk").                             |
-| rettelse                  | A correction the household made, which can teach future suggestions.               |
-| lese, lesing              | Reading a receipt image: "Leser kvitteringen", "Les bildene på nytt".              |
-| Oda                       | The grocery service, by name.                                                      |
+| Word                      | Meaning                                                                                                  |
+| ------------------------- | -------------------------------------------------------------------------------------------------------- |
+| Kvitto                    | The app.                                                                                                 |
+| kvittering                | A receipt, the main object.                                                                              |
+| husstand, husstanden      | The household that shares receipts.                                                                      |
+| innboks                   | Receipts that need a person or are still being processed.                                                |
+| til kontroll, kontrollere | A receipt that needs review; reviewing it.                                                               |
+| godkjenne, godkjent       | Approving the receipt's facts; see [receipt flow](../architecture.md#receipt-flow) for what it confirms. |
+| kontrollert               | The status of a reviewed receipt; "Godkjent automatisk" when no person was needed.                       |
+| linje                     | A line on a receipt.                                                                                     |
+| vare                      | An item as bought.                                                                                       |
+| produkt, produktkobling   | A catalogue product, and linking a line to it.                                                           |
+| kategori                  | Spending category of a line.                                                                             |
+| forbruk                   | Spending in reports. It means purchases, not what was consumed.                                          |
+| utelatt                   | A receipt left out of spending ("Utelat fra forbruk").                                                   |
+| rettelse                  | A correction the household made, which can teach future suggestions.                                     |
+| lese, lesing              | Reading a receipt image: "Leser kvitteringen", "Les bildene på nytt".                                    |
+| Oda                       | The grocery service, by name.                                                                            |
