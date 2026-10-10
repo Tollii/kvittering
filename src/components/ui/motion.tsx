@@ -137,12 +137,19 @@ export function useDeparture(toward: "up" | "left" = "up") {
       .easing(easing)
       .reduceMotion(ReduceMotion.Never);
 
-  const away =
-    toward === "left" ? { translateX: -motion.swipeExit } : { translateY: -6 };
+  // Every keyframe must name the same transforms, in the same order.
+  const left = toward === "left";
 
   return new Keyframe({
     0: { opacity: 1, transform: [{ translateX: 0 }, { translateY: 0 }] },
-    100: { opacity: 0, transform: [away], easing },
+    100: {
+      opacity: 0,
+      transform: [
+        { translateX: left ? -motion.swipeExit : 0 },
+        { translateY: left ? 0 : -6 },
+      ],
+      easing,
+    },
   }).duration(motion.press);
 }
 
