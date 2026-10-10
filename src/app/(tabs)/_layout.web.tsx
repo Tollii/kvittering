@@ -6,7 +6,7 @@ import { Pressable, StyleSheet, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Copy, Icon } from "@/components/ui";
 import { useTheme } from "@/constants/theme";
-import { mainTabs, useInboxBadge } from "@/features/main-tabs";
+import { mainTabs, useReceiptsBadge } from "@/features/main-tabs";
 
 const barHeight = 62;
 
@@ -20,7 +20,7 @@ function barBottom(inset: number) {
 function TabBar({ state, navigation }: Readonly<BottomTabBarProps>) {
   const colors = useTheme();
   const insets = useSafeAreaInsets();
-  const badge = useInboxBadge();
+  const badge = useReceiptsBadge();
 
   const camera = state.routes[state.index]?.name === cameraTab;
 
@@ -91,7 +91,7 @@ function TabBar({ state, navigation }: Readonly<BottomTabBarProps>) {
             <Copy size={10} weight="600" style={{ color, lineHeight: 12 }}>
               {tab.label}
             </Copy>
-            {tab.name === "inbox" && badge !== undefined && (
+            {tab.name === "receipts" && badge !== undefined && (
               <View
                 style={{
                   position: "absolute",

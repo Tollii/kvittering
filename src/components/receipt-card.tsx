@@ -17,7 +17,10 @@ export const statusLabels: Record<Receipt["status"], string> = {
   failed: "Lesingen mislyktes",
 };
 
-export function receiptStatusLabel(receipt: Receipt) {
+export function receiptStatusLabel(
+  receipt: Pick<Receipt, "status" | "excluded"> &
+    Partial<Pick<Receipt, "autoAccepted">>,
+) {
   if (receipt.excluded) return "Utelatt fra forbruk";
 
   return receipt.status === "reviewed" && receipt.autoAccepted

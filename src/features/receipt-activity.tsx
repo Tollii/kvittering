@@ -95,7 +95,7 @@ async function startActivity(
 
   const instance = activity.start(
     { total: receiptIds.length, completed: 0, failed: 0, ended: false },
-    "kvitto:///(tabs)/inbox",
+    "kvitto:///(tabs)/receipts?show=pending",
     new Date(Date.now() + 300000),
   );
 
