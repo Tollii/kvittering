@@ -3,11 +3,13 @@
 //
 // The web build approximates the iOS app: layout, text, and JavaScript flows
 // are real, but native modules (camera, Keychain, widgets, share sheet) are
-// not exercised.
+// not exercised. The page has an iPhone's full screen, safe areas, and status
+// bar, so screenshots line up with simulator screenshots of the same screen.
 import { execFileSync } from "node:child_process";
 import { mkdirSync, readFileSync, rmSync, statSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { z } from "zod";
+import { statusBar } from "./status-bar.mts";
 import {
   chromium,
   devices,
@@ -18,6 +20,19 @@ import {
 
 const iPhone = devices["iPhone 15"];
 
+// Playwright's iPhone viewport is Safari's, without the browser chrome. The app
+// fills the whole screen, so use the screen and its safe areas instead.
+const screen = { width: 393, height: 852 };
+
+const safeArea = { top: 59, bottom: 34, left: 0, right: 0 };
+
+/**
+ * The reviewed-receipts fixture's purchases are from 21 to 23 September 2026.
+ * A fixed date keeps screens that show the current month the same as the iOS
+ * references in docs/design-system, whenever a flow runs.
+ */
+const fixtureTime = new Date("2026-09-24T18:37:00+02:00");
+
 export type AppOptions = {
   /** Record a video of the session (default true). */
   video?: boolean;
@@ -25,6 +40,8 @@ export type AppOptions = {
   output?: string;
   url?: string;
   colorScheme?: "light" | "dark";
+  /** The browser's clock (default fixtureTime); null keeps the real time. */
+  now?: Date | null;
 };
 
 export type Account = { name: string; email: string; password: string };
@@ -65,7 +82,7 @@ export class App {
     const browser = await chromium.launch();
 
     const context = await browser.newContext({
-      viewport: iPhone.viewport,
+      viewport: screen,
       deviceScaleFactor: iPhone.deviceScaleFactor,
       isMobile: true,
       hasTouch: true,
@@ -76,15 +93,25 @@ export class App {
       ...(recording && {
         recordVideo: {
           dir: join(output, "raw"),
-          size: {
-            width: iPhone.viewport.width * 2,
-            height: iPhone.viewport.height * 2,
-          },
+          size: { width: screen.width * 2, height: screen.height * 2 },
         },
       }),
     });
 
+    const now = options.now === undefined ? fixtureTime : options.now;
+
+    // Date moves on from `now`; timers stay real, so the backend connection and
+    // animations behave as usual.
+    if (now) await context.clock.setSystemTime(now);
+    await context.addInitScript(statusBar);
+
     const page = await context.newPage();
+
+    // env(safe-area-inset-*) drives react-native-safe-area-context on web.
+    const devtools = await context.newCDPSession(page);
+    await devtools.send("Emulation.setSafeAreaInsetsOverride", {
+      insets: safeArea,
+    });
 
     // Errors in the browser often explain a failed step.
     page.on("pageerror", (error) => console.error(`page error: ${error}`));
@@ -150,8 +177,9 @@ export class App {
       `${String(this.shots).padStart(2, "0")}-${label}.png`,
     );
 
-    // Let transitions and images settle before capturing.
+    // Let transitions, images, and icon fonts settle before capturing.
     await this.page.waitForTimeout(500);
+    await this.page.evaluate(() => document.fonts.ready);
     await this.page.screenshot({ path });
 
     return path;
@@ -204,11 +232,15 @@ export class App {
   }
 
   private find(target: string) {
-    return this.page
-      .getByTestId(target)
-      .or(this.page.getByLabel(target, { exact: true }))
-      .or(this.page.getByText(target, { exact: true }))
-      .first();
+    return (
+      this.page
+        .getByTestId(target)
+        .or(this.page.getByLabel(target, { exact: true }))
+        .or(this.page.getByText(target, { exact: true }))
+        // Tabs keep earlier screens mounted but hidden.
+        .filter({ visible: true })
+        .first()
+    );
   }
 }
 

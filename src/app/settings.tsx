@@ -5,13 +5,22 @@ import { FormSection, NativeForm } from "@/components/ui/native-form";
 import { ReleaseSettings } from "@/features/release-settings";
 import { releaseMutation } from "@/lib/releases/requests";
 import { useState } from "react";
-import { Alert, Platform, Share, View } from "react-native";
+import { Alert, Platform, Pressable, Share, View } from "react-native";
 import { router, Stack } from "expo-router";
 import { useConvex } from "convex/react";
 import * as Clipboard from "expo-clipboard";
 import { randomUUID } from "expo-crypto";
 import { api } from "../../convex/_generated/api";
-import { Button, Copy, Icon, List, Notice, Row, Screen } from "@/components/ui";
+import {
+  Button,
+  Copy,
+  Icon,
+  List,
+  Notice,
+  pressed,
+  Row,
+  Screen,
+} from "@/components/ui";
 import { useHousehold } from "@/features/household-context";
 import { OfflineNotice } from "@/features/offline-notice";
 import { BudgetSettings } from "@/features/budget-settings";
@@ -50,10 +59,7 @@ export default function Settings() {
       <Stack.Screen
         options={{
           title: "Husstanden",
-          headerRight:
-            Platform.OS === "ios"
-              ? undefined
-              : () => <Button title="Ferdig" onPress={() => router.back()} />,
+          headerRight: Platform.OS === "ios" ? undefined : () => <DoneButton />,
         }}
       />
       {Platform.OS === "ios" && (
@@ -216,5 +222,37 @@ export default function Settings() {
         </FormSection>
       </NativeForm>
     </Screen>
+  );
+}
+
+const doneHeight = 36;
+
+/** The web stand-in for the iOS toolbar's glass "Ferdig" capsule, inside a 44-point target. */
+function DoneButton() {
+  const colors = useTheme();
+
+  return (
+    <Pressable
+      accessibilityRole="button"
+      onPress={() => router.back()}
+      style={(state) => [
+        { minHeight: 44, justifyContent: "center", marginRight: 16 },
+        pressed(state),
+      ]}
+    >
+      <View
+        style={{
+          height: doneHeight,
+          borderRadius: doneHeight / 2,
+          paddingHorizontal: 14,
+          justifyContent: "center",
+          backgroundColor: colors.heroControl,
+        }}
+      >
+        <Copy size={15} weight="600" style={{ color: colors.onHero }}>
+          Ferdig
+        </Copy>
+      </View>
+    </Pressable>
   );
 }

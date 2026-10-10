@@ -1,36 +1,10 @@
-import { useCachedReceipts } from "@/features/receipt-cache-context";
-import { useQueryLifecycle } from "@/features/query-lifecycle";
-import { useQuery } from "convex/react";
-import { api } from "../../../convex/_generated/api";
 import { NativeTabs } from "expo-router/unstable-native-tabs";
 import { useTheme } from "@/constants/theme";
-import { useHousehold } from "@/features/household-context";
+import { mainTabs, useReceiptsBadge } from "@/features/main-tabs";
 
 export default function TabLayout() {
   const colors = useTheme();
-  const { queue } = useHousehold();
-  const cache = useCachedReceipts();
-  const { active, online } = useQueryLifecycle();
-
-  const legacy = useQuery(
-    api.receipts.attentionCount,
-    !cache.available && active && online ? {} : "skip",
-  );
-
-  const attention = cache.available
-    ? {
-        count: cache.receipts.filter(
-          (receipt) =>
-            !receipt.excluded &&
-            (receipt.status === "needs_review" || receipt.status === "failed"),
-        ).length,
-        capped: !cache.complete,
-      }
-    : legacy;
-
-  // Badge only what needs a person; processing receipts resolve on their own.
-  const pending =
-    (attention?.count ?? 0) + queue.filter((entry) => entry.error).length;
+  const badge = useReceiptsBadge();
 
   return (
     <NativeTabs
@@ -38,27 +12,21 @@ export default function TabLayout() {
       backgroundColor={colors.background}
       disableTransparentOnScrollEdge
     >
-      <NativeTabs.Trigger name="index">
-        <NativeTabs.Trigger.Label>Kamera</NativeTabs.Trigger.Label>
-        <NativeTabs.Trigger.Icon
-          sf={{ default: "camera", selected: "camera.fill" }}
-        />
-      </NativeTabs.Trigger>
-      <NativeTabs.Trigger name="spending">
-        <NativeTabs.Trigger.Label>Forbruk</NativeTabs.Trigger.Label>
-        <NativeTabs.Trigger.Icon sf="chart.bar.xaxis" />
-      </NativeTabs.Trigger>
-      <NativeTabs.Trigger name="receipts">
-        <NativeTabs.Trigger.Label>Kvitteringer</NativeTabs.Trigger.Label>
-        <NativeTabs.Trigger.Icon
-          sf={{ default: "doc.text", selected: "doc.text.fill" }}
-        />
-        {pending > 0 && (
-          <NativeTabs.Trigger.Badge>
-            {attention?.capped ? `${pending}+` : String(pending)}
-          </NativeTabs.Trigger.Badge>
-        )}
-      </NativeTabs.Trigger>
+      {mainTabs.map((tab) => (
+        <NativeTabs.Trigger key={tab.name} name={tab.name}>
+          <NativeTabs.Trigger.Label>{tab.label}</NativeTabs.Trigger.Label>
+          <NativeTabs.Trigger.Icon
+            sf={
+              tab.selectedIcon
+                ? { default: tab.icon, selected: tab.selectedIcon }
+                : tab.icon
+            }
+          />
+          {tab.name === "receipts" && badge !== undefined && (
+            <NativeTabs.Trigger.Badge>{badge}</NativeTabs.Trigger.Badge>
+          )}
+        </NativeTabs.Trigger>
+      ))}
     </NativeTabs>
   );
 }

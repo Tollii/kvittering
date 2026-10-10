@@ -18,7 +18,7 @@ When a second screen needs a feature's component, move it up to `src/components`
 
 **`Amount`** is the large number a screen or sheet leads with, and `detail` is its one-line explanation under it, such as "3 kjøp" or "12 poster i perioden". `hero` puts it on a `SummaryBand` in `onHero`; otherwise it sits on paper at the top of a sheet or a detail view.
 
-**`Icon`** renders an SF Symbol, `primary` by default, hidden from VoiceOver. Label the control that contains it instead.
+**`Icon`** renders an SF Symbol, `primary` by default, hidden from VoiceOver. Label the control that contains it instead. The web build shows the closest Material Symbol from [symbol.web.tsx](../../src/components/ui/symbol.web.tsx); a new symbol needs an entry there, or browser checks show a question mark and log an error.
 
 **`pressed(state)`** and **`faded(disabled)`** are the shared press and disabled styles. Use both on any custom `Pressable`.
 
@@ -49,7 +49,7 @@ States: `disabled` fades the button; `busy` shows a spinner in place of the icon
 
 **`Toggle`** is a labelled `Switch` with optional detail text, tinted `primary`.
 
-**`Segments`** switches between two to four views of the same content, such as Kvitteringer / Varer. On iOS it is the native segmented control; at large text sizes, and off iOS, it draws its own control (see [accessibility](foundations.md#accessibility)).
+**`Segments`** switches between two to four views of the same content, such as Kvitteringer / Varer. On iOS it is the native segmented control, and the web build draws a JavaScript copy of it; at large text sizes it draws its own control (see [accessibility](foundations.md#accessibility)).
 
 **`Select`** ([selection](../../src/components/ui/selection.tsx)) is a `Row` that opens a `Sheet` with options, a checkmark on the current one, and search when the list is long.
 
@@ -95,4 +95,4 @@ Pass `insetTop={false}` when a native stack header already covers the top inset.
 
 **`NativeForm`** and **`FormSection`** ([native form](../../src/components/ui/native-form.ios.tsx)) render a SwiftUI grouped form on iOS for settings-style screens and field sheets, with React Native content inside each section. Each section takes the theme's `surface` as its row background, so settings cards match every other card in both colour schemes.
 
-**Native menus.** `PeriodMenu` ([period menu](../../src/features/period-menu.ios.tsx)) and `ReceiptContextMenu` ([context menu](../../src/features/receipt-context-menu.ios.tsx)) use SwiftUI menus on iOS; each has a plain fallback for other platforms in the same folder.
+**Native menus.** `PeriodMenu` ([period menu](../../src/features/period-menu.ios.tsx)) and `ReceiptContextMenu` ([context menu](../../src/features/receipt-context-menu.ios.tsx)) use SwiftUI menus on iOS; each has a plain fallback for other platforms in the same folder, drawn to look like the iOS control at rest.
