@@ -4,7 +4,7 @@ How the components combine into screens, and how the screens connect. Routes liv
 
 ## Navigation
 
-Four native tabs (`src/app/(tabs)/_layout.tsx`), each with an SF Symbol; Kamera and Innboks switch to the filled symbol when selected:
+Four native tabs, each with an SF Symbol; Kamera and Innboks switch to the filled symbol when selected. The tabs are listed once in [main tabs](../../src/features/main-tabs.ts): the iOS layout shows them as native tabs, and the web layout draws a look-alike floating tab bar for browser checks.
 
 | Tab       | Symbol            | Purpose                                                                                       |
 | --------- | ----------------- | --------------------------------------------------------------------------------------------- |

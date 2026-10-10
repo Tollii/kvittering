@@ -9,7 +9,9 @@ metadata:
 
 # Check a change visually
 
-On a Mac with Xcode, use the iOS Simulator instead, as [file-pr](../file-pr/SKILL.md) and [simulator-check](../simulator-check/SKILL.md) describe: it runs the native app. The web build is an approximation of the iOS app. Layout, text, navigation, and JavaScript behavior are real; SF Symbol icons, the camera, Keychain, widgets, the share sheet, and native tab bars are not. The tab bar sits at the top on web. When the change touches a native-only path, say in the PR that the web build cannot show it; the `End-to-end` workflow covers it on iOS (see [verification](../../../docs/verification.md)).
+On a Mac with Xcode, use the iOS Simulator instead, as [file-pr](../file-pr/SKILL.md) and [simulator-check](../simulator-check/SKILL.md) describe: it runs the native app. The web build is an approximation of the iOS app. Layout, text, navigation, and JavaScript behavior are real. The page has an iPhone 15's full screen, safe areas, and status bar, and web stand-ins draw the tab bar, segmented controls, and SF Symbols (as the closest Material Symbol) like iOS. The camera, Keychain, widgets, the share sheet, SwiftUI menus and forms, native header search, and sheet presentation are not real. When the change touches a native-only path, say in the PR that the web build cannot show it; the `End-to-end` workflow covers it on iOS (see [verification](../../../docs/verification.md)).
+
+The iOS references for each screen are the simulator screenshots linked from the [screen catalogue](../../../docs/design-system/patterns.md#screen-catalogue). If the web build differs from them in a way your change did not cause, fix the web stand-in rather than the shared component, and keep the iOS app as the source of truth.
 
 ## Start the app
 
@@ -17,7 +19,9 @@ On a Mac with Xcode, use the iOS Simulator instead, as [file-pr](../file-pr/SKIL
 npm run visual:start
 ```
 
-This starts a disposable local Convex backend with the mock receipt provider and email sign-up, exports the web build, and serves it at `http://127.0.0.1:8081`. It prints the URL when ready. Rerun it after every source change: the export is static. Each start resets the data to the `reviewed-receipts` fixture from `tools/e2e/fixtures/`: one household with three reviewed receipts. Choose another fixture with `VISUAL_FIXTURE=<name>`, or start without data with `VISUAL_FIXTURE=`. When a branch changes the schema, update the fixtures in the same change. `VISUAL_RESET=1` also deletes the database before the start. Logs are in `build/visual/`.
+This starts a disposable local Convex backend with the mock receipt provider and email sign-up, exports the web build, and serves it at `http://127.0.0.1:8081`. It prints the URL when ready. Later starts in a session are faster, because unchanged functions and packages are not deployed again. Each start resets the data to the `reviewed-receipts` fixture from `tools/e2e/fixtures/`: one household with three reviewed receipts. Choose another fixture with `VISUAL_FIXTURE=<name>`, or start without data with `VISUAL_FIXTURE=`. When a branch changes the schema, update the fixtures in the same change. `VISUAL_RESET=1` also deletes the database before the start. Logs are in `build/visual/`.
+
+The export is static. After an app change, run `tools/visual/build.sh`, which re-exports quickly and keeps the data; rerun `npm run visual:start` after a backend change or to reset the data.
 
 The environment's setup script provides Chromium, ffmpeg, and unzip. The helper needs ffmpeg to shrink recordings to a size the PR can link, so if it is missing, report that and stop.
 
@@ -39,9 +43,11 @@ await App.run("add-receipt", async (app) => {
 });
 ```
 
-[app.mts](../../../tools/visual/app.mts) opens an iPhone 15-sized page in Norwegian and records video by default. `tap`, `see`, and `type` find an element by test ID, accessibility label, or exact visible text, as Maestro flows do. `app.page` is the Playwright page for anything else. `signIn` signs in to the seeded fixture account, so the flow starts with the fixture's data. `signUp` creates a new account and household, so the flow starts empty. The mock provider always returns the same example receipt (Eksempelbutikk).
+[app.mts](../../../tools/visual/app.mts) opens an iPhone 15-sized page in Norwegian and records video by default. The browser clock starts at `fixtureTime`, just after the fixture's purchases, so month views show the same month as the references. The backend keeps the real time, so a flow that creates receipts can mix the two months; pass `now: null` to `App.run` when it matters. `tap`, `see`, and `type` find the first visible element with this test ID, accessibility label, or exact visible text, as Maestro flows do. `app.page` is the Playwright page for anything else. `signIn` signs in to the seeded fixture account, so the flow starts with the fixture's data. `signUp` creates a new account and household, so the flow starts empty. The mock provider always returns the same example receipt (Eksempelbutikk).
 
 `App.run` saves numbered screenshots, `flow.mp4`, and a `flow.gif` preview in `build/visual/media/<name>/`, prints that directory, and on failure saves `failed.png` first. Browser errors print to stderr. Open the screenshots and check that each shows what its caption will claim before you publish them; a capture of an error or loading screen proves nothing.
+
+[screens.mts](../../../tools/visual/flows/screens.mts) captures the main screens in light and dark mode for comparing with the references.
 
 Keep each flow to the steps the change needs, so the video stays short enough to watch. The helper refuses recordings over 9 MB.
 
@@ -50,6 +56,7 @@ Keep each flow to the steps the change needs, so the video stays short enough to
 For a before view, run the same flow on `main` in a separate worktree, then rerun `npm run visual:start` on your branch:
 
 ```sh
+git fetch origin main
 git worktree add ../kvitto-before origin/main
 cd ../kvitto-before && npm ci && npm run visual:start
 node <path-to-your-flow>.mts

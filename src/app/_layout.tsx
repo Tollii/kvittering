@@ -15,7 +15,7 @@ import {
 import { StatusBar } from "expo-status-bar";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
-import { useColorScheme } from "react-native";
+import { Platform, useColorScheme } from "react-native";
 import { QueryLifecycleProvider } from "@/features/query-lifecycle";
 import { SessionProvider } from "@/features/session";
 import { useTheme } from "@/constants/theme";
@@ -84,6 +84,9 @@ function RootLayout() {
                     contentStyle: { backgroundColor: colors.background },
                     headerShadowVisible: false,
                     headerBackButtonDisplayMode: "minimal",
+                    // iOS centers titles; the web header follows for browser checks.
+                    headerTitleAlign:
+                      Platform.OS === "web" ? "center" : undefined,
                   }}
                 >
                   <Stack.Screen
