@@ -4,7 +4,7 @@ Kvitto captures household grocery receipts and explains purchases. It uses Expo 
 
 <p align="center">
   <img src="docs/images/app-history.png" width="240" alt="Receipt history grouped by month, with a total per month">
-  <img src="docs/images/app-receipt.png" width="240" alt="A reviewed receipt with its total, categories, and line items">
+  <img src="docs/images/app-receipt.png" width="240" alt="A reviewed receipt with its total and spending by category">
   <img src="docs/images/app-spending.png" width="240" alt="Monthly spending broken down by category">
 </p>
 
