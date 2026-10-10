@@ -1,14 +1,15 @@
 import { CalendarDate } from "@/lib/domain/calendar";
 import { useReleaseMutation } from "@/lib/releases/requests";
 import { useState } from "react";
-import { View } from "react-native";
 import { Stack } from "expo-router";
 import { useQuery, usePaginatedQuery } from "convex-helpers/react/cache";
 import { api } from "../../convex/_generated/api";
 import type { Id } from "../../convex/_generated/dataModel";
 import {
+  Amount,
   Button,
   Copy,
+  Disclosure,
   Empty,
   List,
   Loading,
@@ -25,6 +26,7 @@ import {
   parseCategoryId,
 } from "@/lib/domain/categories";
 import { failureMessage } from "@/lib/failure-message";
+import { plural } from "@/lib/domain/receipt-review";
 
 /** Corrections record ids as stored, which may predate the current categories. */
 const categoryName = (id: string | null) => {
@@ -106,20 +108,16 @@ export default function Corrections() {
         <Loading />
       ) : (
         <>
-          <View style={{ gap: 4 }}>
-            <Copy selectable size={24} weight="700">
-              {changes.length} rettelser ·{" "}
-              {history.entries.length - changes.length} bekreftelser
-            </Copy>
-            <Copy muted size={13}>
-              Siste {history.entries.length} registrerte beslutninger
-              {history.truncated ? " (eldre finnes)" : ""}. Nye kategori- og
-              produktrettelser lagres fra nå av. Automatisk godkjenning teller
-              ikke som en rettelse.
-            </Copy>
-          </View>
+          <Amount
+            detail={`${plural(history.entries.length - changes.length, "bekreftelse", "bekreftelser")} · siste ${history.entries.length} beslutninger${history.truncated ? ", eldre finnes" : ""}`}
+          >
+            {plural(changes.length, "rettelse", "rettelser")}
+          </Amount>
           {!!error && <Notice tone="error">{error}</Notice>}
-          <SectionTitle title="Siste beslutninger" />
+          <SectionTitle
+            title="Siste beslutninger"
+            detail="Trykk på en rettelse for å bruke den på samme vare i andre kvitteringer"
+          />
           {!history.entries.length && (
             <Empty
               title="Ingen rettelser ennå"
@@ -133,9 +131,11 @@ export default function Corrections() {
                 key={entry._id}
                 title={entry.name}
                 detail={
-                  entry.field === "category"
-                    ? `${categoryName(entry.previous)} → ${categoryName(entry.expected)}`
-                    : "Produktkobling endret"
+                  entry.field !== "category"
+                    ? "Produktkobling endret"
+                    : entry.previous === entry.expected
+                      ? `Bekreftet: ${categoryName(entry.expected)}`
+                      : `${categoryName(entry.previous)} → ${categoryName(entry.expected)}`
                 }
                 value={entry.store ?? undefined}
                 onPress={
@@ -143,6 +143,7 @@ export default function Corrections() {
                   isDecidedCategory(entry.expected)
                     ? () => {
                         setTargetKeys([]);
+                        setError("");
                         setSelected(entry._id);
                       }
                     : undefined
@@ -157,6 +158,12 @@ export default function Corrections() {
               onPress={() => historyPage.loadMore(50)}
             />
           )}
+          <Disclosure title="Om rettelser">
+            <Copy size={14} muted>
+              Nye kategori- og produktrettelser lagres fra nå av. Automatisk
+              godkjenning teller ikke som en rettelse.
+            </Copy>
+          </Disclosure>
           {!!batches?.length && (
             <>
               <SectionTitle title="Rettelser på flere varer" />
@@ -187,6 +194,30 @@ export default function Corrections() {
         title="Bruk rettelsen på samme vare"
         visible={!!selected}
         onClose={() => setSelected(null)}
+        footer={
+          <>
+            {!!error && <Notice tone="error">{error}</Notice>}
+            <Button
+              title={`Rett ${plural(targets.length, "vare", "varer")}`}
+              disabled={!targets.length || busy}
+              busy={busy}
+              onPress={() =>
+                void run(async () => {
+                  if (!selected) return;
+                  await apply({
+                    id: selected,
+                    targets: targets.map(({ receiptId, lineId, revision }) => ({
+                      receiptId,
+                      lineId,
+                      revision,
+                    })),
+                  });
+                  setSelected(null);
+                })
+              }
+            />
+          </>
+        }
       >
         <Copy>
           Sett kategorien til {categoryName(selectedEntry?.expected ?? null)}{" "}
@@ -234,26 +265,6 @@ export default function Corrections() {
                 onPress={() => previewPage.loadMore(20)}
               />
             )}
-            {!!error && <Notice tone="error">{error}</Notice>}
-            <Button
-              title={`Rett ${targets.length} varer`}
-              disabled={!targets.length || busy}
-              busy={busy}
-              onPress={() =>
-                void run(async () => {
-                  if (!selected) return;
-                  await apply({
-                    id: selected,
-                    targets: targets.map(({ receiptId, lineId, revision }) => ({
-                      receiptId,
-                      lineId,
-                      revision,
-                    })),
-                  });
-                  setSelected(null);
-                })
-              }
-            />
           </>
         )}
       </Sheet>

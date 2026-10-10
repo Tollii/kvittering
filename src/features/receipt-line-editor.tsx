@@ -41,7 +41,7 @@ import {
 } from "@/lib/domain/receipt-review";
 import { CategoryPicker } from "./category-picker";
 import { CatalogProductSheet } from "./catalog-product-sheet";
-import { radius, useTheme } from "@/constants/theme";
+import { useTheme } from "@/constants/theme";
 import { priceSignalLabel, type PriceSignal } from "@/lib/domain/price-signals";
 import { tapFeedback } from "@/lib/haptics";
 
@@ -265,20 +265,16 @@ export function ReceiptLineEditor({
           )}
         </View>
       )}
+      {/* The line header expands the editor, so accepting is the one button. */}
       {!showEditor && review && readerIssues.length > 0 && (
-        <View style={{ flexDirection: "row", gap: 8 }}>
+        <View style={{ flexDirection: "row" }}>
           <Button
             title="Dette stemmer"
             variant="tint"
             compact
             icon="checkmark"
+            accessibilityLabel={`Merknadene om ${line.name} stemmer`}
             onPress={acceptReaderIssues}
-          />
-          <Button
-            title="Rediger"
-            variant="secondary"
-            compact
-            onPress={() => setExpanded(true)}
           />
         </View>
       )}
@@ -464,40 +460,37 @@ function LineProductRow({
         />
       )}
       {!review && priceSignal && <PriceSignalChip signal={priceSignal} />}
-      <Pressable
-        accessibilityRole="button"
-        accessibilityLabel={
-          catalogProduct
-            ? `Produktinformasjon for ${catalogProduct.name}`
-            : `${productLabel} for ${line.name}. Endre produktkobling`
-        }
-        onPress={onOpenCatalog}
-        style={(state) => [
-          {
-            minHeight: 44,
-            flexDirection: "row",
-            alignItems: "center",
-            gap: 5,
-            marginLeft: "auto",
-          },
-          pressed(state),
-        ]}
-      >
-        <Icon
-          name={productMissing ? "link" : "checkmark.circle"}
-          size={13}
-          color={colors.primary}
-        />
-        <Copy
-          size={14}
-          weight="600"
-          style={{
-            color: colors.primary,
-          }}
+      {/* Product linking is optional, so review mode keeps the category decision alone. */}
+      {!review && (
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={
+            catalogProduct
+              ? `Produktinformasjon for ${catalogProduct.name}`
+              : `${productLabel} for ${line.name}. Endre produktkobling`
+          }
+          onPress={onOpenCatalog}
+          style={(state) => [
+            {
+              minHeight: 44,
+              flexDirection: "row",
+              alignItems: "center",
+              gap: 5,
+              marginLeft: "auto",
+            },
+            pressed(state),
+          ]}
         >
-          {productLabel}
-        </Copy>
-      </Pressable>
+          <Icon
+            name={productMissing ? "link" : "checkmark.circle"}
+            size={13}
+            color={colors.primary}
+          />
+          <Copy size={14} weight="600" style={{ color: colors.primary }}>
+            {productLabel}
+          </Copy>
+        </Pressable>
+      )}
     </View>
   );
 }
@@ -530,8 +523,6 @@ function CategorySuggestion({
   onOpenCategory: () => void;
   onConfirmCategory: (categoryId: CategoryId) => void;
 }>) {
-  const colors = useTheme();
-
   const confidenceLabel =
     line.confidence != null
       ? `, ${Math.round(line.confidence * 100)} prosent sikker`
@@ -550,29 +541,14 @@ function CategorySuggestion({
         accessibilityLabel={`Forslag: ${categoryLabel}${confidenceLabel}. Trykk for å velge en annen kategori`}
         onPress={onOpenCategory}
       />
-      <Pressable
-        accessibilityRole="button"
+      <Button
+        title="Bekreft"
+        variant="tint"
+        compact
+        icon="checkmark"
         accessibilityLabel={`Bekreft kategorien ${categoryLabel} for ${line.name}`}
         onPress={() => onConfirmCategory(line.categoryId)}
-        style={(state) => [
-          {
-            flexDirection: "row",
-            alignItems: "center",
-            gap: 5,
-            minHeight: 44,
-            paddingHorizontal: 11,
-            borderRadius: radius.tile,
-            borderCurve: "continuous",
-            backgroundColor: colors.primary,
-          },
-          pressed(state),
-        ]}
-      >
-        <Icon name="checkmark" size={11} color={colors.onPrimary} />
-        <Copy size={15} weight="600" style={{ color: colors.onPrimary }}>
-          Bekreft kategori
-        </Copy>
-      </Pressable>
+      />
     </>
   );
 }

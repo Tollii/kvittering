@@ -23,7 +23,6 @@ export function CaptureReview({
   importRecovery,
   onClose,
   onSave,
-  onChoosePhotos,
   onRemovePhoto,
   onCombinedChange,
 }: Readonly<{
@@ -35,7 +34,6 @@ export function CaptureReview({
   importRecovery: ReactNode;
   onClose: () => void;
   onSave: () => void;
-  onChoosePhotos: () => void;
   onRemovePhoto: (uri: string) => void;
   onCombinedChange: (value: boolean) => void;
 }>) {
@@ -149,26 +147,14 @@ export function CaptureReview({
           />
         </Panel>
       )}
-      <View style={{ flexDirection: "row", gap: 8 }}>
-        <View style={{ flex: 1 }}>
-          <Button
-            title="Ta flere"
-            variant="secondary"
-            icon="camera"
-            disabled={busy || photos.length >= maxReceiptImages}
-            onPress={onClose}
-          />
-        </View>
-        <View style={{ flex: 1 }}>
-          <Button
-            title="Velg flere"
-            variant="secondary"
-            icon="photo.on.rectangle"
-            disabled={busy || photos.length >= maxReceiptImages}
-            onPress={onChoosePhotos}
-          />
-        </View>
-      </View>
+      {/* The camera behind the sheet has both the shutter and the import buttons. */}
+      <Button
+        title="Legg til flere bilder"
+        variant="secondary"
+        icon="plus"
+        disabled={busy || photos.length >= maxReceiptImages}
+        onPress={onClose}
+      />
     </Sheet>
   );
 }

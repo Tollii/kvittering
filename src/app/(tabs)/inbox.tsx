@@ -1,16 +1,12 @@
 import { needsAttention } from "@/lib/domain/receipt-state";
-import { QueueRegroup } from "@/features/queue-regroup";
 import { ReceiptActivityButton } from "@/features/receipt-activity";
 import { useCompleteReceipts } from "@/features/receipt-queries";
+import { UploadQueueCard } from "@/features/upload-queue-card";
 import { router } from "expo-router";
-import { ActivityIndicator, View } from "react-native";
 import {
   Button,
-  Copy,
   IconButton,
-  IconTile,
   Loading,
-  Panel,
   Screen,
   SectionTitle,
 } from "@/components/ui";
@@ -67,6 +63,17 @@ export default function Inbox() {
         <>
           <SectionTitle
             title="Til kontroll"
+            detail={
+              attention.some(
+                (receipt) =>
+                  !!quickApproveData(
+                    receipt.data,
+                    !!receipt.duplicateOf && !receipt.duplicateResolved,
+                  ),
+              )
+                ? "Sveip til venstre for å godkjenne"
+                : undefined
+            }
             action={attention.length > 1 ? "Start" : undefined}
             onAction={() => {
               const [next] = attention;
@@ -83,17 +90,6 @@ export default function Inbox() {
               <ReceiptCard receipt={receipt} />
             </SwipeToApprove>
           ))}
-          {attention.some(
-            (receipt) =>
-              !!quickApproveData(
-                receipt.data,
-                !!receipt.duplicateOf && !receipt.duplicateResolved,
-              ),
-          ) && (
-            <Copy size={12} muted style={{ textAlign: "center" }}>
-              Sveip for å godkjenne
-            </Copy>
-          )}
         </>
       )}
       {(working.length > 0 || queue.length > 0) && (
@@ -109,76 +105,14 @@ export default function Inbox() {
               ]),
             ]}
           />
-          {queue.map((entry) => {
-            const uploaded = entry.uploaded.filter(Boolean).length;
-
-            return (
-              <Panel key={entry.id} style={{ gap: 8 }}>
-                <View
-                  style={{
-                    flexDirection: "row",
-                    alignItems: "center",
-                    gap: 12,
-                  }}
-                >
-                  {/* A failed upload is a warning: the images are safe and wait for a retry. */}
-                  {entry.error ? (
-                    <IconTile
-                      icon="arrow.clockwise.circle"
-                      color={colors.warning}
-                    />
-                  ) : (
-                    <IconTile>
-                      <ActivityIndicator color={colors.primary} />
-                    </IconTile>
-                  )}
-                  <View style={{ flex: 1, gap: 2 }}>
-                    <Copy weight="600">
-                      {entry.images.length === 1
-                        ? "Ny kvittering"
-                        : `Ny kvittering · ${entry.images.length} bilder`}
-                    </Copy>
-                    <Copy size={13} muted>
-                      {entry.error
-                        ? "Prøver igjen"
-                        : online
-                          ? `Laster opp · ${uploaded} av ${entry.images.length}`
-                          : "Venter på nett"}
-                    </Copy>
-                  </View>
-                </View>
-                <View
-                  style={{
-                    height: 4,
-                    borderRadius: 2,
-                    backgroundColor: colors.muted,
-                    overflow: "hidden",
-                  }}
-                >
-                  <View
-                    style={{
-                      height: 4,
-                      width: `${Math.max(6, (uploaded / entry.images.length) * 100)}%`,
-                      backgroundColor: entry.error
-                        ? colors.warning
-                        : colors.primary,
-                    }}
-                  />
-                </View>
-                <QueueRegroup entry={entry} />
-                {!!entry.error && (
-                  <Button
-                    title="Prøv igjen"
-                    variant="tint"
-                    compact
-                    icon="arrow.clockwise"
-                    onPress={() => void retryFailedUploads()}
-                    disabled={!online}
-                  />
-                )}
-              </Panel>
-            );
-          })}
+          {queue.map((entry) => (
+            <UploadQueueCard
+              key={entry.id}
+              entry={entry}
+              online={online}
+              onRetry={() => void retryFailedUploads()}
+            />
+          ))}
           {working.map((receipt) => (
             <ReceiptCard key={receipt._id} receipt={receipt} compact />
           ))}

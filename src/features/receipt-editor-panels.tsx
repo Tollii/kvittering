@@ -1,4 +1,4 @@
-import { ActivityIndicator, Alert, View } from "react-native";
+import { ActivityIndicator, Alert } from "react-native";
 import { Ore } from "@/lib/domain/ore";
 import {
   Button,
@@ -8,6 +8,7 @@ import {
   Notice,
   Panel,
   Row,
+  SectionTitle,
   Segments,
 } from "@/components/ui";
 import type { ReceiptData } from "@/lib/domain/receipt";
@@ -41,8 +42,8 @@ export function StaleRevisionNotice({
 }
 
 /**
- * The choice between review lines and all lines, and the review shortcuts
- * above the line list.
+ * The choice between review lines and all lines, and the heading of the line
+ * list with its one bulk action.
  */
 export function ReceiptLineControls({
   allLines,
@@ -85,68 +86,41 @@ export function ReceiptLineControls({
           ]}
         />
       )}
-      {!allLines && confirmable > 1 && (
-        <Button
-          title={`Bekreft alle ${confirmable} foreslåtte kategorier`}
-          variant="tint"
-          icon="checkmark.circle"
-          onPress={onConfirmAll}
-        />
-      )}
-      {!allLines && reviewComplete && (
+      {!allLines && reviewComplete ? (
         <Panel style={{ alignItems: "center", paddingVertical: 24 }}>
           <Icon name="checkmark.circle" size={28} color={colors.success} />
           <Copy weight="600">
             {hasTasks ? "Varene er avklart" : "Klar til godkjenning"}
           </Copy>
         </Panel>
-      )}
-      {allLines && (
-        <View
-          style={{
-            flexDirection: "row",
-            alignItems: "center",
-            flexWrap: "wrap",
-            gap: 8,
-          }}
-        >
-          <Copy
-            accessibilityRole="header"
-            size={19}
-            weight="600"
-            style={{ flex: 1 }}
-          >
-            Varelinjer
-          </Copy>
-          {difference !== null && <LineBalance difference={difference} />}
-        </View>
+      ) : (
+        <SectionTitle
+          title={allLines ? "Varelinjer" : "Varer å sjekke"}
+          detail={
+            allLines ? balanceLabel(difference) : suggestionLabel(confirmable)
+          }
+          action={!allLines && confirmable > 1 ? "Bekreft alle" : undefined}
+          actionLabel={`Bekreft alle ${confirmable} foreslåtte kategorier`}
+          onAction={!allLines && confirmable > 1 ? onConfirmAll : undefined}
+        />
       )}
     </>
   );
 }
 
 /** Whether the lines add up to the paid amount, updated as lines are edited. */
-function LineBalance({ difference }: Readonly<{ difference: Ore }>) {
-  const colors = useTheme();
-  const color = difference === 0 ? colors.success : colors.warning;
+function balanceLabel(difference: Ore | null): string | undefined {
+  if (difference === null) return undefined;
 
-  return (
-    <View
-      accessibilityLiveRegion="polite"
-      style={{ flexDirection: "row", alignItems: "center", gap: 4 }}
-    >
-      <Icon
-        name={difference === 0 ? "checkmark.circle.fill" : "equal.circle"}
-        size={14}
-        color={color}
-      />
-      <Copy size={13} weight="600" style={{ color }}>
-        {difference === 0
-          ? "Stemmer med betalt"
-          : `Avvik ${Ore.format(difference)}`}
-      </Copy>
-    </View>
-  );
+  return difference === 0
+    ? "Linjene stemmer med betalt"
+    : `Avvik mot betalt: ${Ore.format(difference)}`;
+}
+
+function suggestionLabel(confirmable: number): string | undefined {
+  if (confirmable < 2) return undefined;
+
+  return `${confirmable} forslag kan bekreftes samlet`;
 }
 
 /**

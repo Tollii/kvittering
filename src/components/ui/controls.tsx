@@ -74,6 +74,7 @@ export function Button({
   icon,
   style,
   testID,
+  accessibilityLabel,
 }: Readonly<{
   title: string;
   onPress: () => void;
@@ -86,6 +87,8 @@ export function Button({
   style?: StyleProp<ViewStyle>;
   /** Identifies the button for end-to-end flows. */
   testID?: string;
+  /** Names the object when the title alone would not, such as "Bekreft". */
+  accessibilityLabel?: string;
 }>) {
   const colors = useTheme();
 
@@ -100,6 +103,7 @@ export function Button({
     <Pressable
       testID={testID}
       accessibilityRole="button"
+      accessibilityLabel={accessibilityLabel}
       accessibilityState={{ disabled: disabled || busy, busy }}
       disabled={disabled || busy}
       onPress={onPress}

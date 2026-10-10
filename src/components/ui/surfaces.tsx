@@ -125,11 +125,14 @@ export function SectionTitle({
   title,
   detail,
   action,
+  actionLabel,
   onAction,
 }: Readonly<{
   title: string;
   detail?: string;
   action?: string;
+  /** Names the object when the short action text alone would not. */
+  actionLabel?: string;
   onAction?: () => void;
 }>) {
   const colors = useTheme();
@@ -149,6 +152,7 @@ export function SectionTitle({
       {!!action && onAction && (
         <Pressable
           accessibilityRole="button"
+          accessibilityLabel={actionLabel}
           onPress={onAction}
           style={(state) => [
             { minHeight: 44, justifyContent: "center", paddingLeft: 12 },

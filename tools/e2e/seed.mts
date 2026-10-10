@@ -3,7 +3,11 @@ import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { parseEnv } from "node:util";
 import { z } from "zod";
-import { loadFixture, resolveTables } from "./fixtures.mts";
+import {
+  importFixtureTables,
+  loadFixture,
+  resolveTables,
+} from "./fixtures.mts";
 
 const site = "http://127.0.0.1:3211";
 
@@ -133,9 +137,26 @@ if (fixture) {
     householdId: household._id,
   });
 
-  for (const [table, rows] of Object.entries(tables)) {
-    if (table !== "households") importTable(table, rows);
-  }
+  await importFixtureTables(tables, {
+    importTable,
+    readReceipts: () =>
+      Promise.resolve(
+        z
+          .array(z.object({ _id: z.string(), clientId: z.string() }))
+          .parse(
+            JSON.parse(
+              convex([
+                "data",
+                "receipts",
+                "--format",
+                "json",
+                "--limit",
+                "1000",
+              ]),
+            ),
+          ),
+      ),
+  });
 
   writeFileSync(
     resolve(output, "account.json"),

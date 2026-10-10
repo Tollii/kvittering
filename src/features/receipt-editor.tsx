@@ -23,8 +23,8 @@ import {
   ReceiptFooter,
   ReceiptLineList,
   ReceiptSummary,
-  ReviewTaskChips,
 } from "@/features/receipt-editor-sections";
+import { ReviewNextStep } from "@/features/review-next-step";
 import {
   ReceiptActionsSheet,
   ReceiptEditorToolbar,
@@ -344,19 +344,7 @@ export function ReceiptEditor({
           onShowActions: () => setSheet("actions"),
         })}
       />
-      <ReceiptEditorToolbar
-        menu={menu}
-        saveOffered={
-          !!data &&
-          !processing &&
-          !approved &&
-          (dirty || receipt.status !== "reviewed")
-        }
-        saveDisabled={saveDisabled}
-        dirty={dirty}
-        ready={ready}
-        onSave={() => void save()}
-      />
+      <ReceiptEditorToolbar menu={menu} />
       <Screen
         summary={
           <ReceiptSummary
@@ -364,20 +352,8 @@ export function ReceiptEditor({
             data={data}
             dirty={dirty}
             excluded={excluded}
-            approved={approved}
             processing={processing}
             busy={busy}
-            chips={
-              <ReviewTaskChips
-                tasks={tasks}
-                data={data}
-                onResolveDuplicate={() => edit({ duplicateResolved: true })}
-                onEditFields={() => setSheet("fields")}
-                onShowLines={showLines}
-                onAddLine={addLine}
-                onChange={change}
-              />
-            }
             onEditFields={() => setSheet("fields")}
           />
         }
@@ -429,13 +405,18 @@ export function ReceiptEditor({
             pointerEvents={busy || processing ? "none" : "auto"}
             style={{ gap: 12 }}
           >
-            <PurchaseTotals
-              data={data}
-              totals={totals}
-              difference={tasks.find((task) => task.kind === "difference")}
-              onChange={change}
-              onShowLines={showLines}
-            />
+            {!approved && (
+              <ReviewNextStep
+                tasks={tasks}
+                data={data}
+                onResolveDuplicate={() => edit({ duplicateResolved: true })}
+                onEditFields={() => setSheet("fields")}
+                onShowLines={showLines}
+                onAddLine={addLine}
+                onChange={change}
+              />
+            )}
+            <PurchaseTotals data={data} totals={totals} />
             <ReceiptCategorySpending data={data} />
             <ReceiptLineControls
               allLines={allLines}
