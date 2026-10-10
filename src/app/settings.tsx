@@ -68,7 +68,15 @@ export default function Settings() {
         <FormSection title={household.name}>
           <HouseholdNameSettings />
           {details ? (
-            <List style={{ paddingHorizontal: 0, paddingVertical: 0 }}>
+            <List
+              // The form row already is the card, so the rows sit flush in it.
+              style={{
+                backgroundColor: "transparent",
+                borderRadius: 0,
+                paddingHorizontal: 0,
+                paddingVertical: 0,
+              }}
+            >
               {details.members.map((member) => (
                 <Row key={member._id} title={member.name} icon="person" />
               ))}
