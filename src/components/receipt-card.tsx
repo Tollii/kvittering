@@ -2,13 +2,8 @@ import { CalendarDate } from "@/lib/domain/calendar";
 import { Ore } from "@/lib/domain/ore";
 import { isReceiptProcessing } from "@/lib/domain/receipt-state";
 import { router } from "expo-router";
-import {
-  ActivityIndicator,
-  Pressable,
-  View,
-  useWindowDimensions,
-} from "react-native";
-import { Copy, Icon, pressed } from "./ui";
+import { ActivityIndicator, View, useWindowDimensions } from "react-native";
+import { Copy, Icon, Press } from "./ui";
 import { radius, useTheme } from "@/constants/theme";
 import { reviewSummary } from "@/lib/domain/receipt-review";
 import type { Receipt } from "@/lib/domain/insights";
@@ -61,20 +56,17 @@ export function ReceiptCard({
   const remainingLabel = needs.length > 3 ? ` · +${needs.length - 3}` : "";
 
   return (
-    <Pressable
+    <Press
       accessibilityRole="button"
       accessibilityLabel={`${receipt.data?.store || "Ny kvittering"}, ${Ore.format(receipt.data?.totalOre ?? null)}, ${receiptStatusLabel(receipt)}${reviewLabel}`}
       onPress={() => openReceipt(receipt)}
-      style={(state) => [
-        {
-          backgroundColor: colors.surface,
-          borderRadius: radius.card,
-          borderCurve: "continuous",
-          overflow: "hidden",
-          flexDirection: "row",
-        },
-        pressed(state),
-      ]}
+      style={{
+        backgroundColor: colors.surface,
+        borderRadius: radius.card,
+        borderCurve: "continuous",
+        overflow: "hidden",
+        flexDirection: "row",
+      }}
     >
       <View
         style={{
@@ -142,6 +134,6 @@ export function ReceiptCard({
           </Copy>
         )}
       </View>
-    </Pressable>
+    </Press>
   );
 }

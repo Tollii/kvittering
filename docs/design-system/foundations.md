@@ -107,11 +107,14 @@ Illustrations are separate from icons. [Monument artwork](../../src/components/m
 
 ## Motion and feedback
 
-Motion is mostly native: tab switches, stack pushes, sheet presentation, context menus, and the segmented control animate as iOS does. The app adds little of its own:
+Motion is mostly native: tab switches, stack pushes, sheet presentation, context menus, and the segmented control animate as iOS does, and the app never rebuilds them in JavaScript. Its own motion is small, fast, and earns its place. Animate only what a person sees occasionally or caused themselves, give each animation a purpose (feedback, where something came from, or a state change), and leave anything seen dozens of times a day still or nearly so. [Theme](../../src/constants/theme.ts) owns the durations and curves in `motion`, and [motion](../../src/components/ui/motion.tsx) builds on them:
 
-- Press feedback lowers opacity through `pressed()` and a disabled control fades through `faded()` ([typography](../../src/components/ui/typography.tsx)). Use both on any custom `Pressable`; there are no other opacities. Opacity, unlike scaling or sliding, is acceptable under Reduce Motion.
-- Swipe to approve under "Til kontroll" is the one custom gesture: a left swipe reveals the green approve action and saves when released past the threshold.
-- The upload success note on Kamera fades out on its own once the upload lands.
+- **Press.** Every custom pressable is a `Press`. Objects such as buttons, chips, cards, and the camera controls shrink to 97 % and dim slightly under the finger; rows and text links inside a card only dim (`feedback="highlight"`), because a row shrinking inside its card looks broken. The feedback starts on touch-down and takes `motion.press`, so it reads as instant. A disabled control fades through `faded()`.
+- **Arrival.** Content a person asked for settles into place from a few points above with `useArrival`, as a `Disclosure`'s detail and Kamera's upload note do. The upload note leaves on its own, so it goes back the same way, faster, with `useDeparture`; a closing disclosure just closes. Detail that is open from the start does not animate.
+- **State.** A `Disclosure` turns its chevron rather than swapping the symbol.
+- **Gesture.** Swipe to approve under "Til kontroll" is the one custom gesture: a left swipe reveals the green approve action and saves when released past the threshold.
+
+Curves come only from `motion`: the strong ease-out for anything arriving or answering a press, the ease-in-out for something turning in place, and never an ease-in, which starts slowly at the moment the person is watching. Animate only `transform` and `opacity`. Under Reduce Motion, keep fades and drop movement and scaling: `Press` only dims, and arrivals only fade. The app reads the setting at launch, so a change takes effect the next time it opens.
 
 [Haptics](../../src/lib/haptics.ts) mark outcomes, not taps: a light impact for a confirmed decision, success when a receipt is approved or a product link is saved or undone, error when a save fails.
 

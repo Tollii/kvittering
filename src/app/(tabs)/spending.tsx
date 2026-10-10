@@ -20,7 +20,7 @@ import {
   useInitialSpendingTotals,
 } from "@/features/receipt-queries";
 import { useState } from "react";
-import { Pressable, View } from "react-native";
+import { View } from "react-native";
 import {
   Amount,
   Button,
@@ -37,7 +37,7 @@ import {
   SectionTitle,
   Segments,
   SummaryBand,
-  pressed,
+  Press,
 } from "@/components/ui";
 import { MonumentArtwork } from "@/components/monument-artwork";
 import { SpendingBars, SpendingDetails } from "@/components/spending-details";
@@ -349,18 +349,16 @@ function Spending({ initialMonth }: Readonly<{ initialMonth: CalendarMonth }>) {
               ]}
             />
             {!!group && (
-              <Pressable
+              <Press
+                feedback="highlight"
                 accessibilityRole="button"
                 onPress={() => setGroup(null)}
-                style={(state) => [
-                  {
-                    flexDirection: "row",
-                    alignItems: "center",
-                    gap: 6,
-                    minHeight: 44,
-                  },
-                  pressed(state),
-                ]}
+                style={{
+                  flexDirection: "row",
+                  alignItems: "center",
+                  gap: 6,
+                  minHeight: 44,
+                }}
               >
                 <Icon name="chevron.left" size={12} />
                 <Copy size={14} weight="600" style={{ color: colors.primary }}>
@@ -369,7 +367,7 @@ function Spending({ initialMonth }: Readonly<{ initialMonth: CalendarMonth }>) {
                 <Copy size={14} muted>
                   · {categoryOf(rows[0]?.id).groupName}
                 </Copy>
-              </Pressable>
+              </Press>
             )}
             <SpendingBars
               rows={showAllGroups ? rows : rows.slice(0, 5)}

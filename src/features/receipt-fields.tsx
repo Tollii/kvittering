@@ -27,13 +27,20 @@ export function ReceiptFields({
   onMoneyError: (value: string | null) => void;
   onClose: () => void;
 }>) {
-  const [showDate, setShowDate] = useState(false);
   const [totalError, setTotalError] = useState<string | null>(null);
   const [storePicker, setStorePicker] = useState(false);
 
+  // When the date picker opened, which is also its latest selectable date.
+  const [datePickerOpenedAt, setDatePickerOpenedAt] = useState<Date | null>(
+    null,
+  );
+
   const close = () => {
     if (totalError) Alert.alert("Kontroller beløpet", totalError);
-    else onClose();
+    else {
+      setDatePickerOpenedAt(null);
+      onClose();
+    }
   };
 
   const missingStore = !data.store?.trim();
@@ -99,9 +106,11 @@ export function ReceiptFields({
             title="Kjøpsdato"
             value={CalendarDate.format(data.purchaseDate)}
             icon="calendar"
-            onPress={() => setShowDate(!showDate)}
+            onPress={() =>
+              setDatePickerOpenedAt(datePickerOpenedAt ? null : new Date())
+            }
           />
-          {showDate && (
+          {datePickerOpenedAt && (
             <DateTimePicker
               value={CalendarDate.toNoon(
                 data.purchaseDate ?? CalendarDate.today(),
@@ -109,10 +118,10 @@ export function ReceiptFields({
               mode="date"
               display={Platform.OS === "ios" ? "inline" : "default"}
               locale="nb-NO"
-              maximumDate={new Date()}
-              onDismiss={() => setShowDate(false)}
+              maximumDate={datePickerOpenedAt}
+              onDismiss={() => setDatePickerOpenedAt(null)}
               onValueChange={(_event, date) => {
-                if (Platform.OS !== "ios") setShowDate(false);
+                if (Platform.OS !== "ios") setDatePickerOpenedAt(null);
 
                 onChange({
                   ...data,
