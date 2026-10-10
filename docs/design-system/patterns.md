@@ -21,17 +21,17 @@ On iOS, header and toolbar actions are native toolbar items, such as the receipt
 
 A typical screen, top to bottom:
 
-1. **Header.** Cobalt, either the `Screen title` hero or the native stack header (see [open questions](open-questions.md#two-kinds-of-screen-header)). The settings button sits at the top right of every tab.
-2. **Summary band** (optional). Edge-to-edge cobalt below the header with the screen's key number: the month total on Forbruk, the paid amount and status chips on a receipt, the current item in Koble produkter. Text on it uses `onHero` and `onHeroMuted`; controls on it use `heroControl` discs.
+1. **Header.** Cobalt. A tab root draws the `Screen title` hero with the arch mark, a large left-aligned title, and the settings button. A pushed or modal screen uses the native stack header, so it gets the system back button, title, and toolbar items. Historikk is the one tab root on the native header, because the native search bar lives there; it keeps the settings button in the same place as a toolbar item. Kamera has no header.
+2. **Summary band** (optional). A `SummaryBand` below the header with the screen's key number: the month menu and total on Forbruk, the paid amount and status chips on a receipt, the current item in Koble produkter. Text on it uses `onHero` and `onHeroMuted`; controls on it use `heroControl` discs.
 3. **Status notices.** The offline notice first, then loading or partial-data notices.
-4. **Content** on warm paper: `SectionTitle` groups, `Panel` cards, `Row` lists with dividers, and `Segments` to switch views.
+4. **Content** on warm paper: `SectionTitle` groups, `Panel` cards, `List` cards for rows and bars, and `Segments` to switch views. Nothing sits bare between cards; a list that needs a heading gets a `SectionTitle`, as the months in Historikk do.
 5. **Footer** (optional). A pinned action bar with the screen's primary action and a one-line status above it, as on the receipt.
 
 ### States every data screen handles
 
 - **Loading:** `Loading` with a named object, or keep the cached content and show a notice that more is coming.
 - **Empty:** `IllustratedEmpty` on an empty tab root; `Empty` everywhere else.
-- **Offline:** the "Uten nett" notice with the `wifi.slash` icon at the top, which Kamera, Innboks, Forbruk, and the receipt show today (see [open questions](open-questions.md#offline-notice-on-some-screens)); content from the local cache stays readable, and actions that need the server are disabled rather than hidden.
+- **Offline:** the "Uten nett" notice with the `wifi.slash` icon at the top of every screen that reads or writes household data: the four tabs, the receipt, Forbruksanalyse, Rettelser, Koble produkter, and settings. Content from the local cache stays readable, and actions that need the server are disabled rather than hidden. A screen whose actions queue, such as Koble produkter, adds one line under the title saying when they will land.
 - **Error:** `Notice tone="error"` near the action that failed, with the message from `failureMessage`.
 - **Partial data:** reports say when they are provisional ("foreløpige") or incomplete instead of showing a total as final.
 

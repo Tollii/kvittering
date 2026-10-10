@@ -62,9 +62,10 @@ export function IllustratedEmpty({
   return (
     <View style={{ gap: 16, paddingVertical: 20 }}>
       <MonumentArtwork scene={scene} />
+      {/* The screen-title role: this empty state stands in for a tab's content. */}
       <Copy
         accessibilityRole="header"
-        size={25}
+        size={24}
         weight="600"
         style={{ textAlign: "center" }}
       >

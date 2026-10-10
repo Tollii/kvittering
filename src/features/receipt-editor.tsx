@@ -256,7 +256,7 @@ export function ReceiptEditor({
 
   function removeReceipt() {
     Alert.alert(
-      "Slett kvitteringen?",
+      "Slette kvitteringen?",
       "Kvitteringen og bildene blir slettet.",
       [
         { text: "Avbryt", style: "cancel" },

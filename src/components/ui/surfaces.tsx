@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from "react";
+import { Children, isValidElement, useState, type ReactNode } from "react";
 import {
   ActivityIndicator,
   Pressable,
@@ -18,7 +18,8 @@ export function Panel({
 }: Readonly<{
   children: ReactNode;
   style?: StyleProp<ViewStyle>;
-  tone?: "surface" | "primary" | "soft" | "plain";
+  /** `plain` is the quieter card for a group nested inside another card. */
+  tone?: "surface" | "plain";
 }>) {
   const colors = useTheme();
 
@@ -27,13 +28,7 @@ export function Panel({
       style={[
         {
           backgroundColor:
-            tone === "primary"
-              ? colors.hero
-              : tone === "soft"
-                ? colors.primarySoft
-                : tone === "plain"
-                  ? colors.surfaceRaised
-                  : colors.surface,
+            tone === "plain" ? colors.surfaceRaised : colors.surface,
           borderRadius: radius.card,
           borderCurve: "continuous",
           paddingVertical: 16,
@@ -45,6 +40,79 @@ export function Panel({
       ]}
     >
       {children}
+    </View>
+  );
+}
+
+/**
+ * A card that holds a list: each child after the first gets a divider. Every
+ * list in the app sits in one of these, so lists look the same everywhere.
+ */
+export function List({
+  children,
+  style,
+}: Readonly<{ children: ReactNode; style?: StyleProp<ViewStyle> }>) {
+  const colors = useTheme();
+
+  return (
+    <Panel style={[{ gap: 0, paddingVertical: 4 }, style]}>
+      {Children.toArray(children)
+        .filter(isValidElement)
+        .map((child, index) => (
+          // `toArray` gives every element a key, from its own key or its position.
+          <View
+            key={child.key}
+            style={{
+              borderTopWidth: index ? 1 : 0,
+              borderTopColor: colors.line,
+            }}
+          >
+            {child}
+          </View>
+        ))}
+    </Panel>
+  );
+}
+
+/**
+ * The soft cobalt tile behind an icon. Tiles up to 44 points are squircles
+ * with the `tile` radius; the larger empty-state disc is a circle.
+ */
+export function IconTile({
+  icon,
+  size = 32,
+  color,
+  children,
+}: Readonly<{
+  icon?: SymbolViewProps["name"];
+  size?: number;
+  color?: string;
+  /** Replaces the icon, for a spinner. */
+  children?: ReactNode;
+}>) {
+  const colors = useTheme();
+
+  return (
+    <View
+      style={{
+        width: size,
+        height: size,
+        borderRadius: size > 44 ? size / 2 : radius.tile,
+        borderCurve: "continuous",
+        backgroundColor: colors.primarySoft,
+        alignItems: "center",
+        justifyContent: "center",
+      }}
+    >
+      {children ??
+        (icon && (
+          <Icon
+            name={icon}
+            size={Math.round(size * (size > 44 ? 0.44 : 0.5))}
+            weight={size > 44 ? undefined : "semibold"}
+            color={color}
+          />
+        ))}
     </View>
   );
 }
@@ -112,10 +180,7 @@ export function Disclosure({
         accessibilityRole="button"
         accessibilityState={{ expanded: open }}
         onPress={() => setOpen(!open)}
-        style={({ pressed: down }) => [
-          styles.row,
-          { minHeight: 44, opacity: down ? 0.6 : 1 },
-        ]}
+        style={(state) => [styles.row, { minHeight: 44 }, pressed(state)]}
       >
         <Copy weight="600" style={{ flex: 1 }}>
           {title}
@@ -138,12 +203,18 @@ export function Disclosure({
 
 export function Notice({
   children,
+  title,
   tone = "info",
   icon,
+  onPress,
 }: Readonly<{
   children: ReactNode;
+  /** A bold first line above the message. */
+  title?: string;
   tone?: "info" | "warning" | "error" | "success";
   icon?: SymbolViewProps["name"];
+  /** Makes the notice a button with a trailing chevron. */
+  onPress?: () => void;
 }>) {
   const colors = useTheme();
 
@@ -174,30 +245,53 @@ export function Notice({
     },
   }[tone];
 
-  return (
-    <View
-      style={{
-        flexDirection: "row",
-        gap: 10,
-        padding: 12,
-        paddingLeft: 14,
-        borderRadius: radius.control,
-        borderCurve: "continuous",
-        backgroundColor: palette.background,
-        alignItems: "flex-start",
-      }}
-    >
-      <View style={{ paddingTop: 2 }}>
+  const frame: ViewStyle = {
+    flexDirection: "row",
+    gap: 10,
+    padding: 12,
+    paddingLeft: 14,
+    borderRadius: radius.control,
+    borderCurve: "continuous",
+    backgroundColor: palette.background,
+    alignItems: title ? "center" : "flex-start",
+  };
+
+  const content = (
+    <>
+      <View style={{ paddingTop: title ? 0 : 2 }}>
         <Icon name={icon ?? palette.icon} size={16} color={palette.accent} />
       </View>
-      <Copy
-        size={15}
-        accessibilityRole={tone === "error" ? "alert" : undefined}
-        style={{ color: palette.text, flex: 1 }}
-      >
-        {children}
-      </Copy>
-    </View>
+      <View style={{ flex: 1, gap: 1 }}>
+        {!!title && (
+          <Copy size={15} weight="600" style={{ color: palette.text }}>
+            {title}
+          </Copy>
+        )}
+        <Copy
+          size={title ? 13 : 15}
+          muted={!!title && tone === "info"}
+          accessibilityRole={tone === "error" ? "alert" : undefined}
+          style={{ color: title && tone === "info" ? undefined : palette.text }}
+        >
+          {children}
+        </Copy>
+      </View>
+      {onPress && (
+        <Icon name="chevron.right" size={12} color={colors.secondary} />
+      )}
+    </>
+  );
+
+  return onPress ? (
+    <Pressable
+      accessibilityRole="button"
+      onPress={onPress}
+      style={(state) => [frame, pressed(state)]}
+    >
+      {content}
+    </Pressable>
+  ) : (
+    <View style={frame}>{content}</View>
   );
 }
 
@@ -221,22 +315,10 @@ export function Empty({
   icon?: SymbolViewProps["name"];
   children?: ReactNode;
 }>) {
-  const colors = useTheme();
-
   return (
     <Panel style={{ paddingVertical: 32, alignItems: "center", gap: 8 }}>
-      <View
-        style={{
-          width: 64,
-          height: 64,
-          borderRadius: 32,
-          backgroundColor: colors.primarySoft,
-          alignItems: "center",
-          justifyContent: "center",
-          marginBottom: 6,
-        }}
-      >
-        <Icon name={icon} size={28} />
+      <View style={{ marginBottom: 6 }}>
+        <IconTile icon={icon} size={64} />
       </View>
       <Copy
         accessibilityRole="header"
@@ -281,26 +363,13 @@ export function Row({
       accessibilityState={onPress ? { selected } : undefined}
       disabled={!onPress}
       onPress={onPress}
-      style={({ pressed: down }) => [
+      style={(state) => [
         styles.row,
-        { minHeight: 52, paddingVertical: 10, opacity: down ? 0.6 : 1 },
+        { minHeight: 52, paddingVertical: 10 },
+        pressed(state),
       ]}
     >
-      {icon && (
-        <View
-          style={{
-            width: 32,
-            height: 32,
-            borderRadius: 9,
-            borderCurve: "continuous",
-            backgroundColor: colors.primarySoft,
-            alignItems: "center",
-            justifyContent: "center",
-          }}
-        >
-          <Icon name={icon} size={16} weight="semibold" />
-        </View>
-      )}
+      {icon && <IconTile icon={icon} />}
       <View style={{ flex: 1, gap: 4 }}>
         <Copy weight="600">{title}</Copy>
         {!!detail && (

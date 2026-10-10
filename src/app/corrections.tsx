@@ -1,6 +1,7 @@
 import { CalendarDate } from "@/lib/domain/calendar";
 import { useReleaseMutation } from "@/lib/releases/requests";
 import { useState } from "react";
+import { View } from "react-native";
 import { Stack } from "expo-router";
 import { useQuery, usePaginatedQuery } from "convex-helpers/react/cache";
 import { api } from "../../convex/_generated/api";
@@ -9,6 +10,7 @@ import {
   Button,
   Copy,
   Empty,
+  List,
   Loading,
   Notice,
   Row,
@@ -16,6 +18,7 @@ import {
   SectionTitle,
   Sheet,
 } from "@/components/ui";
+import { useHousehold } from "@/features/household-context";
 import {
   category,
   isDecidedCategory,
@@ -31,6 +34,8 @@ const categoryName = (id: string | null) => {
 };
 
 export default function Corrections() {
+  const { online } = useHousehold();
+
   const historyPage = usePaginatedQuery(
     api.corrections.listPage,
     {},
@@ -98,20 +103,23 @@ export default function Corrections() {
   return (
     <Screen insetTop={false}>
       <Stack.Screen options={{ title: "Rettelser" }} />
+      {!online && <Notice icon="wifi.slash">Uten nett</Notice>}
       {!history ? (
         <Loading />
       ) : (
         <>
-          <Copy selectable size={24} weight="700">
-            {changes.length} rettelser ·{" "}
-            {history.entries.length - changes.length} bekreftelser
-          </Copy>
-          <Copy muted size={13}>
-            Siste {history.entries.length} registrerte beslutninger
-            {history.truncated ? " (eldre finnes)" : ""}. Vi lagrer nye
-            kategori- og produktrettelser fra nå av. Automatisk godkjenning
-            teller ikke som en rettelse.
-          </Copy>
+          <View style={{ gap: 4 }}>
+            <Copy selectable size={24} weight="700">
+              {changes.length} rettelser ·{" "}
+              {history.entries.length - changes.length} bekreftelser
+            </Copy>
+            <Copy muted size={13}>
+              Siste {history.entries.length} registrerte beslutninger
+              {history.truncated ? " (eldre finnes)" : ""}. Nye kategori- og
+              produktrettelser lagres fra nå av. Automatisk godkjenning teller
+              ikke som en rettelse.
+            </Copy>
+          </View>
           {!!error && <Notice tone="error">{error}</Notice>}
           <SectionTitle title="Siste beslutninger" />
           {!history.entries.length && (
@@ -121,26 +129,31 @@ export default function Corrections() {
               icon="checkmark.circle"
             />
           )}
-          {history.entries.map((entry) => (
-            <Row
-              key={entry._id}
-              title={entry.name}
-              detail={
-                entry.field === "category"
-                  ? `${categoryName(entry.previous)} → ${categoryName(entry.expected)}`
-                  : "Produktkobling endret"
-              }
-              value={entry.store ?? undefined}
-              onPress={
-                entry.field === "category" && isDecidedCategory(entry.expected)
-                  ? () => {
-                      setTargetKeys([]);
-                      setSelected(entry._id);
-                    }
-                  : undefined
-              }
-            />
-          ))}
+          {history.entries.length > 0 && (
+            <List>
+              {history.entries.map((entry) => (
+                <Row
+                  key={entry._id}
+                  title={entry.name}
+                  detail={
+                    entry.field === "category"
+                      ? `${categoryName(entry.previous)} → ${categoryName(entry.expected)}`
+                      : "Produktkobling endret"
+                  }
+                  value={entry.store ?? undefined}
+                  onPress={
+                    entry.field === "category" &&
+                    isDecidedCategory(entry.expected)
+                      ? () => {
+                          setTargetKeys([]);
+                          setSelected(entry._id);
+                        }
+                      : undefined
+                  }
+                />
+              ))}
+            </List>
+          )}
           {historyPage.status === "CanLoadMore" && (
             <Button
               title="Vis eldre beslutninger"
@@ -149,25 +162,29 @@ export default function Corrections() {
             />
           )}
           {!!batches?.length && (
-            <SectionTitle title="Rettelser på flere varer" />
+            <>
+              <SectionTitle title="Rettelser på flere varer" />
+              <List>
+                {batches.map((batch) => (
+                  <Row
+                    key={batch._id}
+                    title={`${batch.changes.reduce((sum, change) => sum + change.before.length, 0)} varer rettet`}
+                    detail={
+                      batch.undone
+                        ? "Angret"
+                        : "Angre er tilgjengelig så lenge kvitteringene ikke er endret"
+                    }
+                    value={batch.undone ? undefined : "Angre"}
+                    onPress={
+                      batch.undone || busy
+                        ? undefined
+                        : () => void run(() => undo({ id: batch._id }))
+                    }
+                  />
+                ))}
+              </List>
+            </>
           )}
-          {batches?.map((batch) => (
-            <Row
-              key={batch._id}
-              title={`${batch.changes.reduce((sum, change) => sum + change.before.length, 0)} varer rettet`}
-              detail={
-                batch.undone
-                  ? "Angret"
-                  : "Angre er tilgjengelig så lenge kvitteringene ikke er endret"
-              }
-              value={batch.undone ? undefined : "Angre"}
-              onPress={
-                batch.undone || busy
-                  ? undefined
-                  : () => void run(() => undo({ id: batch._id }))
-              }
-            />
-          ))}
         </>
       )}
       <Sheet
@@ -184,26 +201,30 @@ export default function Corrections() {
           <Loading />
         ) : (
           <>
-            {preview.targets.map((target) => (
-              <Row
-                key={`${target.receiptId}:${target.lineId}`}
-                title={target.name}
-                selected={targetKeys.includes(
-                  `${target.receiptId}:${target.lineId}`,
-                )}
-                onPress={() => {
-                  const key = `${target.receiptId}:${target.lineId}`;
-                  setTargetKeys((previous) =>
-                    previous.includes(key)
-                      ? previous.filter((value) => value !== key)
-                      : previous.length < 20
-                        ? [...previous, key]
-                        : previous,
-                  );
-                }}
-                detail={`${CalendarDate.format(target.date)} · ${categoryName(target.categoryId)}`}
-              />
-            ))}
+            {preview.targets.length > 0 && (
+              <List>
+                {preview.targets.map((target) => (
+                  <Row
+                    key={`${target.receiptId}:${target.lineId}`}
+                    title={target.name}
+                    selected={targetKeys.includes(
+                      `${target.receiptId}:${target.lineId}`,
+                    )}
+                    onPress={() => {
+                      const key = `${target.receiptId}:${target.lineId}`;
+                      setTargetKeys((previous) =>
+                        previous.includes(key)
+                          ? previous.filter((value) => value !== key)
+                          : previous.length < 20
+                            ? [...previous, key]
+                            : previous,
+                      );
+                    }}
+                    detail={`${CalendarDate.format(target.date)} · ${categoryName(target.categoryId)}`}
+                  />
+                ))}
+              </List>
+            )}
             {!preview.targets.length && (
               <Copy muted>Ingen andre varer kan rettes.</Copy>
             )}

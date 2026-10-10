@@ -11,7 +11,7 @@ Every string the app writes is Norwegian Bokmål; system controls, such as the S
 
 ## Address
 
-Use **du** for the person using the app: "Alle kvitteringene dine er behandlet", "Dine ulagrede endringer blir fjernet." Use **dere** for the household's shopping: "Se hvor dere handler, og hva dere bruker per butikk", "Hvilket produkt kjøpte dere?" The app rarely speaks as "vi"; see [open questions](open-questions.md#the-app-sometimes-says-vi).
+Use **du** for the person using the app: "Alle kvitteringene dine er behandlet", "Dine ulagrede endringer blir fjernet." Use **dere** for the household's shopping: "Se hvor dere handler, og hva dere bruker per butikk", "Hvilket produkt kjøpte dere?" The app never speaks as "vi": there is no team behind the screen, so a sentence names what does the work instead. "Nye rettelser lagres fra nå av", not "Vi lagrer nye rettelser"; "Sammenligningen trenger kjøp fra forrige periode", not "Vi trenger …".
 
 ## Mechanics
 
@@ -27,7 +27,7 @@ Use **du** for the person using the app: "Alle kvitteringene dine er behandlet",
 Format through the domain helpers, never by hand, so every screen agrees:
 
 - Money: `Ore.format` ([øre](../../src/lib/domain/ore.ts)) gives Norwegian kroner with a comma decimal and non-breaking spaces, and "Ukjent" for an unknown amount. Amount inputs take the same format; `MoneyField` explains invalid input in Norwegian.
-- Dates: `CalendarDate.format` ([calendar](../../src/lib/domain/calendar.ts)) gives "23. sep. 2026" and "Dato ukjent". Months use `CalendarMonth.format`, "september 2026". Historikk capitalises it in month headers and the Forbruk month menu does not; see [open questions](open-questions.md#month-names-in-lower-and-upper-case).
+- Dates: `CalendarDate.format` ([calendar](../../src/lib/domain/calendar.ts)) gives "23. sep. 2026" and "Dato ukjent". A month inside a sentence uses `CalendarMonth.format`, "september 2026"; a month that stands alone, as a heading, a menu label, or a menu item, uses `CalendarMonth.title`, "September 2026".
 - Time: "kl. 14:32" after the date.
 
 ## Patterns
@@ -36,7 +36,7 @@ Format through the domain helpers, never by hand, so every screen agrees:
 | ------------------- | ---------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------- |
 | Button              | Imperative verb, sentence case. Name the object when the screen has several actions.                             | "Lagre og godkjenn", "Ta flere", "Vis flere kvitteringer"                          |
 | Navigation button   | "Til" plus the destination.                                                                                      | "Til innboksen", "Til kvitteringene"                                               |
-| Confirmation alert  | Question title, a body that says what is lost or kept, the verb again on the confirm button, "Avbryt" to cancel. | "Slett kvitteringen?" / "Kvitteringen og bildene blir slettet." / "Slett"          |
+| Confirmation alert  | Infinitive question as the title, a body that says what is lost or kept, the imperative verb on the confirm button, "Avbryt" to cancel. | "Slette kvitteringen?" / "Kvitteringen og bildene blir slettet." / "Slett"; "Forkaste endringene?", "Lage ny kode?", "Hente siste versjon?" |
 | Discard choice      | Offer staying as the safe option.                                                                                | "Forkast" and "Fortsett å redigere"                                                |
 | Failure             | "Kunne ikke" plus the action, then the next step.                                                                | "Kunne ikke lagre.", "Kunne ikke godkjenne" / "Prøv igjen."                        |
 | Retry               | "Prøv … igjen".                                                                                                  | "Prøv igjen", "Prøv importen igjen", "Prøv produktsøk igjen"                       |

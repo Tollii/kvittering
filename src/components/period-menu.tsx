@@ -11,7 +11,7 @@ export type PeriodMenuProps = Readonly<{
 export function PeriodMenu({ value }: PeriodMenuProps) {
   const colors = useTheme();
 
-  const label = CalendarMonth.format(value);
+  const label = CalendarMonth.title(value);
 
   return (
     <Copy size={22} weight="600" style={{ color: colors.onHero, flex: 1 }}>

@@ -10,7 +10,7 @@ import {
   Toggle,
   pressed,
 } from "@/components/ui";
-import { useTheme } from "@/constants/theme";
+import { radius, useTheme } from "@/constants/theme";
 import { maxReceiptImages } from "@/lib/receipt-import";
 
 /** Review prepared images before saving them to the upload queue. */
@@ -86,7 +86,7 @@ export function CaptureReview({
               style={{
                 width: "100%",
                 height: "100%",
-                borderRadius: 14,
+                borderRadius: radius.inner,
                 borderWidth: 1,
                 borderColor: colors.imageOutline,
                 backgroundColor: colors.muted,

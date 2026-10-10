@@ -1,7 +1,16 @@
 import { useState } from "react";
 import { View } from "react-native";
 import { SpendingBars } from "@/components/spending-details";
-import { Copy, Notice, Panel, Row, SectionTitle, Sheet } from "@/components/ui";
+import {
+  Amount,
+  Button,
+  Copy,
+  List,
+  Notice,
+  Row,
+  SectionTitle,
+  Sheet,
+} from "@/components/ui";
 import { receiptCategorySpending } from "@/lib/domain/receipt-category-spending";
 import { Ore } from "@/lib/domain/ore";
 import { reconcile, type ReceiptData } from "@/lib/domain/receipt";
@@ -42,8 +51,10 @@ export function ReceiptCategorySpending({
             onSelect={(group) => setSelectedId(group.id)}
           />
           {groups.length > 5 && (
-            <Row
+            <Button
               title={showAll ? "Vis færre" : `Vis alle ${groups.length}`}
+              variant="secondary"
+              compact
               onPress={() => setShowAll(!showAll)}
             />
           )}
@@ -54,18 +65,20 @@ export function ReceiptCategorySpending({
           >
             {selected && (
               <>
-                <Copy testID="receipt-category-total" size={34} weight="800">
-                  {Ore.format(selected.amountOre)}
-                </Copy>
-                <Copy size={13} muted>
-                  Etter rabatt, uten pant og pantretur.
-                </Copy>
+                <View style={{ gap: 2 }}>
+                  <Amount testID="receipt-category-total">
+                    {Ore.format(selected.amountOre)}
+                  </Amount>
+                  <Copy size={13} muted>
+                    Etter rabatt, uten pant og pantretur.
+                  </Copy>
+                </View>
                 {totals.unknown > 0 && (
                   <Notice tone="warning">
                     Beløp mangler på noen linjer. Summene er ufullstendige.
                   </Notice>
                 )}
-                <Panel style={{ gap: 0, paddingVertical: 4 }}>
+                <List>
                   {selected.items.map((item) => (
                     <Row
                       key={item.id}
@@ -73,7 +86,7 @@ export function ReceiptCategorySpending({
                       value={Ore.format(item.amountOre)}
                     />
                   ))}
-                </Panel>
+                </List>
               </>
             )}
           </Sheet>

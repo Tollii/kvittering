@@ -3,7 +3,7 @@ import { Pressable, View } from "react-native";
 import { Image } from "expo-image";
 import { useQuery } from "convex-helpers/react/cache";
 import { api } from "../../convex/_generated/api";
-import { Copy, Icon, Loading, Notice, pressed } from "@/components/ui";
+import { Copy, Icon, Loading, Notice, faded, pressed } from "@/components/ui";
 import { radius, useTheme } from "@/constants/theme";
 import { useCatalogSearch } from "./catalog-queries";
 import { useFeatureFlag } from "./featureFlags";
@@ -160,7 +160,7 @@ export function ProductLinkingOptions({
                 gap: 16,
               },
               pressed(state),
-              disabled && { opacity: 0.45 },
+              faded(disabled),
             ]}
           >
             <ProductImage product={product} />

@@ -11,17 +11,19 @@ import { useState } from "react";
 import { Stack, useLocalSearchParams } from "expo-router";
 import { View } from "react-native";
 import {
+  Amount,
   Disclosure,
   Copy,
   IconButton,
+  List,
   Notice,
-  Panel,
   Row,
   Screen,
   SectionTitle,
   Segments,
 } from "@/components/ui";
 import { SpendingDetails } from "@/components/spending-details";
+import { useHousehold } from "@/features/household-context";
 import {
   analysisPeriod,
   analysisSummary,
@@ -31,6 +33,7 @@ import {
 
 export default function Analysis() {
   const spendingAnalysisEnabled = useFeatureFlag("spendingAnalysis");
+  const { online } = useHousehold();
   const { month } = useLocalSearchParams<{ month?: string }>();
   const [frequency, setFrequency] = useState<AnalysisFrequency>("month");
 
@@ -86,7 +89,8 @@ export default function Analysis() {
 
   if (!spendingAnalysisEnabled)
     return (
-      <Screen title="Forbruksanalyse">
+      <Screen insetTop={false}>
+        <Stack.Screen options={{ title: "Forbruksanalyse" }} />
         <Notice>Forbruksanalysen er midlertidig satt på pause.</Notice>
       </Screen>
     );
@@ -94,6 +98,7 @@ export default function Analysis() {
   return (
     <Screen insetTop={false}>
       <Stack.Screen options={{ title: "Forbruksanalyse" }} />
+      {!online && <Notice icon="wifi.slash">Uten nett</Notice>}
       <Segments
         value={frequency}
         onChange={setFrequency}
@@ -129,16 +134,16 @@ export default function Analysis() {
         <Notice>Henter hele historikken før analysen vises …</Notice>
       ) : (
         <>
-          <Copy selectable size={34} weight="800">
-            {Ore.format(report.currentOre)}
-          </Copy>
-          <Copy selectable>{analysisSummary(report)}</Copy>
-          <Copy muted size={13}>
-            Sammenlignet med {CalendarDate.format(period.previousStart)} –{" "}
-            {CalendarDate.format(period.previousEnd)}. {report.currentReceipts}{" "}
-            mot {report.previousReceipts} kvitteringer. Gjelder registrerte
-            kjøp, ikke målt forbruk.
-          </Copy>
+          <View style={{ gap: 4 }}>
+            <Amount>{Ore.format(report.currentOre)}</Amount>
+            <Copy selectable>{analysisSummary(report)}</Copy>
+            <Copy muted size={13}>
+              Sammenlignet med {CalendarDate.format(period.previousStart)} –{" "}
+              {CalendarDate.format(period.previousEnd)}.{" "}
+              {report.currentReceipts} mot {report.previousReceipts}{" "}
+              kvitteringer. Gjelder registrerte kjøp, ikke målt forbruk.
+            </Copy>
+          </View>
           {(report.provisionalReceipts > 0 || report.missingAmounts > 0) && (
             <Notice tone="warning">
               {report.provisionalReceipts} kvitteringer er foreløpige.{" "}
@@ -148,20 +153,24 @@ export default function Analysis() {
           {report.previousReceipts > 0 && (
             <>
               <SectionTitle title="Kort forklart" />
-              {explanations.map((explanation) => (
-                <Row
-                  key={explanation.id}
-                  title={explanation.name}
-                  detail={explanation.detail}
-                  onPress={() =>
-                    setSelection({
-                      period: periodKey,
-                      dimension: "change",
-                      key: explanation.id,
-                    })
-                  }
-                />
-              ))}
+              {explanations.length > 0 && (
+                <List>
+                  {explanations.map((explanation) => (
+                    <Row
+                      key={explanation.id}
+                      title={explanation.name}
+                      detail={explanation.detail}
+                      onPress={() =>
+                        setSelection({
+                          period: periodKey,
+                          dimension: "change",
+                          key: explanation.id,
+                        })
+                      }
+                    />
+                  ))}
+                </List>
+              )}
               {!explanations.length && (
                 <Copy muted>
                   {report.effects.length
@@ -176,7 +185,7 @@ export default function Analysis() {
                 kvitteringer og produktkoblinger kan endre bildet.
               </Copy>
               <Disclosure title="Slik er endringen beregnet">
-                <Panel style={{ gap: 0, paddingVertical: 4 }}>
+                <List>
                   <Row
                     title="Endret pris per mengde"
                     value={Ore.format(report.priceOre)}
@@ -189,7 +198,7 @@ export default function Analysis() {
                     title="Andre varer og ukjent mengde"
                     value={Ore.format(report.unexplainedOre)}
                   />
-                </Panel>
+                </List>
                 <Copy muted size={13}>
                   {report.measuredLines} av {report.productLines} varelinjer kan
                   sammenlignes som samme produktfamilie med kjent mengde. Pris
@@ -200,25 +209,29 @@ export default function Analysis() {
                 <SectionTitle title="Sammenlignbare produkter" />
                 {!report.effects.length && (
                   <Copy muted>
-                    Vi trenger samme produktfamilie med kjent mengde i begge
-                    perioder.
+                    Sammenligningen trenger samme produktfamilie med kjent
+                    mengde i begge perioder.
                   </Copy>
                 )}
-                {report.effects.map((effect) => (
-                  <Row
-                    key={effect.id}
-                    title={effect.name}
-                    value={Ore.format(effect.differenceOre)}
-                    detail={`${effect.previousQuantity} → ${effect.currentQuantity} ${effect.unit} · pris ${Ore.format(effect.priceOre)}, mengde ${Ore.format(effect.quantityOre)}`}
-                    onPress={() =>
-                      setSelection({
-                        period: periodKey,
-                        dimension: "effect",
-                        key: effect.id,
-                      })
-                    }
-                  />
-                ))}
+                {report.effects.length > 0 && (
+                  <List>
+                    {report.effects.map((effect) => (
+                      <Row
+                        key={effect.id}
+                        title={effect.name}
+                        value={Ore.format(effect.differenceOre)}
+                        detail={`${effect.previousQuantity} → ${effect.currentQuantity} ${effect.unit} · pris ${Ore.format(effect.priceOre)}, mengde ${Ore.format(effect.quantityOre)}`}
+                        onPress={() =>
+                          setSelection({
+                            period: periodKey,
+                            dimension: "effect",
+                            key: effect.id,
+                          })
+                        }
+                      />
+                    ))}
+                  </List>
+                )}
               </Disclosure>
             </>
           )}
@@ -227,25 +240,32 @@ export default function Analysis() {
               report.previousReceipts ? "Kategoriendringer" : "Kjøp i perioden"
             }
           />
-          {report.categories.slice(0, 8).map((row) => (
-            <Row
-              key={row.id}
-              title={row.name}
-              detail={
-                report.previousReceipts
-                  ? `${Ore.format(row.previousOre)} → ${Ore.format(row.currentOre)}`
-                  : undefined
-              }
-              value={Ore.format(row.differenceOre)}
-              onPress={() =>
-                setSelection({
-                  period: periodKey,
-                  dimension: "category",
-                  key: row.id,
-                })
-              }
-            />
-          ))}
+          <List>
+            {report.categories.slice(0, 8).map((row) => (
+              <Row
+                key={row.id}
+                title={row.name}
+                detail={
+                  report.previousReceipts
+                    ? `${Ore.format(row.previousOre)} → ${Ore.format(row.currentOre)}`
+                    : undefined
+                }
+                value={Ore.format(row.differenceOre)}
+                onPress={() =>
+                  setSelection({
+                    period: periodKey,
+                    dimension: "category",
+                    key: row.id,
+                  })
+                }
+              />
+            ))}
+            {!report.categories.length && (
+              <Copy muted style={{ paddingVertical: 10 }}>
+                Ingen kjøp i perioden.
+              </Copy>
+            )}
+          </List>
         </>
       )}
       <SpendingDetails selected={selected} onClose={() => setSelection(null)} />

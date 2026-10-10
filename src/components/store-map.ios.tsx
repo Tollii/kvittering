@@ -3,7 +3,7 @@ import { Ore } from "@/lib/domain/ore";
 import { useEffect, useRef, useState } from "react";
 import { View } from "react-native";
 import MapView, { Marker } from "react-native-maps";
-import { useTheme } from "@/constants/theme";
+import { radius, useTheme } from "@/constants/theme";
 import { Copy } from "@/components/ui";
 import type { StoreMapProps } from "./store-map";
 import { z } from "zod";
@@ -47,7 +47,14 @@ export function StoreMap({ stores, onSelect }: Readonly<StoreMapProps>) {
 
   return (
     <View style={{ gap: 8 }}>
-      <View style={{ height: 280, borderRadius: 20, overflow: "hidden" }}>
+      <View
+        style={{
+          height: 280,
+          borderRadius: radius.card,
+          borderCurve: "continuous",
+          overflow: "hidden",
+        }}
+      >
         <MapView
           ref={map}
           style={{ flex: 1 }}

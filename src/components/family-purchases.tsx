@@ -2,7 +2,7 @@ import { CalendarDate } from "@/lib/domain/calendar";
 import { Ore } from "@/lib/domain/ore";
 import { useState } from "react";
 import { Pressable, View } from "react-native";
-import { Copy, Icon, Panel, Row, pressed } from "./ui";
+import { Amount, Copy, Icon, List, Row, pressed } from "./ui";
 import { useTheme } from "@/constants/theme";
 import {
   familyInsights,
@@ -48,61 +48,43 @@ export function FamilyPurchases({
             Alle
           </Copy>
         </Pressable>
-        <Copy size={30} weight="800">
-          {formatPurchaseQuantity(selected.quantity)}
-        </Copy>
-        <Copy muted>
-          {selected.name} · {Ore.format(selected.amountOre)}
-        </Copy>
-        {partialQuantity(selected) && (
-          <Copy muted size={13}>
-            Noen mengder mangler
+        <View style={{ gap: 2 }}>
+          <Amount>{formatPurchaseQuantity(selected.quantity)}</Amount>
+          <Copy size={13} muted>
+            {selected.name} · {Ore.format(selected.amountOre)}
+            {partialQuantity(selected) ? " · noen mengder mangler" : ""}
           </Copy>
-        )}
-        <Panel style={{ gap: 0, paddingVertical: 4 }}>
-          {selected.contributions.map((item, index) => (
-            <View
+        </View>
+        <List>
+          {selected.contributions.map((item) => (
+            <Row
               key={`${item.receipt._id}:${item.line.id}`}
-              style={{
-                borderTopWidth: index ? 1 : 0,
-                borderTopColor: colors.line,
+              title={item.line.catalogProduct?.name ?? item.line.name}
+              detail={`${CalendarDate.format(item.receipt.data.purchaseDate)} · ${formatPurchaseQuantity(item.quantity)}`}
+              value={Ore.format(item.amountOre)}
+              onPress={() => {
+                onClose();
+                openReceipt(item.receipt);
               }}
-            >
-              <Row
-                title={item.line.catalogProduct?.name ?? item.line.name}
-                detail={`${CalendarDate.format(item.receipt.data.purchaseDate)} · ${formatPurchaseQuantity(item.quantity)}`}
-                value={Ore.format(item.amountOre)}
-                onPress={() => {
-                  onClose();
-                  openReceipt(item.receipt);
-                }}
-              />
-            </View>
+            />
           ))}
-        </Panel>
+        </List>
       </>
     );
 
   return (
     <>
-      <Panel style={{ gap: 0, paddingVertical: 4 }}>
-        {report.families.map((family, index) => (
-          <View
+      <List>
+        {report.families.map((family) => (
+          <Row
             key={family.id}
-            style={{
-              borderTopWidth: index ? 1 : 0,
-              borderTopColor: colors.line,
-            }}
-          >
-            <Row
-              title={family.name}
-              detail={`${formatPurchaseQuantity(family.quantity)}${partialQuantity(family) ? " · delvis kjent" : ""}`}
-              value={Ore.format(family.amountOre)}
-              onPress={() => setSelection(family.id)}
-            />
-          </View>
+            title={family.name}
+            detail={`${formatPurchaseQuantity(family.quantity)}${partialQuantity(family) ? " · delvis kjent" : ""}`}
+            value={Ore.format(family.amountOre)}
+            onPress={() => setSelection(family.id)}
+          />
         ))}
-      </Panel>
+      </List>
       {report.linked < report.total && (
         <Copy muted size={12}>
           {report.linked} av {report.total} varelinjer gruppert

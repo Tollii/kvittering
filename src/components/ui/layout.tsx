@@ -6,6 +6,8 @@ import {
   ScrollView,
   StyleSheet,
   View,
+  type StyleProp,
+  type ViewStyle,
 } from "react-native";
 import {
   SafeAreaView,
@@ -52,6 +54,35 @@ export function SettingsButton({
         color={camera ? colors.onCamera : colors.onHero}
       />
     </Pressable>
+  );
+}
+
+/**
+ * The cobalt band under a screen's header that carries its key number: the
+ * month total on Forbruk, the paid amount on a receipt. Pass it to `Screen`
+ * as `summary`; text on it uses `onHero` and `onHeroMuted`.
+ */
+export function SummaryBand({
+  children,
+  style,
+}: Readonly<{ children: ReactNode; style?: StyleProp<ViewStyle> }>) {
+  const colors = useTheme();
+
+  return (
+    <View
+      style={[
+        {
+          backgroundColor: colors.hero,
+          paddingHorizontal: 20,
+          paddingTop: 8,
+          paddingBottom: 20,
+          gap: 8,
+        },
+        style,
+      ]}
+    >
+      {children}
+    </View>
   );
 }
 

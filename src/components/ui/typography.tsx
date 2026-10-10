@@ -6,7 +6,7 @@ import {
   type ViewStyle,
 } from "react-native";
 import { SymbolView, type SymbolViewProps } from "expo-symbols";
-import { tracking, useTheme } from "@/constants/theme";
+import { disabledOpacity, tracking, useTheme } from "@/constants/theme";
 
 export function Copy({
   children,
@@ -44,6 +44,31 @@ export function Copy({
   );
 }
 
+/**
+ * A large amount or count that a screen or sheet leads with. `hero` sits on
+ * the cobalt summary band; `sheet` opens a sheet or a detail view on paper.
+ */
+export function Amount({
+  size = "sheet",
+  style,
+  ...props
+}: Omit<TextProps, "style"> & {
+  size?: "hero" | "sheet";
+  style?: TextProps["style"];
+}) {
+  const colors = useTheme();
+
+  return (
+    <Copy
+      selectable
+      size={size === "hero" ? 36 : 32}
+      weight={size === "hero" ? "600" : "700"}
+      style={[size === "hero" && { color: colors.onHero }, style]}
+      {...props}
+    />
+  );
+}
+
 export function Icon({
   name,
   size = 22,
@@ -73,6 +98,10 @@ export function Icon({
 /** Opacity feedback also respects the Reduce Motion preference. */
 export const pressed = (state: PressableStateCallbackType): ViewStyle =>
   state.pressed ? { opacity: 0.72 } : { opacity: 1 };
+
+/** The one disabled look: a faded control that keeps its layout. */
+export const faded = (disabled: boolean): ViewStyle =>
+  disabled ? { opacity: disabledOpacity } : {};
 
 export const styles = StyleSheet.create({
   row: { flexDirection: "row", alignItems: "center", gap: 12 },

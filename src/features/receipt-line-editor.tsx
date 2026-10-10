@@ -41,7 +41,7 @@ import {
 } from "@/lib/domain/receipt-review";
 import { CategoryPicker } from "./category-picker";
 import { CatalogProductSheet } from "./catalog-product-sheet";
-import { useTheme } from "@/constants/theme";
+import { radius, useTheme } from "@/constants/theme";
 import { priceSignalLabel, type PriceSignal } from "@/lib/domain/price-signals";
 import { tapFeedback } from "@/lib/haptics";
 
@@ -335,13 +335,15 @@ function LineHeader({
       accessibilityLabel={`${expanded ? "Skjul" : "Rediger"} ${line.name || "ny vare"}, ${Ore.format(line.amountOre)}`}
       accessibilityState={{ expanded }}
       onPress={onPress}
-      style={({ pressed: down }) => ({
-        minHeight: 44,
-        flexDirection: "row",
-        alignItems: "center",
-        gap: 10,
-        opacity: down ? 0.6 : 1,
-      })}
+      style={(state) => [
+        {
+          minHeight: 44,
+          flexDirection: "row",
+          alignItems: "center",
+          gap: 10,
+        },
+        pressed(state),
+      ]}
     >
       <View style={{ flex: 1, gap: 1 }}>
         <Copy
@@ -470,14 +472,16 @@ function LineProductRow({
             : `${productLabel} for ${line.name}. Endre produktkobling`
         }
         onPress={onOpenCatalog}
-        style={({ pressed: down }) => ({
-          minHeight: 44,
-          flexDirection: "row",
-          alignItems: "center",
-          gap: 5,
-          marginLeft: "auto",
-          opacity: down ? 0.6 : 1,
-        })}
+        style={(state) => [
+          {
+            minHeight: 44,
+            flexDirection: "row",
+            alignItems: "center",
+            gap: 5,
+            marginLeft: "auto",
+          },
+          pressed(state),
+        ]}
       >
         <Icon
           name={productMissing ? "link" : "checkmark.circle"}
@@ -557,7 +561,7 @@ function CategorySuggestion({
             gap: 5,
             minHeight: 44,
             paddingHorizontal: 11,
-            borderRadius: 10,
+            borderRadius: radius.tile,
             borderCurve: "continuous",
             backgroundColor: colors.primary,
           },

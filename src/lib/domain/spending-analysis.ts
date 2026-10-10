@@ -359,7 +359,7 @@ export function analysisSummary(
   if (!report.currentReceipts) return "Ingen registrerte kjøp i perioden.";
 
   if (!report.previousReceipts)
-    return "Vi trenger kjøp fra forrige periode for å forklare endringen.";
+    return "Sammenligningen trenger kjøp fra forrige periode for å forklare endringen.";
 
   if (!report.differenceOre)
     return "Registrert forbruk er likt i de to periodene.";

@@ -10,6 +10,7 @@ Cobalt ink on warm paper. A cobalt header and summary band carry the screen's id
 
 - Use theme tokens through `useTheme()`; never write a colour literal. The [widgets](foundations.md#widgets) are the one exception.
 - Build from the shared components, and extend one when it cannot express what you need instead of restyling a `View`.
+- Every list sits in a `List` card; every large amount is an `Amount`; every cobalt band is a `SummaryBand`. When two screens need the same thing, they share the component rather than the styles.
 - Use native iOS presentation first: a `Sheet` for choices and short edits, a system alert for confirmations, a native menu for a short fixed list such as the month menu, and `Select` or a sheet for a long or searchable list.
 - Keep touch targets at 44 points and check layouts at the largest text size.
 - Show what is known and say what is not. Unknown amounts and dates read "Ukjent" and "Dato ukjent"; provisional totals say so.
@@ -21,7 +22,6 @@ Cobalt ink on warm paper. A cobalt header and summary band carry the screen's id
 - [Components](components.md): the shared components, their variants and states.
 - [Screens and flows](patterns.md): navigation, screen anatomy, required states, the main flows, and a screenshot of each screen.
 - [Voice and copy](voice.md): tone, mechanics, number and date formats, copy patterns, and vocabulary.
-- [Open questions](open-questions.md): inconsistencies in the app today, recorded rather than resolved.
 
 ## Designing ahead
 
@@ -29,4 +29,4 @@ The [Kvitto design system on claude.ai](https://claude.ai/artifact/N6izBtD3XSNnF
 
 ## Changing the system
 
-Resolve an open question by changing the code, then remove the question.
+When a screen needs something the system does not have, add it to the shared component or the theme, use it from every place that needs it, and describe it on the page it belongs to in the same change. Where the app once did the same thing in more than one way, these pages now state the one way; a new exception needs a reason written next to it.

@@ -12,8 +12,8 @@ import {
   Empty,
   Loading,
   Notice,
-  Panel,
   Screen,
+  SummaryBand,
 } from "@/components/ui";
 import { useProductLinkingQueue } from "@/features/product-linking-queue";
 import { ProductLinkingOptions } from "@/features/product-linking-options";
@@ -106,13 +106,7 @@ export default function ProductLinking() {
     <Screen
       summary={
         item && (
-          <Panel
-            tone="primary"
-            style={{
-              borderRadius: 0,
-              paddingHorizontal: 20,
-            }}
-          >
+          <SummaryBand style={{ paddingTop: 12 }}>
             <Copy size={13} style={{ color: colors.onHeroMuted }}>
               {item.store} · {CalendarDate.format(item.date)}
             </Copy>
@@ -136,7 +130,7 @@ export default function ProductLinking() {
                 .filter(Boolean)
                 .join(" · ")}
             </Copy>
-          </Panel>
+          </SummaryBand>
         )
       }
       key={itemKey ?? "empty"}
@@ -219,8 +213,8 @@ export default function ProductLinking() {
         </Stack.Toolbar>
       )}
       {!online && (
-        <Notice icon="wifi.slash">
-          Koble til nettet for å lagre produktvalg.
+        <Notice icon="wifi.slash" title="Uten nett">
+          Produktvalg kan lagres når du er på nett igjen.
         </Notice>
       )}
       {!!error && <Notice tone="error">{error}</Notice>}

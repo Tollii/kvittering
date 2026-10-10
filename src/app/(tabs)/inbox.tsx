@@ -7,8 +7,8 @@ import { ActivityIndicator, View } from "react-native";
 import {
   Button,
   Copy,
-  Icon,
   IconButton,
+  IconTile,
   Loading,
   Notice,
   Panel,
@@ -121,26 +121,17 @@ export default function Inbox() {
                     gap: 12,
                   }}
                 >
-                  <View
-                    style={{
-                      width: 36,
-                      height: 36,
-                      borderRadius: 10,
-                      backgroundColor: colors.accentSoft,
-                      alignItems: "center",
-                      justifyContent: "center",
-                    }}
-                  >
-                    {entry.error ? (
-                      <Icon
-                        name="exclamationmark.circle"
-                        size={18}
-                        color={colors.danger}
-                      />
-                    ) : (
-                      <ActivityIndicator color={colors.accent} />
-                    )}
-                  </View>
+                  {/* A failed upload is a warning: the images are safe and wait for a retry. */}
+                  {entry.error ? (
+                    <IconTile
+                      icon="arrow.clockwise.circle"
+                      color={colors.warning}
+                    />
+                  ) : (
+                    <IconTile>
+                      <ActivityIndicator color={colors.primary} />
+                    </IconTile>
+                  )}
                   <View style={{ flex: 1, gap: 2 }}>
                     <Copy weight="600">
                       {entry.images.length === 1
@@ -169,8 +160,8 @@ export default function Inbox() {
                       height: 4,
                       width: `${Math.max(6, (uploaded / entry.images.length) * 100)}%`,
                       backgroundColor: entry.error
-                        ? colors.danger
-                        : colors.accent,
+                        ? colors.warning
+                        : colors.primary,
                     }}
                   />
                 </View>

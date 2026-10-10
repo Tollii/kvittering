@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { useColorScheme, useWindowDimensions, View } from "react-native";
 import * as AppleAuthentication from "expo-apple-authentication";
 import { Copy } from "@/components/ui";
+import { radius } from "@/constants/theme";
 
 /** Unsupported platforms and older binaries keep email authentication. */
 export function useAppleAuthentication() {
@@ -35,7 +36,8 @@ export function AppleAuthenticationButton({
 }>) {
   const dark = useColorScheme() === "dark";
   const { fontScale } = useWindowDimensions();
-  const height = Math.max(56, 44 * fontScale);
+  // The same height and corners as `Button`, so the sign-in options line up.
+  const height = Math.max(50, 44 * fontScale);
 
   return (
     <View
@@ -51,7 +53,7 @@ export function AppleAuthenticationButton({
             ? AppleAuthentication.AppleAuthenticationButtonStyle.WHITE
             : AppleAuthentication.AppleAuthenticationButtonStyle.BLACK
         }
-        cornerRadius={height / 2}
+        cornerRadius={radius.control}
         style={{ height, width: "100%" }}
         onPress={() => {
           if (!busy && !disabled) onPress();

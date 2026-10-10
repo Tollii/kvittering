@@ -35,15 +35,12 @@ const light = {
   text: "#152369",
   secondary: "#5F6380",
   primary: "#263CC7",
-  primaryStrong: "#1B2C9B",
   primarySoft: "#E6E9FA",
   onPrimary: "#FFFFFF",
   /** Cobalt summary surfaces stay dark in both colour schemes. */
   hero: "#263CC7",
   onHero: "#FFFFFF",
   onHeroMuted: "#E3E7FF",
-  accent: "#263CC7",
-  accentSoft: "#E6E9FA",
   line: "#D6D5CF",
   chart: ["#263CC7", "#4055CF", "#6375DC", "#8998E7"],
   onChart: ["#FFFFFF", "#FFFFFF", "#000000", "#101C51"],
@@ -55,8 +52,6 @@ const light = {
   warningSoft: "#F4EFD4",
   danger: "#B3302B",
   dangerSoft: "#F9E3E1",
-  shadow: "rgba(21, 35, 105, 0.08)",
-  scrim: "rgba(16, 22, 45, 0.55)",
 };
 
 const dark: typeof light = {
@@ -69,14 +64,11 @@ const dark: typeof light = {
   text: "#F6F3EA",
   secondary: "#B3BAD2",
   primary: "#A5B7FF",
-  primaryStrong: "#CED7FF",
   primarySoft: "#243261",
   onPrimary: "#101C51",
   hero: "#2033A8",
   onHero: "#F6F3EA",
   onHeroMuted: "#E3E7FF",
-  accent: "#A5B7FF",
-  accentSoft: "#243261",
   line: "#35415D",
   chart: ["#A5B7FF", "#859BEE", "#687DD2", "#5065B5"],
   onChart: ["#101C51", "#101C51", "#000000", "#FFFFFF"],
@@ -88,8 +80,6 @@ const dark: typeof light = {
   warningSoft: "#3A3418",
   danger: "#FF9E97",
   dangerSoft: "#45201F",
-  shadow: "rgba(0, 0, 0, 0)",
-  scrim: "rgba(0, 0, 0, 0.6)",
 };
 
 export type Theme = typeof light;
@@ -98,13 +88,20 @@ export function useTheme(): Theme {
   return useColorScheme() === "dark" ? dark : light;
 }
 
+/**
+ * Corners by role. `tile` is the small icon tile or inset box inside a card;
+ * circular controls use half their size instead.
+ */
 export const radius = {
-  sheet: 24,
   card: 24,
   control: 8,
   chip: 6,
   inner: 8,
+  tile: 10,
 } as const;
+
+/** Disabled controls fade to this; pressed ones use `pressed()`. */
+export const disabledOpacity = 0.45;
 
 export function tracking(size: number) {
   if (size >= 40) return -1.2;

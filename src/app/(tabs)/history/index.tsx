@@ -16,15 +16,18 @@ import { useDebouncedSearch } from "@/features/catalog-queries";
 import { useState } from "react";
 import { Platform, View, useWindowDimensions } from "react-native";
 import {
+  Amount,
   Button,
   Copy,
   Empty,
   Field,
+  List,
   Loading,
   Notice,
   Panel,
   Row,
   Screen,
+  SectionTitle,
   Segments,
   SettingsButton,
   Sheet,
@@ -32,10 +35,10 @@ import {
 import { IllustratedEmpty } from "@/components/monument-artwork";
 import { openReceipt } from "@/components/receipt-card";
 import { SpendingBars } from "@/components/spending-details";
-import { useTheme } from "@/constants/theme";
+import { useHousehold } from "@/features/household-context";
 
 export default function History() {
-  const colors = useTheme();
+  const { online } = useHousehold();
   const { fontScale } = useWindowDimensions();
   const [search, setSearch] = useState("");
   const [tab, setTab] = useState<"receipts" | "products">("receipts");
@@ -80,13 +83,8 @@ export default function History() {
     months.set(key, [...(months.get(key) ?? []), receipt]);
   }
 
-  const monthTitle = (key: CalendarMonth | "unknown") => {
-    if (key === "unknown") return "Uten dato";
-
-    const label = CalendarMonth.format(key);
-
-    return label.charAt(0).toLocaleUpperCase("nb-NO") + label.slice(1);
-  };
+  const monthTitle = (key: CalendarMonth | "unknown") =>
+    key === "unknown" ? "Uten dato" : CalendarMonth.title(key);
 
   const allProducts = productHistory(receipts);
   const products = allProducts.filter((product) => matches(product.name));
@@ -131,6 +129,7 @@ export default function History() {
           { value: "products", label: `Varer (${products.length})` },
         ]}
       />
+      {!online && <Notice icon="wifi.slash">Uten nett</Notice>}
       {!completeReceipts && (
         <Notice>
           {tab === "products" || term
@@ -149,47 +148,19 @@ export default function History() {
               );
 
               return (
-                <View key={key} style={{ gap: 0 }}>
-                  <View
-                    style={{
-                      flexDirection: "row",
-                      alignItems: "baseline",
-                      paddingTop: 16,
-                      paddingBottom: 12,
-                      borderBottomWidth: 1,
-                      borderBottomColor: colors.text,
-                      gap: 8,
-                      flexWrap: "wrap",
-                    }}
-                  >
-                    <Copy
-                      accessibilityRole="header"
-                      size={15}
-                      weight="700"
-                      style={fontScale > 1.3 ? { width: "100%" } : { flex: 1 }}
-                    >
-                      {monthTitle(key)}
-                    </Copy>
-                    <Copy size={13} weight="600" muted>
-                      {items.length}{" "}
-                      {items.length === 1 ? "kvittering" : "kvitteringer"} ·{" "}
-                      {Ore.format(total)}
-                    </Copy>
-                  </View>
-                  {items.map((receipt) => (
-                    <ReceiptContextMenu
-                      key={receipt._id}
-                      receiptId={receipt._id}
-                      store={receipt.store || "Ny kvittering"}
-                      amount={Ore.format(receipt.totalOre)}
-                      date={CalendarDate.format(receipt.purchaseDate)}
-                    >
-                      <View
-                        style={{
-                          borderBottomWidth: 1,
-                          borderBottomColor: colors.line,
-                          paddingVertical: 12,
-                        }}
+                <View key={key} style={{ gap: 4 }}>
+                  <SectionTitle
+                    title={monthTitle(key)}
+                    detail={`${items.length} ${items.length === 1 ? "kvittering" : "kvitteringer"} · ${Ore.format(total)}`}
+                  />
+                  <List>
+                    {items.map((receipt) => (
+                      <ReceiptContextMenu
+                        key={receipt._id}
+                        receiptId={receipt._id}
+                        store={receipt.store || "Ny kvittering"}
+                        amount={Ore.format(receipt.totalOre)}
+                        date={CalendarDate.format(receipt.purchaseDate)}
                       >
                         <Row
                           title={receipt.store || "Ny kvittering"}
@@ -202,31 +173,24 @@ export default function History() {
                             })
                           }
                         />
-                      </View>
-                    </ReceiptContextMenu>
-                  ))}
+                      </ReceiptContextMenu>
+                    ))}
+                  </List>
                 </View>
               );
             })}
           {tab === "products" && products.length > 0 && (
-            <Panel style={{ gap: 0, paddingVertical: 4 }}>
-              {products.map((product, index) => (
-                <View
+            <List>
+              {products.map((product) => (
+                <Row
                   key={product.key}
-                  style={{
-                    borderTopWidth: index ? 1 : 0,
-                    borderTopColor: colors.line,
-                  }}
-                >
-                  <Row
-                    title={product.name || "Ukjent vare"}
-                    detail={`${product.purchases.size} kjøp · ${product.linked ? "Koblet produkt" : "Enkeltvare"}`}
-                    value={Ore.format(product.amountOre)}
-                    onPress={() => setSelectedKey(product.key)}
-                  />
-                </View>
+                  title={product.name || "Ukjent vare"}
+                  detail={`${product.purchases.size} kjøp · ${product.linked ? "Koblet produkt" : "Enkeltvare"}`}
+                  value={Ore.format(product.amountOre)}
+                  onPress={() => setSelectedKey(product.key)}
+                />
               ))}
-            </Panel>
+            </List>
           )}
           {(tab === "receipts" ? filtered : products).length === 0 &&
             (search.trim() || tab === "products" ? (
@@ -254,10 +218,12 @@ export default function History() {
       >
         {selected && prices && (
           <>
-            <Copy size={30} weight="800">
-              {Ore.format(selected.amountOre)}
-            </Copy>
-            <Copy muted>{selected.purchases.size} kjøp</Copy>
+            <View style={{ gap: 2 }}>
+              <Amount>{Ore.format(selected.amountOre)}</Amount>
+              <Copy size={13} muted>
+                {selected.purchases.size} kjøp
+              </Copy>
+            </View>
             <Panel
               style={{
                 flexDirection: fontScale > 1.3 ? "column" : "row",
@@ -299,29 +265,22 @@ export default function History() {
                 fra diagrammet.
               </Notice>
             )}
-            <Panel style={{ gap: 0, paddingVertical: 4 }}>
-              {selected.contributions.map((contribution, index) => (
-                <View
+            <List>
+              {selected.contributions.map((contribution) => (
+                <Row
                   key={contributionKey(contribution)}
-                  style={{
-                    borderTopWidth: index ? 1 : 0,
-                    borderTopColor: colors.line,
+                  title={CalendarDate.format(
+                    contribution.receipt.data?.purchaseDate,
+                  )}
+                  detail={`${contribution.receipt.data?.store} · ${contribution.line ? matchLabel(contribution.line) : ""}`}
+                  value={Ore.format(contribution.amountOre)}
+                  onPress={() => {
+                    setSelectedKey(null);
+                    openReceipt(contribution.receipt);
                   }}
-                >
-                  <Row
-                    title={CalendarDate.format(
-                      contribution.receipt.data?.purchaseDate,
-                    )}
-                    detail={`${contribution.receipt.data?.store} · ${contribution.line ? matchLabel(contribution.line) : ""}`}
-                    value={Ore.format(contribution.amountOre)}
-                    onPress={() => {
-                      setSelectedKey(null);
-                      openReceipt(contribution.receipt);
-                    }}
-                  />
-                </View>
+                />
               ))}
-            </Panel>
+            </List>
           </>
         )}
       </Sheet>
