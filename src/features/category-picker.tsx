@@ -1,14 +1,13 @@
 import { useState } from "react";
-import { Pressable, View } from "react-native";
 import {
   Copy,
+  Empty,
   Field,
-  Icon,
   List,
   Row,
+  SectionTitle,
   Sheet,
   Toggle,
-  pressed,
 } from "@/components/ui";
 import {
   categories,
@@ -18,7 +17,6 @@ import {
   parseCategoryId,
   type CategoryId,
 } from "@/lib/domain/categories";
-import { radius, useTheme } from "@/constants/theme";
 
 // Common receipt words make category search useful without knowing the taxonomy.
 const keywords = new Map(
@@ -104,7 +102,6 @@ export function CategoryPicker({
   onSelect: (value: CategoryId) => void;
   onClose: () => void;
 }>) {
-  const colors = useTheme();
   const [search, setSearch] = useState("");
   const [group, setGroup] = useState<string | null>(null);
   const query = search.trim().toLocaleLowerCase("nb-NO");
@@ -142,6 +139,8 @@ export function CategoryPicker({
   const list = (ids: CategoryId[], showGroup: boolean) => (
     <List>{ids.map((id) => categoryRow(id, showGroup))}</List>
   );
+
+  const groupName = categoryGroups.find(([id]) => id === group)?.[1];
 
   return (
     <Sheet
@@ -183,96 +182,50 @@ export function CategoryPicker({
     >
       {query || group ? (
         <>
-          {!query && (
-            <Pressable
-              accessibilityRole="button"
-              onPress={() => setGroup(null)}
-              style={(state) => [
-                {
-                  flexDirection: "row",
-                  alignItems: "center",
-                  gap: 6,
-                  minHeight: 44,
-                },
-                pressed(state),
-              ]}
-            >
-              <Icon name="chevron.left" size={12} />
-              <Copy size={14} weight="600" style={{ color: colors.primary }}>
-                Alle kategorier
-              </Copy>
-            </Pressable>
-          )}
-          <Copy size={13} weight="600" muted>
-            {query
-              ? `${results.length} treff`
-              : categoryGroups.find(([id]) => id === group)?.[1]}
-          </Copy>
+          <SectionTitle
+            title={query ? `${results.length} treff` : (groupName ?? "")}
+            action={query ? undefined : "Alle kategorier"}
+            onAction={() => setGroup(null)}
+          />
           {results.length ? (
             list(
               results.map((category) => category.id),
               !!query,
             )
           ) : (
-            <Copy muted>Ingen treff</Copy>
+            <Empty
+              title="Ingen treff"
+              message="Prøv et annet ord, eller velg en gruppe."
+              icon="magnifyingglass"
+            />
           )}
         </>
       ) : (
         <>
           {isDecidedCategory(currentId) && (
             <>
-              <Copy size={13} weight="600" muted>
-                {confidence != null && confidence < 1
-                  ? `Forslag · ${Math.round(confidence * 100)} %`
-                  : "Valgt"}
-              </Copy>
+              <SectionTitle
+                title={
+                  confidence != null && confidence < 1
+                    ? `Forslag · ${Math.round(confidence * 100)} %`
+                    : "Valgt"
+                }
+              />
               {list([currentId], true)}
             </>
           )}
           {recentCategories.length > 0 && (
             <>
-              <Copy size={13} weight="600" muted>
-                Ofte brukt
-              </Copy>
+              <SectionTitle title="Ofte brukt" />
               {list(recentCategories, true)}
             </>
           )}
-          <Copy size={13} weight="600" muted>
-            Alle kategorier
-          </Copy>
-          <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8 }}>
+          <SectionTitle title="Alle kategorier" />
+          <List>
             {categoryGroups.map(([id, label]) => (
-              <Pressable
-                key={id}
-                accessibilityRole="button"
-                accessibilityLabel={label}
-                onPress={() => setGroup(id)}
-                style={(state) => [
-                  {
-                    width: "48%",
-                    flexGrow: 1,
-                    minHeight: 54,
-                    paddingHorizontal: 12,
-                    paddingVertical: 10,
-                    borderRadius: radius.tile,
-                    borderCurve: "continuous",
-                    backgroundColor: colors.surface,
-                    borderWidth: 1,
-                    borderColor: colors.line,
-                    flexDirection: "row",
-                    alignItems: "center",
-                    gap: 8,
-                  },
-                  pressed(state),
-                ]}
-              >
-                <Copy size={15} weight="600" style={{ flex: 1 }}>
-                  {label}
-                </Copy>
-                <Icon name="chevron.right" size={11} color={colors.secondary} />
-              </Pressable>
+              <Row key={id} title={label} onPress={() => setGroup(id)} />
             ))}
-          </View>
+          </List>
         </>
       )}
     </Sheet>

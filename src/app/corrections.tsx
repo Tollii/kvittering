@@ -1,14 +1,15 @@
 import { CalendarDate } from "@/lib/domain/calendar";
 import { useReleaseMutation } from "@/lib/releases/requests";
 import { useState } from "react";
-import { View } from "react-native";
 import { Stack } from "expo-router";
 import { useQuery, usePaginatedQuery } from "convex-helpers/react/cache";
 import { api } from "../../convex/_generated/api";
 import type { Id } from "../../convex/_generated/dataModel";
 import {
+  Amount,
   Button,
   Copy,
+  Disclosure,
   Empty,
   List,
   Loading,
@@ -106,20 +107,18 @@ export default function Corrections() {
         <Loading />
       ) : (
         <>
-          <View style={{ gap: 4 }}>
-            <Copy selectable size={24} weight="700">
-              {changes.length} rettelser ·{" "}
-              {history.entries.length - changes.length} bekreftelser
-            </Copy>
-            <Copy muted size={13}>
-              Siste {history.entries.length} registrerte beslutninger
-              {history.truncated ? " (eldre finnes)" : ""}. Nye kategori- og
-              produktrettelser lagres fra nå av. Automatisk godkjenning teller
-              ikke som en rettelse.
-            </Copy>
-          </View>
+          <Amount
+            detail={`${history.entries.length - changes.length} bekreftelser · siste ${history.entries.length} beslutninger${history.truncated ? ", eldre finnes" : ""}`}
+          >
+            {changes.length === 1
+              ? "1 rettelse"
+              : `${changes.length} rettelser`}
+          </Amount>
           {!!error && <Notice tone="error">{error}</Notice>}
-          <SectionTitle title="Siste beslutninger" />
+          <SectionTitle
+            title="Siste beslutninger"
+            detail="Trykk på en rettelse for å bruke den på samme vare i andre kvitteringer"
+          />
           {!history.entries.length && (
             <Empty
               title="Ingen rettelser ennå"
@@ -157,6 +156,12 @@ export default function Corrections() {
               onPress={() => historyPage.loadMore(50)}
             />
           )}
+          <Disclosure title="Om rettelser">
+            <Copy size={14} muted>
+              Nye kategori- og produktrettelser lagres fra nå av. Automatisk
+              godkjenning teller ikke som en rettelse.
+            </Copy>
+          </Disclosure>
           {!!batches?.length && (
             <>
               <SectionTitle title="Rettelser på flere varer" />
@@ -187,6 +192,34 @@ export default function Corrections() {
         title="Bruk rettelsen på samme vare"
         visible={!!selected}
         onClose={() => setSelected(null)}
+        footer={
+          <>
+            {!!error && <Notice tone="error">{error}</Notice>}
+            <Button
+              title={
+                targets.length === 1
+                  ? "Rett 1 vare"
+                  : `Rett ${targets.length} varer`
+              }
+              disabled={!targets.length || busy}
+              busy={busy}
+              onPress={() =>
+                void run(async () => {
+                  if (!selected) return;
+                  await apply({
+                    id: selected,
+                    targets: targets.map(({ receiptId, lineId, revision }) => ({
+                      receiptId,
+                      lineId,
+                      revision,
+                    })),
+                  });
+                  setSelected(null);
+                })
+              }
+            />
+          </>
+        }
       >
         <Copy>
           Sett kategorien til {categoryName(selectedEntry?.expected ?? null)}{" "}
@@ -234,26 +267,6 @@ export default function Corrections() {
                 onPress={() => previewPage.loadMore(20)}
               />
             )}
-            {!!error && <Notice tone="error">{error}</Notice>}
-            <Button
-              title={`Rett ${targets.length} varer`}
-              disabled={!targets.length || busy}
-              busy={busy}
-              onPress={() =>
-                void run(async () => {
-                  if (!selected) return;
-                  await apply({
-                    id: selected,
-                    targets: targets.map(({ receiptId, lineId, revision }) => ({
-                      receiptId,
-                      lineId,
-                      revision,
-                    })),
-                  });
-                  setSelected(null);
-                })
-              }
-            />
           </>
         )}
       </Sheet>

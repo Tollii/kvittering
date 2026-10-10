@@ -1,9 +1,8 @@
 import { CalendarDate } from "@/lib/domain/calendar";
 import { Ore } from "@/lib/domain/ore";
 import type { ReactNode } from "react";
-import { Alert, View, useWindowDimensions } from "react-native";
+import { View, useWindowDimensions } from "react-native";
 import { router } from "expo-router";
-import { randomUUID } from "expo-crypto";
 import {
   Amount,
   Button,
@@ -12,204 +11,33 @@ import {
   Icon,
   IconButton,
   List,
-  Notice,
   Panel,
   SummaryBand,
 } from "@/components/ui";
 import { ReceiptImages } from "@/features/receipt-images";
 import { type reconcile, type ReceiptData } from "@/lib/domain/receipt";
-import {
-  balanceWithAdjustment,
-  type ReviewTask,
-} from "@/lib/domain/receipt-review";
 import type { Receipt } from "@/lib/domain/insights";
 import { receiptStatusLabel } from "@/components/receipt-card";
 import { useTheme } from "@/constants/theme";
 
 type Totals = ReturnType<typeof reconcile>;
 
-type DifferenceTask = Extract<ReviewTask, { kind: "difference" }>;
-
-/** The ways a person can settle a difference, most common first. */
-function differenceFixes(
-  task: DifferenceTask,
-  data: ReceiptData | null,
-  onChange: (data: ReceiptData) => void,
-  onShowLines: (lines: "review" | "all") => void,
-) {
-  return [
-    { text: "Rett en vare", onPress: () => onShowLines("all") },
-    {
-      text: `Betalt var ${Ore.format(task.calculatedOre)}`,
-      onPress: () => {
-        if (data) onChange({ ...data, totalOre: task.calculatedOre });
-      },
-    },
-    {
-      text: "Legg inn justering",
-      onPress: () => {
-        if (data) onChange(balanceWithAdjustment(data, randomUUID()));
-        onShowLines("all");
-      },
-    },
-  ];
-}
-
-/** One compact chip per open question. Tapping it jumps straight to the fix. */
-export function ReviewTaskChips({
-  tasks,
-  data,
-  onResolveDuplicate,
-  onEditFields,
-  onShowLines,
-  onAddLine,
-  onChange,
-}: Readonly<{
-  tasks: ReviewTask[];
-  data: ReceiptData | null;
-  onResolveDuplicate: () => void;
-  onEditFields: () => void;
-  onShowLines: (lines: "review" | "all") => void;
-  onAddLine: () => void;
-  onChange: (data: ReceiptData) => void;
-}>) {
-  function taskChip(task: ReviewTask) {
-    const chip = (
-      label: string,
-      icon: Parameters<typeof Chip>[0]["icon"],
-      onPress: () => void,
-    ) => (
-      <Chip
-        key={task.kind}
-        label={label}
-        icon={icon}
-        tone="warning"
-        trailing="none"
-        onPress={onPress}
-      />
-    );
-
-    const toLines = () => onShowLines("review");
-
-    switch (task.kind) {
-      case "duplicate":
-        return chip("Mulig duplikat", "doc.on.doc", () =>
-          Alert.alert(
-            "Mulig duplikat",
-            "Samme bilde eller kjøp finnes fra før.",
-            [
-              { text: "Avbryt", style: "cancel" },
-              {
-                text: "Dette er et eget kjøp",
-                onPress: onResolveDuplicate,
-              },
-            ],
-          ),
-        );
-      case "store":
-        return chip("Butikk mangler", "storefront", onEditFields);
-      case "total":
-        return chip("Betalt beløp mangler", "banknote", onEditFields);
-      case "date":
-        return chip("Dato mangler", "calendar", onEditFields);
-      case "currency":
-        return chip(
-          `Valuta: ${data?.currency ?? "ukjent"}`,
-          "coloncurrencysign.circle",
-          onEditFields,
-        );
-      case "no-lines":
-        return chip("Ingen varer lest", "plus", onAddLine);
-      case "difference": {
-        const printed = task.printedAs
-          ? ` Kvitteringen har også linjen «${task.printedAs}».`
-          : "";
-
-        return chip(`Avvik ${Ore.format(task.amountOre)}`, "equal.circle", () =>
-          Alert.alert(
-            `Avvik ${Ore.format(task.amountOre)}`,
-            `Varelinjene gir ${Ore.format(task.calculatedOre)}, men betalt beløp er ${Ore.format(data?.totalOre ?? null)}.${printed} Har en vare feil pris, retter du linjesummen på varen.`,
-            [
-              ...differenceFixes(task, data, onChange, onShowLines),
-              { text: "Avbryt", style: "cancel" },
-            ],
-          ),
-        );
-      }
-
-      case "receipt-issues": {
-        // Only the reader's own notes can be removed; computed checks stay until fixed.
-        const removable = task.issues.filter((issue) =>
-          data?.issues.includes(issue),
-        );
-
-        return chip(
-          task.issues.length === 1
-            ? "1 merknad"
-            : `${task.issues.length} merknader`,
-          "exclamationmark.bubble",
-          () =>
-            Alert.alert(
-              "Merknader fra lesingen",
-              task.issues.join("\n"),
-              data && removable.length
-                ? [
-                    { text: "Behold", style: "cancel" },
-                    {
-                      text:
-                        removable.length > 1
-                          ? "Fjern merknadene"
-                          : "Fjern merknaden",
-                      onPress: () =>
-                        onChange({
-                          ...data,
-                          issues: data.issues.filter(
-                            (issue) => !removable.includes(issue),
-                          ),
-                        }),
-                    },
-                  ]
-                : [{ text: "OK" }],
-            ),
-        );
-      }
-
-      case "amounts":
-        return chip(`${task.count} beløp mangler`, "numbers", toLines);
-      case "names":
-        return chip(`${task.count} navn mangler`, "textformat", toLines);
-      case "line-issues":
-        return chip(
-          `${task.count} ${task.count === 1 ? "vare" : "varer"} å sjekke`,
-          "exclamationmark.circle",
-          toLines,
-        );
-    }
-  }
-
-  return <>{tasks.map(taskChip)}</>;
-}
-
-/** The receipt's date, total, images, status, and open review questions. */
+/** The receipt's date, total, images, and status. */
 export function ReceiptSummary({
   receipt,
   data,
   dirty,
   excluded,
-  approved,
   processing,
   busy,
-  chips,
   onEditFields,
 }: Readonly<{
   receipt: Receipt;
   data: ReceiptData | null;
   dirty: boolean;
   excluded: boolean;
-  approved: boolean;
   processing: boolean;
   busy: boolean;
-  chips: ReactNode;
   onEditFields: () => void;
 }>) {
   const colors = useTheme();
@@ -289,7 +117,6 @@ export function ReceiptSummary({
           }
         />
         {excluded && <Chip label="Utelatt" icon="eye.slash" />}
-        {!approved && chips}
       </View>
       {receipt.status === "reviewed" && !dirty && !excluded && (
         <Copy size={14} style={{ color: colors.onHeroMuted }}>
@@ -305,17 +132,8 @@ export function ReceiptSummary({
 export function PurchaseTotals({
   data,
   totals,
-  difference,
-  onChange,
-  onShowLines,
-}: Readonly<{
-  data: ReceiptData;
-  totals: Totals;
-  /** An open difference between the lines and the paid amount. */
-  difference: DifferenceTask | undefined;
-  onChange: (data: ReceiptData) => void;
-  onShowLines: (lines: "review" | "all") => void;
-}>) {
+}: Readonly<{ data: ReceiptData; totals: Totals }>) {
+  const colors = useTheme();
   const { fontScale } = useWindowDimensions();
 
   // Components appear only when present; the line sum and paid amount always do.
@@ -333,6 +151,9 @@ export function PurchaseTotals({
     { label: "Betalt", amount: data.totalOre },
   ];
 
+  // The next-step notice names the open difference; the paid row only marks it.
+  const paidUnsettled = totals.difference !== 0;
+
   return (
     <Panel>
       <View
@@ -349,28 +170,6 @@ export function PurchaseTotals({
           {data.lines.filter((line) => line.kind === "product").length} varer
         </Copy>
       </View>
-      {totals.difference !== 0 && (
-        <Notice tone="warning">
-          {totals.difference === null
-            ? "Betalt beløp mangler"
-            : `Avvik mellom varelinjer og betalt beløp: ${Ore.format(totals.difference)}`}
-        </Notice>
-      )}
-      {difference && (
-        <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8 }}>
-          {differenceFixes(difference, data, onChange, onShowLines).map(
-            (fix, index) => (
-              <Button
-                key={fix.text}
-                title={fix.text}
-                variant={index === 0 ? "tint" : "secondary"}
-                compact
-                onPress={fix.onPress}
-              />
-            ),
-          )}
-        </View>
-      )}
       {rows.map((row) => (
         <View
           key={row.label}
@@ -384,7 +183,15 @@ export function PurchaseTotals({
           <Copy size={14} muted style={{ flexShrink: 1 }}>
             {row.label}
           </Copy>
-          <Copy size={14} weight={row.label === "Betalt" ? "700" : "500"}>
+          <Copy
+            size={14}
+            weight={row.label === "Betalt" ? "700" : "500"}
+            style={
+              row.label === "Betalt" && paidUnsettled
+                ? { color: colors.warning }
+                : undefined
+            }
+          >
             {Ore.format(row.amount)}
           </Copy>
         </View>

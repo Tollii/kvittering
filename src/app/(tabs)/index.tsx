@@ -589,7 +589,6 @@ export default function Capture() {
         importRecovery={importRecovery}
         onClose={() => setReview(false)}
         onSave={() => void save()}
-        onChoosePhotos={() => void choosePhotos()}
         onCombinedChange={setCombined}
         onRemovePhoto={(uri) => {
           setPhotos((current) => current.filter((photo) => photo !== uri));

@@ -8,7 +8,7 @@ A component's folder says how far it reaches, so a reader knows what a change to
 
 - [`src/components/ui`](../../src/components/ui) is the catalogue: presentation only, no household data, used anywhere. Everything on this page below lives here unless it says otherwise.
 - [`src/components`](../../src/components) holds domain components that more than one screen shares: `ReceiptCard` and its status helpers, `SpendingBars` and `SpendingDetails`, `MoneyField`, `ReceiptTip`, and the monument artwork.
-- [`src/features`](../../src/features) holds screens' own parts, next to the screen or sheet that uses them: the receipt editor's sections, the spending reports with their calendar, family purchases and store map, the period menu of Forbruk, and the context menu of Historikk.
+- [`src/features`](../../src/features) holds screens' own parts, next to the screen or sheet that uses them: the receipt editor's sections and its next-step notice, the inbox's upload queue card, the spending reports with their calendar, family purchases and store map, the period menu of Forbruk, and the context menu of Historikk.
 
 When a second screen needs a feature's component, move it up to `src/components` in the same change; when it needs new styling, extend the `ui` component it is built from.
 
@@ -33,7 +33,7 @@ When a second screen needs a feature's component, move it up to `src/components`
 | `tint`      | `primarySoft` fill, `primary` text | A supporting action that should still read as cobalt: "Kopier", "Prøv igjen", "Bekreft alle …". |
 | `danger`    | `dangerSoft` fill, `danger` text   | Destructive actions such as "Slett kvittering". Confirm with an alert.                          |
 
-States: `disabled` fades the button; `busy` shows a spinner in place of the icon, or before the title when there is no icon, and disables the button while keeping the title. `compact` is the shorter size for inline and footer use. A "show more" control under a list is a `compact` `secondary` button, not a row.
+States: `disabled` fades the button; `busy` shows a spinner in place of the icon, or before the title when there is no icon, and disables the button while keeping the title. `compact` is the shorter size for inline and footer use. A "show more" control under a list is a `compact` `secondary` button, not a row. A short title next to the thing it acts on, such as "Bekreft" beside a category suggestion, gets an `accessibilityLabel` that names the object.
 
 **`IconButton`** is an icon-only control with a required Norwegian `label`. `filled` adds the muted disc, or pass a colour such as `heroControl` on the hero.
 
@@ -71,7 +71,7 @@ States: `disabled` fades the button; `busy` shows a spinner in place of the icon
 
 ## Feedback and states
 
-**`Notice`** is an inline message with an icon. Tones: `info` (soft cobalt), `warning`, `error` (marked as an alert), and `success`. [Screen states](patterns.md#states-every-data-screen-handles) say where the offline notice goes. `title` adds a bold first line above the message, and `onPress` makes the notice a button with a trailing chevron, as the pending-receipts notice on Forbruk that opens Innboks. `OfflineNotice` ([offline notice](../../src/features/offline-notice.tsx)) is the "Uten nett" notice that reads the household's connection itself; a screen renders it first instead of checking `online`.
+**`Notice`** is an inline message with an icon. Tones: `info` (soft cobalt), `warning`, `error` (marked as an alert), and `success`. [Screen states](patterns.md#states-every-data-screen-handles) say where the offline notice goes. `title` adds a bold first line above the message, and `onPress` makes the notice a button with a trailing chevron, as the pending-receipts notice on Forbruk that opens Innboks and the next-step notice on a receipt under review, whose title is the open question and whose message says how to settle it. `OfflineNotice` ([offline notice](../../src/features/offline-notice.tsx)) is the "Uten nett" notice that reads the household's connection itself; a screen renders it first instead of checking `online`.
 
 **`Loading`** is a centred spinner with a Norwegian status, "Henter …" by default. Name what is loading: "Henter kvittering …".
 

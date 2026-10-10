@@ -50,15 +50,23 @@ Sign-in is a full-screen form outside the tabs ([sign-in](../../src/features/sig
 ### Capture
 
 1. Kamera is a full-bleed viewfinder with controls on overlay discs; importing from Bilder or Filer sits beside the shutter.
-2. Each photo opens a review sheet ([capture review](../../src/features/capture-review.tsx)) where pages can be combined into one receipt before saving. Shared images and PDFs from other apps arrive in the same sheet.
-3. Saving returns to the camera at once. A note follows the upload and fades when it lands; processing continues in Innboks and a Live Activity, never on a blocking screen.
+2. Each photo opens a review sheet ([capture review](../../src/features/capture-review.tsx)) where pages can be combined into one receipt before saving. Shared images and PDFs from other apps arrive in the same sheet. The footer holds the one primary action, "Lagre kvittering"; the one secondary button, "Legg til flere bilder", returns to the camera, where both the shutter and the import buttons are.
+3. Saving returns to the camera at once. A note follows the upload and fades when it lands; processing continues in Innboks and a Live Activity, never on a blocking screen. In Innboks the upload is an [upload queue card](../../src/features/upload-queue-card.tsx) with its progress and, after a failure, "Prøv igjen" as its one button.
 
 ### Review
 
-1. Innboks lists receipts that need a person first and receipts still processing below them. Swipe left approves a receipt whose facts are complete.
-2. The receipt screen leads with the summary band: amount, status chip, and one chip per task, each jumping to what needs attention. Lines expand in place for small edits; categories and catalogue products open sheets; rarer actions live in the "Flere handlinger" menu.
-3. The footer always says what is left and offers the one next action; after approval it offers the next receipt when one is waiting.
-4. Unsaved changes survive restarts, and leaving asks before discarding them.
+Every review screen offers one next action. Status reads as text and chips; the controls that compete with the next action are gone or moved behind the "Flere handlinger" menu.
+
+1. Innboks lists receipts that need a person first and receipts still processing below them. The "Til kontroll" title's detail says that a swipe left approves a receipt without open questions; "Start" opens the first one.
+2. The receipt screen leads with the summary band: amount and status chip. Under the notices, a warning `Notice` ([review next step](../../src/features/review-next-step.tsx)) names the first open question as its title, says in one sentence how to settle it, and names the questions after it under "Deretter". Tapping it jumps straight to the fix: the Kvitteringsdetaljer sheet for the store, amount, date, or currency; the review lines; or an alert for a duplicate, a difference, or the reader's notes. The purchase overview only marks the paid amount in `warning` while it is unsettled; it repeats neither the question nor the fixes.
+3. The line list is headed by a `SectionTitle`: "Varer å sjekke" in review mode, with "Bekreft alle" as its action when more than one category suggestion is waiting; "Varelinjer" with the balance against the paid amount in the all-lines view. In review mode a product line shows its category suggestion as a chip and one `tint` "Bekreft" button, and a reader's note gets one "Dette stemmer" button; the line header expands the editor. Product linking is optional, so its control appears in the all-lines view only.
+4. The footer always says what is left and owns the one primary action: "Godkjenn kvittering", "Lagre og godkjenn", or "Lagre for senere". The navigation bar has no second save button, only the "Flere handlinger" menu. After approval the footer offers the next receipt when one is waiting.
+5. The category picker ([category picker](../../src/features/category-picker.tsx)) is a sheet with the search field in its header and the remember toggle in its footer. The suggestion, the most-used categories, and the groups are `List` cards under `SectionTitle`s; a group opens as a list with "Alle kategorier" as the title's action to go back, and a search without a match shows `Empty`.
+6. Unsaved changes survive restarts, and leaving asks before discarding them.
+
+### Corrections
+
+Rettelser ([corrections](../../src/app/corrections.tsx)) leads with an `Amount` of corrections and its confirmations as the detail, then the decisions in a `List` under a `SectionTitle` whose detail says what a tap does; "Om rettelser" is a `Disclosure` at the end. Applying a correction to the same item elsewhere is a sheet whose footer holds "Rett N varer".
 
 ### Explore spending
 

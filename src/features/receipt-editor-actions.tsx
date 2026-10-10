@@ -20,38 +20,17 @@ export type ReceiptActionMenu = {
 };
 
 /**
- * The save button and the action menu in the iOS navigation bar.
+ * The action menu in the iOS navigation bar. The footer owns saving and
+ * approval, so the bar carries only the rarer actions.
  * Other platforms show the actions in `ReceiptActionsSheet`.
  */
 export function ReceiptEditorToolbar({
   menu,
-  saveOffered,
-  saveDisabled,
-  dirty,
-  ready,
-  onSave,
-}: Readonly<{
-  menu: ReceiptActionMenu;
-  /** The draft has changes to save, or the receipt waits for approval. */
-  saveOffered: boolean;
-  saveDisabled: boolean;
-  dirty: boolean;
-  ready: boolean;
-  onSave: () => void;
-}>) {
+}: Readonly<{ menu: ReceiptActionMenu }>) {
   if (Platform.OS !== "ios") return null;
 
   return (
     <Stack.Toolbar placement="right">
-      {saveOffered && (
-        <Stack.Toolbar.Button
-          icon="checkmark"
-          disabled={saveDisabled || menu.busy || (!dirty && !ready)}
-          onPress={onSave}
-        >
-          {saveButtonLabel(menu.busy, dirty)}
-        </Stack.Toolbar.Button>
-      )}
       <Stack.Toolbar.Menu icon="ellipsis" title="Flere handlinger">
         <Stack.Toolbar.MenuAction
           icon="pencil"
@@ -100,12 +79,6 @@ export function ReceiptEditorToolbar({
       </Stack.Toolbar.Menu>
     </Stack.Toolbar>
   );
-}
-
-function saveButtonLabel(busy: boolean, dirty: boolean): string {
-  if (busy) return "Lagrer …";
-
-  return dirty ? "Lagre" : "Godkjenn";
 }
 
 /** The receipt actions on platforms without the iOS toolbar menu. */
