@@ -152,7 +152,7 @@ export function PurchaseTotals({
     { label: "Betalt", amount: data.totalOre, paid: true },
   ];
 
-  const paidUnsettled = totals.difference !== 0;
+  const paidUnsettled = totals.difference !== null && totals.difference !== 0;
 
   return (
     <Panel>
