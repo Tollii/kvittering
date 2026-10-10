@@ -29,7 +29,7 @@ function ReceiptDetail({ id }: Readonly<{ id: string }>) {
     // The editor has unmounted, so its unsaved-change guard cannot block leaving.
     if (deletion === "deleted") {
       if (router.canGoBack()) router.back();
-      else router.replace("/(tabs)/history");
+      else router.replace("/(tabs)/receipts");
     }
   }, [deletion]);
 
@@ -68,7 +68,7 @@ function ReceiptDetail({ id }: Readonly<{ id: string }>) {
           </Copy>
           <Button
             title="Til kvitteringene"
-            onPress={() => router.dismissTo("/(tabs)/history")}
+            onPress={() => router.dismissTo("/(tabs)/receipts")}
           />
         </View>
       </Screen>

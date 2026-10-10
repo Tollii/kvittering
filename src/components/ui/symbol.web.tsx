@@ -44,6 +44,7 @@ const material = new Map<string, AndroidSymbol>([
   ["doc.badge.plus", "note_add"],
   ["doc.on.doc", "content_copy"],
   ["doc.questionmark", "unknown_document"],
+  ["doc.text", "description"],
   ["doc.text.magnifyingglass", "document_search"],
   ["doc.viewfinder", "document_scanner"],
   ["ellipsis", "more_horiz"],

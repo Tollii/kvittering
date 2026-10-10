@@ -1,7 +1,7 @@
 appId: no.tolnes.kvitto
 name: Save a receipt edit and read it after clearing local app data
 ---
-- runFlow: history.yaml
+- runFlow: receipts.yaml
 - tapOn: "Flere handlinger"
 - tapOn: "Kvitteringsdetaljer"
 - tapOn: "Oslo"
@@ -14,9 +14,9 @@ name: Save a receipt edit and read it after clearing local app data
 - assertNotVisible: "Kvitteringsdetaljer"
 - tapOn: "Lagre og godkjenn"
 - extendedWaitUntil:
-    visible: "Til innboksen"
+    visible: "Til kvitteringene"
     timeout: 30000
 # Clear the device cache and draft before reading the saved server value.
-- runFlow: history.yaml
+- runFlow: receipts.yaml
 - assertVisible: ".*Saved branch.*"
 - assertNotVisible: ".*Oslo.*"

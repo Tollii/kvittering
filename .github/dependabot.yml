@@ -60,6 +60,11 @@ updates:
         update-types: [version-update:semver-major]
       # Cloud sessions provide the Chromium build that this exact version expects.
       - dependency-name: "@playwright/test"
+      # @convex-dev/better-auth sets the Better Auth minor, and the packages move together.
+      - dependency-name: "better-auth"
+        update-types: [version-update:semver-major, version-update:semver-minor]
+      - dependency-name: "@better-auth/*"
+        update-types: [version-update:semver-major, version-update:semver-minor]
   - package-ecosystem: github-actions
     directory: /
     schedule:

@@ -3,6 +3,7 @@ import type { FunctionArgs } from "convex/server";
 import type { api } from "../../convex/_generated/api";
 import type { Receipt } from "./domain/insights";
 import { productIdentityKey } from "./domain/product-reference";
+import { isReceiptProcessing } from "./domain/receipt-state";
 import { receiptListItem, receiptSearchText } from "./domain/receipt-summary";
 
 export function selectReceipts(
@@ -48,12 +49,22 @@ export function selectReceipts(
     .sort((left, right) => right._creationTime - left._creationTime);
 }
 
+/**
+ * Receipts still on their way in are listed under "Under behandling" until they
+ * are read. An excluded receipt is never there, so it stays in its month.
+ */
+export function listedInHistory(
+  receipt: Readonly<{ status: Receipt["status"]; excluded: boolean }>,
+) {
+  return !isReceiptProcessing(receipt.status) || receipt.excluded;
+}
+
 export function selectReceiptHistory(receipts: Receipt[], search: string) {
   const term = search.trim().toLocaleLowerCase("nb-NO");
 
   return receipts
     .flatMap((receipt) =>
-      receiptSearchText(receipt).includes(term)
+      listedInHistory(receipt) && receiptSearchText(receipt).includes(term)
         ? [receiptListItem(receipt)]
         : [],
     )

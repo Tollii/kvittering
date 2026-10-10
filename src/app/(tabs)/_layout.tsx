@@ -1,10 +1,10 @@
 import { NativeTabs } from "expo-router/unstable-native-tabs";
 import { useTheme } from "@/constants/theme";
-import { mainTabs, useInboxBadge } from "@/features/main-tabs";
+import { mainTabs, useReceiptsBadge } from "@/features/main-tabs";
 
 export default function TabLayout() {
   const colors = useTheme();
-  const badge = useInboxBadge();
+  const badge = useReceiptsBadge();
 
   return (
     <NativeTabs
@@ -22,7 +22,7 @@ export default function TabLayout() {
                 : tab.icon
             }
           />
-          {tab.name === "inbox" && badge !== undefined && (
+          {tab.name === "receipts" && badge !== undefined && (
             <NativeTabs.Trigger.Badge>{badge}</NativeTabs.Trigger.Badge>
           )}
         </NativeTabs.Trigger>

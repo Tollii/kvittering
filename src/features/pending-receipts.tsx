@@ -2,26 +2,21 @@ import { needsAttention } from "@/lib/domain/receipt-state";
 import { ReceiptActivityButton } from "@/features/receipt-activity";
 import { useCompleteReceipts } from "@/features/receipt-queries";
 import { UploadQueueCard } from "@/features/upload-queue-card";
-import { router } from "expo-router";
-import {
-  Button,
-  IconButton,
-  Loading,
-  Screen,
-  SectionTitle,
-} from "@/components/ui";
-import { IllustratedEmpty } from "@/components/monument-artwork";
+import { SectionTitle } from "@/components/ui";
 import { ReceiptCard, openReceipt } from "@/components/receipt-card";
 import { SwipeToApprove } from "@/features/swipe-approve";
 import { useHousehold } from "@/features/household-context";
-import { OfflineNotice } from "@/features/offline-notice";
-import { useTheme } from "@/constants/theme";
 import { quickApproveData } from "@/lib/domain/receipt-review";
 
-export default function Inbox() {
-  const colors = useTheme();
-  const { queue, online, retryFailedUploads } = useHousehold();
-  const { receipts, loadingReceipts } = useCompleteReceipts({ kind: "inbox" });
+/** Receipts that wait for a person or are still on their way in, pinned above the months in Kvitteringer. */
+export function usePendingReceipts(enabled: boolean) {
+  const { queue } = useHousehold();
+
+  const { receipts, loadingReceipts } = useCompleteReceipts(
+    { kind: "inbox" },
+    enabled,
+  );
+
   const reserved = new Set(queue.map((entry) => entry.receiptId));
 
   const open = receipts.filter(
@@ -32,33 +27,26 @@ export default function Inbox() {
   );
 
   const attention = open.filter((receipt) => needsAttention(receipt.status));
-
   const working = open.filter((receipt) => !needsAttention(receipt.status));
 
-  const empty = !loadingReceipts && open.length === 0 && queue.length === 0;
+  return {
+    attention,
+    working,
+    queue,
+    count: attention.length + working.length + queue.length,
+    loading: loadingReceipts,
+  };
+}
+
+export function PendingReceipts({
+  attention,
+  working,
+  queue,
+}: Readonly<ReturnType<typeof usePendingReceipts>>) {
+  const { online, retryFailedUploads } = useHousehold();
 
   return (
-    <Screen
-      title="Innboks"
-      subtitle={
-        attention.length
-          ? `${attention.length} til kontroll`
-          : working.length + queue.length
-            ? "Behandles"
-            : undefined
-      }
-      settings
-      headerRight={
-        <IconButton
-          name="barcode"
-          label="Koble produkter"
-          color={colors.onHero}
-          onPress={() => router.push("/product-linking")}
-        />
-      }
-    >
-      <OfflineNotice />
-      {loadingReceipts && <Loading />}
+    <>
       {attention.length > 0 && (
         <>
           <SectionTitle
@@ -118,20 +106,6 @@ export default function Inbox() {
           ))}
         </>
       )}
-      {empty && (
-        <IllustratedEmpty
-          scene="inbox"
-          title="Ingen kvitteringer til kontroll"
-          message="Alle kvitteringene dine er behandlet."
-        />
-      )}
-      {empty && (
-        <Button
-          title="Ny kvittering"
-          icon="camera"
-          onPress={() => router.navigate("/")}
-        />
-      )}
-    </Screen>
+    </>
   );
 }

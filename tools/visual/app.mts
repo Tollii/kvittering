@@ -198,7 +198,7 @@ export class App {
     await this.type("sign-in-email", account.email);
     await this.type("sign-in-password", account.password);
     await this.tap("sign-in-submit");
-    await this.see("Historikk");
+    await this.see("Kvitteringer");
 
     return account;
   }
@@ -213,7 +213,7 @@ export class App {
     await this.tap("sign-in-submit");
     await this.see("Start med mine kvitteringer");
     await this.tap("Start med mine kvitteringer");
-    await this.see("Innboks");
+    await this.see("Kvitteringer");
 
     return account;
   }

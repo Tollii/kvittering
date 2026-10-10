@@ -1,7 +1,7 @@
 import { Ore, oreValidator } from "./ore";
 import { CalendarDate, calendarDateValidator } from "./calendar";
 import { receiptStatusValidator } from "./receipt-state";
-import { v } from "convex/values";
+import { v, type Infer } from "convex/values";
 import { monthlyInsights, type Receipt } from "./insights";
 import { reconcile } from "./receipt";
 
@@ -97,7 +97,9 @@ export const receiptListItemValidator = v.object({
   excluded: v.boolean(),
 });
 
-export function receiptListItem(receipt: Receipt) {
+export type ReceiptListItem = Infer<typeof receiptListItemValidator>;
+
+export function receiptListItem(receipt: Receipt): ReceiptListItem {
   return {
     _id: receipt._id,
     _creationTime: receipt._creationTime,

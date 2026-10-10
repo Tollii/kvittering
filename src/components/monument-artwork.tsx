@@ -3,12 +3,12 @@ import { useWindowDimensions, View } from "react-native";
 import { Copy } from "./ui/typography";
 import { useTheme } from "@/constants/theme";
 
-import inboxIllustration from "../../assets/artwork/inbox-nave.png";
-import historyIllustration from "../../assets/artwork/history-monument.png";
+import naveIllustration from "../../assets/artwork/nave.png";
+import monumentIllustration from "../../assets/artwork/monument.png";
 
 const illustrations = {
-  inbox: inboxIllustration,
-  history: historyIllustration,
+  nave: naveIllustration,
+  monument: monumentIllustration,
 };
 
 /** Decorative artwork is separate from readable data and product photographs. */
@@ -40,10 +40,10 @@ export function MonumentArtwork({
           : {
               width: "100%",
               maxWidth: 360,
-              aspectRatio: scene === "inbox" ? 1 : 1.5,
+              aspectRatio: 1.5,
               alignSelf: "center",
-              borderTopLeftRadius: scene === "inbox" ? 180 : 4,
-              borderTopRightRadius: scene === "inbox" ? 180 : 4,
+              borderTopLeftRadius: 4,
+              borderTopRightRadius: 4,
             }
       }
     />
