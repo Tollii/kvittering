@@ -5,7 +5,7 @@ import { useDebouncedSearch } from "./catalog-queries";
 import { productSearch } from "@/lib/catalog/search";
 import { productReference } from "@/lib/domain/product-reference";
 import { useState } from "react";
-import { Pressable, View, useWindowDimensions } from "react-native";
+import { View, useWindowDimensions } from "react-native";
 import { useQuery } from "convex-helpers/react/cache";
 import { api } from "../../convex/_generated/api";
 import type { Id } from "../../convex/_generated/dataModel";
@@ -19,7 +19,8 @@ import {
   Panel,
   Row,
   Select,
-  pressed,
+  ExpandChevron,
+  Press,
 } from "@/components/ui";
 import { MoneyField } from "@/components/money-field";
 import {
@@ -326,19 +327,19 @@ function LineHeader({
   const detail = lineDetail(line);
 
   return (
-    <Pressable
+    <Press
+      feedback="highlight"
       accessibilityRole="button"
       accessibilityLabel={`${expanded ? "Skjul" : "Rediger"} ${line.name || "ny vare"}, ${Ore.format(line.amountOre)}`}
       accessibilityState={{ expanded }}
       onPress={onPress}
-      style={(state) => [
+      style={[
         {
           minHeight: 44,
           flexDirection: "row",
           alignItems: "center",
           gap: 10,
         },
-        pressed(state),
       ]}
     >
       <View style={{ flex: 1, gap: 1 }}>
@@ -367,12 +368,8 @@ function LineHeader({
       >
         {missingAmount ? "Beløp?" : Ore.format(line.amountOre)}
       </Copy>
-      <Icon
-        name={expanded ? "chevron.up" : "chevron.down"}
-        size={11}
-        color={colors.secondary}
-      />
-    </Pressable>
+      <ExpandChevron open={expanded} size={11} />
+    </Press>
   );
 }
 
@@ -462,7 +459,8 @@ function LineProductRow({
       {!review && priceSignal && <PriceSignalChip signal={priceSignal} />}
       {/* Product linking is optional, so review mode keeps the category decision alone. */}
       {!review && (
-        <Pressable
+        <Press
+          feedback="highlight"
           accessibilityRole="button"
           accessibilityLabel={
             catalogProduct
@@ -470,7 +468,7 @@ function LineProductRow({
               : `${productLabel} for ${line.name}. Endre produktkobling`
           }
           onPress={onOpenCatalog}
-          style={(state) => [
+          style={[
             {
               minHeight: 44,
               flexDirection: "row",
@@ -478,7 +476,6 @@ function LineProductRow({
               gap: 5,
               marginLeft: "auto",
             },
-            pressed(state),
           ]}
         >
           <Icon
@@ -489,7 +486,7 @@ function LineProductRow({
           <Copy size={14} weight="600" style={{ color: colors.primary }}>
             {productLabel}
           </Copy>
-        </Pressable>
+        </Press>
       )}
     </View>
   );

@@ -2,13 +2,12 @@ import {
   StyleSheet,
   Text,
   View,
-  type PressableStateCallbackType,
   type TextProps,
   type ViewStyle,
 } from "react-native";
 import { type SymbolViewProps } from "expo-symbols";
 import { SymbolView } from "./symbol";
-import { disabledOpacity, motion, tracking, useTheme } from "@/constants/theme";
+import { disabledOpacity, tracking, useTheme } from "@/constants/theme";
 
 export function Copy({
   children,
@@ -110,13 +109,6 @@ export function Icon({
     />
   );
 }
-
-/**
- * Superseded by `Press`; kept only until the category picker, the line
- * editor, and capture review move to it.
- */
-export const pressed = (state: PressableStateCallbackType): ViewStyle =>
-  state.pressed ? { opacity: motion.highlightOpacity } : { opacity: 1 };
 
 /** The one disabled look: a faded control that keeps its layout. */
 export const faded = (disabled: boolean): ViewStyle =>

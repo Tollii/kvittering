@@ -1,6 +1,7 @@
 import { ActivityIndicator, View } from "react-native";
-import { Button, Copy, IconTile, Panel } from "@/components/ui";
-import { useTheme } from "@/constants/theme";
+import Animated from "react-native-reanimated";
+import { Button, Copy, IconTile, Panel, easeOut } from "@/components/ui";
+import { motion, useTheme } from "@/constants/theme";
 import type { LocalReceipt } from "@/lib/upload-queue";
 import { QueueRegroup } from "./queue-regroup";
 
@@ -51,11 +52,15 @@ export function UploadQueueCard({
           overflow: "hidden",
         }}
       >
-        <View
+        {/* A childless fill, so easing its width re-lays out nothing else. */}
+        <Animated.View
           style={{
             height: 4,
             width: `${Math.max(6, (uploaded / entry.images.length) * 100)}%`,
             backgroundColor: entry.error ? colors.warning : colors.primary,
+            transitionProperty: "width",
+            transitionDuration: motion.state,
+            transitionTimingFunction: easeOut,
           }}
         />
       </View>

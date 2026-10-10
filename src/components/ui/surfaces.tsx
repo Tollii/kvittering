@@ -8,9 +8,9 @@ import {
 } from "react-native";
 import { type SymbolViewProps } from "expo-symbols";
 import Animated, { LayoutAnimationConfig } from "react-native-reanimated";
-import { motion, radius, useTheme } from "@/constants/theme";
+import { radius, useTheme } from "@/constants/theme";
 import { Copy, Icon, styles } from "./typography";
-import { Press, easeInOut, useArrival } from "./motion";
+import { ExpandChevron, Press, useArrival } from "./motion";
 
 export function Panel({
   children,
@@ -180,7 +180,6 @@ export function Disclosure({
 }>) {
   const [open, setOpen] = useState(initiallyOpen);
   const arrival = useArrival();
-  const colors = useTheme();
 
   return (
     <Panel style={{ gap: open ? 10 : 0 }}>
@@ -199,16 +198,7 @@ export function Disclosure({
             {value}
           </Copy>
         )}
-        <Animated.View
-          style={{
-            transform: [{ rotate: open ? "180deg" : "0deg" }],
-            transitionProperty: "transform",
-            transitionDuration: motion.state,
-            transitionTimingFunction: easeInOut,
-          }}
-        >
-          <Icon name="chevron.down" size={12} color={colors.secondary} />
-        </Animated.View>
+        <ExpandChevron open={open} />
       </Press>
       {/* Detail that is open from the start is already there; only a tap brings it in. */}
       <LayoutAnimationConfig skipEntering>

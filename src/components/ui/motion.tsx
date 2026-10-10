@@ -5,7 +5,7 @@ import {
   type StyleProp,
   type ViewStyle,
 } from "react-native";
-import {
+import Animated, {
   Easing,
   FadeIn,
   FadeOut,
@@ -15,7 +15,8 @@ import {
   cubicBezier,
   useReducedMotion,
 } from "react-native-reanimated";
-import { motion } from "@/constants/theme";
+import { motion, useTheme } from "@/constants/theme";
+import { Icon } from "./typography";
 
 const AnimatedPressable = createAnimatedComponent(Pressable);
 
@@ -73,6 +74,30 @@ export function Press({
         style,
       ]}
     />
+  );
+}
+
+/**
+ * The chevron of something that expands in place. It turns rather than
+ * swapping symbols, so the change reads as one control changing state.
+ */
+export function ExpandChevron({
+  open,
+  size = 12,
+}: Readonly<{ open: boolean; size?: number }>) {
+  const colors = useTheme();
+
+  return (
+    <Animated.View
+      style={{
+        transform: [{ rotate: open ? "180deg" : "0deg" }],
+        transitionProperty: "transform",
+        transitionDuration: motion.state,
+        transitionTimingFunction: easeInOut,
+      }}
+    >
+      <Icon name="chevron.down" size={size} color={colors.secondary} />
+    </Animated.View>
   );
 }
 
