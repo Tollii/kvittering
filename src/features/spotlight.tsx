@@ -115,7 +115,7 @@ export function ReceiptSearchSettings() {
           } else clearReceiptSearch();
         }}
       />
-      <Copy muted size={14}>
+      <Copy muted role="detail">
         De siste 100 kvitteringene kan søkes opp med butikk eller varenavn fra
         Hjem-skjermen. Slå av for å fjerne indeksen.
       </Copy>

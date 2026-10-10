@@ -88,7 +88,7 @@ function TabBar({ state, navigation }: Readonly<BottomTabBarProps>) {
               size={24}
               color={color}
             />
-            <Copy size={10} weight="600" style={{ color, lineHeight: 12 }}>
+            <Copy role="caption" weight="600" style={{ color }}>
               {tab.label}
             </Copy>
             {tab.name === "inbox" && badge !== undefined && (
@@ -106,11 +106,10 @@ function TabBar({ state, navigation }: Readonly<BottomTabBarProps>) {
                 }}
               >
                 <Copy
-                  size={11}
+                  role="caption"
                   weight="700"
                   style={{
                     color: colors.surface,
-                    lineHeight: 13,
                     textAlign: "center",
                   }}
                 >

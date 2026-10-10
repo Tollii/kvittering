@@ -65,8 +65,7 @@ export function IllustratedEmpty({
       {/* The screen-title role: this empty state stands in for a tab's content. */}
       <Copy
         accessibilityRole="header"
-        size={24}
-        weight="600"
+        role="screenTitle"
         style={{ textAlign: "center" }}
       >
         {title}

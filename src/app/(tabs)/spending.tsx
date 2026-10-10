@@ -299,14 +299,14 @@ function Spending({ initialMonth }: Readonly<{ initialMonth: CalendarMonth }>) {
             >
               <View style={{ flex: 1, gap: 8 }}>
                 <Copy
-                  size={12}
+                  role="caption"
                   weight="600"
                   style={{ color: colors.onHeroMuted }}
                 >
                   DAGLIGVARER
                 </Copy>
                 <Amount hero>{Ore.format(headline.products)}</Amount>
-                <Copy size={13} style={{ color: colors.onHeroMuted }}>
+                <Copy role="detail" style={{ color: colors.onHeroMuted }}>
                   {headline.receipts}{" "}
                   {headline.receipts === 1 ? "kvittering" : "kvitteringer"}
                   {headline.provisional
@@ -363,10 +363,14 @@ function Spending({ initialMonth }: Readonly<{ initialMonth: CalendarMonth }>) {
                 ]}
               >
                 <Icon name="chevron.left" size={12} />
-                <Copy size={14} weight="600" style={{ color: colors.primary }}>
+                <Copy
+                  role="detail"
+                  weight="600"
+                  style={{ color: colors.primary }}
+                >
                   Alle kategorier
                 </Copy>
-                <Copy size={14} muted>
+                <Copy role="detail" muted>
                   · {categoryOf(rows[0]?.id).groupName}
                 </Copy>
               </Pressable>
@@ -551,7 +555,7 @@ function BudgetPaceBar({
           />
         )}
       </View>
-      <Copy size={13} weight="600" style={{ color: colors.onHeroMuted }}>
+      <Copy role="detail" weight="600" style={{ color: colors.onHeroMuted }}>
         {paceLabel(pace)}
       </Copy>
     </View>

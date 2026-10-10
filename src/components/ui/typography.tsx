@@ -8,21 +8,27 @@ import {
 } from "react-native";
 import { type SymbolViewProps } from "expo-symbols";
 import { SymbolView } from "./symbol";
-import { disabledOpacity, tracking, useTheme } from "@/constants/theme";
+import {
+  disabledOpacity,
+  tracking,
+  typeScale,
+  useTheme,
+  type FontWeight,
+  type TypeRole,
+} from "@/constants/theme";
 
-export function Copy({
-  children,
-  muted = false,
-  size = 16,
-  weight = "400",
-  style,
-  ...props
-}: TextProps & {
+/** `role` names the type role; accessibility semantics go through `accessibilityRole`. */
+type TypeProps = Omit<TextProps, "role"> & {
+  role: TypeRole;
+  /** Overrides the role's weight; weight carries meaning, size does not. */
+  weight?: FontWeight;
   muted?: boolean;
-  size?: number;
-  weight?: "400" | "500" | "600" | "700";
-}) {
+};
+
+/** Draws one role of the type scale; `Copy` and `Amount` are its two faces. */
+function Type({ role, weight, muted = false, style, ...props }: TypeProps) {
   const colors = useTheme();
+  const { size, weight: roleWeight } = typeScale[role];
 
   return (
     <Text
@@ -31,7 +37,7 @@ export function Copy({
         {
           color: muted ? colors.secondary : colors.text,
           fontSize: size,
-          fontWeight: weight,
+          fontWeight: weight ?? roleWeight,
           lineHeight: Math.round(
             size * (size >= 28 ? 1.12 : size >= 22 ? 1.2 : 1.32),
           ),
@@ -40,10 +46,18 @@ export function Copy({
         },
         style,
       ]}
-    >
-      {children}
-    </Text>
+    />
   );
+}
+
+/** The text roles; amounts go through `Amount`. */
+export type CopyRole = Exclude<TypeRole, "heroAmount" | "amount">;
+
+export function Copy({
+  role = "body",
+  ...props
+}: Omit<TypeProps, "role"> & { role?: CopyRole }) {
+  return <Type role={role} {...props} />;
 }
 
 /**
@@ -56,14 +70,13 @@ export function Amount({
   detail,
   style,
   ...props
-}: TextProps & { hero?: boolean; detail?: string }) {
+}: Omit<TextProps, "role"> & { hero?: boolean; detail?: string }) {
   const colors = useTheme();
 
   const amount = (
-    <Copy
+    <Type
       selectable
-      size={hero ? 36 : 32}
-      weight={hero ? "600" : "700"}
+      role={hero ? "heroAmount" : "amount"}
       style={[hero && { color: colors.onHero }, style]}
       {...props}
     />
@@ -75,7 +88,7 @@ export function Amount({
     <View style={{ gap: 2 }}>
       {amount}
       <Copy
-        size={13}
+        role="detail"
         muted={!hero}
         style={hero && { color: colors.onHeroMuted }}
       >

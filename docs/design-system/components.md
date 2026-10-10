@@ -89,7 +89,7 @@ States: `disabled` fades the button; `busy` shows a spinner in place of the icon
 
 Pass `insetTop={false}` when a native stack header already covers the top inset.
 
-**`SummaryBand`** is the cobalt band with a screen's key number: the month menu and total on Forbruk, the paid amount and status chips on a receipt, the current item in Koble produkter. It owns the hero fill and padding; screens put an `Amount size="hero"` and `onHero` text inside it.
+**`SummaryBand`** is the cobalt band with a screen's key number: the month menu and total on Forbruk, the paid amount and status chips on a receipt, the current item in Koble produkter. It owns the hero fill and padding; screens put an `Amount hero` and `onHero` text inside it.
 
 **`Sheet`** is a bottom sheet with a title, a close button ("Lukk"), optional fixed `header` and `footer`, and scrolling content. On iOS it is a native sheet with medium and large detents and a drag indicator. Set `dismissible={false}` while closing would lose work or leave an invalid value: while a save is busy, or while the paid amount is invalid in Kvitteringsdetaljer.
 

@@ -103,6 +103,27 @@ export const radius = {
 /** Disabled controls fade to this; pressed ones use `pressed()`. */
 export const disabledOpacity = 0.45;
 
+/**
+ * The type scale: every text the app draws is one of these roles. `Copy`
+ * draws the text roles and `Amount` the two amounts; line height and tracking
+ * follow the size. Weight carries meaning, so a caller may override it.
+ */
+export const typeScale = {
+  heroAmount: { size: 36, weight: "600" },
+  amount: { size: 32, weight: "700" },
+  screenTitle: { size: 24, weight: "600" },
+  sheetTitle: { size: 20, weight: "700" },
+  sectionTitle: { size: 19, weight: "700" },
+  cardTitle: { size: 17, weight: "600" },
+  body: { size: 16, weight: "400" },
+  detail: { size: 13, weight: "400" },
+  caption: { size: 12, weight: "400" },
+} as const satisfies Record<string, { size: number; weight: FontWeight }>;
+
+export type TypeRole = keyof typeof typeScale;
+
+export type FontWeight = "400" | "500" | "600" | "700";
+
 export function tracking(size: number) {
   if (size >= 40) return -1.2;
 

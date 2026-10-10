@@ -95,7 +95,7 @@ export function SwipeToApprove({
           }}
         >
           <Icon name="checkmark.seal" size={22} color={colors.success} />
-          <Copy size={13} weight="700" style={{ color: colors.success }}>
+          <Copy role="detail" weight="700" style={{ color: colors.success }}>
             Godkjenn
           </Copy>
         </View>

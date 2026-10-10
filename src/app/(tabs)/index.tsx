@@ -322,11 +322,11 @@ export default function Capture() {
         <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
           {overlay(
             <>
-              <Copy size={15} weight="700" style={{ color: colors.onCamera }}>
+              <Copy weight="700" style={{ color: colors.onCamera }}>
                 Ny kvittering
               </Copy>
               <Copy
-                size={13}
+                role="detail"
                 numberOfLines={1}
                 style={{ color: colors.onCameraMuted, flexShrink: 1 }}
               >
@@ -436,14 +436,12 @@ export default function Capture() {
                 />
                 <Copy
                   accessibilityRole="header"
-                  size={24}
-                  weight="600"
+                  role="screenTitle"
                   style={{ color: colors.onCamera, textAlign: "center" }}
                 >
                   Ta vare på kvitteringen
                 </Copy>
                 <Copy
-                  size={15}
                   style={{ color: colors.onCameraMuted, textAlign: "center" }}
                 >
                   Ta et bilde, eller importer en kvittering fra Bilder eller
@@ -566,7 +564,7 @@ export default function Capture() {
                 }}
               >
                 <Copy
-                  size={12}
+                  role="caption"
                   weight="700"
                   style={{ color: colors.onPrimary }}
                 >

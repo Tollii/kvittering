@@ -34,7 +34,7 @@ export function UploadQueueCard({
               ? "Ny kvittering"
               : `Ny kvittering · ${entry.images.length} bilder`}
           </Copy>
-          <Copy size={13} muted>
+          <Copy role="detail" muted>
             {entry.error
               ? "Venter på nytt forsøk"
               : online

@@ -81,7 +81,7 @@ export function CatalogStorePicker({
           onClose();
         }}
       />
-      <Copy size={12} muted>
+      <Copy role="caption" muted>
         Butikkdata fra Kassalapp.
       </Copy>
     </Sheet>

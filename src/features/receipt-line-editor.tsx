@@ -200,7 +200,7 @@ export function ReceiptLineEditor({
               size={13}
               color={colors.warning}
             />
-            <Copy size={13} style={{ color: colors.warning, flex: 1 }}>
+            <Copy role="detail" style={{ color: colors.warning, flex: 1 }}>
               {receiptIssueText(issue)}
             </Copy>
           </View>
@@ -208,7 +208,7 @@ export function ReceiptLineEditor({
       {showEditor && (
         <View style={{ gap: 10, paddingVertical: 6 }}>
           {expanded && !!line.originalText && (
-            <Copy muted size={13}>
+            <Copy muted role="detail">
               Lest: {line.originalText}
             </Copy>
           )}
@@ -342,21 +342,16 @@ function LineHeader({
       ]}
     >
       <View style={{ flex: 1, gap: 1 }}>
-        <Copy
-          size={16}
-          weight="600"
-          numberOfLines={fontScale > 1.3 ? undefined : 2}
-        >
+        <Copy weight="600" numberOfLines={fontScale > 1.3 ? undefined : 2}>
           {line.name || (missingName ? "Navn mangler" : "Ny vare")}
         </Copy>
         {!!detail && (
-          <Copy size={12} muted>
+          <Copy role="caption" muted>
             {detail}
           </Copy>
         )}
       </View>
       <Copy
-        size={16}
         weight="600"
         style={{
           flexShrink: 1,
@@ -486,7 +481,7 @@ function LineProductRow({
             size={13}
             color={colors.primary}
           />
-          <Copy size={14} weight="600" style={{ color: colors.primary }}>
+          <Copy role="detail" weight="600" style={{ color: colors.primary }}>
             {productLabel}
           </Copy>
         </Pressable>
@@ -707,7 +702,7 @@ function ProductSelector({
         value={search}
         onChangeText={setSearch}
       />
-      <Copy size={13} muted>
+      <Copy role="detail" muted>
         {line.productName || "Ingen sikker produktkobling"}
       </Copy>
       <View style={{ flexDirection: "row", gap: 8 }}>

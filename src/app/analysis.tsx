@@ -136,7 +136,7 @@ export default function Analysis() {
           <Amount detail={analysisSummary(report)}>
             {Ore.format(report.currentOre)}
           </Amount>
-          <Copy muted size={13}>
+          <Copy muted role="detail">
             Sammenlignet med {CalendarDate.format(period.previousStart)} –{" "}
             {CalendarDate.format(period.previousEnd)}. {report.currentReceipts}{" "}
             mot {report.previousReceipts} kvitteringer. Gjelder registrerte
@@ -174,7 +174,7 @@ export default function Analysis() {
                     : "Det er ikke nok sammenlignbare produktopplysninger til å forklare endringen."}
                 </Copy>
               )}
-              <Copy muted size={13}>
+              <Copy muted role="detail">
                 Viser de største pris- og mengdebidragene og opptil to
                 produktfamilier som bare er identifisert i denne perioden. Dette
                 er ikke nødvendigvis nye eller uvanlige kjøp. Manglende
@@ -195,7 +195,7 @@ export default function Analysis() {
                     value={Ore.format(report.unexplainedOre)}
                   />
                 </List>
-                <Copy muted size={13}>
+                <Copy muted role="detail">
                   {report.measuredLines} av {report.productLines} varelinjer kan
                   sammenlignes som samme produktfamilie med kjent mengde. Pris
                   omfatter rabatter og ulik fordeling mellom butikker og

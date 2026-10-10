@@ -84,13 +84,13 @@ export function AuthenticationLayout({
             <View style={{ gap: 10, alignItems: "center" }}>
               <Copy
                 accessibilityRole="header"
-                size={32}
+                role="screenTitle"
                 weight="700"
                 style={{ textAlign: "center" }}
               >
                 {title}
               </Copy>
-              <Copy muted size={17} style={{ textAlign: "center" }}>
+              <Copy muted style={{ textAlign: "center" }}>
                 {subtitle}
               </Copy>
             </View>
@@ -135,11 +135,7 @@ export function AuthenticationLink({
       ]}
     >
       {back && <Icon name="chevron.left" size={16} color={colors.primary} />}
-      <Copy
-        size={16}
-        weight="500"
-        style={{ color: colors.primary, flexShrink: 1 }}
-      >
+      <Copy weight="500" style={{ color: colors.primary, flexShrink: 1 }}>
         {title}
       </Copy>
     </Pressable>

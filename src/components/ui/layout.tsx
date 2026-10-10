@@ -127,14 +127,17 @@ export function Screen({
       <View style={{ flex: 1, gap: 2 }}>
         <Copy
           accessibilityRole="header"
-          size={24}
-          weight="600"
+          role="screenTitle"
           style={{ color: colors.onHero }}
         >
           {title}
         </Copy>
         {!!subtitle && (
-          <Copy size={14} weight="500" style={{ color: colors.onHeroMuted }}>
+          <Copy
+            role="detail"
+            weight="500"
+            style={{ color: colors.onHeroMuted }}
+          >
             {subtitle}
           </Copy>
         )}
@@ -253,8 +256,7 @@ export function Sheet({
         >
           <Copy
             accessibilityRole="header"
-            size={20}
-            weight="700"
+            role="sheetTitle"
             style={{ flex: 1 }}
           >
             {title}

@@ -112,7 +112,7 @@ export default function Settings() {
                 <Icon name="key" size={16} />
                 <Copy
                   selectable
-                  size={14}
+                  role="detail"
                   weight="600"
                   style={{ flex: 1, fontVariant: ["tabular-nums"] }}
                 >
@@ -155,7 +155,7 @@ export default function Settings() {
                 </View>
               </View>
               {!!message && (
-                <Copy size={13} style={{ color: colors.success }}>
+                <Copy role="detail" style={{ color: colors.success }}>
                   {message}
                 </Copy>
               )}
@@ -249,7 +249,7 @@ function DoneButton() {
           backgroundColor: colors.heroControl,
         }}
       >
-        <Copy size={15} weight="600" style={{ color: colors.onHero }}>
+        <Copy weight="600" style={{ color: colors.onHero }}>
           Ferdig
         </Copy>
       </View>
