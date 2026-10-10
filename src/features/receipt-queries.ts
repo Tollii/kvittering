@@ -8,6 +8,7 @@ import { useQueryLifecycle } from "./query-lifecycle-context";
 import { recordEvent } from "@/lib/observability";
 import {
   createReceiptSelector,
+  listedInHistory,
   selectReceiptHistory,
 } from "../lib/receipt-selection";
 
@@ -87,7 +88,11 @@ export function useReceiptHistory(search: string, enabled: boolean) {
     [cache.receipts, search],
   );
 
-  if (!cache.available) return page;
+  if (!cache.available)
+    return {
+      ...page,
+      results: page.results.filter(listedInHistory),
+    };
   const results = search.trim() ? selected : selected.slice(0, limit);
 
   return {

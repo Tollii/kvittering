@@ -14,7 +14,7 @@ Status: DEFERRED DESIGN REVIEW. The earlier native review proposed opening an ap
 
 ## Inbox and History navigation
 
-Status: DEFERRED DESIGN EXPERIMENT. The 23 September product review retained separate Inbox and History tabs. Test a combined receipt destination only if it improves both review and purchase lookup. Do not merge tabs solely to reduce their number. The optional product-linking queue remains in the Inbox header.
+Status: DECIDED 10 October 2026. The owner chose to merge Innboks into Historikk, renamed Kvitteringer, after an exploration showed the inbox was empty on most days because most receipts are approved automatically. Receipts to review and uploads in progress are pinned above the months, the badge moved to Kvitteringer, and the product-linking queue opens from the Varer view. [Screens and flows](../docs/design-system/patterns.md#navigation) describes the result.
 
 ## Public App Store account lifecycle
 

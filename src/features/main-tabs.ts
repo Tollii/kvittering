@@ -10,7 +10,7 @@ import { api } from "../../convex/_generated/api";
  * layout draws a tab bar that looks like them for browser checks.
  */
 export const mainTabs: readonly {
-  name: "index" | "inbox" | "spending" | "history";
+  name: "index" | "spending" | "receipts";
   label: string;
   icon: SFSymbol;
   selectedIcon?: SFSymbol;
@@ -21,13 +21,17 @@ export const mainTabs: readonly {
     icon: "camera",
     selectedIcon: "camera.fill",
   },
-  { name: "inbox", label: "Innboks", icon: "tray", selectedIcon: "tray.fill" },
   { name: "spending", label: "Forbruk", icon: "chart.bar.xaxis" },
-  { name: "history", label: "Historikk", icon: "magnifyingglass" },
+  {
+    name: "receipts",
+    label: "Kvitteringer",
+    icon: "doc.text",
+    selectedIcon: "doc.text.fill",
+  },
 ];
 
-/** The inbox badge: receipts and uploads that need a person, if any. */
-export function useInboxBadge() {
+/** The Kvitteringer badge: receipts and uploads that need a person, if any. */
+export function useReceiptsBadge() {
   const { queue } = useHousehold();
   const cache = useCachedReceipts();
   const { active, online } = useQueryLifecycle();

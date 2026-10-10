@@ -8,7 +8,7 @@ A component's folder says how far it reaches, so a reader knows what a change to
 
 - [`src/components/ui`](../../src/components/ui) is the catalogue: presentation only, no household data, used anywhere. Everything on this page below lives here unless it says otherwise.
 - [`src/components`](../../src/components) holds domain components that more than one screen shares: `ReceiptCard` and its status helpers, `SpendingBars` and `SpendingDetails`, `MoneyField`, `ReceiptTip`, and the monument artwork.
-- [`src/features`](../../src/features) holds screens' own parts, next to the screen or sheet that uses them: the receipt editor's sections and its next-step notice, the inbox's upload queue card, the spending reports with their calendar, family purchases and store map, the period menu of Forbruk, and the context menu of Historikk.
+- [`src/features`](../../src/features) holds screens' own parts, next to the screen or sheet that uses them: the receipt editor's sections and its next-step notice, the pending receipts of Kvitteringer with their upload queue card, the spending reports with their calendar, family purchases and store map, the period menu of Forbruk, and the context menu of Kvitteringer.
 
 When a second screen needs a feature's component, move it up to `src/components` in the same change; when it needs new styling, extend the `ui` component it is built from.
 
@@ -20,7 +20,7 @@ When a second screen needs a feature's component, move it up to `src/components`
 
 **`Icon`** renders an SF Symbol, `primary` by default, hidden from VoiceOver. Label the control that contains it instead. The web build shows the closest Material Symbol from [symbol.web.tsx](../../src/components/ui/symbol.web.tsx); a new symbol needs an entry there, or browser checks show a question mark and log an error.
 
-**`pressed(state)`** and **`faded(disabled)`** are the shared press and disabled styles. Use both on any custom `Pressable`.
+**`Press`** ([motion](../../src/components/ui/motion.tsx)) is the pressable every control is built on, and the one to use for any custom tappable surface: `feedback="scale"` for objects and `"highlight"` for rows and links, as [motion and feedback](foundations.md#motion-and-feedback) describes. **`faded(disabled)`** is the shared disabled style.
 
 ## Actions
 
@@ -57,25 +57,25 @@ States: `disabled` fades the button; `busy` shows a spinner in place of the icon
 
 **`Panel`** ([surfaces](../../src/components/ui/surfaces.tsx)) is the card. `surface` is the default card on `background`; `plain` is a quieter `surfaceRaised` card for a group nested inside another card, such as product search inside the line editor.
 
-**`List`** is the card that holds a list. It draws a `line` divider between its children and renders nothing when it has none, so every list in the app, rows, spending bars, receipt lines, and the receipts of a month in Historikk, sits in one of these and looks the same. Give it `Row`s or other full-width elements directly, one per row; a fragment or a string is not a row, and the caller needs no index bookkeeping or empty guard.
+**`List`** is the card that holds a list. It draws a `line` divider between its children and renders nothing when it has none, so every list in the app, rows, spending bars, receipt lines, and the receipts of a month in Kvitteringer, sits in one of these and looks the same. Give it `Row`s or other full-width elements directly, one per row; a fragment or a string is not a row, and the caller needs no index bookkeeping or empty guard.
 
 **`Row`** is the list item: an optional `IconTile`, a title, detail text, a trailing value, and a chevron when tappable. `selected` swaps the chevron for a checkmark. Large text moves the value under the title (see [accessibility](foundations.md#accessibility)).
 
 **`IconTile`** is the soft cobalt tile behind an icon: a 32-point squircle with the `tile` radius in a `Row` and the upload queue, where it can hold a spinner instead, or the 64-point `circle` that `Empty` leads with.
 
-**`SectionTitle`** heads a group with optional detail text under it and an optional text action on the right, such as "Start" in the inbox or "Bekreft alle" over the review lines; `actionLabel` names the object for VoiceOver when the short action text does not. Historikk uses the detail for the month's count and total.
+**`SectionTitle`** heads a group with optional detail text under it and an optional text action on the right, such as "Start" over the receipts to review or "Bekreft alle" over the review lines; `actionLabel` names the object for VoiceOver when the short action text does not. Kvitteringer uses the detail for the month's count and total.
 
 **`Disclosure`** is a card that expands in place for secondary detail, such as "Om kvitteringen" or "Slik er endringen beregnet".
 
-**`ReceiptCard`** ([receipt card](../../src/components/receipt-card.tsx)) summarises a receipt in the inbox: store, date and branch, total, and a coloured status line (warning for review, danger for failure) followed by what needs attention. A receipt still being processed shows a spinner in place of the total; `compact`, used for those receipts in the inbox, tightens the padding and drops an empty status line.
+**`ReceiptCard`** ([receipt card](../../src/components/receipt-card.tsx)) summarises a receipt that waits for a person or is still on its way in: store, date and branch, total, and a coloured status line (warning for review, danger for failure) followed by what needs attention. A receipt still being processed shows a spinner in place of the total; `compact`, used for those receipts under "Under behandling", tightens the padding and drops an empty status line.
 
 ## Feedback and states
 
-**`Notice`** is an inline message with an icon. Tones: `info` (soft cobalt), `warning`, `error` (marked as an alert), and `success`. [Screen states](patterns.md#states-every-data-screen-handles) say where the offline notice goes. `title` adds a bold first line above the message, and `onPress` makes the notice a button with a trailing chevron, as the pending-receipts notice on Forbruk that opens Innboks and the next-step notice on a receipt under review, whose title is the open question and whose message says how to settle it. `OfflineNotice` ([offline notice](../../src/features/offline-notice.tsx)) is the "Uten nett" notice that reads the household's connection itself; a screen renders it first instead of checking `online`.
+**`Notice`** is an inline message with an icon. Tones: `info` (soft cobalt), `warning`, `error` (marked as an alert), and `success`. [Screen states](patterns.md#states-every-data-screen-handles) say where the offline notice goes. `title` adds a bold first line above the message, and `onPress` makes the notice a button with a trailing chevron, as the pending-receipts notice on Forbruk that opens Kvitteringer and the next-step notice on a receipt under review, whose title is the open question and whose message says how to settle it. `OfflineNotice` ([offline notice](../../src/features/offline-notice.tsx)) is the "Uten nett" notice that reads the household's connection itself; a screen renders it first instead of checking `online`.
 
 **`Loading`** is a centred spinner with a Norwegian status, "Henter …" by default. Name what is loading: "Henter kvittering …".
 
-**`Empty`** is a card with an icon disc, title, message, and optional actions, for an empty state anywhere but a tab root, such as "Ingen treff" or "Ingen rettelser ennå". **`IllustratedEmpty`** ([artwork](../../src/components/monument-artwork.tsx)) puts the monument artwork on an empty tab root with a screen-title-sized heading: "Ingen kvitteringer til kontroll" in the inbox and "Historikken begynner her" in history.
+**`Empty`** is a card with an icon disc, title, message, and optional actions, for an empty state anywhere but a tab root, such as "Ingen treff" or "Ingen rettelser ennå". **`IllustratedEmpty`** ([artwork](../../src/components/monument-artwork.tsx)) puts the monument artwork on an empty tab root with a screen-title-sized heading, as "Kvitteringene samles her" on Kvitteringer.
 
 **`ReceiptTip`** ([receipt tip](../../src/components/receipt-tip.tsx)) shows a native TipKit tip, such as the widget suggestion on Forbruk. It renders nothing where TipKit is unavailable.
 
@@ -83,7 +83,7 @@ States: `disabled` fades the button; `busy` shows a spinner in place of the icon
 
 **`Screen`** ([layout](../../src/components/ui/layout.tsx)) is the page frame. It provides the safe area, keyboard avoidance, scrolling, a maximum content width, and three optional regions:
 
-- `title` and `subtitle` draw the cobalt hero header with the arch mark; `settings` adds `SettingsButton` and `headerRight` adds other icon buttons.
+- `title` and `subtitle` draw the cobalt hero header with the arch mark; `settings` adds `SettingsButton`.
 - `summary` takes a `SummaryBand`, which sits under the header edge to edge.
 - `footer` pins an action bar to the bottom, above the home indicator, on `surface` with a hairline top border.
 

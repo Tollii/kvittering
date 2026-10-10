@@ -1,8 +1,7 @@
 import { CalendarDate } from "@/lib/domain/calendar";
 import { Ore } from "@/lib/domain/ore";
 import { useState } from "react";
-import { Pressable } from "react-native";
-import { Amount, Copy, Icon, List, Row, pressed } from "@/components/ui";
+import { Amount, Copy, Icon, List, Row, Press } from "@/components/ui";
 import { useTheme } from "@/constants/theme";
 import {
   familyInsights,
@@ -30,24 +29,22 @@ export function FamilyPurchases({
   if (selected)
     return (
       <>
-        <Pressable
+        <Press
+          feedback="highlight"
           accessibilityRole="button"
           onPress={() => setSelection(null)}
-          style={(state) => [
-            {
-              flexDirection: "row",
-              alignItems: "center",
-              gap: 6,
-              minHeight: 44,
-            },
-            pressed(state),
-          ]}
+          style={{
+            flexDirection: "row",
+            alignItems: "center",
+            gap: 6,
+            minHeight: 44,
+          }}
         >
           <Icon name="chevron.left" size={12} />
           <Copy size={14} weight="600" style={{ color: colors.primary }}>
             Alle
           </Copy>
-        </Pressable>
+        </Press>
         <Amount
           detail={`${selected.name} · ${Ore.format(selected.amountOre)}${partialQuantity(selected) ? " · noen mengder mangler" : ""}`}
         >

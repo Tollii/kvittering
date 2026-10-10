@@ -40,7 +40,7 @@ Each status has a strong and a soft token. Use the soft one as a fill and the st
 | Warning | `warning` / `warningSoft` | Unsaved changes, reading issues, a needs-review status, and a failed upload that waits to retry. |
 | Danger  | `danger` / `dangerSoft`   | Errors, destructive buttons, failed reading.                                                     |
 
-A failed upload is a warning, not a danger: the images are safe in the queue and the app retries, so Kamera's upload note and the Innboks queue both show the `arrow.clockwise.circle` symbol in `warning`.
+A failed upload is a warning, not a danger: the images are safe in the queue and the app retries, so Kamera's upload note and the upload queue card in Kvitteringer both show the `arrow.clockwise.circle` symbol in `warning`.
 
 ### Charts
 
@@ -103,15 +103,18 @@ Icons are SF Symbols through `Icon`, tinted `primary` by default and hidden from
 
 Recurring meanings: `wifi.slash` offline, `checkmark.seal` reviewed or approve, `exclamationmark.triangle` warning, `exclamationmark.circle` error, `arrow.clockwise` retry, `arrow.clockwise.circle` an upload waiting to retry, `barcode` product linking, `person.2` household and settings, `xmark` close, `chevron.right` navigates, `chevron.down` opens a menu or picker.
 
-Illustrations are separate from icons. [Monument artwork](../../src/components/monument-artwork.tsx) supplies two decorative scenes (inbox nave, history monument) under arched masks, and `ArchMark` is the small arch logo in hero headers and on sign-in. Artwork is decorative: it is hidden from VoiceOver and disappears in compact layouts on narrow screens or with large text.
+Illustrations are separate from icons. [Monument artwork](../../src/components/monument-artwork.tsx) supplies two decorative scenes (`nave`, the arched nave in the Forbruk band, and `monument`, the empty state of Kvitteringer) under arched masks, and `ArchMark` is the small arch logo in hero headers and on sign-in. Artwork is decorative: it is hidden from VoiceOver and disappears in compact layouts on narrow screens or with large text.
 
 ## Motion and feedback
 
-Motion is mostly native: tab switches, stack pushes, sheet presentation, context menus, and the segmented control animate as iOS does. The app adds little of its own:
+Motion is mostly native: tab switches, stack pushes, sheet presentation, context menus, and the segmented control animate as iOS does, and the app never rebuilds them in JavaScript. Its own motion is small, fast, and earns its place. Animate only what a person sees occasionally or caused themselves, give each animation a purpose (feedback, where something came from, or a state change), and leave anything seen dozens of times a day still or nearly so. [Theme](../../src/constants/theme.ts) owns the durations and curves in `motion`, and [motion](../../src/components/ui/motion.tsx) builds on them:
 
-- Press feedback lowers opacity through `pressed()` and a disabled control fades through `faded()` ([typography](../../src/components/ui/typography.tsx)). Use both on any custom `Pressable`; there are no other opacities. Opacity, unlike scaling or sliding, is acceptable under Reduce Motion.
-- Swipe to approve in the inbox is the one custom gesture: a left swipe reveals the green approve action and saves when released past the threshold.
-- The upload success note on Kamera fades out on its own once the upload lands.
+- **Press.** Every custom pressable is a `Press`. Objects such as buttons, chips, cards, and the camera controls shrink to 97 % and dim slightly under the finger; rows and text links inside a card only dim (`feedback="highlight"`), because a row shrinking inside its card looks broken. The feedback starts on touch-down and takes `motion.press`, so it reads as instant. A disabled control fades through `faded()`.
+- **Arrival.** Content a person asked for settles into place from a few points above with `useArrival`, as a `Disclosure`'s detail and Kamera's upload note do. The upload note leaves on its own, so it goes back the same way, faster, with `useDeparture`; a closing disclosure just closes. Detail that is open from the start does not animate.
+- **State.** A `Disclosure` turns its chevron rather than swapping the symbol.
+- **Gesture.** Swipe to approve under "Til kontroll" is the one custom gesture: a left swipe reveals the green approve action and saves when released past the threshold.
+
+Curves come only from `motion`: the strong ease-out for anything arriving or answering a press, the ease-in-out for something turning in place, and never an ease-in, which starts slowly at the moment the person is watching. Animate only `transform` and `opacity`. Under Reduce Motion, keep fades and drop movement and scaling: `Press` only dims, and arrivals only fade. The app reads the setting at launch, so a change takes effect the next time it opens.
 
 [Haptics](../../src/lib/haptics.ts) mark outcomes, not taps: a light impact for a confirmed decision, success when a receipt is approved or a product link is saved or undone, error when a save fails.
 

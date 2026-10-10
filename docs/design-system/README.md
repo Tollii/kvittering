@@ -14,6 +14,7 @@ Cobalt ink on warm paper. A cobalt header and summary band carry the screen's id
 - Every list sits in a `List` card; every large amount is an `Amount`; every cobalt band is a `SummaryBand`. When two screens need the same thing, they share the component rather than the styles.
 - Use native iOS presentation first: a `Sheet` for choices and short edits, a system alert for confirmations, a native menu for a short fixed list such as the month menu, and `Select` or a sheet for a long or searchable list.
 - Keep touch targets at 44 points and check layouts at the largest text size.
+- Keep motion native, small, and purposeful: build tappable surfaces on `Press` and take durations and curves from the theme. See [motion and feedback](foundations.md#motion-and-feedback).
 - Show what is known and say what is not. Unknown amounts and dates read "Ukjent" and "Dato ukjent"; provisional totals say so.
 - Write sentence-case Norwegian that tells the person what happened and what to do next.
 
@@ -27,6 +28,12 @@ Cobalt ink on warm paper. A cobalt header and summary band carry the screen's id
 ## Designing ahead
 
 The [Kvitto design system on claude.ai](https://claude.ai/artifact/N6izBtD3XSNnFXQdHVqSxi) is a browsable copy of these pages with the tokens, the logo and artwork, and web renditions of the components, for mocking up a feature on a design canvas before building it. It is a snapshot synced from this code at the commit it names; when they differ, the code wins.
+
+## Design skills
+
+The [design engineering](../../.agents/skills/emil-design-eng/SKILL.md), [Apple design](../../.agents/skills/apple-design/SKILL.md), and [Expo animation](../../.agents/skills/animate-expo/SKILL.md) skills, with their siblings for reviewing, auditing, and stress-testing UI, are Emil Kowalski's, vendored unchanged. Use them to judge interaction and motion; several speak in web terms, so translate CSS to React Native and Reanimated. Where they and these pages differ, these pages win. Their recipes sometimes install a package with `npx expo install`; a new native package needs a new TestFlight build, so prefer what the app already ships.
+
+The [make-interfaces-feel-better](../../.agents/skills/make-interfaces-feel-better/SKILL.md) skill is Andreas's own refinement checklist for typography, surfaces, icons, motion and rendering cost, vendored from the personal skills on the Mac so cloud threads see the same one. It works within whatever system it finds, so here it works within these pages.
 
 ## Changing the system
 
