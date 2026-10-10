@@ -21,7 +21,7 @@ Shared presentation components live in [`src/components/ui`](../../src/component
 | `tint`      | `primarySoft` fill, `primary` text | A supporting action that should still read as cobalt: "Kopier", "Prøv igjen". |
 | `danger`    | `dangerSoft` fill, `danger` text   | Destructive actions such as "Slett kvittering". Confirm with an alert.        |
 
-States: `disabled` fades the button; `busy` replaces the icon with a spinner and disables it while keeping the title, so the button does not change width. `compact` is the shorter size for inline and footer use.
+States: `disabled` fades the button; `busy` shows a spinner in place of the icon, or before the title when there is no icon, and disables the button while keeping the title. `compact` is the shorter size for inline and footer use.
 
 **`IconButton`** is an icon-only control with a required Norwegian `label`. `filled` adds the muted disc, or pass a colour such as `heroControl` on the hero.
 

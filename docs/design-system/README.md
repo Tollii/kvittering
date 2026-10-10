@@ -4,7 +4,7 @@ Kvitto's visual language, components, screen patterns, and voice, as the app doe
 
 ## Character
 
-Cobalt ink on warm paper. A cobalt header and summary band carry the screen's identity and its key number; content sits below on paper in flat white cards. Native iOS controls do the work wherever they exist: tabs, stack headers, sheets, menus, search, segmented controls, and forms. Artwork, the arch mark and the monument scenes, adds texture to headers and empty screens, while controls stay plain. Every string is Norwegian.
+Cobalt ink on warm paper. A cobalt header and summary band carry the screen's identity and its key number; content sits below on paper in flat white cards. Native iOS controls do the work wherever they exist: tabs, stack headers, sheets, menus, search, segmented controls, and forms. Artwork, the arch mark and the monument scenes, adds texture to headers and empty screens, while controls stay plain. Every string the app writes is Norwegian.
 
 ## Rules of thumb
 

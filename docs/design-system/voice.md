@@ -1,6 +1,6 @@
 # Voice and copy
 
-Every visible string is Norwegian Bokmål. Copy lives in the components that show it; there is no string catalogue. Write it the way the app already speaks: plain, calm, and specific about what happened and what the person can do next.
+Every string the app writes is Norwegian Bokmål; system controls, such as the Sign in with Apple button, follow the device language. Copy lives in the components that show it; there is no string catalogue. Write it the way the app already speaks: plain, calm, and specific about what happened and what the person can do next.
 
 ## Tone
 
