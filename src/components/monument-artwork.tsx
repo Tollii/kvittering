@@ -40,10 +40,10 @@ export function MonumentArtwork({
           : {
               width: "100%",
               maxWidth: 360,
-              aspectRatio: scene === "nave" ? 1 : 1.5,
+              aspectRatio: 1.5,
               alignSelf: "center",
-              borderTopLeftRadius: scene === "nave" ? 180 : 4,
-              borderTopRightRadius: scene === "nave" ? 180 : 4,
+              borderTopLeftRadius: 4,
+              borderTopRightRadius: 4,
             }
       }
     />

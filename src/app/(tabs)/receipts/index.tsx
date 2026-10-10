@@ -7,13 +7,14 @@ import {
   productPrices,
 } from "@/lib/domain/insights";
 import { ReceiptContextMenu } from "@/features/receipt-context-menu";
-import { router, Stack } from "expo-router";
+import { router, Stack, useLocalSearchParams } from "expo-router";
+import type { SearchBarCommands } from "react-native-screens";
 import {
   useCompleteReceipts,
   useReceiptHistory,
 } from "@/features/receipt-queries";
 import { useDebouncedSearch } from "@/features/catalog-queries";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Platform, View, useWindowDimensions } from "react-native";
 import {
   Amount,
@@ -33,61 +34,55 @@ import {
   Sheet,
 } from "@/components/ui";
 import { IllustratedEmpty } from "@/components/monument-artwork";
-import { openReceipt, statusLabels } from "@/components/receipt-card";
+import { openReceipt, receiptStatusLabel } from "@/components/receipt-card";
 import { SpendingBars } from "@/components/spending-details";
 import { OfflineNotice } from "@/features/offline-notice";
 import {
   PendingReceipts,
   usePendingReceipts,
 } from "@/features/pending-receipts";
-import { isReceiptProcessing } from "@/lib/domain/receipt-state";
-import type { receiptListItem } from "@/lib/domain/receipt-summary";
+import type { ReceiptListItem } from "@/lib/domain/receipt-summary";
 
 export default function Receipts() {
-  const { fontScale } = useWindowDimensions();
   const [search, setSearch] = useState("");
   const [tab, setTab] = useState<"receipts" | "products">("receipts");
-  const [selectedKey, setSelectedKey] = useState<string | null>(null);
+  const searchBar = useRef<SearchBarCommands>(null);
+  const { show } = useLocalSearchParams<{ show?: string }>();
 
-  const matches = (value: string) =>
-    value
-      .toLocaleLowerCase("nb-NO")
-      .includes(search.trim().toLocaleLowerCase("nb-NO"));
+  const [shown, setShown] = useState(show);
+
+  // Links that promise receipts to review land on the pinned sections, whatever view was left open.
+  if (show !== shown) {
+    setShown(show);
+
+    if (show === "pending") {
+      setTab("receipts");
+      setSearch("");
+    }
+  }
+
+  useEffect(() => {
+    if (show !== "pending") return;
+    searchBar.current?.clearText();
+    router.setParams({ show: undefined });
+  }, [show]);
 
   const term = useDebouncedSearch(search.trim());
   const history = useReceiptHistory(term, tab === "receipts");
+  const pending = usePendingReceipts(tab === "receipts");
 
   const { receipts, completeReceipts: completeProducts } = useCompleteReceipts(
     { kind: "allProducts" },
     tab === "products",
   );
 
-  const pending = usePendingReceipts();
-
-  // Receipts still on their way in sit under "Under behandling" until they are read.
-  const filtered = history.results.filter(
-    (receipt) => !isReceiptProcessing(receipt.status),
-  );
-
-  const pinned = tab === "receipts" && !search.trim();
-
-  const pendingShown =
-    pinned &&
-    pending.attention.length + pending.working.length + pending.queue.length >
-      0;
-
-  const completeReceipts =
-    tab === "products" ? completeProducts : history.status === "Exhausted";
-
-  const loadingReceipts =
-    tab === "products"
-      ? !completeProducts
-      : history.status === "LoadingFirstPage";
-
   const allProducts = productHistory(receipts);
-  const products = allProducts.filter((product) => matches(product.name));
-  const selected = allProducts.find((product) => product.key === selectedKey);
-  const prices = selected ? productPrices(selected.contributions) : null;
+
+  const products = allProducts.filter((product) =>
+    product.name
+      .toLocaleLowerCase("nb-NO")
+      .includes(search.trim().toLocaleLowerCase("nb-NO")),
+  );
 
   return (
     <Screen
@@ -98,6 +93,7 @@ export default function Receipts() {
       {Platform.OS === "ios" && (
         <>
           <Stack.SearchBar
+            ref={searchBar}
             placeholder="Butikk, vare eller etikett"
             onChangeText={(event) => setSearch(event.nativeEvent.text)}
             hideWhenScrolling={false}
@@ -123,33 +119,95 @@ export default function Receipts() {
         value={tab}
         onChange={setTab}
         options={[
-          { value: "receipts", label: `Kvitteringer (${filtered.length})` },
+          {
+            value: "receipts",
+            label: `Kvitteringer (${history.results.length})`,
+          },
           { value: "products", label: `Varer (${products.length})` },
         ]}
       />
       <OfflineNotice />
-      {pinned && <PendingReceipts {...pending} />}
-      {!completeReceipts && (
+      {tab === "receipts" ? (
+        <ReceiptsView history={history} pending={pending} searching={!!term} />
+      ) : (
+        <ProductsView
+          allProducts={allProducts}
+          products={products}
+          complete={completeProducts}
+        />
+      )}
+    </Screen>
+  );
+}
+
+/** What waits for a person on top, then every read receipt by month. A search shows only the matches. */
+function ReceiptsView({
+  history,
+  pending,
+  searching,
+}: Readonly<{
+  history: ReturnType<typeof useReceiptHistory>;
+  pending: ReturnType<typeof usePendingReceipts>;
+  searching: boolean;
+}>) {
+  const loading = history.status === "LoadingFirstPage";
+  const empty = !loading && history.results.length === 0;
+
+  return (
+    <>
+      {history.status !== "Exhausted" && (
         <Notice>
-          {tab === "products" || term
+          {searching
             ? "Henter hele resultatet …"
             : "Viser innlastede kvitteringer."}
         </Notice>
       )}
-      {loadingReceipts ? (
-        <Loading />
-      ) : (
+      {!searching && <PendingReceipts {...pending} />}
+      {loading ? <Loading /> : <ReceiptMonths receipts={history.results} />}
+      {empty && searching && (
+        <Empty title="Ingen treff" icon="magnifyingglass" />
+      )}
+      {empty && !searching && !pending.loading && pending.count === 0 && (
+        <NoReceipts />
+      )}
+      {history.status === "CanLoadMore" && !searching && (
+        <Button
+          title="Vis flere kvitteringer"
+          variant="secondary"
+          onPress={() => history.loadMore(30)}
+        />
+      )}
+    </>
+  );
+}
+
+/** Every product the household bought, with product linking as the section's action and price history in a sheet. */
+function ProductsView({
+  allProducts,
+  products,
+  complete,
+}: Readonly<{
+  allProducts: ReturnType<typeof productHistory>;
+  products: ReturnType<typeof productHistory>;
+  complete: boolean;
+}>) {
+  const { fontScale } = useWindowDimensions();
+  const [selectedKey, setSelectedKey] = useState<string | null>(null);
+  const selected = allProducts.find((product) => product.key === selectedKey);
+  const prices = selected ? productPrices(selected.contributions) : null;
+
+  return (
+    <>
+      {!complete && <Notice>Henter hele resultatet …</Notice>}
+      {complete ? (
         <>
-          {tab === "receipts" && <ReceiptMonths receipts={filtered} />}
-          {tab === "products" && (
-            <SectionTitle
-              title="Varer"
-              detail="En koblet vare samler kjøpene på tvers av navn og butikker."
-              action="Koble produkter"
-              onAction={() => router.push("/product-linking")}
-            />
-          )}
-          {tab === "products" && (
+          <SectionTitle
+            title="Varer"
+            detail="En koblet vare samler kjøpene på tvers av navn og butikker."
+            action="Koble produkter"
+            onAction={() => router.push("/product-linking")}
+          />
+          {products.length ? (
             <List>
               {products.map((product) => (
                 <Row
@@ -161,21 +219,12 @@ export default function Receipts() {
                 />
               ))}
             </List>
+          ) : (
+            <Empty title="Ingen treff" icon="magnifyingglass" />
           )}
-          {(tab === "receipts" ? filtered : products).length === 0 &&
-            (search.trim() || tab === "products" ? (
-              <Empty title="Ingen treff" icon="magnifyingglass" />
-            ) : (
-              !pendingShown && <NoReceipts />
-            ))}
         </>
-      )}
-      {tab === "receipts" && history.status === "CanLoadMore" && !term && (
-        <Button
-          title="Vis flere kvitteringer"
-          variant="secondary"
-          onPress={() => history.loadMore(30)}
-        />
+      ) : (
+        <Loading />
       )}
       <Sheet
         title={selected?.name || "Varehistorikk"}
@@ -247,30 +296,23 @@ export default function Receipts() {
           </>
         )}
       </Sheet>
-    </Screen>
+    </>
   );
 }
 
 /** Name the state of a receipt that is not plainly reviewed, so the list says what the pinned section does. */
-function rowDetail(
-  receipt: Pick<
-    ReturnType<typeof receiptListItem>,
-    "purchaseDate" | "status" | "excluded"
-  >,
-) {
+function rowDetail(receipt: ReceiptListItem) {
   const date = CalendarDate.format(receipt.purchaseDate);
 
-  if (receipt.excluded) return `${date} · Utelatt fra forbruk`;
-
-  return receipt.status === "reviewed"
+  return receipt.status === "reviewed" && !receipt.excluded
     ? date
-    : `${date} · ${statusLabels[receipt.status]}`;
+    : `${date} · ${receiptStatusLabel(receipt)}`;
 }
 
 /** Receipts by purchase month, newest first, with each month's count and spending. */
 function ReceiptMonths({
   receipts,
-}: Readonly<{ receipts: ReturnType<typeof receiptListItem>[] }>) {
+}: Readonly<{ receipts: ReceiptListItem[] }>) {
   const sorted = [...receipts].sort(
     (a, b) =>
       CalendarDate.compare(b.purchaseDate, a.purchaseDate) ||

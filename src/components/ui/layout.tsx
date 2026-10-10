@@ -93,7 +93,6 @@ export function Screen({
   settings = false,
   insetTop = true,
   footer,
-  headerRight,
   summary,
   statusBarStyle,
   scrollable = true,
@@ -104,7 +103,6 @@ export function Screen({
   settings?: boolean;
   insetTop?: boolean;
   footer?: ReactNode;
-  headerRight?: ReactNode;
   summary?: ReactNode;
   statusBarStyle?: "auto" | "light" | "dark";
   scrollable?: boolean;
@@ -139,7 +137,6 @@ export function Screen({
           </Copy>
         )}
       </View>
-      {headerRight}
       {settings && <SettingsButton />}
     </View>
   );

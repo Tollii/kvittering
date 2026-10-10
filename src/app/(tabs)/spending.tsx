@@ -573,7 +573,9 @@ function PendingReceiptsNotice({
           ? "Én kvittering venter på kontroll"
           : `${pending.length} kvitteringer venter på kontroll`
       }
-      onPress={() => router.navigate("/receipts")}
+      onPress={() =>
+        router.navigate({ pathname: "/receipts", params: { show: "pending" } })
+      }
     >
       {(firstPending ? receiptNeeds(firstPending) : [])
         .slice(0, 2)

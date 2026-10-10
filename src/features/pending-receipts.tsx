@@ -9,9 +9,14 @@ import { useHousehold } from "@/features/household-context";
 import { quickApproveData } from "@/lib/domain/receipt-review";
 
 /** Receipts that wait for a person or are still on their way in, pinned above the months in Kvitteringer. */
-export function usePendingReceipts() {
+export function usePendingReceipts(enabled: boolean) {
   const { queue } = useHousehold();
-  const { receipts } = useCompleteReceipts({ kind: "inbox" });
+
+  const { receipts, loadingReceipts } = useCompleteReceipts(
+    { kind: "inbox" },
+    enabled,
+  );
+
   const reserved = new Set(queue.map((entry) => entry.receiptId));
 
   const open = receipts.filter(
@@ -21,10 +26,15 @@ export function usePendingReceipts() {
       !reserved.has(receipt._id),
   );
 
+  const attention = open.filter((receipt) => needsAttention(receipt.status));
+  const working = open.filter((receipt) => !needsAttention(receipt.status));
+
   return {
-    attention: open.filter((receipt) => needsAttention(receipt.status)),
-    working: open.filter((receipt) => !needsAttention(receipt.status)),
+    attention,
+    working,
     queue,
+    count: attention.length + working.length + queue.length,
+    loading: loadingReceipts,
   };
 }
 

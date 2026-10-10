@@ -1,7 +1,7 @@
 appId: no.tolnes.kvitto
 name: Recover and discard an unsaved receipt edit after restart
 ---
-- runFlow: history.yaml
+- runFlow: receipts.yaml
 - tapOn: "Flere handlinger"
 - tapOn: "Kvitteringsdetaljer"
 - tapOn: "Oslo"

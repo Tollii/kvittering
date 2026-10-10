@@ -57,7 +57,7 @@ States: `disabled` fades the button; `busy` shows a spinner in place of the icon
 
 **`Panel`** ([surfaces](../../src/components/ui/surfaces.tsx)) is the card. `surface` is the default card on `background`; `plain` is a quieter `surfaceRaised` card for a group nested inside another card, such as product search inside the line editor.
 
-**`List`** is the card that holds a list. It draws a `line` divider between its children and renders nothing when it has none, so every list in the app, rows, spending bars, receipt lines, and the receipts of a month in Historikk, sits in one of these and looks the same. Give it `Row`s or other full-width elements directly, one per row; a fragment or a string is not a row, and the caller needs no index bookkeeping or empty guard.
+**`List`** is the card that holds a list. It draws a `line` divider between its children and renders nothing when it has none, so every list in the app, rows, spending bars, receipt lines, and the receipts of a month in Kvitteringer, sits in one of these and looks the same. Give it `Row`s or other full-width elements directly, one per row; a fragment or a string is not a row, and the caller needs no index bookkeeping or empty guard.
 
 **`Row`** is the list item: an optional `IconTile`, a title, detail text, a trailing value, and a chevron when tappable. `selected` swaps the chevron for a checkmark. Large text moves the value under the title (see [accessibility](foundations.md#accessibility)).
 
@@ -83,7 +83,7 @@ States: `disabled` fades the button; `busy` shows a spinner in place of the icon
 
 **`Screen`** ([layout](../../src/components/ui/layout.tsx)) is the page frame. It provides the safe area, keyboard avoidance, scrolling, a maximum content width, and three optional regions:
 
-- `title` and `subtitle` draw the cobalt hero header with the arch mark; `settings` adds `SettingsButton` and `headerRight` adds other icon buttons.
+- `title` and `subtitle` draw the cobalt hero header with the arch mark; `settings` adds `SettingsButton`.
 - `summary` takes a `SummaryBand`, which sits under the header edge to edge.
 - `footer` pins an action bar to the bottom, above the home indicator, on `surface` with a hairline top border.
 

@@ -1,7 +1,7 @@
 appId: no.tolnes.kvitto
 name: Delete one receipt and retain the other household receipts
 ---
-- runFlow: history.yaml
+- runFlow: receipts.yaml
 - tapOn: "Flere handlinger"
 - tapOn: "Slett kvittering"
 - assertVisible: "Slette kvitteringen[?]"

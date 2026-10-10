@@ -8,7 +8,7 @@ struct OpenReceiptsIntent: AppIntent {
 
   @MainActor
   func perform() async throws -> some IntentResult {
-    await UIApplication.shared.open(URL(string: "kvitto:///(tabs)/receipts")!)
+    await UIApplication.shared.open(URL(string: "kvitto:///(tabs)/receipts?show=pending")!)
     return .result()
   }
 }
