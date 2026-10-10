@@ -325,7 +325,8 @@ export function Segments<T extends string>({
 
   const { fontScale } = useWindowDimensions();
 
-  if (Platform.OS === "ios" && fontScale <= 1.3)
+  // The web build draws the same control in JavaScript for browser checks.
+  if (Platform.OS !== "android" && fontScale <= 1.3)
     return (
       <View style={{ minHeight: 44, justifyContent: "center" }}>
         <SegmentedControl
@@ -336,7 +337,9 @@ export function Segments<T extends string>({
 
             if (option) onChange(option.value);
           }}
-          tintColor={colors.primary}
+          // iOS 26 draws the selected segment without the tint; so does web
+          // when none is given.
+          tintColor={Platform.OS === "ios" ? colors.primary : undefined}
           style={{ height: 44 }}
         />
       </View>

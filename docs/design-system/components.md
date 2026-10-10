@@ -6,7 +6,7 @@ Shared presentation components live in [`src/components/ui`](../../src/component
 
 **`Copy`** ([typography](../../src/components/ui/typography.tsx)) is the only text component. It takes `size`, `weight`, and `muted`, and sets line height, tracking, and tabular numerals. See [typography](foundations.md#typography) for the size of each role.
 
-**`Icon`** renders an SF Symbol, `primary` by default, hidden from VoiceOver. Label the control that contains it instead.
+**`Icon`** renders an SF Symbol, `primary` by default, hidden from VoiceOver. Label the control that contains it instead. The web build shows the closest Material Symbol from [symbol.web.tsx](../../src/components/ui/symbol.web.tsx); a new symbol needs an entry there, or browser checks show a question mark and log an error.
 
 **`pressed(state)`** is the shared press style. Use it on any custom `Pressable`.
 
@@ -37,7 +37,7 @@ States: `disabled` fades the button; `busy` shows a spinner in place of the icon
 
 **`Toggle`** is a labelled `Switch` with optional detail text, tinted `primary`.
 
-**`Segments`** switches between two to four views of the same content, such as Kvitteringer / Varer. On iOS it is the native segmented control; at large text sizes, and off iOS, it draws its own control (see [accessibility](foundations.md#accessibility)).
+**`Segments`** switches between two to four views of the same content, such as Kvitteringer / Varer. On iOS it is the native segmented control, and the web build draws a JavaScript copy of it; at large text sizes it draws its own control (see [accessibility](foundations.md#accessibility)).
 
 **`Select`** ([selection](../../src/components/ui/selection.tsx)) is a `Row` that opens a `Sheet` with options, a checkmark on the current one, and search when the list is long.
 
@@ -84,4 +84,4 @@ Pass `insetTop={false}` when a native stack header already covers the top inset.
 
 **`NativeForm`** and **`FormSection`** ([native form](../../src/components/ui/native-form.ios.tsx)) render a SwiftUI grouped form on iOS for settings-style screens and field sheets, with React Native content inside each section.
 
-**Native menus.** `PeriodMenu` ([period menu](../../src/components/period-menu.ios.tsx)) and `ReceiptContextMenu` ([context menu](../../src/components/receipt-context-menu.ios.tsx)) use SwiftUI menus on iOS; each has a plain fallback for other platforms in the same folder.
+**Native menus.** `PeriodMenu` ([period menu](../../src/components/period-menu.ios.tsx)) and `ReceiptContextMenu` ([context menu](../../src/components/receipt-context-menu.ios.tsx)) use SwiftUI menus on iOS; each has a plain fallback for other platforms in the same folder, drawn to look like the iOS control at rest.

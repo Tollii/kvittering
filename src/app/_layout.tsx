@@ -84,6 +84,8 @@ function RootLayout() {
                     contentStyle: { backgroundColor: colors.background },
                     headerShadowVisible: false,
                     headerBackButtonDisplayMode: "minimal",
+                    // iOS centers titles; the web header follows for browser checks.
+                    headerTitleAlign: "center",
                   }}
                 >
                   <Stack.Screen

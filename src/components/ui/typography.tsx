@@ -5,7 +5,8 @@ import {
   type TextProps,
   type ViewStyle,
 } from "react-native";
-import { SymbolView, type SymbolViewProps } from "expo-symbols";
+import { type SymbolViewProps } from "expo-symbols";
+import { SymbolView } from "./symbol";
 import { tracking, useTheme } from "@/constants/theme";
 
 export function Copy({

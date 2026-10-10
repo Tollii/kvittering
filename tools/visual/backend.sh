@@ -22,7 +22,8 @@ if [[ "${VISUAL_RESET:-}" == 1 ]]; then
   mkdir -p "$state"
 fi
 
-binary="$(find "$HOME/.cache/convex/binaries" -name convex-local-backend -type f 2>/dev/null | sort | tail -n 1)"
+# A fresh session has no cache directory yet; find must not end the script.
+binary="$(find "$HOME/.cache/convex/binaries" -name convex-local-backend -type f 2>/dev/null | sort | tail -n 1 || true)"
 if [[ -z "$binary" ]]; then
   echo "▸ Downloading the Convex local backend" >&2
   asset="convex-local-backend-x86_64-unknown-linux-gnu.zip"
@@ -47,9 +48,11 @@ name="kvitto-visual"
 
 if ! curl -fsS -o /dev/null http://127.0.0.1:3210/version 2>/dev/null; then
   echo "▸ Starting the local backend" >&2
+  # Detach fully, so a caller that pipes this script's output is not held open.
   (cd "$state" && nohup "$binary" --instance-name "$name" --instance-secret "$secret" \
     --port 3210 --site-proxy-port 3211 --local-storage "$PWD/storage" \
-    --disable-beacon "$PWD/backend.sqlite3" >"$PWD/backend.log" 2>&1 &)
+    --disable-beacon "$PWD/backend.sqlite3" >"$PWD/backend.log" 2>&1 &) \
+    </dev/null >/dev/null 2>&1
   for _ in $(seq 1 60); do
     if curl -fsS -o /dev/null http://127.0.0.1:3210/version 2>/dev/null; then break; fi
     sleep 1
@@ -72,6 +75,15 @@ convex() {
   env -u CONVEX_DEPLOYMENT npx convex "$@" --env-file "$env_file" 2>>"$out/convex-cli.log"
 }
 
+# Skip the deploy when this backend already runs these functions.
+deployed="$state/deployed"
+stamp="$( (echo "$web_origin"; git ls-files -co --exclude-standard convex ":!convex/_generated" | sort | xargs sha1sum) | sha1sum)"
+if [[ -f "$deployed" && "$(cat "$deployed")" == "$stamp" ]]; then
+  echo "$env_file"
+  exit 0
+fi
+rm -f "$deployed"
+
 echo "▸ Deploying functions" >&2
 if ! convex env list --names-only 2>/dev/null | grep -qx BETTER_AUTH_SECRET; then
   convex env set BETTER_AUTH_SECRET "$(openssl rand -hex 32)" >/dev/null
@@ -79,7 +91,7 @@ fi
 convex env set RECEIPT_PROVIDER mock >/dev/null
 convex env set RELEASE_CHANNEL development >/dev/null
 convex env set SITE_URL "$web_origin" >/dev/null
-convex deploy --yes --typecheck disable >/dev/null || {
+convex deploy --yes --typecheck disable --codegen disable >/dev/null || {
   tail -n 40 "$out/convex-cli.log" >&2
   exit 1
 }
@@ -93,5 +105,6 @@ cat >"$flags" <<'EOF'
 ]
 EOF
 convex import --yes --replace --table featureFlags "$flags" >/dev/null
+echo "$stamp" >"$deployed"
 
 echo "$env_file"

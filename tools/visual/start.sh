@@ -1,7 +1,9 @@
 #!/usr/bin/env bash
 # Build the web version of the app and serve it with a local backend for
-# browser checks. Prints the app URL when it is ready. Rerun after source
-# changes. Each start resets the data to an end-to-end fixture:
+# browser checks. Prints the app URL when it is ready. Rerun after backend
+# changes; after app changes, tools/visual/build.sh is enough. Unchanged
+# functions are not deployed again. Each start resets the data to an
+# end-to-end fixture:
 # VISUAL_FIXTURE names one in tools/e2e/fixtures (default reviewed-receipts);
 # set it empty to start without data. Its account is in build/visual/seed.
 set -euo pipefail
@@ -22,21 +24,11 @@ if ! VISUAL_ENV_FILE="$out/convex.env" node tools/e2e/seed.mts "$fixture" "$out/
   exit 1
 fi
 
-echo "▸ Exporting the web build" >&2
-rm -rf "$out/web"
-# The export inlines EXPO_PUBLIC_* values; --clear keeps an earlier export's
-# values out of the bundle. Site routes are proxied through the web server.
-if ! EXPO_OFFLINE=1 EXPO_NO_TELEMETRY=1 SENTRY_DISABLE_AUTO_UPLOAD=true \
-  EXPO_PUBLIC_CONVEX_URL=http://127.0.0.1:3210 \
-  EXPO_PUBLIC_CONVEX_SITE_URL="$origin" \
-  npx expo export --platform web --clear --output-dir "$out/web" \
-  >"$out/export.log" 2>&1 </dev/null; then
-  tail -n 40 "$out/export.log" >&2
-  exit 1
-fi
+tools/visual/build.sh </dev/null
 
 pkill -f "tools/visual/serve.mts $out/web $port" 2>/dev/null || true
-nohup node tools/visual/serve.mts "$out/web" "$port" </dev/null >"$out/serve.log" 2>&1 &
+(nohup node tools/visual/serve.mts "$out/web" "$port" >"$out/serve.log" 2>&1 &) \
+  </dev/null >/dev/null 2>&1
 for _ in $(seq 1 20); do
   if curl -fs -o /dev/null "$origin/"; then break; fi
   sleep 0.5

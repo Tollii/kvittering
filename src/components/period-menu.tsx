@@ -1,5 +1,6 @@
+import { View } from "react-native";
 import { CalendarMonth } from "@/lib/domain/calendar";
-import { Copy } from "./ui";
+import { Copy, Icon } from "./ui";
 import { useTheme } from "@/constants/theme";
 
 export type PeriodMenuProps = Readonly<{
@@ -8,14 +9,25 @@ export type PeriodMenuProps = Readonly<{
   onChange: (month: CalendarMonth) => void;
 }>;
 
+/** Shows the month as the iOS menu's label does; the arrows beside it change it. */
 export function PeriodMenu({ value }: PeriodMenuProps) {
   const colors = useTheme();
 
-  const label = CalendarMonth.format(value);
-
   return (
-    <Copy size={22} weight="600" style={{ color: colors.onHero, flex: 1 }}>
-      {label}
-    </Copy>
+    <View
+      style={{
+        flex: 1,
+        minHeight: 44,
+        flexDirection: "row",
+        alignItems: "center",
+        justifyContent: "center",
+        gap: 8,
+      }}
+    >
+      <Icon name="calendar" size={18} color={colors.onHero} />
+      <Copy size={17} style={{ color: colors.onHero }}>
+        {CalendarMonth.format(value)}
+      </Copy>
+    </View>
   );
 }

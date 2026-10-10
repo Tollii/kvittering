@@ -4,8 +4,9 @@
 // for cross-origin isolated pages. The local backend's HTTP routes are proxied
 // under this origin, so authentication cookies and uploads need no CORS
 // support that the iOS app does not use. Unknown paths fall back to the app
-// shell so Expo Router can resolve deep links.
-import { createReadStream, statSync } from "node:fs";
+// shell so Expo Router can resolve deep links. The shell asks to cover the
+// whole screen, as the iOS app does, so env(safe-area-inset-*) applies.
+import { createReadStream, readFileSync, statSync } from "node:fs";
 import { createServer, request as forward } from "node:http";
 import { extname, join, normalize, resolve } from "node:path";
 
@@ -80,7 +81,15 @@ createServer((request, response) => {
     "Cache-Control": "no-store",
     ...isolation,
   });
-  createReadStream(path).pipe(response);
+
+  if (extname(path) === ".html")
+    response.end(
+      readFileSync(path, "utf8").replace(
+        'name="viewport" content="',
+        'name="viewport" content="viewport-fit=cover, ',
+      ),
+    );
+  else createReadStream(path).pipe(response);
 }).listen(port, "127.0.0.1", () => {
   console.log(`Serving ${root} at http://127.0.0.1:${port}`);
 });
