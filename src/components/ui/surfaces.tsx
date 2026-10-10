@@ -7,7 +7,7 @@ import {
   type ViewStyle,
 } from "react-native";
 import { type SymbolViewProps } from "expo-symbols";
-import Animated from "react-native-reanimated";
+import Animated, { LayoutAnimationConfig } from "react-native-reanimated";
 import { motion, radius, useTheme } from "@/constants/theme";
 import { Copy, Icon, styles } from "./typography";
 import { Press, easeInOut, useArrival } from "./motion";
@@ -152,7 +152,7 @@ export function SectionTitle({
           feedback="highlight"
           accessibilityRole="button"
           onPress={onAction}
-          style={[{ minHeight: 44, justifyContent: "center", paddingLeft: 12 }]}
+          style={{ minHeight: 44, justifyContent: "center", paddingLeft: 12 }}
         >
           <Copy size={14} weight="600" style={{ color: colors.primary }}>
             {action}
@@ -175,8 +175,6 @@ export function Disclosure({
   initiallyOpen?: boolean;
 }>) {
   const [open, setOpen] = useState(initiallyOpen);
-  // Detail that is open from the start is already there; only a tap brings it in.
-  const [toggled, setToggled] = useState(false);
   const arrival = useArrival();
   const colors = useTheme();
 
@@ -186,10 +184,7 @@ export function Disclosure({
         feedback="highlight"
         accessibilityRole="button"
         accessibilityState={{ expanded: open }}
-        onPress={() => {
-          setOpen(!open);
-          setToggled(true);
-        }}
+        onPress={() => setOpen(!open)}
         style={[styles.row, { minHeight: 44 }]}
       >
         <Copy weight="600" style={{ flex: 1 }}>
@@ -211,14 +206,14 @@ export function Disclosure({
           <Icon name="chevron.down" size={12} color={colors.secondary} />
         </Animated.View>
       </Press>
-      {open && (
-        <Animated.View
-          entering={toggled ? arrival : undefined}
-          style={{ gap: 10 }}
-        >
-          {children}
-        </Animated.View>
-      )}
+      {/* Detail that is open from the start is already there; only a tap brings it in. */}
+      <LayoutAnimationConfig skipEntering>
+        {open && (
+          <Animated.View entering={arrival} style={{ gap: 10 }}>
+            {children}
+          </Animated.View>
+        )}
+      </LayoutAnimationConfig>
     </Panel>
   );
 }
@@ -306,7 +301,7 @@ export function Notice({
   );
 
   return onPress ? (
-    <Press accessibilityRole="button" onPress={onPress} style={[frame]}>
+    <Press accessibilityRole="button" onPress={onPress} style={frame}>
       {content}
     </Press>
   ) : (

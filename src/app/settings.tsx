@@ -235,7 +235,7 @@ function DoneButton() {
     <Press
       accessibilityRole="button"
       onPress={() => router.back()}
-      style={[{ minHeight: 44, justifyContent: "center", marginRight: 16 }]}
+      style={{ minHeight: 44, justifyContent: "center", marginRight: 16 }}
     >
       <View
         style={{

@@ -110,6 +110,11 @@ export const disabledOpacity = 0.45;
 export const motion = {
   /** Press feedback, seen many times a day, so near-imperceptible. */
   press: 120,
+  /** How far an object shrinks under the finger, and how much it dims. */
+  pressScale: 0.97,
+  pressOpacity: 0.85,
+  /** How much a row or link dims, and an object under Reduce Motion. */
+  highlightOpacity: 0.72,
   /** A small change a person asked for: a disclosure opening, a note arriving. */
   state: 200,
   /** Strong ease-out: starts fast, so the response feels immediate. */

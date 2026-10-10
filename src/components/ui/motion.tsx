@@ -10,6 +10,7 @@ import {
   FadeIn,
   FadeOut,
   Keyframe,
+  ReduceMotion,
   createAnimatedComponent,
   cubicBezier,
   useReducedMotion,
@@ -58,8 +59,12 @@ export function Press({
       }}
       style={[
         {
-          opacity: down ? (shrink ? 0.85 : 0.72) : 1,
-          transform: [{ scale: down && shrink ? 0.97 : 1 }],
+          opacity: down
+            ? shrink
+              ? motion.pressOpacity
+              : motion.highlightOpacity
+            : 1,
+          transform: [{ scale: down && shrink ? motion.pressScale : 1 }],
           transitionProperty: ["opacity", "transform"],
           transitionDuration: motion.press,
           transitionTimingFunction: easeOut,
@@ -80,7 +85,11 @@ export function useArrival() {
   const reduced = useReducedMotion();
   const easing = Easing.bezier(...motion.easeOut);
 
-  if (reduced) return FadeIn.duration(motion.state).easing(easing);
+  // Reanimated skips layout animations under Reduce Motion unless told not to.
+  if (reduced)
+    return FadeIn.duration(motion.state)
+      .easing(easing)
+      .reduceMotion(ReduceMotion.Never);
 
   return new Keyframe({
     0: { opacity: 0, transform: [{ translateY: -6 }] },
@@ -96,7 +105,10 @@ export function useDeparture() {
   const reduced = useReducedMotion();
   const easing = Easing.bezier(...motion.easeOut);
 
-  if (reduced) return FadeOut.duration(motion.press).easing(easing);
+  if (reduced)
+    return FadeOut.duration(motion.press)
+      .easing(easing)
+      .reduceMotion(ReduceMotion.Never);
 
   return new Keyframe({
     0: { opacity: 1, transform: [{ translateY: 0 }] },

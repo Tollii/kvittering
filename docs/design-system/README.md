@@ -31,7 +31,7 @@ The [Kvitto design system on claude.ai](https://claude.ai/artifact/N6izBtD3XSNnF
 
 ## Design skills
 
-The [design engineering](../../.agents/skills/emil-design-eng/SKILL.md), [Apple design](../../.agents/skills/apple-design/SKILL.md), and [Expo animation](../../.agents/skills/animate-expo/SKILL.md) skills, with their siblings for reviewing, auditing, and stress-testing UI, are Emil Kowalski's, vendored unchanged. Use them to judge interaction and motion; several speak in web terms, so translate CSS to React Native and Reanimated. Where they and these pages differ, these pages win.
+The [design engineering](../../.agents/skills/emil-design-eng/SKILL.md), [Apple design](../../.agents/skills/apple-design/SKILL.md), and [Expo animation](../../.agents/skills/animate-expo/SKILL.md) skills, with their siblings for reviewing, auditing, and stress-testing UI, are Emil Kowalski's, vendored unchanged. Use them to judge interaction and motion; several speak in web terms, so translate CSS to React Native and Reanimated. Where they and these pages differ, these pages win. Their recipes sometimes install a package with `npx expo install`; a new native package needs a new TestFlight build, so prefer what the app already ships.
 
 ## Changing the system
 
