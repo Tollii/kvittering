@@ -1,5 +1,5 @@
 import { CalendarMonth } from "@/lib/domain/calendar";
-import { Copy } from "./ui";
+import { Copy } from "@/components/ui";
 import { useTheme } from "@/constants/theme";
 
 export type PeriodMenuProps = Readonly<{
@@ -11,7 +11,7 @@ export type PeriodMenuProps = Readonly<{
 export function PeriodMenu({ value }: PeriodMenuProps) {
   const colors = useTheme();
 
-  const label = CalendarMonth.format(value);
+  const label = CalendarMonth.title(value);
 
   return (
     <Copy size={22} weight="600" style={{ color: colors.onHero, flex: 1 }}>

@@ -29,10 +29,12 @@ import {
   IconButton,
   Notice,
   Panel,
+  faded,
   pressed,
   SettingsButton,
 } from "@/components/ui";
 import { useHousehold } from "@/features/household-context";
+import { OfflineNotice } from "@/features/offline-notice";
 import { saveLocalReceipts } from "@/lib/receipt-storage";
 import { maxReceiptImages, prepareImage } from "@/lib/receipt-import";
 import {
@@ -43,7 +45,7 @@ import {
   usePendingImports,
 } from "@/lib/pending-import";
 import { nextImport, type ImportOutcome } from "@/lib/capture-import";
-import { useTheme } from "@/constants/theme";
+import { radius, useTheme } from "@/constants/theme";
 import { failureMessage } from "@/lib/failure-message";
 import { UserError } from "@/lib/user-errors";
 
@@ -286,7 +288,7 @@ export default function Capture() {
           gap: 8,
           paddingHorizontal: 12,
           paddingVertical: 8,
-          borderRadius: 14,
+          borderRadius: radius.tile,
           borderCurve: "continuous",
           backgroundColor: colors.cameraOverlay,
         },
@@ -356,14 +358,14 @@ export default function Capture() {
           </Pressable>
           <SettingsButton surface="camera" />
         </View>
-        {!online && <Notice icon="wifi.slash">Uten nett</Notice>}
+        <OfflineNotice />
         {saved > 0 && (
           <Panel style={{ gap: 4 }}>
             <View
               style={{ flexDirection: "row", alignItems: "center", gap: 10 }}
             >
               {uploading ? (
-                <ActivityIndicator color={colors.accent} />
+                <ActivityIndicator color={colors.primary} />
               ) : (
                 <Icon
                   name={
@@ -486,8 +488,7 @@ export default function Capture() {
               {
                 width: 54,
                 height: 54,
-                borderRadius: 18,
-                borderCurve: "continuous",
+                borderRadius: 27,
                 backgroundColor: colors.cameraOverlay,
                 alignItems: "center",
                 justifyContent: "center",
@@ -513,14 +514,18 @@ export default function Capture() {
                 padding: 5,
                 borderRadius: 39,
                 borderWidth: 3,
-                borderColor: "white",
-                opacity: shutterDisabled ? 0.4 : 1,
+                borderColor: colors.onCamera,
               },
-              state.pressed && { opacity: 0.7 },
+              pressed(state),
+              faded(shutterDisabled),
             ]}
           >
             <View
-              style={{ flex: 1, borderRadius: 33, backgroundColor: "white" }}
+              style={{
+                flex: 1,
+                borderRadius: 33,
+                backgroundColor: colors.onCamera,
+              }}
             />
           </Pressable>
           {photos.length ? (
@@ -532,8 +537,7 @@ export default function Capture() {
                 {
                   width: 54,
                   height: 54,
-                  borderRadius: 18,
-                  borderCurve: "continuous",
+                  borderRadius: 27,
                   overflow: "hidden",
                   backgroundColor: colors.cameraOverlay,
                   alignItems: "center",

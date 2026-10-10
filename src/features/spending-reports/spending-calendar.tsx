@@ -1,8 +1,8 @@
 import { CalendarDate, CalendarMonth } from "@/lib/domain/calendar";
 import { Ore } from "@/lib/domain/ore";
 import { Pressable, View, useWindowDimensions } from "react-native";
-import { Copy, Empty, Row } from "./ui";
-import { useTheme } from "@/constants/theme";
+import { Copy, Empty, Row, faded, pressed } from "@/components/ui";
+import { radius, useTheme } from "@/constants/theme";
 import {
   spendingCalendar,
   type Receipt,
@@ -107,17 +107,16 @@ export function SpendingCalendar({
                       disabled: day.future || !day.contributions.length,
                     }}
                     onPress={() => selectDay(day)}
-                    style={({ pressed }) => ({
-                      flex: 1,
-                      height: 56,
-                      padding: 2,
-                      opacity: day.future ? 0.3 : pressed ? 0.6 : 1,
-                    })}
+                    style={(state) => [
+                      { flex: 1, height: 56, padding: 2 },
+                      pressed(state),
+                      faded(day.future),
+                    ]}
                   >
                     <View
                       style={{
                         flex: 1,
-                        borderRadius: 10,
+                        borderRadius: radius.tile,
                         borderCurve: "continuous",
                         alignItems: "center",
                         justifyContent: "center",

@@ -29,7 +29,7 @@ export function PeriodMenu({ value, latest, onChange }: PeriodMenuProps) {
       seedColor={colors.onHero}
     >
       <Menu
-        label={CalendarMonth.format(value)}
+        label={CalendarMonth.title(value)}
         systemImage="calendar"
         modifiers={[
           foregroundStyle(colors.onHero),
@@ -44,7 +44,7 @@ export function PeriodMenu({ value, latest, onChange }: PeriodMenuProps) {
         >
           {months.map((month) => (
             <Text key={month} modifiers={[tag(month)]}>
-              {CalendarMonth.format(month)}
+              {CalendarMonth.title(month)}
             </Text>
           ))}
         </Picker>

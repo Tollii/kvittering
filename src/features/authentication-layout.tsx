@@ -2,16 +2,15 @@ import type { ReactNode } from "react";
 import {
   KeyboardAvoidingView,
   Platform,
-  PlatformColor,
   Pressable,
   ScrollView,
   View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { StatusBar } from "expo-status-bar";
-import { Copy, Icon } from "@/components/ui";
+import { Copy, Icon, faded, pressed } from "@/components/ui";
 import { ArchMark } from "@/components/monument-artwork";
-import { useTheme } from "@/constants/theme";
+import { radius, useTheme } from "@/constants/theme";
 
 export function AuthenticationLayout({
   children,
@@ -32,13 +31,7 @@ export function AuthenticationLayout({
   return (
     <KeyboardAvoidingView
       behavior={Platform.OS === "ios" ? "padding" : undefined}
-      style={{
-        flex: 1,
-        backgroundColor:
-          Platform.OS === "ios"
-            ? PlatformColor("systemBackground")
-            : colors.surface,
-      }}
+      style={{ flex: 1, backgroundColor: colors.background }}
     >
       <StatusBar style="auto" />
       <ScrollView
@@ -77,7 +70,7 @@ export function AuthenticationLayout({
               style={{
                 width: compact ? 64 : 88,
                 height: compact ? 64 : 88,
-                borderRadius: compact ? 18 : 24,
+                borderRadius: radius.card,
                 borderCurve: "continuous",
                 backgroundColor: colors.hero,
                 alignItems: "center",
@@ -93,13 +86,7 @@ export function AuthenticationLayout({
                 accessibilityRole="header"
                 size={32}
                 weight="700"
-                style={{
-                  textAlign: "center",
-                  color:
-                    Platform.OS === "ios"
-                      ? PlatformColor("label")
-                      : colors.text,
-                }}
+                style={{ textAlign: "center" }}
               >
                 {title}
               </Copy>
@@ -134,15 +121,18 @@ export function AuthenticationLink({
       accessibilityState={{ disabled }}
       disabled={disabled}
       onPress={onPress}
-      style={({ pressed }) => ({
-        minHeight: 44,
-        paddingVertical: 10,
-        flexDirection: "row",
-        alignItems: "center",
-        justifyContent: back ? "flex-start" : "center",
-        gap: 6,
-        opacity: disabled ? 0.45 : pressed ? 0.6 : 1,
-      })}
+      style={(state) => [
+        {
+          minHeight: 44,
+          paddingVertical: 10,
+          flexDirection: "row",
+          alignItems: "center",
+          justifyContent: back ? "flex-start" : "center",
+          gap: 6,
+        },
+        pressed(state),
+        faded(disabled),
+      ]}
     >
       {back && <Icon name="chevron.left" size={16} color={colors.primary} />}
       <Copy

@@ -4,7 +4,7 @@ name: Delete one receipt and retain the other household receipts
 - runFlow: history.yaml
 - tapOn: "Flere handlinger"
 - tapOn: "Slett kvittering"
-- assertVisible: "Slett kvitteringen[?]"
+- assertVisible: "Slette kvitteringen[?]"
 - tapOn: "Slett"
 - extendedWaitUntil:
     visible: "Historikk"

@@ -12,13 +12,14 @@ import {
   Empty,
   Loading,
   Notice,
-  Panel,
   Screen,
+  SummaryBand,
 } from "@/components/ui";
 import { useProductLinkingQueue } from "@/features/product-linking-queue";
 import { ProductLinkingOptions } from "@/features/product-linking-options";
 import { CatalogProductSheet } from "@/features/catalog-product-sheet";
 import { useHousehold } from "@/features/household-context";
+import { OfflineNotice } from "@/features/offline-notice";
 import { useReleaseMutation } from "@/lib/releases/requests";
 import { errorFeedback, successFeedback } from "@/lib/haptics";
 import type { ReceiptCommitAcknowledgement } from "../../convex/receiptChanges";
@@ -106,13 +107,7 @@ export default function ProductLinking() {
     <Screen
       summary={
         item && (
-          <Panel
-            tone="primary"
-            style={{
-              borderRadius: 0,
-              paddingHorizontal: 20,
-            }}
-          >
+          <SummaryBand>
             <Copy size={13} style={{ color: colors.onHeroMuted }}>
               {item.store} · {CalendarDate.format(item.date)}
             </Copy>
@@ -136,7 +131,7 @@ export default function ProductLinking() {
                 .filter(Boolean)
                 .join(" · ")}
             </Copy>
-          </Panel>
+          </SummaryBand>
         )
       }
       key={itemKey ?? "empty"}
@@ -218,11 +213,7 @@ export default function ProductLinking() {
           )}
         </Stack.Toolbar>
       )}
-      {!online && (
-        <Notice icon="wifi.slash">
-          Koble til nettet for å lagre produktvalg.
-        </Notice>
-      )}
+      <OfflineNotice detail="Produktvalg kan lagres når du er på nett igjen." />
       {!!error && <Notice tone="error">{error}</Notice>}
       {busy && <ActivityIndicator accessibilityLabel="Lagrer produktvalg" />}
       {item ? (

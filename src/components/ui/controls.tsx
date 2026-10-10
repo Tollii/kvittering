@@ -16,7 +16,7 @@ import {
 } from "react-native";
 import { type SymbolViewProps } from "expo-symbols";
 import { radius, useTheme } from "@/constants/theme";
-import { Copy, Icon, pressed, styles } from "./typography";
+import { Copy, Icon, faded, pressed, styles } from "./typography";
 
 export function IconButton({
   name,
@@ -53,7 +53,8 @@ export function IconButton({
           minWidth: 44,
           minHeight: 44,
         },
-        { opacity: disabled ? 0.35 : state.pressed ? 0.6 : 1 },
+        pressed(state),
+        faded(disabled),
       ]}
     >
       <Icon name={name} size={size} color={color} />
@@ -117,7 +118,7 @@ export function Button({
         },
         style,
         pressed(state),
-        disabled && !busy && { opacity: 0.45 },
+        faded(disabled && !busy),
       ]}
     >
       {busy ? (
@@ -151,7 +152,7 @@ export function Chip({
 }: Readonly<{
   label: string;
   icon?: SymbolViewProps["name"];
-  tone?: "muted" | "primary" | "warning" | "success" | "accent";
+  tone?: "muted" | "warning" | "success";
   onPress?: () => void;
   accessibilityLabel?: string;
   /** Dropdown-style chips show a chevron; action chips do not. */
@@ -161,10 +162,8 @@ export function Chip({
 
   const palette = {
     muted: { background: colors.muted, text: colors.text },
-    primary: { background: colors.primarySoft, text: colors.primary },
     warning: { background: colors.warningSoft, text: colors.warning },
     success: { background: colors.successSoft, text: colors.success },
-    accent: { background: colors.accentSoft, text: colors.accent },
   }[tone];
 
   return (

@@ -22,8 +22,8 @@ import { catalogInsights } from "@/lib/catalog/insights";
 import { productSearch, rankCatalogProducts } from "@/lib/catalog/matching";
 import { catalogImageSources } from "@/lib/catalog/images";
 import { catalogSource } from "@/lib/catalog/oda";
-import { useTheme } from "@/constants/theme";
-import { useHousehold } from "./household-context";
+import { radius, useTheme } from "@/constants/theme";
+import { OfflineNotice } from "./offline-notice";
 
 function CatalogSearchField({
   value,
@@ -61,7 +61,6 @@ function CatalogSearchResults({
 
   const hasBarcode = products.some((product) => product.ean);
   const withoutBarcode = products.filter((product) => !product.ean).length;
-  const { online } = useHousehold();
 
   return (
     <>
@@ -71,7 +70,7 @@ function CatalogSearchResults({
           vises fortsatt.
         </Notice>
       )}
-      {!online && <Notice icon="wifi.slash">Uten nett</Notice>}
+      <OfflineNotice />
       {((query.isFetching && !query.data) ||
         (productLookup && query.data?.status === "pending")) && (
         <Loading title="Henter produkter …" />
@@ -346,7 +345,7 @@ function CatalogImage({
       source={{ uri }}
       style={[
         {
-          borderRadius: 8,
+          borderRadius: radius.inner,
           borderWidth: 1,
           borderColor: colors.imageOutline,
           backgroundColor: colors.surface,

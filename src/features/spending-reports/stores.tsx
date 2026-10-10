@@ -5,9 +5,11 @@ import { useState } from "react";
 import { Platform, View } from "react-native";
 import { router } from "expo-router";
 import {
+  Amount,
   Copy,
   Empty,
   IconButton,
+  List,
   Loading,
   Notice,
   Panel,
@@ -16,8 +18,7 @@ import {
   Segments,
   Sheet,
 } from "@/components/ui";
-import { StoreMap } from "@/components/store-map";
-import { useTheme } from "@/constants/theme";
+import { StoreMap } from "@/features/spending-reports/store-map";
 import {
   storeSpending,
   type StorePurchase,
@@ -39,7 +40,6 @@ function StoreReport({
   purchases: StorePurchase[];
   onClose: () => void;
 }>) {
-  const colors = useTheme();
   const [dimension, setDimension] = useState<"stores" | "chains">("stores");
   const [selectedId, setSelectedId] = useState<string>();
   const report = storeSpending(purchases);
@@ -88,18 +88,21 @@ function StoreReport({
           onPress={() => setSelectedId(undefined)}
         />
         <Panel>
-          <Copy size={23} weight="700">
-            {storeName(selected)}
-          </Copy>
-          {!!selected.address && <Copy muted>{selected.address}</Copy>}
-          <Copy size={30} weight="700">
+          <View style={{ gap: 2 }}>
+            <Copy size={19} weight="700">
+              {storeName(selected)}
+            </Copy>
+            {!!selected.address && (
+              <Copy size={13} muted>
+                {selected.address}
+              </Copy>
+            )}
+          </View>
+          <Amount
+            detail={`Vareforbruk · ${selected.purchases.length} kjøp · siste ${CalendarDate.format(selected.purchases[0]?.date)}`}
+          >
             {Ore.format(selected.amountOre)}
-          </Copy>
-          <Copy muted>Vareforbruk · {selected.purchases.length} kjøp</Copy>
-          <Copy size={14} muted>
-            Siste kjøp i perioden:{" "}
-            {CalendarDate.format(selected.purchases[0]?.date)}
-          </Copy>
+          </Amount>
         </Panel>
         {selected.unknownAmounts > 0 && (
           <Notice tone="warning">
@@ -113,7 +116,7 @@ function StoreReport({
           </Notice>
         )}
         <SectionTitle title="Kvitteringer" />
-        <Panel>
+        <List>
           {selected.purchases.map((purchase) => (
             <Row
               key={purchase.receiptId}
@@ -135,7 +138,7 @@ function StoreReport({
               }}
             />
           ))}
-        </Panel>
+        </List>
       </>
     );
 
@@ -170,8 +173,8 @@ function StoreReport({
         title={dimension === "stores" ? "Butikksteder" : "Kjeder"}
         detail="Sortert etter vareforbruk"
       />
-      <Panel style={{ gap: 0 }}>
-        {rows.map((store, index) => {
+      <List>
+        {rows.map((store) => {
           const markerIndex = points.findIndex(
             (point) => point.id === store.id,
           );
@@ -182,33 +185,25 @@ function StoreReport({
               : "";
 
           return (
-            <View
+            <Row
               key={store.id}
-              style={{
-                borderTopWidth: index ? 1 : 0,
-                borderTopColor: colors.line,
-                paddingVertical: 8,
-              }}
-            >
-              <Row
-                title={`${markerLabel}${storeName(store)}`}
-                detail={[
-                  `${store.purchases.length} kjøp`,
-                  store.address,
-                  dimension === "stores" && !store.location
-                    ? "Ukjent kartposisjon"
-                    : undefined,
-                  store.unknownAmounts ? "Ufullstendig beløp" : undefined,
-                ]
-                  .filter(Boolean)
-                  .join(" · ")}
-                value={Ore.format(store.amountOre)}
-                onPress={() => setSelectedId(store.id)}
-              />
-            </View>
+              title={`${markerLabel}${storeName(store)}`}
+              detail={[
+                `${store.purchases.length} kjøp`,
+                store.address,
+                dimension === "stores" && !store.location
+                  ? "Ukjent kartposisjon"
+                  : undefined,
+                store.unknownAmounts ? "Ufullstendig beløp" : undefined,
+              ]
+                .filter(Boolean)
+                .join(" · ")}
+              value={Ore.format(store.amountOre)}
+              onPress={() => setSelectedId(store.id)}
+            />
           );
         })}
-      </Panel>
+      </List>
     </>
   );
 }
@@ -252,7 +247,11 @@ export function StoreSpendingSheet({
             label="Forrige måned"
             onPress={onPreviousMonth}
           />
-          <Copy weight="600" style={{ flex: 1, textAlign: "center" }}>
+          <Copy
+            accessibilityRole="header"
+            weight="600"
+            style={{ flex: 1, textAlign: "center" }}
+          >
             {monthLabel}
           </Copy>
           <IconButton

@@ -4,7 +4,7 @@ import { shortcutMonth } from "@/lib/shortcut-selection";
 import { z } from "zod";
 import { WidgetTip } from "@/features/widget-tip";
 import { usePurchaseWidget } from "@/features/purchase-widget";
-import { PeriodMenu } from "@/components/period-menu";
+import { PeriodMenu } from "@/features/period-menu";
 import {
   useSpendingReports,
   reportIds,
@@ -22,23 +22,27 @@ import {
 import { useState } from "react";
 import { Pressable, View } from "react-native";
 import {
+  Amount,
+  Button,
   Copy,
   Icon,
   IconButton,
   Sheet,
   Empty,
+  List,
   Loading,
   Notice,
-  Panel,
   Row,
   Screen,
   SectionTitle,
   Segments,
+  SummaryBand,
   pressed,
 } from "@/components/ui";
 import { MonumentArtwork } from "@/components/monument-artwork";
 import { SpendingBars, SpendingDetails } from "@/components/spending-details";
 import { useHousehold } from "@/features/household-context";
+import { OfflineNotice } from "@/features/offline-notice";
 import {
   comparisonInsights,
   receiptCoverage,
@@ -78,7 +82,7 @@ export default function SpendingRoute() {
 }
 
 function Spending({ initialMonth }: Readonly<{ initialMonth: CalendarMonth }>) {
-  const { online, details } = useHousehold();
+  const { details } = useHousehold();
   const colors = useTheme();
   const currentMonth = CalendarMonth.current();
   const [month, setMonth] = useState(initialMonth);
@@ -128,7 +132,7 @@ function Spending({ initialMonth }: Readonly<{ initialMonth: CalendarMonth }>) {
     provisional: headline.provisional,
   });
 
-  const monthLabel = CalendarMonth.format(month);
+  const monthLabel = CalendarMonth.title(month);
 
   const coverage = receiptCoverage([...receipts, ...undated.receipts]);
   const catalog = catalogInsights(totals.selected);
@@ -264,15 +268,7 @@ function Spending({ initialMonth }: Readonly<{ initialMonth: CalendarMonth }>) {
     <Screen
       summary={
         (!loadingReceipts || !!initialTotals) && (
-          <Panel
-            tone="primary"
-            style={{
-              padding: 20,
-              paddingTop: 0,
-              gap: 8,
-              borderRadius: 0,
-            }}
-          >
+          <SummaryBand style={{ paddingTop: 0 }}>
             <View style={{ flexDirection: "row", alignItems: "center" }}>
               <PeriodMenu
                 value={month}
@@ -309,14 +305,7 @@ function Spending({ initialMonth }: Readonly<{ initialMonth: CalendarMonth }>) {
                 >
                   DAGLIGVARER
                 </Copy>
-                <Copy
-                  size={36}
-                  weight="600"
-                  selectable
-                  style={{ color: colors.onHero }}
-                >
-                  {Ore.format(headline.products)}
-                </Copy>
+                <Amount hero>{Ore.format(headline.products)}</Amount>
                 <Copy size={13} style={{ color: colors.onHeroMuted }}>
                   {headline.receipts}{" "}
                   {headline.receipts === 1 ? "kvittering" : "kvitteringer"}
@@ -329,20 +318,20 @@ function Spending({ initialMonth }: Readonly<{ initialMonth: CalendarMonth }>) {
               <MonumentArtwork scene="inbox" compact />
             </View>
             {pace && <BudgetPaceBar pace={pace} colors={colors} />}
-          </Panel>
+          </SummaryBand>
         )
       }
       title="Forbruk"
       settings
     >
-      {!online && <Notice icon="wifi.slash">Uten nett</Notice>}
+      <OfflineNotice />
       {loadingReceipts ? (
         <Loading />
       ) : (
         <>
           {!completeReceipts && <Notice>Henter kvitteringer …</Notice>}
           {coverage.pending.length > 0 && (
-            <PendingReceiptsNotice pending={coverage.pending} colors={colors} />
+            <PendingReceiptsNotice pending={coverage.pending} />
           )}
           <View style={{ gap: 4 }}>
             <SectionTitle title="Fordeling" />
@@ -393,8 +382,10 @@ function Spending({ initialMonth }: Readonly<{ initialMonth: CalendarMonth }>) {
               }}
             />
             {rows.length > 5 && (
-              <Row
+              <Button
                 title={showAllGroups ? "Vis færre" : `Vis alle ${rows.length}`}
+                variant="secondary"
+                compact
                 onPress={() => setShowAllGroups(!showAllGroups)}
               />
             )}
@@ -402,44 +393,36 @@ function Spending({ initialMonth }: Readonly<{ initialMonth: CalendarMonth }>) {
               <Empty title="Ingen kjøp denne måneden" icon="cart" />
             )}
           </View>
-          <Panel>
-            <Row
-              title="Butikker"
-              detail="Se hvor dere handler, og hva dere bruker per butikk"
-              icon="map"
-              onPress={() => setStoresOpen(true)}
-            />
-          </Panel>
-          <SectionTitle title="Utforsk forbruket" />
-          <Row
-            title="Forbruksanalyse"
-            detail="Hva endret seg denne uken eller måneden?"
-            icon="chart.bar"
-            onPress={() =>
-              router.push({ pathname: "/analysis", params: { month } })
-            }
-          />
-          <Panel style={{ gap: 0, paddingVertical: 4 }}>
-            {reportIds
-              .filter((id) => reports[id].visible !== false)
-              .map((id, index) => (
-                <View
-                  key={id}
-                  style={{
-                    borderTopWidth: index ? 1 : 0,
-                    borderTopColor: colors.line,
-                    paddingVertical: 2,
-                  }}
-                >
+          <View style={{ gap: 4 }}>
+            <SectionTitle title="Utforsk forbruket" />
+            <List>
+              <Row
+                title="Butikker"
+                detail="Se hvor dere handler, og hva dere bruker per butikk"
+                icon="map"
+                onPress={() => setStoresOpen(true)}
+              />
+              <Row
+                title="Forbruksanalyse"
+                detail="Hva endret seg denne uken eller måneden?"
+                icon="chart.bar"
+                onPress={() =>
+                  router.push({ pathname: "/analysis", params: { month } })
+                }
+              />
+              {reportIds
+                .filter((id) => reports[id].visible !== false)
+                .map((id) => (
                   <Row
+                    key={id}
                     title={reports[id].title}
                     icon={reports[id].icon}
                     value={reports[id].value}
                     onPress={() => setReport(id)}
                   />
-                </View>
-              ))}
-          </Panel>
+                ))}
+            </List>
+          </View>
         </>
       )}
       <StoreSpendingSheet
@@ -568,11 +551,7 @@ function BudgetPaceBar({
           />
         )}
       </View>
-      <Copy
-        size={13}
-        weight="600"
-        style={{ color: colors.onHero, opacity: 0.9 }}
-      >
+      <Copy size={13} weight="600" style={{ color: colors.onHeroMuted }}>
         {paceLabel(pace)}
       </Copy>
     </View>
@@ -581,45 +560,24 @@ function BudgetPaceBar({
 
 function PendingReceiptsNotice({
   pending,
-  colors,
 }: Readonly<{
   pending: ReturnType<typeof receiptCoverage>["pending"];
-  colors: Colors;
 }>) {
   const [firstPending] = pending;
 
   return (
-    <Pressable
-      accessibilityRole="button"
+    <Notice
+      icon="tray.full"
+      title={
+        pending.length === 1
+          ? "Én kvittering venter på kontroll"
+          : `${pending.length} kvitteringer venter på kontroll`
+      }
       onPress={() => router.navigate("/inbox")}
-      style={(state) => [
-        {
-          flexDirection: "row",
-          alignItems: "center",
-          gap: 12,
-          padding: 12,
-          paddingLeft: 14,
-          borderRadius: 14,
-          borderCurve: "continuous",
-          backgroundColor: colors.primarySoft,
-        },
-        pressed(state),
-      ]}
     >
-      <Icon name="tray.full" size={18} />
-      <View style={{ flex: 1, gap: 1 }}>
-        <Copy size={14} weight="600">
-          {pending.length === 1
-            ? "Én kvittering venter på kontroll"
-            : `${pending.length} kvitteringer venter på kontroll`}
-        </Copy>
-        <Copy size={12} muted numberOfLines={1}>
-          {(firstPending ? receiptNeeds(firstPending) : [])
-            .slice(0, 2)
-            .join(" · ") || "Summene er foreløpige."}
-        </Copy>
-      </View>
-      <Icon name="chevron.right" size={12} color={colors.secondary} />
-    </Pressable>
+      {(firstPending ? receiptNeeds(firstPending) : [])
+        .slice(0, 2)
+        .join(" · ") || "Summene er foreløpige."}
+    </Notice>
   );
 }

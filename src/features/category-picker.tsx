@@ -4,7 +4,7 @@ import {
   Copy,
   Field,
   Icon,
-  Panel,
+  List,
   Row,
   Sheet,
   Toggle,
@@ -18,7 +18,7 @@ import {
   parseCategoryId,
   type CategoryId,
 } from "@/lib/domain/categories";
-import { useTheme } from "@/constants/theme";
+import { radius, useTheme } from "@/constants/theme";
 
 // Common receipt words make category search useful without knowing the taxonomy.
 const keywords = new Map(
@@ -140,19 +140,7 @@ export function CategoryPicker({
   };
 
   const list = (ids: CategoryId[], showGroup: boolean) => (
-    <Panel style={{ gap: 0, paddingVertical: 4 }}>
-      {ids.map((id, index) => (
-        <View
-          key={id}
-          style={{
-            borderTopWidth: index ? 1 : 0,
-            borderTopColor: colors.line,
-          }}
-        >
-          {categoryRow(id, showGroup)}
-        </View>
-      ))}
-    </Panel>
+    <List>{ids.map((id) => categoryRow(id, showGroup))}</List>
   );
 
   return (
@@ -266,7 +254,7 @@ export function CategoryPicker({
                     minHeight: 54,
                     paddingHorizontal: 12,
                     paddingVertical: 10,
-                    borderRadius: 14,
+                    borderRadius: radius.tile,
                     borderCurve: "continuous",
                     backgroundColor: colors.surface,
                     borderWidth: 1,
