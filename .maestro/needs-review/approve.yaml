@@ -1,24 +1,28 @@
 # The parent directory selects tools/e2e/fixtures/needs-review/.
 appId: no.tolnes.kvitto
-name: Approve a complete receipt from the inbox with a swipe
+name: Approve the one receipt without open questions and keep the others
 ---
 - runFlow: ../shared/sign-in.yml
 - tapOn: "Innboks"
 - extendedWaitUntil:
     visible: "Til kontroll"
     timeout: 30000
-- assertVisible: "MENY.*"
 - assertVisible: "KIWI.*Betalt beløp mangler.*"
 - assertVisible: "REMA 1000.*Mulig duplikat.*"
-- assertVisible: "Lesingen mislyktes.*"
-# Only the receipt without open questions can be approved from the list.
-- swipe:
-    from:
-      text: "MENY.*"
-    direction: LEFT
+- assertVisible: ".*Lesingen mislyktes.*"
+- tapOn: "MENY.*"
 - extendedWaitUntil:
-    notVisible: "MENY.*"
+    visible: "Klar til godkjenning"
     timeout: 30000
+- tapOn: "Godkjenn kvittering"
+- extendedWaitUntil:
+    visible: "Til innboksen"
+    timeout: 30000
+- tapOn: "Til innboksen"
+- extendedWaitUntil:
+    visible: "Til kontroll"
+    timeout: 30000
+- assertNotVisible: "MENY.*"
 - assertVisible: "KIWI.*"
 - tapOn: "Historikk"
 - extendedWaitUntil:
