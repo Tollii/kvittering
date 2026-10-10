@@ -2,6 +2,12 @@
 
 Kvitto captures household grocery receipts and explains purchases. It uses Expo 57 / React Native on iOS and Convex for authentication, storage, and processing. Reports describe purchases, not consumption; missing evidence remains unknown.
 
+<p align="center">
+  <img src="docs/images/app-history.png" width="240" alt="Receipt history grouped by month, with a total per month">
+  <img src="docs/images/app-receipt.png" width="240" alt="A reviewed receipt with its total, categories, and line items">
+  <img src="docs/images/app-spending.png" width="240" alt="Monthly spending broken down by category">
+</p>
+
 ## Documentation
 
 - [Architecture](docs/architecture.md): responsibility boundaries, data flow, and reasons behind the design.
