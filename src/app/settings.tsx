@@ -5,13 +5,22 @@ import { FormSection, NativeForm } from "@/components/ui/native-form";
 import { ReleaseSettings } from "@/features/release-settings";
 import { releaseMutation } from "@/lib/releases/requests";
 import { useState } from "react";
-import { Alert, Platform, Share, View } from "react-native";
+import { Alert, Platform, Pressable, Share, View } from "react-native";
 import { router, Stack } from "expo-router";
 import { useConvex } from "convex/react";
 import * as Clipboard from "expo-clipboard";
 import { randomUUID } from "expo-crypto";
 import { api } from "../../convex/_generated/api";
-import { Button, Copy, Icon, List, Notice, Row, Screen } from "@/components/ui";
+import {
+  Button,
+  Copy,
+  Icon,
+  List,
+  Notice,
+  pressed,
+  Row,
+  Screen,
+} from "@/components/ui";
 import { useHousehold } from "@/features/household-context";
 import { OfflineNotice } from "@/features/offline-notice";
 import { BudgetSettings } from "@/features/budget-settings";
@@ -53,7 +62,32 @@ export default function Settings() {
           headerRight:
             Platform.OS === "ios"
               ? undefined
-              : () => <Button title="Ferdig" onPress={() => router.back()} />,
+              : // Drawn like the iOS toolbar's glass capsule.
+                () => (
+                  <Pressable
+                    accessibilityRole="button"
+                    onPress={() => router.back()}
+                    style={(state) => [
+                      {
+                        marginRight: 16,
+                        minHeight: 36,
+                        paddingHorizontal: 14,
+                        borderRadius: 18,
+                        justifyContent: "center",
+                        backgroundColor: colors.heroControl,
+                      },
+                      pressed(state),
+                    ]}
+                  >
+                    <Copy
+                      size={15}
+                      weight="600"
+                      style={{ color: colors.onHero }}
+                    >
+                      Ferdig
+                    </Copy>
+                  </Pressable>
+                ),
         }}
       />
       {Platform.OS === "ios" && (
