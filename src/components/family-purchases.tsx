@@ -1,7 +1,7 @@
 import { CalendarDate } from "@/lib/domain/calendar";
 import { Ore } from "@/lib/domain/ore";
 import { useState } from "react";
-import { Pressable, View } from "react-native";
+import { Pressable } from "react-native";
 import { Amount, Copy, Icon, List, Row, pressed } from "./ui";
 import { useTheme } from "@/constants/theme";
 import {
@@ -48,13 +48,11 @@ export function FamilyPurchases({
             Alle
           </Copy>
         </Pressable>
-        <View style={{ gap: 2 }}>
-          <Amount>{formatPurchaseQuantity(selected.quantity)}</Amount>
-          <Copy size={13} muted>
-            {selected.name} · {Ore.format(selected.amountOre)}
-            {partialQuantity(selected) ? " · noen mengder mangler" : ""}
-          </Copy>
-        </View>
+        <Amount
+          detail={`${selected.name} · ${Ore.format(selected.amountOre)}${partialQuantity(selected) ? " · noen mengder mangler" : ""}`}
+        >
+          {formatPurchaseQuantity(selected.quantity)}
+        </Amount>
         <List>
           {selected.contributions.map((item) => (
             <Row

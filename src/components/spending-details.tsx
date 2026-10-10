@@ -22,9 +22,6 @@ export function SpendingBars<
   const { fontScale } = useWindowDimensions();
   const maximum = Math.max(1, ...rows.map((row) => Math.abs(row.amountOre)));
 
-  // An empty month shows its `Empty` card instead of an empty list card.
-  if (!rows.length) return null;
-
   return (
     <List>
       {rows.map((row, index) => {
@@ -113,14 +110,11 @@ export function SpendingDetails({
     <Sheet title={selected?.name ?? ""} visible={!!selected} onClose={onClose}>
       {selected && (
         <>
-          <View style={{ gap: 2 }}>
-            <Amount>{Ore.format(selected.amountOre)}</Amount>
-            <Copy size={13} muted>
-              {selected.contributions.length}{" "}
-              {selected.contributions.length === 1 ? "post" : "poster"} i
-              perioden
-            </Copy>
-          </View>
+          <Amount
+            detail={`${selected.contributions.length} ${selected.contributions.length === 1 ? "post" : "poster"} i perioden`}
+          >
+            {Ore.format(selected.amountOre)}
+          </Amount>
           <List>
             {selected.contributions.map((contribution) => (
               <Row

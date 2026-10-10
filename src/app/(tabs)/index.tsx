@@ -34,6 +34,7 @@ import {
   SettingsButton,
 } from "@/components/ui";
 import { useHousehold } from "@/features/household-context";
+import { OfflineNotice } from "@/features/offline-notice";
 import { saveLocalReceipts } from "@/lib/receipt-storage";
 import { maxReceiptImages, prepareImage } from "@/lib/receipt-import";
 import {
@@ -357,7 +358,7 @@ export default function Capture() {
           </Pressable>
           <SettingsButton surface="camera" />
         </View>
-        {!online && <Notice icon="wifi.slash">Uten nett</Notice>}
+        <OfflineNotice />
         {saved > 0 && (
           <Panel style={{ gap: 4 }}>
             <View

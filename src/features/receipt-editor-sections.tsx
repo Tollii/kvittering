@@ -216,7 +216,7 @@ export function ReceiptSummary({
   const { fontScale } = useWindowDimensions();
 
   return (
-    <SummaryBand style={{ paddingTop: 12, gap: 12 }}>
+    <SummaryBand style={{ gap: 12 }}>
       <View
         style={{
           flexDirection: "row",
@@ -239,7 +239,7 @@ export function ReceiptSummary({
               : ""}
             {data?.branch ? ` · ${data.branch}` : ""}
           </Copy>
-          <Amount size="hero">{Ore.format(data?.totalOre ?? null)}</Amount>
+          <Amount hero>{Ore.format(data?.totalOre ?? null)}</Amount>
         </View>
         <View style={{ flexDirection: "row", gap: 6 }}>
           {receipt.imageCount > 0 && (
@@ -498,10 +498,6 @@ export function ReceiptLineList({
   renderLine: (line: ReceiptData["lines"][number]) => ReactNode;
 }) {
   return lines.length ? (
-    <List style={{ paddingVertical: 2 }}>
-      {lines.map((line) => (
-        <View key={line.id}>{renderLine(line)}</View>
-      ))}
-    </List>
+    <List style={{ paddingVertical: 2 }}>{lines.map(renderLine)}</List>
   ) : null;
 }

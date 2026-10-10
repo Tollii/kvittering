@@ -45,59 +45,63 @@ export function Panel({
 }
 
 /**
- * A card that holds a list: each child after the first gets a divider. Every
- * list in the app sits in one of these, so lists look the same everywhere.
+ * A card that holds a list: each child after the first gets a divider, and
+ * no children means no card. Every list in the app sits in one of these, so
+ * lists look the same everywhere. A fragment counts as one child, so pass
+ * rows directly rather than grouped.
  */
 export function List({
   children,
   style,
 }: Readonly<{ children: ReactNode; style?: StyleProp<ViewStyle> }>) {
   const colors = useTheme();
+  const items = Children.toArray(children).filter(isValidElement);
+
+  if (!items.length) return null;
 
   return (
     <Panel style={[{ gap: 0, paddingVertical: 4 }, style]}>
-      {Children.toArray(children)
-        .filter(isValidElement)
-        .map((child, index) => (
-          // `toArray` gives every element a key, from its own key or its position.
-          <View
-            key={child.key}
-            style={{
-              borderTopWidth: index ? 1 : 0,
-              borderTopColor: colors.line,
-            }}
-          >
-            {child}
-          </View>
-        ))}
+      {items.map((child, index) => (
+        // `toArray` gives every element a key, from its own key or its position.
+        <View
+          key={child.key}
+          style={{
+            borderTopWidth: index ? 1 : 0,
+            borderTopColor: colors.line,
+          }}
+        >
+          {child}
+        </View>
+      ))}
     </Panel>
   );
 }
 
 /**
- * The soft cobalt tile behind an icon. Tiles up to 44 points are squircles
- * with the `tile` radius; the larger empty-state disc is a circle.
+ * The soft cobalt tile behind an icon: a 32-point squircle in a row, or the
+ * 64-point `circle` that an empty state leads with.
  */
 export function IconTile({
   icon,
-  size = 32,
+  circle = false,
   color,
   children,
 }: Readonly<{
   icon?: SymbolViewProps["name"];
-  size?: number;
+  circle?: boolean;
   color?: string;
   /** Replaces the icon, for a spinner. */
   children?: ReactNode;
 }>) {
   const colors = useTheme();
+  const size = circle ? 64 : 32;
 
   return (
     <View
       style={{
         width: size,
         height: size,
-        borderRadius: size > 44 ? size / 2 : radius.tile,
+        borderRadius: circle ? size / 2 : radius.tile,
         borderCurve: "continuous",
         backgroundColor: colors.primarySoft,
         alignItems: "center",
@@ -108,8 +112,8 @@ export function IconTile({
         (icon && (
           <Icon
             name={icon}
-            size={Math.round(size * (size > 44 ? 0.44 : 0.5))}
-            weight={size > 44 ? undefined : "semibold"}
+            size={circle ? 28 : 16}
+            weight={circle ? undefined : "semibold"}
             color={color}
           />
         ))}
@@ -271,7 +275,8 @@ export function Notice({
           size={title ? 13 : 15}
           muted={!!title && tone === "info"}
           accessibilityRole={tone === "error" ? "alert" : undefined}
-          style={{ color: title && tone === "info" ? undefined : palette.text }}
+          // An explicit `undefined` colour would override the muted colour.
+          style={title && tone === "info" ? undefined : { color: palette.text }}
         >
           {children}
         </Copy>
@@ -318,7 +323,7 @@ export function Empty({
   return (
     <Panel style={{ paddingVertical: 32, alignItems: "center", gap: 8 }}>
       <View style={{ marginBottom: 6 }}>
-        <IconTile icon={icon} size={64} />
+        <IconTile icon={icon} circle />
       </View>
       <Copy
         accessibilityRole="header"

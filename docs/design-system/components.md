@@ -6,7 +6,7 @@ Shared presentation components live in [`src/components/ui`](../../src/component
 
 **`Copy`** ([typography](../../src/components/ui/typography.tsx)) is the only text component. It takes `size`, `weight`, and `muted`, and sets line height, tracking, and tabular numerals. See [typography](foundations.md#typography) for the size of each role.
 
-**`Amount`** is the large number a screen or sheet leads with. `size="hero"` sits on a `SummaryBand` in `onHero`; the default sits on paper at the top of a sheet or a detail view. Put its one-line explanation, such as "3 kjøp" or "12 poster i perioden", in a `View` with a 2-point gap under it.
+**`Amount`** is the large number a screen or sheet leads with, and `detail` is its one-line explanation under it, such as "3 kjøp" or "12 poster i perioden". `hero` puts it on a `SummaryBand` in `onHero`; otherwise it sits on paper at the top of a sheet or a detail view.
 
 **`Icon`** renders an SF Symbol, `primary` by default, hidden from VoiceOver. Label the control that contains it instead.
 
@@ -16,12 +16,12 @@ Shared presentation components live in [`src/components/ui`](../../src/component
 
 **`Button`** ([controls](../../src/components/ui/controls.tsx)) is a full-width-capable action with an optional leading SF Symbol.
 
-| Variant     | Look                               | Use                                                                                                |
-| ----------- | ---------------------------------- | -------------------------------------------------------------------------------------------------- |
-| `primary`   | `primary` fill, `onPrimary` text   | The one main action on a screen or sheet: "Lagre og godkjenn", "Logg inn".                         |
-| `secondary` | `muted` fill, `text`               | Alternatives: "Forkast importen", "Vis flere kvitteringer", and `compact` for "Vis alle 8".         |
-| `tint`      | `primarySoft` fill, `primary` text | A supporting action that should still read as cobalt: "Kopier", "Prøv igjen", "Bekreft alle …".    |
-| `danger`    | `dangerSoft` fill, `danger` text   | Destructive actions such as "Slett kvittering". Confirm with an alert.                             |
+| Variant     | Look                               | Use                                                                                             |
+| ----------- | ---------------------------------- | ----------------------------------------------------------------------------------------------- |
+| `primary`   | `primary` fill, `onPrimary` text   | The one main action on a screen or sheet: "Lagre og godkjenn", "Logg inn".                      |
+| `secondary` | `muted` fill, `text`               | Alternatives: "Forkast importen", "Vis flere kvitteringer", and `compact` for "Vis alle 8".     |
+| `tint`      | `primarySoft` fill, `primary` text | A supporting action that should still read as cobalt: "Kopier", "Prøv igjen", "Bekreft alle …". |
+| `danger`    | `dangerSoft` fill, `danger` text   | Destructive actions such as "Slett kvittering". Confirm with an alert.                          |
 
 States: `disabled` fades the button; `busy` shows a spinner in place of the icon, or before the title when there is no icon, and disables the button while keeping the title. `compact` is the shorter size for inline and footer use. A "show more" control under a list is a `compact` `secondary` button, not a row.
 
@@ -47,11 +47,11 @@ States: `disabled` fades the button; `busy` shows a spinner in place of the icon
 
 **`Panel`** ([surfaces](../../src/components/ui/surfaces.tsx)) is the card. `surface` is the default card on `background`; `plain` is a quieter `surfaceRaised` card for a group nested inside another card, such as product search inside the line editor.
 
-**`List`** is the card that holds a list. It draws a `line` divider between its children, so every list in the app, rows, spending bars, receipt lines, and the receipts of a month in Historikk, sits in one of these and looks the same. Give it `Row`s or other full-width children; it needs no index bookkeeping from the caller.
+**`List`** is the card that holds a list. It draws a `line` divider between its children and renders nothing when it has none, so every list in the app, rows, spending bars, receipt lines, and the receipts of a month in Historikk, sits in one of these and looks the same. Give it `Row`s or other full-width elements directly, one per row; a fragment or a string is not a row, and the caller needs no index bookkeeping or empty guard.
 
 **`Row`** is the list item: an optional `IconTile`, a title, detail text, a trailing value, and a chevron when tappable. `selected` swaps the chevron for a checkmark. Large text moves the value under the title (see [accessibility](foundations.md#accessibility)).
 
-**`IconTile`** is the soft cobalt tile behind an icon: 32 points with the `tile` radius in a `Row` and the upload queue, where it can hold a spinner instead, and a 64-point circle in `Empty`.
+**`IconTile`** is the soft cobalt tile behind an icon: a 32-point squircle with the `tile` radius in a `Row` and the upload queue, where it can hold a spinner instead, or the 64-point `circle` that `Empty` leads with.
 
 **`SectionTitle`** heads a group with optional detail text under it and an optional text action on the right, such as "Start" in the inbox. Historikk uses the detail for the month's count and total.
 
@@ -61,7 +61,7 @@ States: `disabled` fades the button; `busy` shows a spinner in place of the icon
 
 ## Feedback and states
 
-**`Notice`** is an inline message with an icon. Tones: `info` (soft cobalt), `warning`, `error` (marked as an alert), and `success`. Pass `icon="wifi.slash"` for the offline notice; [screen states](patterns.md#states-every-data-screen-handles) say where it goes. `title` adds a bold first line above the message, and `onPress` makes the notice a button with a trailing chevron, as the pending-receipts notice on Forbruk that opens Innboks.
+**`Notice`** is an inline message with an icon. Tones: `info` (soft cobalt), `warning`, `error` (marked as an alert), and `success`. [Screen states](patterns.md#states-every-data-screen-handles) say where the offline notice goes. `title` adds a bold first line above the message, and `onPress` makes the notice a button with a trailing chevron, as the pending-receipts notice on Forbruk that opens Innboks. `OfflineNotice` ([offline notice](../../src/features/offline-notice.tsx)) is the "Uten nett" notice that reads the household's connection itself; a screen renders it first instead of checking `online`.
 
 **`Loading`** is a centred spinner with a Norwegian status, "Henter …" by default. Name what is loading: "Henter kvittering …".
 

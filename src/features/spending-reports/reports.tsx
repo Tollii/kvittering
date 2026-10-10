@@ -142,7 +142,7 @@ export function useSpendingReports({
               icon="tag"
             />
           )}
-          {historyComplete && surprises.length > 0 && (
+          {historyComplete && (
             <List>
               {surprises.map((signal) => (
                 <Row

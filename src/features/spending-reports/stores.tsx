@@ -98,13 +98,11 @@ function StoreReport({
               </Copy>
             )}
           </View>
-          <View style={{ gap: 2 }}>
-            <Amount>{Ore.format(selected.amountOre)}</Amount>
-            <Copy size={13} muted>
-              Vareforbruk · {selected.purchases.length} kjøp · siste{" "}
-              {CalendarDate.format(selected.purchases[0]?.date)}
-            </Copy>
-          </View>
+          <Amount
+            detail={`Vareforbruk · ${selected.purchases.length} kjøp · siste ${CalendarDate.format(selected.purchases[0]?.date)}`}
+          >
+            {Ore.format(selected.amountOre)}
+          </Amount>
         </Panel>
         {selected.unknownAmounts > 0 && (
           <Notice tone="warning">

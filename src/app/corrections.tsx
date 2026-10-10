@@ -18,7 +18,7 @@ import {
   SectionTitle,
   Sheet,
 } from "@/components/ui";
-import { useHousehold } from "@/features/household-context";
+import { OfflineNotice } from "@/features/offline-notice";
 import {
   category,
   isDecidedCategory,
@@ -34,8 +34,6 @@ const categoryName = (id: string | null) => {
 };
 
 export default function Corrections() {
-  const { online } = useHousehold();
-
   const historyPage = usePaginatedQuery(
     api.corrections.listPage,
     {},
@@ -103,7 +101,7 @@ export default function Corrections() {
   return (
     <Screen insetTop={false}>
       <Stack.Screen options={{ title: "Rettelser" }} />
-      {!online && <Notice icon="wifi.slash">Uten nett</Notice>}
+      <OfflineNotice />
       {!history ? (
         <Loading />
       ) : (
@@ -129,31 +127,29 @@ export default function Corrections() {
               icon="checkmark.circle"
             />
           )}
-          {history.entries.length > 0 && (
-            <List>
-              {history.entries.map((entry) => (
-                <Row
-                  key={entry._id}
-                  title={entry.name}
-                  detail={
-                    entry.field === "category"
-                      ? `${categoryName(entry.previous)} → ${categoryName(entry.expected)}`
-                      : "Produktkobling endret"
-                  }
-                  value={entry.store ?? undefined}
-                  onPress={
-                    entry.field === "category" &&
-                    isDecidedCategory(entry.expected)
-                      ? () => {
-                          setTargetKeys([]);
-                          setSelected(entry._id);
-                        }
-                      : undefined
-                  }
-                />
-              ))}
-            </List>
-          )}
+          <List>
+            {history.entries.map((entry) => (
+              <Row
+                key={entry._id}
+                title={entry.name}
+                detail={
+                  entry.field === "category"
+                    ? `${categoryName(entry.previous)} → ${categoryName(entry.expected)}`
+                    : "Produktkobling endret"
+                }
+                value={entry.store ?? undefined}
+                onPress={
+                  entry.field === "category" &&
+                  isDecidedCategory(entry.expected)
+                    ? () => {
+                        setTargetKeys([]);
+                        setSelected(entry._id);
+                      }
+                    : undefined
+                }
+              />
+            ))}
+          </List>
           {historyPage.status === "CanLoadMore" && (
             <Button
               title="Vis eldre beslutninger"
@@ -201,30 +197,28 @@ export default function Corrections() {
           <Loading />
         ) : (
           <>
-            {preview.targets.length > 0 && (
-              <List>
-                {preview.targets.map((target) => (
-                  <Row
-                    key={`${target.receiptId}:${target.lineId}`}
-                    title={target.name}
-                    selected={targetKeys.includes(
-                      `${target.receiptId}:${target.lineId}`,
-                    )}
-                    onPress={() => {
-                      const key = `${target.receiptId}:${target.lineId}`;
-                      setTargetKeys((previous) =>
-                        previous.includes(key)
-                          ? previous.filter((value) => value !== key)
-                          : previous.length < 20
-                            ? [...previous, key]
-                            : previous,
-                      );
-                    }}
-                    detail={`${CalendarDate.format(target.date)} · ${categoryName(target.categoryId)}`}
-                  />
-                ))}
-              </List>
-            )}
+            <List>
+              {preview.targets.map((target) => (
+                <Row
+                  key={`${target.receiptId}:${target.lineId}`}
+                  title={target.name}
+                  selected={targetKeys.includes(
+                    `${target.receiptId}:${target.lineId}`,
+                  )}
+                  onPress={() => {
+                    const key = `${target.receiptId}:${target.lineId}`;
+                    setTargetKeys((previous) =>
+                      previous.includes(key)
+                        ? previous.filter((value) => value !== key)
+                        : previous.length < 20
+                          ? [...previous, key]
+                          : previous,
+                    );
+                  }}
+                  detail={`${CalendarDate.format(target.date)} · ${categoryName(target.categoryId)}`}
+                />
+              ))}
+            </List>
             {!preview.targets.length && (
               <Copy muted>Ingen andre varer kan rettes.</Copy>
             )}

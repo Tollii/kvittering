@@ -13,6 +13,7 @@ import { randomUUID } from "expo-crypto";
 import { api } from "../../convex/_generated/api";
 import { Button, Copy, Icon, List, Notice, Row, Screen } from "@/components/ui";
 import { useHousehold } from "@/features/household-context";
+import { OfflineNotice } from "@/features/offline-notice";
 import { BudgetSettings } from "@/features/budget-settings";
 import { OdaSettings } from "@/features/oda-settings";
 import { NotificationSettings } from "@/features/notifications";
@@ -62,12 +63,12 @@ export default function Settings() {
           </Stack.Toolbar.Button>
         </Stack.Toolbar>
       )}
-      {!online && <Notice icon="wifi.slash">Uten nett</Notice>}
+      <OfflineNotice />
       <NativeForm>
         <FormSection title={household.name}>
           <HouseholdNameSettings />
           {details ? (
-            <List style={{ padding: 0 }}>
+            <List style={{ paddingHorizontal: 0, paddingVertical: 0 }}>
               {details.members.map((member) => (
                 <Row key={member._id} title={member.name} icon="person" />
               ))}

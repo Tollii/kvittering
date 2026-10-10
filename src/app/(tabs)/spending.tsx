@@ -42,6 +42,7 @@ import {
 import { MonumentArtwork } from "@/components/monument-artwork";
 import { SpendingBars, SpendingDetails } from "@/components/spending-details";
 import { useHousehold } from "@/features/household-context";
+import { OfflineNotice } from "@/features/offline-notice";
 import {
   comparisonInsights,
   receiptCoverage,
@@ -81,7 +82,7 @@ export default function SpendingRoute() {
 }
 
 function Spending({ initialMonth }: Readonly<{ initialMonth: CalendarMonth }>) {
-  const { online, details } = useHousehold();
+  const { details } = useHousehold();
   const colors = useTheme();
   const currentMonth = CalendarMonth.current();
   const [month, setMonth] = useState(initialMonth);
@@ -304,7 +305,7 @@ function Spending({ initialMonth }: Readonly<{ initialMonth: CalendarMonth }>) {
                 >
                   DAGLIGVARER
                 </Copy>
-                <Amount size="hero">{Ore.format(headline.products)}</Amount>
+                <Amount hero>{Ore.format(headline.products)}</Amount>
                 <Copy size={13} style={{ color: colors.onHeroMuted }}>
                   {headline.receipts}{" "}
                   {headline.receipts === 1 ? "kvittering" : "kvitteringer"}
@@ -323,7 +324,7 @@ function Spending({ initialMonth }: Readonly<{ initialMonth: CalendarMonth }>) {
       title="Forbruk"
       settings
     >
-      {!online && <Notice icon="wifi.slash">Uten nett</Notice>}
+      <OfflineNotice />
       {loadingReceipts ? (
         <Loading />
       ) : (
@@ -550,11 +551,7 @@ function BudgetPaceBar({
           />
         )}
       </View>
-      <Copy
-        size={13}
-        weight="600"
-        style={{ color: colors.onHero, opacity: 0.9 }}
-      >
+      <Copy size={13} weight="600" style={{ color: colors.onHeroMuted }}>
         {paceLabel(pace)}
       </Copy>
     </View>

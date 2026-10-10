@@ -10,7 +10,6 @@ import {
   IconButton,
   IconTile,
   Loading,
-  Notice,
   Panel,
   Screen,
   SectionTitle,
@@ -19,6 +18,7 @@ import { IllustratedEmpty } from "@/components/monument-artwork";
 import { ReceiptCard, openReceipt } from "@/components/receipt-card";
 import { SwipeToApprove } from "@/features/swipe-approve";
 import { useHousehold } from "@/features/household-context";
+import { OfflineNotice } from "@/features/offline-notice";
 import { useTheme } from "@/constants/theme";
 import { quickApproveData } from "@/lib/domain/receipt-review";
 
@@ -61,7 +61,7 @@ export default function Inbox() {
         />
       }
     >
-      {!online && <Notice icon="wifi.slash">Uten nett</Notice>}
+      <OfflineNotice />
       {loadingReceipts && <Loading />}
       {attention.length > 0 && (
         <>

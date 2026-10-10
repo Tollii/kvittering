@@ -21,24 +21,24 @@ The palette is cobalt ink on warm paper. Light and dark share token names, so a 
 
 ### Content
 
-| Token                   | Role                                                                                                       |
-| ----------------------- | ---------------------------------------------------------------------------------------------------------- |
-| `text`                  | Body copy and titles on light surfaces.                                                                    |
-| `secondary`             | Supporting copy (`Copy muted`), placeholders, trailing chevrons.                                           |
-| `primary`               | Interactive tint: links, icons, selected states, primary buttons, focused field border, spinners.          |
-| `primarySoft`           | Soft cobalt fill: `tint` buttons, info notices, `IconTile`.                                                |
-| `onPrimary`             | Text and icons on a `primary` fill.                                                                        |
-| `onHero`, `onHeroMuted` | Text on `hero`; muted for dates, eyebrows, and subtitles. The camera shutter also draws with `onCamera`. |
+| Token                   | Role                                                                                              |
+| ----------------------- | ------------------------------------------------------------------------------------------------- |
+| `text`                  | Body copy and titles on light surfaces.                                                           |
+| `secondary`             | Supporting copy (`Copy muted`), placeholders, trailing chevrons.                                  |
+| `primary`               | Interactive tint: links, icons, selected states, primary buttons, focused field border, spinners. |
+| `primarySoft`           | Soft cobalt fill: `tint` buttons, info notices, `IconTile`.                                       |
+| `onPrimary`             | Text and icons on a `primary` fill.                                                               |
+| `onHero`, `onHeroMuted` | Text on `hero`; muted for dates, eyebrows, and subtitles.                                         |
 
 ### Status
 
 Each status has a strong and a soft token. Use the soft one as a fill and the strong one for the text and icon on it, as `Notice` and `Chip` do.
 
-| Status  | Strong / soft             | Use                                                                                             |
-| ------- | ------------------------- | ----------------------------------------------------------------------------------------------- |
-| Success | `success` / `successSoft` | Reviewed receipt, completed upload, swipe-to-approve action.                                    |
+| Status  | Strong / soft             | Use                                                                                              |
+| ------- | ------------------------- | ------------------------------------------------------------------------------------------------ |
+| Success | `success` / `successSoft` | Reviewed receipt, completed upload, swipe-to-approve action.                                     |
 | Warning | `warning` / `warningSoft` | Unsaved changes, reading issues, a needs-review status, and a failed upload that waits to retry. |
-| Danger  | `danger` / `dangerSoft`   | Errors, destructive buttons, failed reading.                                                    |
+| Danger  | `danger` / `dangerSoft`   | Errors, destructive buttons, failed reading.                                                     |
 
 A failed upload is a warning, not a danger: the images are safe in the queue and the app retries, so Kamera's upload note and the Innboks queue both show the `arrow.clockwise.circle` symbol in `warning`.
 
@@ -63,35 +63,35 @@ The app uses the system font (San Francisco) through `Copy` ([typography](../../
 
 Text sizes cluster into roles. For new text, copy the size and weight of the role it plays from the place named here rather than picking a new one.
 
-| Role                | Copy it from                                                                                                                       |
-| ------------------- | ---------------------------------------------------------------------------------------------------------------------------------- |
-| Key amount on hero  | `Amount size="hero"`: the month total on Forbruk, the paid amount on a receipt.                                                   |
-| Amount in a sheet   | `Amount`: the total that opens a detail sheet, the store total in Butikker, the analysis total.                                   |
-| Screen title        | The `Screen` header ([layout](../../src/components/ui/layout.tsx)); `IllustratedEmpty` uses the same size on an empty tab root.    |
-| Sheet title         | The `Sheet` header; `Empty` uses the same size for its title.                                                                      |
-| Section title       | `SectionTitle` ([surfaces](../../src/components/ui/surfaces.tsx)).                                                                 |
-| Card title          | Store and amount in [`ReceiptCard`](../../src/components/receipt-card.tsx).                                                        |
-| Body and row titles | The `Copy` default; `Row` titles and buttons use the same size, heavier.                                                           |
-| Detail              | `Row` detail and the labels of `Field` ([controls](../../src/components/ui/controls.tsx)).                                         |
-| Caption             | `Field` hints.                                                                                                                     |
+| Role                | Copy it from                                                                                                                    |
+| ------------------- | ------------------------------------------------------------------------------------------------------------------------------- |
+| Key amount on hero  | `Amount hero`: the month total on Forbruk, the paid amount on a receipt.                                                        |
+| Amount in a sheet   | `Amount`: the total that opens a detail sheet, the store total in Butikker, the analysis total.                                 |
+| Screen title        | The `Screen` header ([layout](../../src/components/ui/layout.tsx)); `IllustratedEmpty` uses the same size on an empty tab root. |
+| Sheet title         | The `Sheet` header; `Empty` uses the same size for its title.                                                                   |
+| Section title       | `SectionTitle` ([surfaces](../../src/components/ui/surfaces.tsx)).                                                              |
+| Card title          | Store and amount in [`ReceiptCard`](../../src/components/receipt-card.tsx).                                                     |
+| Body and row titles | The `Copy` default; `Row` titles and buttons use the same size, heavier.                                                        |
+| Detail              | `Row` detail and the labels of `Field` ([controls](../../src/components/ui/controls.tsx)).                                      |
+| Caption             | `Field` hints.                                                                                                                  |
 
 Weight carries meaning: regular for reading, semibold (600) for labels, interactive text, and the hero amount, bold (700) for titles and amounts on paper. Mark each title with `accessibilityRole="header"`.
 
 ## Spacing
 
-There are no spacing tokens. Spacing follows a 4-point rhythm, and the shared components own it: copy the padding and gaps of `Screen`, `Sheet`, `Panel`, `List`, and `Row` instead of setting new ones. A large amount and its one-line explanation sit in a `View` with a 2-point gap. `Screen` also caps content width and centres it, so layouts stay readable on iPad.
+There are no spacing tokens. Spacing follows a 4-point rhythm, and the shared components own it: copy the padding and gaps of `Screen`, `Sheet`, `Panel`, `List`, and `Row` instead of setting new ones. `Amount` owns the gap between a large amount and its `detail` line. `Screen` also caps content width and centres it, so layouts stay readable on iPad.
 
 ## Shape
 
 | Token            | Value source                          | Use                                                                                        |
 | ---------------- | ------------------------------------- | ------------------------------------------------------------------------------------------ |
 | `radius.card`    | [theme](../../src/constants/theme.ts) | `Panel`, `List`, `Empty`, swipe action, the store map, the arch tile on sign-in.           |
-| `radius.control` | theme                                 | `Button`, `Field`, `Notice`, segmented track, the Sign in with Apple button.                |
+| `radius.control` | theme                                 | `Button`, `Field`, `Notice`, segmented track, the Sign in with Apple button.               |
 | `radius.chip`    | theme                                 | `Chip`.                                                                                    |
 | `radius.inner`   | theme                                 | Images inside a card, including the capture-review pages.                                  |
 | `radius.tile`    | theme                                 | `IconTile`, inset boxes, calendar days, category-group tiles, the camera's overlay labels. |
 
-Always add `borderCurve: "continuous"` with a radius, as iOS does. Circular controls use half their size: icon discs, the shutter and the two 54-point camera buttons beside it, and the 64-point disc in `Empty`. There are no other radii; a new shape joins this table or uses one of these.
+Always add `borderCurve: "continuous"` with a radius, as iOS does. Circles and bars use half their size: icon discs, the shutter and the two 54-point camera buttons beside it, the 64-point disc in `Empty`, and the thin progress and spending bars. There are no other radii; a new shape joins this table or uses one of these.
 
 ## Elevation
 

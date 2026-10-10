@@ -65,14 +65,12 @@ export function ReceiptCategorySpending({
           >
             {selected && (
               <>
-                <View style={{ gap: 2 }}>
-                  <Amount testID="receipt-category-total">
-                    {Ore.format(selected.amountOre)}
-                  </Amount>
-                  <Copy size={13} muted>
-                    Etter rabatt, uten pant og pantretur.
-                  </Copy>
-                </View>
+                <Amount
+                  testID="receipt-category-total"
+                  detail="Etter rabatt, uten pant og pantretur."
+                >
+                  {Ore.format(selected.amountOre)}
+                </Amount>
                 {totals.unknown > 0 && (
                   <Notice tone="warning">
                     Beløp mangler på noen linjer. Summene er ufullstendige.

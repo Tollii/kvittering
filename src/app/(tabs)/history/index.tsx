@@ -35,10 +35,9 @@ import {
 import { IllustratedEmpty } from "@/components/monument-artwork";
 import { openReceipt } from "@/components/receipt-card";
 import { SpendingBars } from "@/components/spending-details";
-import { useHousehold } from "@/features/household-context";
+import { OfflineNotice } from "@/features/offline-notice";
 
 export default function History() {
-  const { online } = useHousehold();
   const { fontScale } = useWindowDimensions();
   const [search, setSearch] = useState("");
   const [tab, setTab] = useState<"receipts" | "products">("receipts");
@@ -129,7 +128,7 @@ export default function History() {
           { value: "products", label: `Varer (${products.length})` },
         ]}
       />
-      {!online && <Notice icon="wifi.slash">Uten nett</Notice>}
+      <OfflineNotice />
       {!completeReceipts && (
         <Notice>
           {tab === "products" || term
@@ -179,7 +178,7 @@ export default function History() {
                 </View>
               );
             })}
-          {tab === "products" && products.length > 0 && (
+          {tab === "products" && (
             <List>
               {products.map((product) => (
                 <Row
@@ -218,12 +217,9 @@ export default function History() {
       >
         {selected && prices && (
           <>
-            <View style={{ gap: 2 }}>
-              <Amount>{Ore.format(selected.amountOre)}</Amount>
-              <Copy size={13} muted>
-                {selected.purchases.size} kjøp
-              </Copy>
-            </View>
+            <Amount detail={`${selected.purchases.size} kjøp`}>
+              {Ore.format(selected.amountOre)}
+            </Amount>
             <Panel
               style={{
                 flexDirection: fontScale > 1.3 ? "column" : "row",

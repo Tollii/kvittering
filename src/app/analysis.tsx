@@ -23,7 +23,7 @@ import {
   Segments,
 } from "@/components/ui";
 import { SpendingDetails } from "@/components/spending-details";
-import { useHousehold } from "@/features/household-context";
+import { OfflineNotice } from "@/features/offline-notice";
 import {
   analysisPeriod,
   analysisSummary,
@@ -33,7 +33,6 @@ import {
 
 export default function Analysis() {
   const spendingAnalysisEnabled = useFeatureFlag("spendingAnalysis");
-  const { online } = useHousehold();
   const { month } = useLocalSearchParams<{ month?: string }>();
   const [frequency, setFrequency] = useState<AnalysisFrequency>("month");
 
@@ -98,7 +97,7 @@ export default function Analysis() {
   return (
     <Screen insetTop={false}>
       <Stack.Screen options={{ title: "Forbruksanalyse" }} />
-      {!online && <Notice icon="wifi.slash">Uten nett</Notice>}
+      <OfflineNotice />
       <Segments
         value={frequency}
         onChange={setFrequency}
@@ -134,16 +133,15 @@ export default function Analysis() {
         <Notice>Henter hele historikken før analysen vises …</Notice>
       ) : (
         <>
-          <View style={{ gap: 4 }}>
-            <Amount>{Ore.format(report.currentOre)}</Amount>
-            <Copy selectable>{analysisSummary(report)}</Copy>
-            <Copy muted size={13}>
-              Sammenlignet med {CalendarDate.format(period.previousStart)} –{" "}
-              {CalendarDate.format(period.previousEnd)}.{" "}
-              {report.currentReceipts} mot {report.previousReceipts}{" "}
-              kvitteringer. Gjelder registrerte kjøp, ikke målt forbruk.
-            </Copy>
-          </View>
+          <Amount detail={analysisSummary(report)}>
+            {Ore.format(report.currentOre)}
+          </Amount>
+          <Copy muted size={13}>
+            Sammenlignet med {CalendarDate.format(period.previousStart)} –{" "}
+            {CalendarDate.format(period.previousEnd)}. {report.currentReceipts}{" "}
+            mot {report.previousReceipts} kvitteringer. Gjelder registrerte
+            kjøp, ikke målt forbruk.
+          </Copy>
           {(report.provisionalReceipts > 0 || report.missingAmounts > 0) && (
             <Notice tone="warning">
               {report.provisionalReceipts} kvitteringer er foreløpige.{" "}
@@ -153,24 +151,22 @@ export default function Analysis() {
           {report.previousReceipts > 0 && (
             <>
               <SectionTitle title="Kort forklart" />
-              {explanations.length > 0 && (
-                <List>
-                  {explanations.map((explanation) => (
-                    <Row
-                      key={explanation.id}
-                      title={explanation.name}
-                      detail={explanation.detail}
-                      onPress={() =>
-                        setSelection({
-                          period: periodKey,
-                          dimension: "change",
-                          key: explanation.id,
-                        })
-                      }
-                    />
-                  ))}
-                </List>
-              )}
+              <List>
+                {explanations.map((explanation) => (
+                  <Row
+                    key={explanation.id}
+                    title={explanation.name}
+                    detail={explanation.detail}
+                    onPress={() =>
+                      setSelection({
+                        period: periodKey,
+                        dimension: "change",
+                        key: explanation.id,
+                      })
+                    }
+                  />
+                ))}
+              </List>
               {!explanations.length && (
                 <Copy muted>
                   {report.effects.length
@@ -213,25 +209,23 @@ export default function Analysis() {
                     mengde i begge perioder.
                   </Copy>
                 )}
-                {report.effects.length > 0 && (
-                  <List>
-                    {report.effects.map((effect) => (
-                      <Row
-                        key={effect.id}
-                        title={effect.name}
-                        value={Ore.format(effect.differenceOre)}
-                        detail={`${effect.previousQuantity} → ${effect.currentQuantity} ${effect.unit} · pris ${Ore.format(effect.priceOre)}, mengde ${Ore.format(effect.quantityOre)}`}
-                        onPress={() =>
-                          setSelection({
-                            period: periodKey,
-                            dimension: "effect",
-                            key: effect.id,
-                          })
-                        }
-                      />
-                    ))}
-                  </List>
-                )}
+                <List>
+                  {report.effects.map((effect) => (
+                    <Row
+                      key={effect.id}
+                      title={effect.name}
+                      value={Ore.format(effect.differenceOre)}
+                      detail={`${effect.previousQuantity} → ${effect.currentQuantity} ${effect.unit} · pris ${Ore.format(effect.priceOre)}, mengde ${Ore.format(effect.quantityOre)}`}
+                      onPress={() =>
+                        setSelection({
+                          period: periodKey,
+                          dimension: "effect",
+                          key: effect.id,
+                        })
+                      }
+                    />
+                  ))}
+                </List>
               </Disclosure>
             </>
           )}

@@ -1,6 +1,7 @@
 import {
   StyleSheet,
   Text,
+  View,
   type PressableStateCallbackType,
   type TextProps,
   type ViewStyle,
@@ -18,7 +19,7 @@ export function Copy({
 }: TextProps & {
   muted?: boolean;
   size?: number;
-  weight?: "400" | "500" | "600" | "700" | "800";
+  weight?: "400" | "500" | "600" | "700";
 }) {
   const colors = useTheme();
 
@@ -45,27 +46,41 @@ export function Copy({
 }
 
 /**
- * A large amount or count that a screen or sheet leads with. `hero` sits on
- * the cobalt summary band; `sheet` opens a sheet or a detail view on paper.
+ * A large amount that a screen or sheet leads with, and the one line that
+ * explains it. `hero` puts it on the cobalt summary band; otherwise it opens
+ * a sheet or a detail view on paper.
  */
 export function Amount({
-  size = "sheet",
+  hero = false,
+  detail,
   style,
   ...props
-}: Omit<TextProps, "style"> & {
-  size?: "hero" | "sheet";
-  style?: TextProps["style"];
-}) {
+}: TextProps & { hero?: boolean; detail?: string }) {
   const colors = useTheme();
 
-  return (
+  const amount = (
     <Copy
       selectable
-      size={size === "hero" ? 36 : 32}
-      weight={size === "hero" ? "600" : "700"}
-      style={[size === "hero" && { color: colors.onHero }, style]}
+      size={hero ? 36 : 32}
+      weight={hero ? "600" : "700"}
+      style={[hero && { color: colors.onHero }, style]}
       {...props}
     />
+  );
+
+  if (!detail) return amount;
+
+  return (
+    <View style={{ gap: 2 }}>
+      {amount}
+      <Copy
+        size={13}
+        muted={!hero}
+        style={hero && { color: colors.onHeroMuted }}
+      >
+        {detail}
+      </Copy>
+    </View>
   );
 }
 

@@ -15,6 +15,7 @@ import {
 } from "@/lib/receipt-draft";
 import { Button, IconButton, Notice, Screen } from "@/components/ui";
 import { ReceiptLineEditor } from "@/features/receipt-line-editor";
+import { OfflineNotice } from "@/features/offline-notice";
 import { ReceiptCategorySpending } from "@/features/receipt-category-spending";
 import { ReceiptFields } from "@/features/receipt-fields";
 import {
@@ -407,7 +408,7 @@ export function ReceiptEditor({
           ) : undefined
         }
       >
-        {!online && <Notice icon="wifi.slash">Uten nett</Notice>}
+        <OfflineNotice />
         {!!storageError && <Notice tone="error">{storageError}</Notice>}
         {stale && (
           <StaleRevisionNotice dirty={dirty} onReload={() => reset(receipt)} />
