@@ -2,7 +2,13 @@ import { needsAttention } from "@/lib/domain/receipt-state";
 import { ReceiptActivityButton } from "@/features/receipt-activity";
 import { useCompleteReceipts } from "@/features/receipt-queries";
 import { UploadQueueCard } from "@/features/upload-queue-card";
-import { SectionTitle } from "@/components/ui";
+import Animated, { LayoutAnimationConfig } from "react-native-reanimated";
+import {
+  SectionTitle,
+  useArrival,
+  useDeparture,
+  useSettle,
+} from "@/components/ui";
 import { ReceiptCard, openReceipt } from "@/components/receipt-card";
 import { SwipeToApprove } from "@/features/swipe-approve";
 import { useHousehold } from "@/features/household-context";
@@ -44,6 +50,9 @@ export function PendingReceipts({
   queue,
 }: Readonly<ReturnType<typeof usePendingReceipts>>) {
   const { online, retryFailedUploads } = useHousehold();
+  const arrival = useArrival();
+  const approved = useDeparture("left");
+  const settle = useSettle();
 
   return (
     <>
@@ -69,15 +78,21 @@ export function PendingReceipts({
               if (next) openReceipt(next);
             }}
           />
-          {attention.map((receipt) => (
-            <SwipeToApprove
-              key={receipt._id}
-              receipt={receipt}
-              enabled={online}
-            >
-              <ReceiptCard receipt={receipt} />
-            </SwipeToApprove>
-          ))}
+          {/* Cards already waiting are just there; one that finishes processing arrives. */}
+          <LayoutAnimationConfig skipEntering>
+            {attention.map((receipt) => (
+              <Animated.View
+                key={receipt._id}
+                entering={arrival}
+                exiting={approved}
+                layout={settle}
+              >
+                <SwipeToApprove receipt={receipt} enabled={online}>
+                  <ReceiptCard receipt={receipt} />
+                </SwipeToApprove>
+              </Animated.View>
+            ))}
+          </LayoutAnimationConfig>
         </>
       )}
       {(working.length > 0 || queue.length > 0) && (

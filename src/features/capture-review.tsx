@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from "react";
+import type { ReactNode } from "react";
 import { Image, View } from "react-native";
 import {
   Button,
@@ -15,8 +15,8 @@ import { maxReceiptImages } from "@/lib/receipt-import";
 
 /** Review prepared images before saving them to the upload queue. */
 export function CaptureReview({
-  photos: selectedPhotos,
-  combined: selectedCombined,
+  photos,
+  combined,
   visible,
   busy,
   error,
@@ -38,24 +38,6 @@ export function CaptureReview({
   onCombinedChange: (value: boolean) => void;
 }>) {
   const colors = useTheme();
-
-  // Saving empties the selection while the sheet is still closing, so the
-  // closing sheet keeps showing what was saved instead of "0 bilder".
-  const [lastShown, setLastShown] = useState({
-    photos: selectedPhotos,
-    combined: selectedCombined,
-  });
-
-  if (
-    visible &&
-    (lastShown.photos !== selectedPhotos ||
-      lastShown.combined !== selectedCombined)
-  )
-    setLastShown({ photos: selectedPhotos, combined: selectedCombined });
-
-  const { photos, combined } = visible
-    ? { photos: selectedPhotos, combined: selectedCombined }
-    : lastShown;
 
   return (
     <Sheet
@@ -134,19 +116,17 @@ export function CaptureReview({
               disabled={busy}
               accessibilityState={{ disabled: busy }}
               onPress={() => onRemovePhoto(uri)}
-              style={[
-                {
-                  position: "absolute",
-                  right: 4,
-                  top: 4,
-                  width: 44,
-                  height: 44,
-                  borderRadius: 22,
-                  backgroundColor: colors.cameraOverlayStrong,
-                  alignItems: "center",
-                  justifyContent: "center",
-                },
-              ]}
+              style={{
+                position: "absolute",
+                right: 4,
+                top: 4,
+                width: 44,
+                height: 44,
+                borderRadius: 22,
+                backgroundColor: colors.cameraOverlayStrong,
+                alignItems: "center",
+                justifyContent: "center",
+              }}
             >
               <Icon name="xmark" size={12} color={colors.onCamera} />
             </Press>

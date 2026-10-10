@@ -10,6 +10,7 @@ import Animated, {
   FadeIn,
   FadeOut,
   Keyframe,
+  LinearTransition,
   ReduceMotion,
   createAnimatedComponent,
   cubicBezier,
@@ -123,10 +124,11 @@ export function useArrival() {
 }
 
 /**
- * How such content leaves on its own: back the way it came, faster than it
- * arrived, because the person is not waiting on it.
+ * How content leaves on its own: back the way it came, faster than it
+ * arrived, because the person is not waiting on it. `left` continues a swipe
+ * to the left, as an approved receipt does.
  */
-export function useDeparture() {
+export function useDeparture(toward: "up" | "left" = "up") {
   const reduced = useReducedMotion();
   const easing = Easing.bezier(...motion.easeOut);
 
@@ -135,8 +137,21 @@ export function useDeparture() {
       .easing(easing)
       .reduceMotion(ReduceMotion.Never);
 
+  const away =
+    toward === "left" ? { translateX: -motion.swipeExit } : { translateY: -6 };
+
   return new Keyframe({
-    0: { opacity: 1, transform: [{ translateY: 0 }] },
-    100: { opacity: 0, transform: [{ translateY: -6 }], easing },
+    0: { opacity: 1, transform: [{ translateX: 0 }, { translateY: 0 }] },
+    100: { opacity: 0, transform: [away], easing },
   }).duration(motion.press);
+}
+
+/**
+ * How the rest of a list closes up after one of its items leaves. Reduce
+ * Motion snaps it into place.
+ */
+export function useSettle() {
+  return LinearTransition.duration(motion.state).easing(
+    Easing.bezier(...motion.easeInOut),
+  );
 }

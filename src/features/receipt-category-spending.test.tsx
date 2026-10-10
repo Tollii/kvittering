@@ -1,5 +1,10 @@
 import { expect, test } from "@jest/globals";
-import { fireEvent, render, screen } from "@testing-library/react-native";
+import {
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+} from "@testing-library/react-native";
 import { emptyLine } from "@/lib/domain/receipt";
 import { batteryFixture } from "@/lib/mock-receipts";
 import { Ore } from "@/lib/domain/ore";
@@ -27,7 +32,8 @@ test("opens the category's items and updates the selected total from the draft",
   expect(screen.getByText("BATTERY REMIX")).toBeTruthy();
   expect(screen.queryByText(Ore.format(Ore.of(2331)))).toBeNull();
   await fireEvent.press(screen.getByRole("button", { name: "Lukk" }));
-  expect(screen.queryByText("BATTERY REMIX")).toBeNull();
+  // The sheet keeps its content while it slides away.
+  await waitFor(() => expect(screen.queryByText("BATTERY REMIX")).toBeNull());
 });
 
 test("makes categories outside the first five available", async () => {

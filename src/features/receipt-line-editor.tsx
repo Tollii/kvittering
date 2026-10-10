@@ -333,14 +333,12 @@ function LineHeader({
       accessibilityLabel={`${expanded ? "Skjul" : "Rediger"} ${line.name || "ny vare"}, ${Ore.format(line.amountOre)}`}
       accessibilityState={{ expanded }}
       onPress={onPress}
-      style={[
-        {
-          minHeight: 44,
-          flexDirection: "row",
-          alignItems: "center",
-          gap: 10,
-        },
-      ]}
+      style={{
+        minHeight: 44,
+        flexDirection: "row",
+        alignItems: "center",
+        gap: 10,
+      }}
     >
       <View style={{ flex: 1, gap: 1 }}>
         <Copy
@@ -468,15 +466,13 @@ function LineProductRow({
               : `${productLabel} for ${line.name}. Endre produktkobling`
           }
           onPress={onOpenCatalog}
-          style={[
-            {
-              minHeight: 44,
-              flexDirection: "row",
-              alignItems: "center",
-              gap: 5,
-              marginLeft: "auto",
-            },
-          ]}
+          style={{
+            minHeight: 44,
+            flexDirection: "row",
+            alignItems: "center",
+            gap: 5,
+            marginLeft: "auto",
+          }}
         >
           <Icon
             name={productMissing ? "link" : "checkmark.circle"}

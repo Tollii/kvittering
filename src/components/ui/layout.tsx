@@ -1,4 +1,4 @@
-import { type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import {
   KeyboardAvoidingView,
   Platform,
@@ -214,14 +214,11 @@ export function Screen({
 }
 
 export function Sheet({
-  title,
   visible,
   onClose,
-  children,
-  header,
-  footer,
   dismissible = true,
   scrollable = true,
+  ...content
 }: Readonly<{
   title: string;
   visible: boolean;
@@ -233,6 +230,28 @@ export function Sheet({
   footer?: ReactNode;
 }>) {
   const colors = useTheme();
+
+  // Callers often clear what a sheet shows in the same update that closes it,
+  // so a closing sheet keeps its last content while it slides away.
+  const [lastOpen, setLastOpen] = useState(content);
+  const [wasVisible, setWasVisible] = useState(visible);
+  const [closing, setClosing] = useState(false);
+
+  if (visible && !sameContent(lastOpen, content)) setLastOpen(content);
+
+  if (wasVisible !== visible) {
+    setWasVisible(visible);
+    setClosing(!visible);
+  }
+
+  useEffect(() => {
+    if (!closing) return undefined;
+    const timeout = setTimeout(() => setClosing(false), sheetDismissal);
+
+    return () => clearTimeout(timeout);
+  }, [closing]);
+
+  const { title, header, footer, children } = closing ? lastOpen : content;
 
   return (
     <SheetPresentation
@@ -307,5 +326,24 @@ export function Sheet({
         </KeyboardAvoidingView>
       </SafeAreaView>
     </SheetPresentation>
+  );
+}
+
+/** Longer than the system's sheet dismissal, which runs about 350 ms. */
+const sheetDismissal = 500;
+
+type SheetContent = Readonly<{
+  title: string;
+  children: ReactNode;
+  header?: ReactNode;
+  footer?: ReactNode;
+}>;
+
+function sameContent(a: SheetContent, b: SheetContent) {
+  return (
+    a.title === b.title &&
+    a.children === b.children &&
+    a.header === b.header &&
+    a.footer === b.footer
   );
 }
