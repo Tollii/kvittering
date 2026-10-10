@@ -143,6 +143,7 @@ export default function Corrections() {
                   isDecidedCategory(entry.expected)
                     ? () => {
                         setTargetKeys([]);
+                        setError("");
                         setSelected(entry._id);
                       }
                     : undefined

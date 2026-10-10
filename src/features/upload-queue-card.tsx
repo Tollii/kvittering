@@ -36,7 +36,7 @@ export function UploadQueueCard({
           </Copy>
           <Copy size={13} muted>
             {entry.error
-              ? "Prøver igjen"
+              ? "Venter på nytt forsøk"
               : online
                 ? `Laster opp · ${uploaded} av ${entry.images.length}`
                 : "Venter på nett"}
