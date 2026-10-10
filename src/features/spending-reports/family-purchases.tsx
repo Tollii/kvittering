@@ -2,7 +2,7 @@ import { CalendarDate } from "@/lib/domain/calendar";
 import { Ore } from "@/lib/domain/ore";
 import { useState } from "react";
 import { Pressable } from "react-native";
-import { Amount, Copy, Icon, List, Row, pressed } from "./ui";
+import { Amount, Copy, Icon, List, Row, pressed } from "@/components/ui";
 import { useTheme } from "@/constants/theme";
 import {
   familyInsights,
@@ -10,7 +10,7 @@ import {
   partialQuantity,
 } from "@/lib/domain/family-insights";
 import type { Receipt } from "@/lib/domain/insights";
-import { openReceipt } from "./receipt-card";
+import { openReceipt } from "@/components/receipt-card";
 
 /** Sheet content: quantities of the same product across pack sizes and stores. */
 export function FamilyPurchases({

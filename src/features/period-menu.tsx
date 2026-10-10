@@ -1,5 +1,5 @@
 import { CalendarMonth } from "@/lib/domain/calendar";
-import { Copy } from "./ui";
+import { Copy } from "@/components/ui";
 import { useTheme } from "@/constants/theme";
 
 export type PeriodMenuProps = Readonly<{

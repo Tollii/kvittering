@@ -10,6 +10,7 @@ Cobalt ink on warm paper. A cobalt header and summary band carry the screen's id
 
 - Use theme tokens through `useTheme()`; never write a colour literal. The [widgets](foundations.md#widgets) are the one exception.
 - Build from the shared components, and extend one when it cannot express what you need instead of restyling a `View`.
+- Put a component where its reach says: the presentation catalogue in `src/components/ui`, a domain component that several screens share in `src/components`, and a component that one screen or sheet uses next to that screen in `src/features`. See [where components live](components.md#where-components-live).
 - Every list sits in a `List` card; every large amount is an `Amount`; every cobalt band is a `SummaryBand`. When two screens need the same thing, they share the component rather than the styles.
 - Use native iOS presentation first: a `Sheet` for choices and short edits, a system alert for confirmations, a native menu for a short fixed list such as the month menu, and `Select` or a sheet for a long or searchable list.
 - Keep touch targets at 44 points and check layouts at the largest text size.

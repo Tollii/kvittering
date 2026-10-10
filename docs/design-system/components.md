@@ -2,6 +2,16 @@
 
 Shared presentation components live in [`src/components/ui`](../../src/components/ui) and are imported from `@/components/ui`. Reach for these before styling a `View` or `Pressable` yourself; when a screen needs something they cannot express, extend the component rather than copying its styles. The source owns props and exact styles; this page explains purpose, variants, and states.
 
+## Where components live
+
+A component's folder says how far it reaches, so a reader knows what a change touches:
+
+- [`src/components/ui`](../../src/components/ui) is the catalogue: presentation only, no household data, used anywhere. Everything on this page below lives here unless it says otherwise.
+- [`src/components`](../../src/components) holds domain components that more than one screen shares: `ReceiptCard` and its status helpers, `SpendingBars` and `SpendingDetails`, `MoneyField`, `ReceiptTip`, and the monument artwork.
+- [`src/features`](../../src/features) holds screens' own parts, next to the screen or sheet that uses them: the receipt editor's sections, the spending reports with their calendar, family purchases and store map, the period menu of Forbruk, and the context menu of Historikk.
+
+When a second screen needs a feature's component, move it up to `src/components` in the same change; when it needs new styling, extend the `ui` component it is built from.
+
 ## Text and icons
 
 **`Copy`** ([typography](../../src/components/ui/typography.tsx)) is the only text component. It takes `size`, `weight`, and `muted`, and sets line height, tracking, and tabular numerals. See [typography](foundations.md#typography) for the size of each role.
@@ -85,4 +95,4 @@ Pass `insetTop={false}` when a native stack header already covers the top inset.
 
 **`NativeForm`** and **`FormSection`** ([native form](../../src/components/ui/native-form.ios.tsx)) render a SwiftUI grouped form on iOS for settings-style screens and field sheets, with React Native content inside each section. Each section takes the theme's `surface` as its row background, so settings cards match every other card in both colour schemes.
 
-**Native menus.** `PeriodMenu` ([period menu](../../src/components/period-menu.ios.tsx)) and `ReceiptContextMenu` ([context menu](../../src/components/receipt-context-menu.ios.tsx)) use SwiftUI menus on iOS; each has a plain fallback for other platforms in the same folder.
+**Native menus.** `PeriodMenu` ([period menu](../../src/features/period-menu.ios.tsx)) and `ReceiptContextMenu` ([context menu](../../src/features/receipt-context-menu.ios.tsx)) use SwiftUI menus on iOS; each has a plain fallback for other platforms in the same folder.

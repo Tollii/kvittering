@@ -6,7 +6,7 @@ import {
   productHistory,
   productPrices,
 } from "@/lib/domain/insights";
-import { ReceiptContextMenu } from "@/components/receipt-context-menu";
+import { ReceiptContextMenu } from "@/features/receipt-context-menu";
 import { router, Stack } from "expo-router";
 import {
   useCompleteReceipts,

@@ -5,8 +5,11 @@ import { type ComponentProps, type ReactNode } from "react";
 import { View } from "react-native";
 import { Copy, Empty, Icon, List, Notice, Row } from "@/components/ui";
 import { SpendingBars } from "@/components/spending-details";
-import { FamilyPurchases, familySummary } from "@/components/family-purchases";
-import { SpendingCalendar } from "@/components/spending-calendar";
+import {
+  FamilyPurchases,
+  familySummary,
+} from "@/features/spending-reports/family-purchases";
+import { SpendingCalendar } from "@/features/spending-reports/spending-calendar";
 import { openReceipt } from "@/components/receipt-card";
 import { isCategoryUncertain } from "@/lib/domain/receipt-issues";
 import {

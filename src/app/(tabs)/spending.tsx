@@ -4,7 +4,7 @@ import { shortcutMonth } from "@/lib/shortcut-selection";
 import { z } from "zod";
 import { WidgetTip } from "@/features/widget-tip";
 import { usePurchaseWidget } from "@/features/purchase-widget";
-import { PeriodMenu } from "@/components/period-menu";
+import { PeriodMenu } from "@/features/period-menu";
 import {
   useSpendingReports,
   reportIds,

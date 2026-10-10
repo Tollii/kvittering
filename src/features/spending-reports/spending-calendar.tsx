@@ -1,7 +1,7 @@
 import { CalendarDate, CalendarMonth } from "@/lib/domain/calendar";
 import { Ore } from "@/lib/domain/ore";
 import { Pressable, View, useWindowDimensions } from "react-native";
-import { Copy, Empty, Row, faded, pressed } from "./ui";
+import { Copy, Empty, Row, faded, pressed } from "@/components/ui";
 import { radius, useTheme } from "@/constants/theme";
 import {
   spendingCalendar,

@@ -18,7 +18,7 @@ import {
   Segments,
   Sheet,
 } from "@/components/ui";
-import { StoreMap } from "@/components/store-map";
+import { StoreMap } from "@/features/spending-reports/store-map";
 import {
   storeSpending,
   type StorePurchase,
