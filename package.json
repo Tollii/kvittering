@@ -7,7 +7,7 @@
     "@ai-sdk/anthropic": "^4.0.75",
     "@ai-sdk/openai": "^4.0.87",
     "@ai-sdk/typesafe-ai": "^3.0.15",
-    "@better-auth/core": "1.6.33",
+    "@better-auth/core": "1.7.7",
     "@better-auth/expo": "1.6.33",
     "@convex-dev/better-auth": "^0.12.5",
     "@convex-dev/rate-limiter": "^0.4.0",
