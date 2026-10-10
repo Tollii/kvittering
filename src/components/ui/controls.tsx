@@ -5,7 +5,6 @@ import {
   InputAccessoryView,
   Keyboard,
   Platform,
-  Pressable,
   Switch,
   TextInput,
   useWindowDimensions,
@@ -16,7 +15,8 @@ import {
 } from "react-native";
 import { type SymbolViewProps } from "expo-symbols";
 import { radius, useTheme } from "@/constants/theme";
-import { Copy, Icon, faded, pressed, styles } from "./typography";
+import { Copy, Icon, faded, styles } from "./typography";
+import { Press } from "./motion";
 
 export function IconButton({
   name,
@@ -39,13 +39,13 @@ export function IconButton({
   const colors = useTheme();
 
   return (
-    <Pressable
+    <Press
       accessibilityRole="button"
       accessibilityLabel={label}
       accessibilityState={{ disabled }}
       disabled={disabled}
       onPress={onPress}
-      style={(state) => [
+      style={[
         styles.iconButton,
         !!filled && {
           backgroundColor: filled === true ? colors.muted : filled,
@@ -53,12 +53,11 @@ export function IconButton({
           minWidth: 44,
           minHeight: 44,
         },
-        pressed(state),
         faded(disabled),
       ]}
     >
       <Icon name={name} size={size} color={color} />
-    </Pressable>
+    </Press>
   );
 }
 
@@ -97,13 +96,13 @@ export function Button({
   }[variant];
 
   return (
-    <Pressable
+    <Press
       testID={testID}
       accessibilityRole="button"
       accessibilityState={{ disabled: disabled || busy, busy }}
       disabled={disabled || busy}
       onPress={onPress}
-      style={(state) => [
+      style={[
         {
           minHeight: compact ? 44 : 50,
           paddingVertical: compact ? 8 : 12,
@@ -117,7 +116,6 @@ export function Button({
           gap: 8,
         },
         style,
-        pressed(state),
         faded(disabled && !busy),
       ]}
     >
@@ -138,7 +136,7 @@ export function Button({
       >
         {title}
       </Copy>
-    </Pressable>
+    </Press>
   );
 }
 
@@ -167,27 +165,24 @@ export function Chip({
   }[tone];
 
   return (
-    <Pressable
+    <Press
       accessibilityRole={onPress ? "button" : "text"}
       accessibilityLabel={accessibilityLabel ?? label}
       disabled={!onPress}
       onPress={onPress}
-      style={(state) => [
-        {
-          flexDirection: "row",
-          alignItems: "center",
-          gap: 5,
-          minHeight: onPress ? 44 : 30,
-          paddingHorizontal: 10,
-          paddingVertical: 5,
-          borderRadius: radius.chip,
-          borderCurve: "continuous",
-          backgroundColor: palette.background,
-          alignSelf: "flex-start",
-          maxWidth: "100%",
-        },
-        onPress ? pressed(state) : null,
-      ]}
+      style={{
+        flexDirection: "row",
+        alignItems: "center",
+        gap: 5,
+        minHeight: onPress ? 44 : 30,
+        paddingHorizontal: 10,
+        paddingVertical: 5,
+        borderRadius: radius.chip,
+        borderCurve: "continuous",
+        backgroundColor: palette.background,
+        alignSelf: "flex-start",
+        maxWidth: "100%",
+      }}
     >
       {icon && <Icon name={icon} size={12} color={palette.text} />}
       <Copy
@@ -200,7 +195,7 @@ export function Chip({
       {onPress && trailing === "chevron" && (
         <Icon name="chevron.down" size={9} color={palette.text} />
       )}
-    </Pressable>
+    </Press>
   );
 }
 
@@ -359,26 +354,24 @@ export function Segments<T extends string>({
         const active = value === option.value;
 
         return (
-          <Pressable
+          <Press
+            feedback="highlight"
             key={option.value}
             accessibilityRole="tab"
             accessibilityState={{ selected: active }}
             onPress={() => onChange(option.value)}
-            style={(state) => [
-              {
-                flex: fontScale > 1.3 ? undefined : 1,
-                minHeight: 44,
-                justifyContent: "center",
-                alignItems: "center",
-                backgroundColor: active ? colors.surface : "transparent",
-                borderWidth: 1,
-                borderColor: active ? colors.primary : "transparent",
-                borderRadius: radius.control - 4,
-                borderCurve: "continuous",
-                padding: 8,
-              },
-              pressed(state),
-            ]}
+            style={{
+              flex: fontScale > 1.3 ? undefined : 1,
+              minHeight: 44,
+              justifyContent: "center",
+              alignItems: "center",
+              backgroundColor: active ? colors.surface : "transparent",
+              borderWidth: 1,
+              borderColor: active ? colors.primary : "transparent",
+              borderRadius: radius.control - 4,
+              borderCurve: "continuous",
+              padding: 8,
+            }}
           >
             <Copy
               size={14}
@@ -390,7 +383,7 @@ export function Segments<T extends string>({
             >
               {option.label}
             </Copy>
-          </Pressable>
+          </Press>
         );
       })}
     </View>

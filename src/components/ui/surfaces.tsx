@@ -1,15 +1,16 @@
 import { Children, isValidElement, useState, type ReactNode } from "react";
 import {
   ActivityIndicator,
-  Pressable,
   View,
   useWindowDimensions,
   type StyleProp,
   type ViewStyle,
 } from "react-native";
 import { type SymbolViewProps } from "expo-symbols";
-import { radius, useTheme } from "@/constants/theme";
-import { Copy, Icon, pressed, styles } from "./typography";
+import Animated from "react-native-reanimated";
+import { motion, radius, useTheme } from "@/constants/theme";
+import { Copy, Icon, styles } from "./typography";
+import { Press, easeInOut, useArrival } from "./motion";
 
 export function Panel({
   children,
@@ -147,18 +148,16 @@ export function SectionTitle({
         )}
       </View>
       {!!action && onAction && (
-        <Pressable
+        <Press
+          feedback="highlight"
           accessibilityRole="button"
           onPress={onAction}
-          style={(state) => [
-            { minHeight: 44, justifyContent: "center", paddingLeft: 12 },
-            pressed(state),
-          ]}
+          style={[{ minHeight: 44, justifyContent: "center", paddingLeft: 12 }]}
         >
           <Copy size={14} weight="600" style={{ color: colors.primary }}>
             {action}
           </Copy>
-        </Pressable>
+        </Press>
       )}
     </View>
   );
@@ -176,15 +175,22 @@ export function Disclosure({
   initiallyOpen?: boolean;
 }>) {
   const [open, setOpen] = useState(initiallyOpen);
+  // Detail that is open from the start is already there; only a tap brings it in.
+  const [toggled, setToggled] = useState(false);
+  const arrival = useArrival();
   const colors = useTheme();
 
   return (
     <Panel style={{ gap: open ? 10 : 0 }}>
-      <Pressable
+      <Press
+        feedback="highlight"
         accessibilityRole="button"
         accessibilityState={{ expanded: open }}
-        onPress={() => setOpen(!open)}
-        style={(state) => [styles.row, { minHeight: 44 }, pressed(state)]}
+        onPress={() => {
+          setOpen(!open);
+          setToggled(true);
+        }}
+        style={[styles.row, { minHeight: 44 }]}
       >
         <Copy weight="600" style={{ flex: 1 }}>
           {title}
@@ -194,13 +200,25 @@ export function Disclosure({
             {value}
           </Copy>
         )}
-        <Icon
-          name={open ? "chevron.up" : "chevron.down"}
-          size={12}
-          color={colors.secondary}
-        />
-      </Pressable>
-      {open && children}
+        <Animated.View
+          style={{
+            transform: [{ rotate: open ? "180deg" : "0deg" }],
+            transitionProperty: "transform",
+            transitionDuration: motion.state,
+            transitionTimingFunction: easeInOut,
+          }}
+        >
+          <Icon name="chevron.down" size={12} color={colors.secondary} />
+        </Animated.View>
+      </Press>
+      {open && (
+        <Animated.View
+          entering={toggled ? arrival : undefined}
+          style={{ gap: 10 }}
+        >
+          {children}
+        </Animated.View>
+      )}
     </Panel>
   );
 }
@@ -288,13 +306,9 @@ export function Notice({
   );
 
   return onPress ? (
-    <Pressable
-      accessibilityRole="button"
-      onPress={onPress}
-      style={(state) => [frame, pressed(state)]}
-    >
+    <Press accessibilityRole="button" onPress={onPress} style={[frame]}>
       {content}
-    </Pressable>
+    </Press>
   ) : (
     <View style={frame}>{content}</View>
   );
@@ -363,16 +377,13 @@ export function Row({
   const stacked = fontScale > 1.3;
 
   return (
-    <Pressable
+    <Press
+      feedback="highlight"
       accessibilityRole={onPress ? "button" : undefined}
       accessibilityState={onPress ? { selected } : undefined}
       disabled={!onPress}
       onPress={onPress}
-      style={(state) => [
-        styles.row,
-        { minHeight: 52, paddingVertical: 10 },
-        pressed(state),
-      ]}
+      style={[styles.row, { minHeight: 52, paddingVertical: 10 }]}
     >
       {icon && <IconTile icon={icon} />}
       <View style={{ flex: 1, gap: 4 }}>
@@ -396,6 +407,6 @@ export function Row({
       {onPress && !selected && (
         <Icon name="chevron.right" size={13} color={colors.secondary} />
       )}
-    </Pressable>
+    </Press>
   );
 }

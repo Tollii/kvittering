@@ -5,7 +5,7 @@ import { FormSection, NativeForm } from "@/components/ui/native-form";
 import { ReleaseSettings } from "@/features/release-settings";
 import { releaseMutation } from "@/lib/releases/requests";
 import { useState } from "react";
-import { Alert, Platform, Pressable, Share, View } from "react-native";
+import { Alert, Platform, Share, View } from "react-native";
 import { router, Stack } from "expo-router";
 import { useConvex } from "convex/react";
 import * as Clipboard from "expo-clipboard";
@@ -17,7 +17,7 @@ import {
   Icon,
   List,
   Notice,
-  pressed,
+  Press,
   Row,
   Screen,
 } from "@/components/ui";
@@ -232,13 +232,10 @@ function DoneButton() {
   const colors = useTheme();
 
   return (
-    <Pressable
+    <Press
       accessibilityRole="button"
       onPress={() => router.back()}
-      style={(state) => [
-        { minHeight: 44, justifyContent: "center", marginRight: 16 },
-        pressed(state),
-      ]}
+      style={[{ minHeight: 44, justifyContent: "center", marginRight: 16 }]}
     >
       <View
         style={{
@@ -253,6 +250,6 @@ function DoneButton() {
           Ferdig
         </Copy>
       </View>
-    </Pressable>
+    </Press>
   );
 }

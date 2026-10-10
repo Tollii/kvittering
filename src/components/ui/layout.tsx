@@ -2,7 +2,6 @@ import { type ReactNode } from "react";
 import {
   KeyboardAvoidingView,
   Platform,
-  Pressable,
   ScrollView,
   StyleSheet,
   View,
@@ -17,7 +16,8 @@ import { router } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { ArchMark } from "../monument-artwork";
 import { useTheme } from "@/constants/theme";
-import { Copy, Icon, pressed, styles } from "./typography";
+import { Copy, Icon, styles } from "./typography";
+import { Press } from "./motion";
 import { IconButton } from "./controls";
 import { SheetPresentation } from "./sheet-presentation";
 
@@ -32,12 +32,12 @@ export function SettingsButton({
   const camera = surface === "camera";
 
   return (
-    <Pressable
+    <Press
       accessibilityRole="button"
       accessibilityLabel="Husstanden og innstillinger"
       onPress={() => router.push("/settings")}
       hitSlop={6}
-      style={(state) => [
+      style={[
         styles.iconButton,
         {
           width: 44,
@@ -45,7 +45,6 @@ export function SettingsButton({
           borderRadius: 22,
           backgroundColor: camera ? colors.cameraOverlay : colors.heroControl,
         },
-        pressed(state),
       ]}
     >
       <Icon
@@ -53,7 +52,7 @@ export function SettingsButton({
         size={18}
         color={camera ? colors.onCamera : colors.onHero}
       />
-    </Pressable>
+    </Press>
   );
 }
 

@@ -1,9 +1,9 @@
 import { useState } from "react";
-import { Pressable, View } from "react-native";
+import { View } from "react-native";
 import { Image } from "expo-image";
 import { useQuery } from "convex-helpers/react/cache";
 import { api } from "../../convex/_generated/api";
-import { Copy, Icon, Loading, Notice, faded, pressed } from "@/components/ui";
+import { Copy, Icon, Loading, Notice, faded, Press } from "@/components/ui";
 import { radius, useTheme } from "@/constants/theme";
 import { useCatalogSearch } from "./catalog-queries";
 import { useFeatureFlag } from "./featureFlags";
@@ -142,14 +142,14 @@ export function ProductLinkingOptions({
       )}
       <View style={{ gap: 10 }}>
         {candidates.map((product) => (
-          <Pressable
+          <Press
             key={product.key}
             accessibilityRole="button"
             accessibilityLabel={`Velg ${product.name}`}
             accessibilityState={{ disabled }}
             disabled={disabled}
             onPress={() => onSelect(product)}
-            style={(state) => [
+            style={[
               {
                 flexDirection: "row",
                 alignItems: "center",
@@ -159,7 +159,6 @@ export function ProductLinkingOptions({
                 backgroundColor: colors.surface,
                 gap: 16,
               },
-              pressed(state),
               faded(disabled),
             ]}
           >
@@ -175,7 +174,7 @@ export function ProductLinkingOptions({
               )}
             </View>
             <Icon name="chevron.right" size={14} color={colors.secondary} />
-          </Pressable>
+          </Press>
         ))}
       </View>
       {!candidates.length &&

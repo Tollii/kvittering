@@ -16,6 +16,9 @@ module.exports = {
   coverageDirectory: "coverage/components",
   coveragePathIgnorePatterns: ["/node_modules/", "\\.test\\.tsx?$"],
   coverageReporters: ["text-summary", "lcov", "json-summary"],
+  // Worklets loads its JavaScript runtime instead of the native module, so
+  // Reanimated components render in tests.
+  resolver: "react-native-worklets/jest/resolver",
   // Exercise the real receipt validators and Sentry React capture pipeline.
   transformIgnorePatterns: expoPreset.transformIgnorePatterns.map((pattern) =>
     pattern.replace(
