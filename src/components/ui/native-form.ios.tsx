@@ -26,12 +26,11 @@ export function FormSection({ title, children }: FormSectionProps) {
   const [width, setWidth] = useState(0);
 
   return (
-    <Section title={title}>
+    // The theme's card colour on every row, where the system would draw its grey.
+    <Section title={title} modifiers={[listRowBackground(colors.surface)]}>
       <VStack
         modifiers={[
           frame({ maxWidth: Infinity, alignment: "leading" }),
-          // The theme's card colour, where the system would draw its grey.
-          listRowBackground(colors.surface),
           onGeometryChange((geometry) => setWidth(geometry.width)),
         ]}
       >
