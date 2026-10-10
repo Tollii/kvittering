@@ -103,39 +103,27 @@ export const radius = {
 /** Disabled controls fade to this; pressed ones use `pressed()`. */
 export const disabledOpacity = 0.45;
 
-/**
- * The type scale: every text the app draws is one of these roles. `Copy`
- * draws the text roles and `Amount` the two amounts; line height and tracking
- * follow the size. Weight carries meaning, so a caller may override it.
- */
-export const typeScale = {
-  heroAmount: { size: 36, weight: "600" },
-  amount: { size: 32, weight: "700" },
-  screenTitle: { size: 24, weight: "600" },
-  sheetTitle: { size: 20, weight: "700" },
-  sectionTitle: { size: 19, weight: "700" },
-  cardTitle: { size: 17, weight: "600" },
-  body: { size: 16, weight: "400" },
-  detail: { size: 13, weight: "400" },
-  caption: { size: 12, weight: "400" },
-} as const satisfies Record<string, { size: number; weight: FontWeight }>;
-
-export type TypeRole = keyof typeof typeScale;
-
 export type FontWeight = "400" | "500" | "600" | "700";
 
-export function tracking(size: number) {
-  if (size >= 40) return -1.2;
+/**
+ * The type scale: every text the app draws is one of these roles. `Copy`
+ * draws the text roles and `Amount` the two amounts. Large text tightens its
+ * tracking and small text loosens it. Weight carries meaning, so a caller may
+ * override it; the other values belong to the role.
+ */
+export const typeScale = {
+  heroAmount: { size: 36, lineHeight: 40, tracking: -0.7, weight: "600" },
+  amount: { size: 32, lineHeight: 36, tracking: -0.7, weight: "700" },
+  screenTitle: { size: 24, lineHeight: 29, tracking: -0.4, weight: "600" },
+  sheetTitle: { size: 20, lineHeight: 26, tracking: -0.15, weight: "700" },
+  sectionTitle: { size: 19, lineHeight: 25, tracking: -0.15, weight: "700" },
+  cardTitle: { size: 17, lineHeight: 22, tracking: -0.15, weight: "600" },
+  body: { size: 16, lineHeight: 21, tracking: 0, weight: "400" },
+  detail: { size: 13, lineHeight: 17, tracking: 0.05, weight: "400" },
+  caption: { size: 12, lineHeight: 16, tracking: 0.15, weight: "400" },
+} as const satisfies Record<
+  string,
+  { size: number; lineHeight: number; tracking: number; weight: FontWeight }
+>;
 
-  if (size >= 28) return -0.7;
-
-  if (size >= 22) return -0.4;
-
-  if (size >= 17) return -0.15;
-
-  if (size <= 12) return 0.15;
-
-  if (size <= 13) return 0.05;
-
-  return 0;
-}
+export type TypeRole = keyof typeof typeScale;

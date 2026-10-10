@@ -14,7 +14,7 @@ When a second screen needs a feature's component, move it up to `src/components`
 
 ## Text and icons
 
-**`Copy`** ([typography](../../src/components/ui/typography.tsx)) is the only text component. It takes `size`, `weight`, and `muted`, and sets line height, tracking, and tabular numerals. See [typography](foundations.md#typography) for the size of each role.
+**`Copy`** ([typography](../../src/components/ui/typography.tsx)) is the only text component. It takes a `role` (default `body`), an optional `weight` override, and `muted`, and draws the role's size, line height, tracking, and tabular numerals. See [typography](foundations.md#typography) for the roles and where each one appears.
 
 **`Amount`** is the large number a screen or sheet leads with, and `detail` is its one-line explanation under it, such as "3 kjøp" or "12 poster i perioden". `hero` puts it on a `SummaryBand` in `onHero`; otherwise it sits on paper at the top of a sheet or a detail view.
 

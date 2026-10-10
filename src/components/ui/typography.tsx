@@ -3,32 +3,39 @@ import {
   Text,
   View,
   type PressableStateCallbackType,
+  type StyleProp,
   type TextProps,
+  type TextStyle,
   type ViewStyle,
 } from "react-native";
 import { type SymbolViewProps } from "expo-symbols";
 import { SymbolView } from "./symbol";
 import {
   disabledOpacity,
-  tracking,
   typeScale,
   useTheme,
   type FontWeight,
   type TypeRole,
 } from "@/constants/theme";
 
-/** `role` names the type role; accessibility semantics go through `accessibilityRole`. */
-type TypeProps = Omit<TextProps, "role"> & {
+/**
+ * `role` names the type role; accessibility semantics go through
+ * `accessibilityRole`. `style` cannot touch what the role owns.
+ */
+type TypeProps = Omit<TextProps, "role" | "style"> & {
   role: TypeRole;
   /** Overrides the role's weight; weight carries meaning, size does not. */
   weight?: FontWeight;
   muted?: boolean;
+  style?: StyleProp<
+    Omit<TextStyle, "fontSize" | "lineHeight" | "letterSpacing" | "fontWeight">
+  >;
 };
 
 /** Draws one role of the type scale; `Copy` and `Amount` are its two faces. */
 function Type({ role, weight, muted = false, style, ...props }: TypeProps) {
   const colors = useTheme();
-  const { size, weight: roleWeight } = typeScale[role];
+  const scale = typeScale[role];
 
   return (
     <Text
@@ -36,12 +43,10 @@ function Type({ role, weight, muted = false, style, ...props }: TypeProps) {
       style={[
         {
           color: muted ? colors.secondary : colors.text,
-          fontSize: size,
-          fontWeight: weight ?? roleWeight,
-          lineHeight: Math.round(
-            size * (size >= 28 ? 1.12 : size >= 22 ? 1.2 : 1.32),
-          ),
-          letterSpacing: tracking(size),
+          fontSize: scale.size,
+          fontWeight: weight ?? scale.weight,
+          lineHeight: scale.lineHeight,
+          letterSpacing: scale.tracking,
           fontVariant: ["tabular-nums"],
         },
         style,
@@ -51,7 +56,7 @@ function Type({ role, weight, muted = false, style, ...props }: TypeProps) {
 }
 
 /** The text roles; amounts go through `Amount`. */
-export type CopyRole = Exclude<TypeRole, "heroAmount" | "amount">;
+type CopyRole = Exclude<TypeRole, "heroAmount" | "amount">;
 
 export function Copy({
   role = "body",
@@ -70,7 +75,7 @@ export function Amount({
   detail,
   style,
   ...props
-}: Omit<TextProps, "role"> & { hero?: boolean; detail?: string }) {
+}: Omit<TypeProps, "role" | "weight"> & { hero?: boolean; detail?: string }) {
   const colors = useTheme();
 
   const amount = (

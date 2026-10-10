@@ -110,12 +110,7 @@ export default function Settings() {
                 }}
               >
                 <Icon name="key" size={16} />
-                <Copy
-                  selectable
-                  role="detail"
-                  weight="600"
-                  style={{ flex: 1, fontVariant: ["tabular-nums"] }}
-                >
+                <Copy selectable role="detail" weight="600" style={{ flex: 1 }}>
                   {details?.household.invitation ??
                     "Koble til nettet for å hente koden."}
                 </Copy>

@@ -89,7 +89,9 @@ function StoreReport({
         />
         <Panel>
           <View style={{ gap: 2 }}>
-            <Copy role="sectionTitle">{storeName(selected)}</Copy>
+            <Copy accessibilityRole="header" role="sectionTitle">
+              {storeName(selected)}
+            </Copy>
             {!!selected.address && (
               <Copy role="detail" muted>
                 {selected.address}

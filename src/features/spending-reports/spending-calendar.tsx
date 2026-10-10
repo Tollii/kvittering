@@ -138,6 +138,8 @@ export function SpendingCalendar({
                         <Copy
                           role="caption"
                           weight="600"
+                          numberOfLines={1}
+                          adjustsFontSizeToFit
                           style={{
                             color: day.level
                               ? colors.onChart[Math.max(0, 4 - day.level)]
