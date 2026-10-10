@@ -100,8 +100,28 @@ export const radius = {
   tile: 10,
 } as const;
 
-/** Disabled controls fade to this; pressed ones use `pressed()`. */
+/** Disabled controls fade to this; pressed ones dim through `Press`. */
 export const disabledOpacity = 0.45;
+
+/**
+ * Durations in milliseconds and cubic-bézier curves for the app's own motion.
+ * Native tabs, stacks, sheets, and menus keep the system's timing.
+ */
+export const motion = {
+  /** Press feedback, seen many times a day, so near-imperceptible. */
+  press: 120,
+  /** How far an object shrinks under the finger, and how much it dims. */
+  pressScale: 0.97,
+  pressOpacity: 0.85,
+  /** How much a row or link dims, and an object under Reduce Motion. */
+  highlightOpacity: 0.72,
+  /** A small change a person asked for: a disclosure opening, a note arriving. */
+  state: 200,
+  /** Strong ease-out: starts fast, so the response feels immediate. */
+  easeOut: [0.23, 1, 0.32, 1],
+  /** Strong ease-in-out for something that turns or moves in place. */
+  easeInOut: [0.77, 0, 0.175, 1],
+} as const;
 
 export type FontWeight = "400" | "500" | "600" | "700";
 

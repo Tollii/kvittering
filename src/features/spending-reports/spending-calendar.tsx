@@ -1,7 +1,7 @@
 import { CalendarDate, CalendarMonth } from "@/lib/domain/calendar";
 import { Ore } from "@/lib/domain/ore";
-import { Pressable, View, useWindowDimensions } from "react-native";
-import { Copy, Empty, Row, faded, pressed } from "@/components/ui";
+import { View, useWindowDimensions } from "react-native";
+import { Copy, Empty, Row, faded, Press } from "@/components/ui";
 import { radius, useTheme } from "@/constants/theme";
 import {
   spendingCalendar,
@@ -98,7 +98,7 @@ export function SpendingCalendar({
                   return <View key={weekday} style={{ flex: 1, height: 56 }} />;
 
                 return (
-                  <Pressable
+                  <Press
                     key={day.date}
                     accessibilityRole="button"
                     accessibilityLabel={`${CalendarDate.format(day.date)}, ${Ore.format(day.amountOre)}, ${day.contributions.length} kvitteringer`}
@@ -107,9 +107,8 @@ export function SpendingCalendar({
                       disabled: day.future || !day.contributions.length,
                     }}
                     onPress={() => selectDay(day)}
-                    style={(state) => [
+                    style={[
                       { flex: 1, height: 56, padding: 2 },
-                      pressed(state),
                       faded(day.future),
                     ]}
                   >
@@ -151,7 +150,7 @@ export function SpendingCalendar({
                         </Copy>
                       )}
                     </View>
-                  </Pressable>
+                  </Press>
                 );
               })}
             </View>

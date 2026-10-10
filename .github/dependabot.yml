@@ -1,6 +1,7 @@
 # Dependency updates arrive as pull requests that run the same quality checks.
 # Expo SDK packages move together through `npx expo install --fix`, so their
-# major and minor versions are not proposed individually.
+# major and minor versions, and every version of the exact pins, are not
+# proposed individually.
 version: 2
 updates:
   - package-ecosystem: npm
@@ -23,12 +24,42 @@ updates:
         update-types: [version-update:semver-major, version-update:semver-minor]
       - dependency-name: "@expo/*"
         update-types: [version-update:semver-major, version-update:semver-minor]
-      - dependency-name: "react"
-        update-types: [version-update:semver-major, version-update:semver-minor]
-      - dependency-name: "react-native"
-        update-types: [version-update:semver-major, version-update:semver-minor]
       - dependency-name: "react-native-*"
         update-types: [version-update:semver-major, version-update:semver-minor]
+      - dependency-name: "@react-native/*"
+        update-types: [version-update:semver-major, version-update:semver-minor]
+      # The SDK pins these to exact versions, so even patch bumps fail
+      # `expo install --check`.
+      - dependency-name: "react"
+      - dependency-name: "react-dom"
+      - dependency-name: "react-test-renderer"
+      - dependency-name: "react-native"
+      - dependency-name: "react-native-maps"
+      - dependency-name: "react-native-reanimated"
+      - dependency-name: "react-native-worklets"
+      - dependency-name: "@react-native-community/datetimepicker"
+      # React types follow the React minor above.
+      - dependency-name: "@types/react"
+        update-types: [version-update:semver-major, version-update:semver-minor]
+      - dependency-name: "@types/react-dom"
+        update-types: [version-update:semver-major, version-update:semver-minor]
+      # jest-expo follows the SDK and decides the Jest major.
+      - dependency-name: "jest-expo"
+        update-types: [version-update:semver-major]
+      - dependency-name: "jest"
+        update-types: [version-update:semver-major]
+      - dependency-name: "@jest/*"
+        update-types: [version-update:semver-major]
+      - dependency-name: "babel-jest"
+        update-types: [version-update:semver-major]
+      # typescript-eslint caps the TypeScript versions it supports.
+      - dependency-name: "typescript"
+        update-types: [version-update:semver-major]
+      # Tests parse stacks with the same major that @sentry/react-native bundles.
+      - dependency-name: "@sentry/browser"
+        update-types: [version-update:semver-major]
+      # Cloud sessions provide the Chromium build that this exact version expects.
+      - dependency-name: "@playwright/test"
   - package-ecosystem: github-actions
     directory: /
     schedule:

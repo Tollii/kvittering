@@ -20,7 +20,7 @@ When a second screen needs a feature's component, move it up to `src/components`
 
 **`Icon`** renders an SF Symbol, `primary` by default, hidden from VoiceOver. Label the control that contains it instead. The web build shows the closest Material Symbol from [symbol.web.tsx](../../src/components/ui/symbol.web.tsx); a new symbol needs an entry there, or browser checks show a question mark and log an error.
 
-**`pressed(state)`** and **`faded(disabled)`** are the shared press and disabled styles. Use both on any custom `Pressable`.
+**`Press`** ([motion](../../src/components/ui/motion.tsx)) is the pressable every control is built on, and the one to use for any custom tappable surface: `feedback="scale"` for objects and `"highlight"` for rows and links, as [motion and feedback](foundations.md#motion-and-feedback) describes. **`faded(disabled)`** is the shared disabled style.
 
 ## Actions
 

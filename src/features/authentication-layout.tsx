@@ -1,14 +1,8 @@
 import type { ReactNode } from "react";
-import {
-  KeyboardAvoidingView,
-  Platform,
-  Pressable,
-  ScrollView,
-  View,
-} from "react-native";
+import { KeyboardAvoidingView, Platform, ScrollView, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { StatusBar } from "expo-status-bar";
-import { Copy, Icon, faded, pressed } from "@/components/ui";
+import { Copy, Icon, faded, Press } from "@/components/ui";
 import { ArchMark } from "@/components/monument-artwork";
 import { radius, useTheme } from "@/constants/theme";
 
@@ -116,12 +110,13 @@ export function AuthenticationLink({
   const colors = useTheme();
 
   return (
-    <Pressable
+    <Press
+      feedback="highlight"
       accessibilityRole="button"
       accessibilityState={{ disabled }}
       disabled={disabled}
       onPress={onPress}
-      style={(state) => [
+      style={[
         {
           minHeight: 44,
           paddingVertical: 10,
@@ -130,7 +125,6 @@ export function AuthenticationLink({
           justifyContent: back ? "flex-start" : "center",
           gap: 6,
         },
-        pressed(state),
         faded(disabled),
       ]}
     >
@@ -138,6 +132,6 @@ export function AuthenticationLink({
       <Copy weight="500" style={{ color: colors.primary, flexShrink: 1 }}>
         {title}
       </Copy>
-    </Pressable>
+    </Press>
   );
 }

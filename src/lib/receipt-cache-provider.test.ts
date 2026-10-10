@@ -57,6 +57,13 @@ vi.mock("react-native", () => ({
   useWindowDimensions: () => ({ width: 400, height: 800 }),
 }));
 
+// oxlint-disable-next-line anti-slop/no-module-mocking -- Reanimated needs the native worklet runtime, and the provider's notice does not move.
+vi.mock("react-native-reanimated", () => ({
+  default: { View: "section" },
+  createAnimatedComponent: <T>(component: T) => component,
+  cubicBezier: () => "ease-out",
+}));
+
 // oxlint-disable-next-line anti-slop/no-module-mocking -- Native symbols have no behavior in these storage tests.
 vi.mock("expo-symbols", () => ({ SymbolView: () => null }));
 

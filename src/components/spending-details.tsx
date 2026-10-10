@@ -1,8 +1,8 @@
 import { CalendarDate } from "@/lib/domain/calendar";
 import { Ore } from "@/lib/domain/ore";
-import { Pressable, View, useWindowDimensions } from "react-native";
+import { View, useWindowDimensions } from "react-native";
 import { useTheme } from "@/constants/theme";
-import { Amount, Copy, List, Row, Sheet, pressed } from "./ui";
+import { Amount, Copy, List, Row, Sheet, Press } from "./ui";
 import { openReceipt, receiptStatusLabel } from "./receipt-card";
 import { contributionKey, type SpendingGroup } from "@/lib/domain/insights";
 
@@ -33,20 +33,18 @@ export function SpendingBars<
         const shareLabel = share !== null ? `, ${share} prosent` : "";
 
         return (
-          <Pressable
+          <Press
+            feedback="highlight"
             key={row.id}
             accessibilityRole="button"
             accessibilityLabel={`${row.name}, ${Ore.format(row.amountOre)}${shareLabel}`}
             onPress={() => onSelect(row)}
-            style={(state) => [
-              {
-                minHeight: 60,
-                gap: 6,
-                justifyContent: "center",
-                paddingVertical: 10,
-              },
-              pressed(state),
-            ]}
+            style={{
+              minHeight: 60,
+              gap: 6,
+              justifyContent: "center",
+              paddingVertical: 10,
+            }}
           >
             <View
               style={{
@@ -89,7 +87,7 @@ export function SpendingBars<
                 }}
               />
             </View>
-          </Pressable>
+          </Press>
         );
       })}
     </List>

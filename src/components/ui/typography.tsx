@@ -12,6 +12,7 @@ import { type SymbolViewProps } from "expo-symbols";
 import { SymbolView } from "./symbol";
 import {
   disabledOpacity,
+  motion,
   typeScale,
   useTheme,
   type FontWeight,
@@ -129,9 +130,12 @@ export function Icon({
   );
 }
 
-/** Opacity feedback also respects the Reduce Motion preference. */
+/**
+ * Superseded by `Press`; kept only until the category picker, the line
+ * editor, and capture review move to it.
+ */
 export const pressed = (state: PressableStateCallbackType): ViewStyle =>
-  state.pressed ? { opacity: 0.72 } : { opacity: 1 };
+  state.pressed ? { opacity: motion.highlightOpacity } : { opacity: 1 };
 
 /** The one disabled look: a faded control that keeps its layout. */
 export const faded = (disabled: boolean): ViewStyle =>

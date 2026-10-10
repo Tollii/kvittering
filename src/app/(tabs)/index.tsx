@@ -12,11 +12,11 @@ import {
   AppState,
   Image,
   Linking,
-  Pressable,
   StyleSheet,
   View,
   type ViewStyle,
 } from "react-native";
+import Animated from "react-native-reanimated";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { CameraView, useCameraPermissions } from "expo-camera";
 import * as ImagePicker from "expo-image-picker";
@@ -30,8 +30,10 @@ import {
   Notice,
   Panel,
   faded,
-  pressed,
+  Press,
   SettingsButton,
+  useArrival,
+  useDeparture,
 } from "@/components/ui";
 import { useHousehold } from "@/features/household-context";
 import { OfflineNotice } from "@/features/offline-notice";
@@ -91,6 +93,8 @@ export default function Capture() {
   const busyRef = useRef(false);
   const [error, setError] = useState("");
   const [saved, setSaved] = useState(0);
+  const arrival = useArrival();
+  const departure = useDeparture();
   useEffect(() => {
     const listener = AppState.addEventListener("change", (state) =>
       setForeground(state === "active"),
@@ -336,57 +340,58 @@ export default function Capture() {
             { flexShrink: 1 },
           )}
           <View style={{ flex: 1 }} />
-          <Pressable
+          <Press
             accessibilityRole="button"
             accessibilityLabel="Importer PDF eller bilde fra Filer"
             disabled={busy}
             accessibilityState={{ disabled: busy, busy }}
             onPress={() => void chooseFiles()}
-            style={(state) => [
-              {
-                width: 44,
-                height: 44,
-                borderRadius: 22,
-                backgroundColor: colors.cameraOverlay,
-                alignItems: "center",
-                justifyContent: "center",
-              },
-              pressed(state),
-            ]}
+            style={{
+              width: 44,
+              height: 44,
+              borderRadius: 22,
+              backgroundColor: colors.cameraOverlay,
+              alignItems: "center",
+              justifyContent: "center",
+            }}
           >
             <Icon name="doc.badge.plus" size={17} color={colors.onCamera} />
-          </Pressable>
+          </Press>
           <SettingsButton surface="camera" />
         </View>
         <OfflineNotice />
         {saved > 0 && (
-          <Panel style={{ gap: 4 }}>
-            <View
-              style={{ flexDirection: "row", alignItems: "center", gap: 10 }}
-            >
-              {uploading ? (
-                <ActivityIndicator color={colors.primary} />
-              ) : (
-                <Icon
-                  name={
-                    failed ? "arrow.clockwise.circle" : "checkmark.circle.fill"
-                  }
-                  size={22}
-                  color={failed ? colors.warning : colors.success}
+          <Animated.View entering={arrival} exiting={departure}>
+            <Panel style={{ gap: 4 }}>
+              <View
+                style={{ flexDirection: "row", alignItems: "center", gap: 10 }}
+              >
+                {uploading ? (
+                  <ActivityIndicator color={colors.primary} />
+                ) : (
+                  <Icon
+                    name={
+                      failed
+                        ? "arrow.clockwise.circle"
+                        : "checkmark.circle.fill"
+                    }
+                    size={22}
+                    color={failed ? colors.warning : colors.success}
+                  />
+                )}
+                <Copy weight="700" style={{ flex: 1 }}>
+                  {uploadStatusTitle(saved, uploading, failed, online)}
+                </Copy>
+                <IconButton
+                  name="xmark"
+                  label="Lukk"
+                  size={14}
+                  color={colors.secondary}
+                  onPress={() => setSaved(0)}
                 />
-              )}
-              <Copy weight="700" style={{ flex: 1 }}>
-                {uploadStatusTitle(saved, uploading, failed, online)}
-              </Copy>
-              <IconButton
-                name="xmark"
-                label="Lukk"
-                size={14}
-                color={colors.secondary}
-                onPress={() => setSaved(0)}
-              />
-            </View>
-          </Panel>
+              </View>
+            </Panel>
+          </Animated.View>
         )}
         {!!error && !review && <Notice tone="error">{error}</Notice>}
         {!review && importRecovery}
@@ -476,27 +481,24 @@ export default function Capture() {
             paddingBottom: 4,
           }}
         >
-          <Pressable
+          <Press
             accessibilityRole="button"
             accessibilityLabel="Velg fra bilder"
             disabled={busy}
             accessibilityState={{ disabled: busy, busy }}
             onPress={() => void choosePhotos()}
-            style={(state) => [
-              {
-                width: 54,
-                height: 54,
-                borderRadius: 27,
-                backgroundColor: colors.cameraOverlay,
-                alignItems: "center",
-                justifyContent: "center",
-              },
-              pressed(state),
-            ]}
+            style={{
+              width: 54,
+              height: 54,
+              borderRadius: 27,
+              backgroundColor: colors.cameraOverlay,
+              alignItems: "center",
+              justifyContent: "center",
+            }}
           >
             <Icon name="photo.on.rectangle" size={22} color={colors.onCamera} />
-          </Pressable>
-          <Pressable
+          </Press>
+          <Press
             accessibilityRole="button"
             accessibilityLabel="Ta bilde av kvitteringen"
             disabled={shutterDisabled}
@@ -505,7 +507,7 @@ export default function Capture() {
               busy,
             }}
             onPress={() => void takePhoto()}
-            style={(state) => [
+            style={[
               {
                 width: 78,
                 height: 78,
@@ -514,7 +516,6 @@ export default function Capture() {
                 borderWidth: 3,
                 borderColor: colors.onCamera,
               },
-              pressed(state),
               faded(shutterDisabled),
             ]}
           >
@@ -525,24 +526,21 @@ export default function Capture() {
                 backgroundColor: colors.onCamera,
               }}
             />
-          </Pressable>
+          </Press>
           {photos.length ? (
-            <Pressable
+            <Press
               accessibilityRole="button"
               accessibilityLabel={`Se ${photos.length} valgte bilder`}
               onPress={() => setReview(true)}
-              style={(state) => [
-                {
-                  width: 54,
-                  height: 54,
-                  borderRadius: 27,
-                  overflow: "hidden",
-                  backgroundColor: colors.cameraOverlay,
-                  alignItems: "center",
-                  justifyContent: "center",
-                },
-                pressed(state),
-              ]}
+              style={{
+                width: 54,
+                height: 54,
+                borderRadius: 27,
+                overflow: "hidden",
+                backgroundColor: colors.cameraOverlay,
+                alignItems: "center",
+                justifyContent: "center",
+              }}
             >
               <Image
                 source={{ uri: photos[photos.length - 1] }}
@@ -571,7 +569,7 @@ export default function Capture() {
                   {photos.length}
                 </Copy>
               </View>
-            </Pressable>
+            </Press>
           ) : (
             // Keeps the shutter centred; nothing to review yet.
             <View style={{ width: 54, height: 54 }} />
