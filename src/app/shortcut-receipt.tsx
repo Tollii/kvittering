@@ -41,8 +41,8 @@ export default function ReceiptShortcut() {
       )}
       <Button
         variant="secondary"
-        title="Åpne historikken"
-        onPress={() => router.replace("/history")}
+        title="Åpne kvitteringene"
+        onPress={() => router.replace("/receipts")}
       />
     </Screen>
   );

@@ -3,31 +3,30 @@ appId: no.tolnes.kvitto
 name: Approve the one receipt without open questions and keep the others
 ---
 - runFlow: ../shared/sign-in.yml
-- tapOn: "Innboks"
+- tapOn: "Kvitteringer"
 - extendedWaitUntil:
     visible: "Til kontroll"
     timeout: 30000
 - assertVisible: "KIWI.*Betalt beløp mangler.*"
 - assertVisible: "REMA 1000.*Mulig duplikat.*"
 - assertVisible: ".*Lesingen mislyktes.*"
-- tapOn: "MENY.*"
+- tapOn: "MENY.*Til kontroll.*"
 - extendedWaitUntil:
     visible: "Klar til godkjenning"
     timeout: 30000
 - tapOn: "Godkjenn kvittering"
 - extendedWaitUntil:
-    visible: "Til innboksen"
+    visible: "Til kvitteringene"
     timeout: 30000
-- tapOn: "Til innboksen"
+- tapOn: "Til kvitteringene"
 - extendedWaitUntil:
     visible: "Til kontroll"
     timeout: 30000
-- assertNotVisible: "MENY.*"
-- assertVisible: "KIWI.*"
-- tapOn: "Historikk"
-- extendedWaitUntil:
-    visible: "MENY.*"
-    timeout: 30000
+# MENY leaves the pinned section and stays in its month.
+- assertNotVisible: "MENY.*Til kontroll.*"
+- assertVisible: "KIWI.*Til kontroll.*"
+- scrollUntilVisible:
+    element: "MENY.*"
 - tapOn: "MENY.*"
 - assertVisible: "Kontrollert"
 - assertVisible: ".*157,80.*"

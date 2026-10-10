@@ -11,12 +11,10 @@ for (const colorScheme of ["light", "dark"] as const)
     `screens-${colorScheme}`,
     async (app) => {
       await app.signIn();
-      await app.tap("Innboks");
-      await app.screenshot("innboks");
       await app.tap("Forbruk");
       await app.screenshot("forbruk");
-      await app.tap("Historikk");
-      await app.screenshot("historikk");
+      await app.tap("Kvitteringer");
+      await app.screenshot("kvitteringer");
       await app.tap("Husstanden og innstillinger");
       await app.see("Ferdig");
       await app.screenshot("innstillinger");
