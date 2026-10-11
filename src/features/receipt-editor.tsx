@@ -9,6 +9,7 @@ import { useConvex } from "convex/react";
 import { randomUUID } from "expo-crypto";
 import { api } from "../../convex/_generated/api";
 import {
+  hasDraftActivity,
   isDraftBusy,
   type ReceiptDraft,
   type ReceiptDraftAction,
@@ -132,6 +133,14 @@ export function ReceiptEditor({
   } = lineReview(data, unresolvedDuplicate);
 
   const stale = receipt.revision !== revision;
+
+  const reviewing = receipt.status !== "reviewed" && !approved;
+
+  // The footer exists for an action or an outcome, not to repeat the band's status.
+  const showFooter =
+    !!data &&
+    !processing &&
+    (reviewing || !!message || hasDraftActivity(draft));
 
   const saveDisabled =
     !online || processing || stale || !!Object.keys(moneyErrors).length;
@@ -360,7 +369,7 @@ export function ReceiptEditor({
         insetTop={false}
         statusBarStyle="light"
         footer={
-          data && !processing ? (
+          showFooter ? (
             <ReceiptFooter
               error={error}
               ready={ready}
@@ -416,8 +425,9 @@ export function ReceiptEditor({
                 onChange={change}
               />
             )}
-            <PurchaseTotals data={data} totals={totals} />
-            <ReceiptCategorySpending data={data} />
+            {/* Review leads with the work; a reviewed receipt leads with its summary. */}
+            {!reviewing && <PurchaseTotals data={data} totals={totals} />}
+            {!reviewing && <ReceiptCategorySpending data={data} />}
             <ReceiptLineControls
               allLines={allLines}
               showLineChoice={
@@ -465,6 +475,8 @@ export function ReceiptEditor({
                 {value}
               </Notice>
             ))}
+            {reviewing && <PurchaseTotals data={data} totals={totals} />}
+            {reviewing && <ReceiptCategorySpending data={data} />}
             <ReceiptDetails
               receipt={receipt}
               data={data}

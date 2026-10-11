@@ -39,6 +39,23 @@ export function openReceipt(receipt: Receipt) {
   router.push({ pathname: "/receipt/[id]", params: { id: receipt._id } });
 }
 
+/** A known amount is bold; an unknown one is said quietly so it never reads as a value. */
+function CardAmount({
+  amount,
+  right = false,
+}: Readonly<{ amount: Ore | null; right?: boolean }>) {
+  return (
+    <Copy
+      weight={amount === null ? "400" : "700"}
+      role="cardTitle"
+      muted={amount === null}
+      style={right ? { flexShrink: 1, textAlign: "right" } : undefined}
+    >
+      {Ore.format(amount)}
+    </Copy>
+  );
+}
+
 export function ReceiptCard({
   receipt,
   compact = false,
@@ -85,24 +102,14 @@ export function ReceiptCard({
               {receipt.data?.branch ? ` · ${receipt.data.branch}` : ""}
             </Copy>
             {stacked && !busy && receipt.data && (
-              <Copy weight="700" role="cardTitle">
-                {Ore.format(receipt.data.totalOre)}
-              </Copy>
+              <CardAmount amount={receipt.data.totalOre} />
             )}
           </View>
           {busy ? (
             <ActivityIndicator color={colors.primary} />
           ) : (
             !stacked &&
-            receipt.data && (
-              <Copy
-                weight="700"
-                role="cardTitle"
-                style={{ flexShrink: 1, textAlign: "right" }}
-              >
-                {Ore.format(receipt.data.totalOre)}
-              </Copy>
-            )
+            receipt.data && <CardAmount amount={receipt.data.totalOre} right />
           )}
           <Chevron />
         </View>

@@ -71,6 +71,21 @@ export function isDraftBusy(draft: ReceiptDraft): boolean {
   );
 }
 
+/**
+ * The draft has edits, a save in flight, or a save result to report. A save in
+ * flight counts because its snapshot can arrive before the save returns.
+ */
+export function hasDraftActivity(draft: ReceiptDraft): boolean {
+  const { operation } = draft;
+
+  return (
+    draft.dirty ||
+    isSaveInFlight(operation) ||
+    operation.kind === "saved" ||
+    operation.kind === "failed"
+  );
+}
+
 export function createReceiptDraft(receipt: Receipt): ReceiptDraft {
   return {
     baseline: receipt,
@@ -190,9 +205,12 @@ function receiveRemote(state: ReceiptDraft, receipt: Receipt): ReceiptDraft {
 
   if (state.dirty || isRequestRunning(state.operation)) return next;
 
+  // A save result outlives later snapshots, so the next-receipt actions stay until an edit.
   return {
     ...createReceiptDraft(receipt),
     generation: state.generation + 1,
+    operation:
+      state.operation.kind === "saved" ? state.operation : { kind: "idle" },
   };
 }
 

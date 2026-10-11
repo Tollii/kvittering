@@ -303,7 +303,7 @@ function Spending({ initialMonth }: Readonly<{ initialMonth: CalendarMonth }>) {
                   weight="600"
                   style={{ color: colors.onHeroMuted }}
                 >
-                  DAGLIGVARER
+                  Dagligvarer
                 </Copy>
                 <Amount hero>{Ore.format(headline.products)}</Amount>
                 <Copy role="detail" style={{ color: colors.onHeroMuted }}>
@@ -334,7 +334,10 @@ function Spending({ initialMonth }: Readonly<{ initialMonth: CalendarMonth }>) {
             <PendingReceiptsNotice pending={coverage.pending} />
           )}
           <View style={{ gap: 4 }}>
-            <SectionTitle title="Fordeling" />
+            <SectionTitle
+              title="Fordeling"
+              {...storesAction(breakdown, () => setStoresOpen(true))}
+            />
             <Segments
               value={breakdown}
               onChange={(value) => {
@@ -399,12 +402,6 @@ function Spending({ initialMonth }: Readonly<{ initialMonth: CalendarMonth }>) {
             <SectionTitle title="Utforsk forbruket" />
             <List>
               <Row
-                title="Butikker"
-                detail="Se hvor dere handler, og hva dere bruker per butikk"
-                icon="map"
-                onPress={() => setStoresOpen(true)}
-              />
-              <Row
                 title="Forbruksanalyse"
                 detail="Hva endret seg denne uken eller måneden?"
                 icon="chart.bar"
@@ -452,6 +449,11 @@ function Spending({ initialMonth }: Readonly<{ initialMonth: CalendarMonth }>) {
 }
 
 type Breakdown = "category" | "store" | "type";
+
+/** The store breakdown opens the full store list from its heading; the others have no action. */
+function storesAction(breakdown: Breakdown, onAction: () => void) {
+  return breakdown === "store" ? { action: "Alle butikker", onAction } : {};
+}
 
 type MonthTotals = ReturnType<typeof comparisonInsights>["current"];
 
