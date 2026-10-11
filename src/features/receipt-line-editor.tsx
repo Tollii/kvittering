@@ -168,7 +168,7 @@ export function ReceiptLineEditor({
         <CategoryPicker
           name={line.name}
           value={line.categoryId}
-          confidence={categoryUncertain ? line.confidence : null}
+          suggested={categoryUncertain}
           originalText={line.originalText}
           brand={line.brand}
           recent={recentCategories}
@@ -511,22 +511,13 @@ function CategorySuggestion({
   onOpenCategory: () => void;
   onConfirmCategory: (categoryId: CategoryId) => void;
 }>) {
-  const confidenceLabel =
-    line.confidence != null
-      ? `, ${Math.round(line.confidence * 100)} prosent sikker`
-      : "";
-
   return (
     <>
       <Chip
-        label={
-          line.confidence != null && line.confidence < 1
-            ? `${categoryLabel} · ${Math.round(line.confidence * 100)} %`
-            : categoryLabel
-        }
+        label={categoryLabel}
         icon="tag"
         tone="warning"
-        accessibilityLabel={`Forslag: ${categoryLabel}${confidenceLabel}. Trykk for å velge en annen kategori`}
+        accessibilityLabel={`Forslag: ${categoryLabel}. Trykk for å velge en annen kategori`}
         onPress={onOpenCategory}
       />
       <Button

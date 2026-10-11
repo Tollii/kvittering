@@ -54,24 +54,19 @@ function mostUsedCategories(
     .map(([id]) => id);
 }
 
-/** Describes the receipt text, brand, and confidence behind a suggestion. */
+/** Describes the receipt text and brand behind a suggestion. */
 function suggestionSource({
   name,
   originalText,
   brand,
-  confidence,
 }: Readonly<{
   name: string;
   originalText?: string;
   brand?: string | null;
-  confidence?: number | null;
 }>): string {
   return [
     originalText && originalText !== name ? `Lest: ${originalText}` : null,
     brand,
-    confidence != null && confidence < 1
-      ? `${Math.round(confidence * 100)} % sikker`
-      : null,
   ]
     .filter(Boolean)
     .join(" · ");
@@ -80,7 +75,7 @@ function suggestionSource({
 export function CategoryPicker({
   name,
   value,
-  confidence,
+  suggested = false,
   originalText,
   brand,
   recent,
@@ -91,8 +86,8 @@ export function CategoryPicker({
 }: Readonly<{
   name: string;
   value: string | null;
-  /** The reader's confidence in the current suggestion, 0–1. */
-  confidence?: number | null;
+  /** The current category is the reader's suggestion, not a decision. */
+  suggested?: boolean;
   /** The raw receipt text the suggestion was based on. */
   originalText?: string;
   brand?: string | null;
@@ -154,9 +149,9 @@ export function CategoryPicker({
           <Copy weight="600" numberOfLines={2}>
             {name}
           </Copy>
-          {!!(originalText || brand || confidence != null) && (
+          {!!suggestionSource({ name, originalText, brand }) && (
             <Copy role="caption" muted numberOfLines={2}>
-              {suggestionSource({ name, originalText, brand, confidence })}
+              {suggestionSource({ name, originalText, brand })}
             </Copy>
           )}
           <Field
@@ -206,13 +201,7 @@ export function CategoryPicker({
         <>
           {isDecidedCategory(currentId) && (
             <>
-              <SectionTitle
-                title={
-                  confidence != null && confidence < 1
-                    ? `Forslag · ${Math.round(confidence * 100)} %`
-                    : "Valgt"
-                }
-              />
+              <SectionTitle title={suggested ? "Forslag" : "Valgt"} />
               {list([currentId], true)}
             </>
           )}

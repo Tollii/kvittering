@@ -6,8 +6,8 @@ Every string the app writes is Norwegian Bokmål; system controls, such as the S
 
 - **Plain and short.** "Uten nett", "Ingen treff", "Prøv igjen". Prefer one clear sentence to an explanation.
 - **Calm about errors.** Say what failed and what still holds: "Importen er ikke fullført. Filene venter på nytt forsøk." Do not blame the person or apologise.
-- **Honest about uncertainty.** Reports describe household purchases, not consumption, and unknown values stay unknown: "Ukjent", "Dato ukjent", "Summene er foreløpige." Never show a guessed value as fact.
-- **No pressure.** Optional work is called optional: "Produktkobling er valgfritt."
+- **Honest about uncertainty.** Reports describe household purchases, not consumption, and unknown values stay unknown: "Ukjent", "Dato ukjent", "Summene er foreløpige." Never show a guessed value as fact. The reader's statistics, such as confidence scores and model names, are not copy: a suggestion shows its tone and a verb, "Bekreft", and never a percentage.
+- **No pressure.** Optional work stays out of the way: product linking appears only in the all-lines view, never as a task.
 
 ## Address
 

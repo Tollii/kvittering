@@ -75,6 +75,8 @@ The app uses the system font (San Francisco) through `Copy` ([typography](../../
 
 Weight carries meaning, so a caller may override the role's default: regular for reading, semibold (600) for labels, interactive text, and the hero amount, bold (700) for titles and amounts on paper. `weight` is the only override; a role that needs a different size is a new role in `typeScale`, added with its users named here. Mark each title with `accessibilityRole="header"`; `Copy`'s `role` names the type role and never an accessibility role.
 
+An unknown value is drawn muted, in `secondary` or `onHeroMuted` on a band, at a lighter weight than a known value would have, keeps the known value's alignment, and never uses the amount roles: "Ukjent" in a receipt card is regular `cardTitle`, and a receipt band without a paid amount says "Ukjent beløp" as a semibold `sheetTitle`.
+
 Text wraps as the system's own labels do: `Copy` uses the standard iOS line-break strategy, which pulls a lone last word up onto the line before it, so a two-line notice or caption does not end in a single orphaned word. A value with no word to break at, such as the invitation code, stays on one line and shrinks instead.
 
 ## Spacing

@@ -71,7 +71,7 @@ export function ReceiptSummary({
               : ""}
             {data?.branch ? ` · ${data.branch}` : ""}
           </Copy>
-          <Amount hero>{Ore.format(data?.totalOre ?? null)}</Amount>
+          <HeroTotal data={data} />
         </View>
         <View style={{ flexDirection: "row", gap: 6 }}>
           {receipt.imageCount > 0 && (
@@ -122,14 +122,26 @@ export function ReceiptSummary({
         />
         {excluded && <Chip label="Utelatt" icon="eye.slash" />}
       </View>
-      {receipt.status === "reviewed" && !dirty && !excluded && (
-        <Copy role="detail" style={{ color: colors.onHeroMuted }}>
-          Kvitteringen er med i forbruket. Du trenger ikke kontrollere hver
-          vare. Produktkobling er valgfritt.
-        </Copy>
-      )}
     </SummaryBand>
   );
+}
+
+/** The paid amount, or a quiet line when it is missing, so a gap never reads as a value. */
+function HeroTotal({ data }: Readonly<{ data: ReceiptData | null }>) {
+  const colors = useTheme();
+
+  if (data && data.totalOre === null)
+    return (
+      <Copy
+        role="sheetTitle"
+        weight="600"
+        style={{ color: colors.onHeroMuted }}
+      >
+        Ukjent beløp
+      </Copy>
+    );
+
+  return <Amount hero>{Ore.format(data?.totalOre ?? null)}</Amount>;
 }
 
 /** How the receipt lines add up to the paid amount. */
@@ -142,21 +154,31 @@ export function PurchaseTotals({
 
   // Components appear only when present; the line sum and paid amount always do.
   // The next-step notice names an open difference; the paid row only marks it.
-  const rows: { label: string; amount: Ore | null; paid?: boolean }[] = [
-    ...[
-      { label: "Varer før rabatt", amount: totals.products },
-      { label: "Rabatter", amount: totals.discounts },
-      {
-        label: "Pant og pantretur",
-        amount: Ore.add(totals.deposits, totals.returns),
-      },
-      { label: "Andre justeringer", amount: totals.adjustments },
-    ].filter((row) => row.amount !== 0),
-    { label: "Sum av linjene", amount: totals.calculated },
-    { label: "Betalt", amount: data.totalOre, paid: true },
-  ];
+  const adjustments = [
+    { label: "Rabatter", amount: totals.discounts },
+    {
+      label: "Pant og pantretur",
+      amount: Ore.add(totals.deposits, totals.returns),
+    },
+    { label: "Andre justeringer", amount: totals.adjustments },
+  ].filter((row) => row.amount !== 0);
 
   const paidUnsettled = totals.difference !== null && totals.difference !== 0;
+
+  // Products alone that add up to the paid amount need one row, not three.
+  const agrees =
+    adjustments.length === 0 && totals.difference === 0 && !totals.unknown;
+
+  const rows: { label: string; amount: Ore | null; paid?: boolean }[] = agrees
+    ? [{ label: "Betalt", amount: data.totalOre, paid: true }]
+    : [
+        ...[{ label: "Varer før rabatt", amount: totals.products }].filter(
+          (row) => row.amount !== 0,
+        ),
+        ...adjustments,
+        { label: "Sum av linjene", amount: totals.calculated },
+        { label: "Betalt", amount: data.totalOre, paid: true },
+      ];
 
   return (
     <Panel>
@@ -172,6 +194,7 @@ export function PurchaseTotals({
         </Copy>
         <Copy role="detail" muted>
           {data.lines.filter((line) => line.kind === "product").length} varer
+          {agrees ? " · linjene stemmer" : ""}
         </Copy>
       </View>
       {rows.map((row) => (
@@ -293,7 +316,6 @@ export function ReceiptFooter({
                   ? "Lagre og godkjenn"
                   : "Godkjenn kvittering"
             }
-            icon={ready ? "checkmark" : undefined}
             busy={busy}
             disabled={saveDisabled || (!dirty && !ready)}
             onPress={onSave}

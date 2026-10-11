@@ -15,7 +15,8 @@ Cobalt ink on warm paper. A cobalt header and summary band carry the screen's id
 - Use native iOS presentation first: a `Sheet` for choices and short edits, a system alert for confirmations, a native menu for a short fixed list such as the month menu, and `Select` or a sheet for a long or searchable list.
 - Keep touch targets at 44 points and check layouts at the largest text size.
 - Keep motion native, small, and purposeful: build tappable surfaces on `Press` and take durations and curves from the theme. See [motion and feedback](foundations.md#motion-and-feedback).
-- Show what is known and say what is not. Unknown amounts and dates read "Ukjent" and "Dato ukjent"; provisional totals say so.
+- Show what is known and say what is not. Unknown amounts and dates read "Ukjent" and "Dato ukjent", drawn quietly so they never read as values; provisional totals say so. See [typography](foundations.md#typography).
+- Say a status once: chip, notice, or footer, whichever the state needs.
 - Write sentence-case Norwegian that tells the person what happened and what to do next.
 
 ## Pages

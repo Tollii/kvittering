@@ -133,6 +133,16 @@ export function ReceiptEditor({
 
   const stale = receipt.revision !== revision;
 
+  const reviewing = receipt.status !== "reviewed" && !approved;
+
+  // The footer exists for an action or an outcome, not to repeat the band's status.
+  const outcome = !!message || !!error || draft.operation.kind === "saved";
+
+  const showFooter =
+    !!data &&
+    !processing &&
+    (dirty || receipt.status !== "reviewed" || outcome);
+
   const saveDisabled =
     !online || processing || stale || !!Object.keys(moneyErrors).length;
 
@@ -360,7 +370,7 @@ export function ReceiptEditor({
         insetTop={false}
         statusBarStyle="light"
         footer={
-          data && !processing ? (
+          showFooter ? (
             <ReceiptFooter
               error={error}
               ready={ready}
@@ -416,8 +426,9 @@ export function ReceiptEditor({
                 onChange={change}
               />
             )}
-            <PurchaseTotals data={data} totals={totals} />
-            <ReceiptCategorySpending data={data} />
+            {/* Review leads with the work; a reviewed receipt leads with its summary. */}
+            {!reviewing && <PurchaseTotals data={data} totals={totals} />}
+            {!reviewing && <ReceiptCategorySpending data={data} />}
             <ReceiptLineControls
               allLines={allLines}
               showLineChoice={
@@ -460,6 +471,8 @@ export function ReceiptEditor({
                 />
               )}
             />
+            {reviewing && <PurchaseTotals data={data} totals={totals} />}
+            {reviewing && <ReceiptCategorySpending data={data} />}
             {Object.entries(moneyErrors).map(([field, value]) => (
               <Notice key={field} tone="error">
                 {value}
