@@ -56,6 +56,11 @@ then read the job summary and the `e2e-ios` artifact with its screenshots.
 | Workflow and secret checks    | actionlint, zizmor, and gitleaks over the full history                                                                          |
 | Dependency review             | No new dependency with a high-severity advisory (once the repository is public)                                                 |
 
+The fingerprint also hashes `package.json` scripts and the `patches/` directory,
+so a JavaScript-only fix delivered as a patch or a new script still needs a
+TestFlight build. Prefer `overrides`, a direct dependency, or a Metro and Jest
+shim for dependency fixes.
+
 The `Change areas` job summary lists the review checklist for each area the
 change touches, from [`tools/presubmit.mts`](../tools/presubmit.mts). Pull
 requests also get two reports that do not block merging: changed lines that no

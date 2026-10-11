@@ -1,4 +1,5 @@
 name: Code scanning alerts
+run-name: ${{ inputs.dismiss && format('Dismiss alert {0}', inputs.dismiss) || 'List open alerts' }}
 
 # Cloud agent sessions get 403 from the code scanning API, so the weekly
 # security routine lists and dismisses alerts through this workflow's token.
@@ -20,7 +21,7 @@ on:
           - won't fix
           - used in tests
       comment:
-        description: Evidence for the dismissal, shown on the alert (280 characters at most)
+        description: Evidence for the dismissal, shown on the alert
         required: false
         type: string
 
@@ -61,6 +62,10 @@ jobs:
           fi
           if [ -z "$COMMENT" ]; then
             echo "::error::A dismissal needs a comment with the evidence"
+            exit 1
+          fi
+          if (( ${#COMMENT} > 280 )); then
+            echo "::error::The comment is longer than GitHub's 280-character limit"
             exit 1
           fi
           gh api -X PATCH "repos/$GITHUB_REPOSITORY/code-scanning/alerts/$ALERT" \
