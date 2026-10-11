@@ -5,7 +5,7 @@
   "license": "FSL-1.1-ALv2",
   "dependencies": {
     "@ai-sdk/anthropic": "^4.0.75",
-    "@ai-sdk/openai": "^4.0.87",
+    "@ai-sdk/openai": "^4.0.88",
     "@ai-sdk/typesafe-ai": "^3.0.15",
     "@better-auth/core": "1.6.33",
     "@better-auth/expo": "1.6.33",
@@ -19,7 +19,7 @@
     "@tanstack/react-query": "^5.104.1",
     "@tanstack/react-query-persist-client": "^5.104.1",
     "@typesafe-ai/sdk": "^0.6.0",
-    "ai": "^7.0.131",
+    "ai": "^7.0.132",
     "better-auth": "1.6.33",
     "convex": "^1.46.0",
     "convex-helpers": "^0.1.128",
