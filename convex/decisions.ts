@@ -13,6 +13,7 @@ import {
   Output,
   type Experimental_DecisionModel,
   type Experimental_DecisionQuestion,
+  type Experimental_DecisionState,
   type JSONSchema7,
   type LanguageModel,
   type ProviderMetadata,
@@ -41,6 +42,13 @@ export type JudgmentAnswer = NoulResponse | ChoiceResponse;
 
 /** The AI SDK has no null input; an absent text is empty. */
 const input = (entry: EntryType | undefined) => entry ?? "";
+
+/** Decision state takes a list only as parts, so a JSON list is one JSON part. */
+function stateInput(entry: EntryType | undefined): Experimental_DecisionState {
+  const state = input(entry);
+
+  return Array.isArray(state) ? [{ type: "json", value: state }] : state;
+}
 
 function decisionQuestion(
   name: string,
@@ -88,7 +96,7 @@ export function judgmentClient(
     async systemOne<const Q extends Questions>(request: JudgmentRequest<Q>) {
       const result = await experimental_decide({
         model,
-        state: input(request.state),
+        state: stateInput(request.state),
         questions: Object.fromEntries(
           Object.entries(request.questions).map(([name, question]) => [
             name,
