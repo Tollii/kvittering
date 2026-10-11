@@ -554,7 +554,7 @@ export default function Capture() {
                   bottom: 4,
                   minWidth: 20,
                   minHeight: 20,
-                  borderRadius: 10,
+                  borderRadius: 12,
                   borderCurve: "continuous",
                   paddingHorizontal: 5,
                   backgroundColor: colors.primary,
@@ -562,11 +562,7 @@ export default function Capture() {
                   justifyContent: "center",
                 }}
               >
-                <Copy
-                  role="caption"
-                  weight="700"
-                  style={{ color: colors.onPrimary }}
-                >
+                <Copy role="counter" style={{ color: colors.onPrimary }}>
                   {photos.length}
                 </Copy>
               </View>

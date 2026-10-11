@@ -32,7 +32,10 @@ export function useLargeText(): boolean {
  * `role` names the type role; accessibility semantics go through
  * `accessibilityRole`. `style` cannot touch what the role owns.
  */
-type TypeProps = Omit<TextProps, "role" | "style"> & {
+type TypeProps = Omit<
+  TextProps,
+  "role" | "style" | "maxFontSizeMultiplier" | "allowFontScaling"
+> & {
   role: TypeRole;
   /** Overrides the role's weight; weight carries meaning, size does not. */
   weight?: FontWeight;
@@ -96,6 +99,10 @@ export function Amount({
   const amount = (
     <Type
       selectable
+      // A number never breaks across lines; a long one shrinks to fit.
+      numberOfLines={1}
+      adjustsFontSizeToFit
+      minimumFontScale={0.5}
       role={hero ? "heroAmount" : "amount"}
       style={[hero && { color: colors.onHero }, style]}
       {...props}

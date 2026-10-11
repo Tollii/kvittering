@@ -1,9 +1,10 @@
 import { Button, ContextMenu, Host, RNHostView } from "@expo/ui/swift-ui";
 import { router } from "expo-router";
-import { Share, View } from "react-native";
+import { Share, View, useWindowDimensions } from "react-native";
 import * as Clipboard from "expo-clipboard";
 import { reportError } from "@/lib/observability";
 import { useState } from "react";
+import { useLargeText } from "@/components/ui";
 import type { ReceiptContextMenuProps } from "./receipt-context-menu";
 
 export function ReceiptContextMenu({
@@ -14,21 +15,22 @@ export function ReceiptContextMenu({
   children,
 }: ReceiptContextMenuProps) {
   const [width, setWidth] = useState<number>();
+  const { fontScale } = useWindowDimensions();
+  const largeText = useLargeText();
+
+  // The SwiftUI host keeps the height it first measures, so a row that wraps
+  // at large text overlaps the next one even when remeasured. There the row
+  // stands alone and still opens the receipt with a tap.
+  if (largeText) return <>{children}</>;
 
   return (
     <View onLayout={(event) => setWidth(event.nativeEvent.layout.width)}>
-      <Host matchContents={{ vertical: true }}>
+      {/* A new width or text size remounts the host, so it measures again. */}
+      <Host key={`${width}:${fontScale}`} matchContents={{ vertical: true }}>
         <ContextMenu>
           <ContextMenu.Trigger>
             <RNHostView matchContents>
-              {/* The host keeps the height it first measures, so the row
-                  renders only once its width is known and its text has
-                  wrapped, as a stacked row at large text does. */}
-              {width === undefined ? (
-                <View />
-              ) : (
-                <View style={{ width }}>{children}</View>
-              )}
+              <View style={{ width }}>{children}</View>
             </RNHostView>
           </ContextMenu.Trigger>
           <ContextMenu.Items>

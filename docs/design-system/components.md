@@ -37,7 +37,7 @@ When a second screen needs a feature's component, move it up to `src/components`
 
 States: `disabled` fades the button; `busy` shows a spinner in place of the icon, or before the title when there is no icon, and disables the button while keeping the title. `compact` is the shorter size for inline and footer use. A "show more" control under a list is a `compact` `secondary` button, not a row. A short title next to the thing it acts on, such as "Bekreft" beside a category suggestion, gets an `accessibilityLabel` that names the object.
 
-**`ButtonRow`** puts two or three buttons side by side, such as "Kopier" and "Del" under the invitation code or "Til kvitteringene" and "Neste til kontroll" under an approved receipt. Each button is as wide as its title needs and they share the spare width; when the titles cannot fit on one line, at large text or on a narrow phone, a button moves to its own line rather than its title wrapping inside it. Side-by-side buttons always go in one of these, never in a row of halves.
+**`ButtonRow`** puts two or three buttons side by side, such as "Kopier" and "Del" under the invitation code or "Til kvitteringene" and "Neste til kontroll" under an approved receipt. Each button is as wide as its title needs and they share the spare width; when the titles cannot fit on one line, at large text or on a narrow phone, a button moves to its own line rather than its title wrapping inside it. Side-by-side buttons always go in one of these, never in a row of halves. Pass the buttons directly; a fragment counts as one item.
 
 **`IconButton`** is an icon-only control with a required Norwegian `label`. `filled` adds the muted disc, or pass a colour such as `heroControl` on the hero.
 
@@ -64,6 +64,8 @@ States: `disabled` fades the button; `busy` shows a spinner in place of the icon
 **`List`** is the card that holds a list. It draws a `line` divider between its children and renders nothing when it has none, so every list in the app, rows, spending bars, receipt lines, and the receipts of a month in Kvitteringer, sits in one of these and looks the same. Give it `Row`s or other full-width elements directly, one per row; a fragment or a string is not a row, and the caller needs no index bookkeeping or empty guard.
 
 **`Row`** is the list item: an optional `IconTile`, a title, detail text, a trailing value, and a chevron when tappable. `selected` swaps the chevron for a checkmark. Large text moves the value under the title (see [accessibility](foundations.md#accessibility)).
+
+**`TitleValue`** is the title column and value that `Row`, `Disclosure`, a receipt line and the purchase totals share: the value sits beside the title, right-aligned and at most 45 % wide, or under it at large text. Use it inside a row whenever a value belongs to a title, rather than placing the value yourself.
 
 **`IconTile`** is the soft cobalt tile behind an icon: a 32-point squircle with the `tile` radius in a `Row` and the upload queue, where it can hold a spinner instead, or the 64-point `circle` that `Empty` leads with.
 

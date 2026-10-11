@@ -1,4 +1,10 @@
-import { Children, isValidElement, useState, type ReactNode } from "react";
+import {
+  Children,
+  isValidElement,
+  useState,
+  type ComponentProps,
+  type ReactNode,
+} from "react";
 import {
   ActivityIndicator,
   View,
@@ -179,6 +185,55 @@ export function SectionTitle({
   );
 }
 
+/**
+ * A title column and the value that belongs to it: beside it, right-aligned
+ * and at most 45 % wide, or on its own line under it at large text. Render it
+ * inside a row; `children` is the title column (a title and its detail).
+ */
+export function TitleValue({
+  children,
+  value,
+  role = "body",
+  weight = "600",
+  muted = false,
+  color,
+  gap = 4,
+}: Readonly<{
+  children: ReactNode;
+  value?: string;
+  role?: NonNullable<ComponentProps<typeof Copy>["role"]>;
+  weight?: NonNullable<ComponentProps<typeof Copy>["weight"]>;
+  muted?: boolean;
+  color?: string;
+  gap?: number;
+}>) {
+  const stacked = useLargeText();
+
+  const valueText = !!value && (
+    <Copy
+      role={role}
+      weight={weight}
+      muted={muted}
+      style={[
+        !stacked && { flexShrink: 1, maxWidth: "45%", textAlign: "right" },
+        !!color && { color },
+      ]}
+    >
+      {value}
+    </Copy>
+  );
+
+  return (
+    <>
+      <View style={{ flex: 1, gap }}>
+        {children}
+        {stacked && valueText}
+      </View>
+      {!stacked && valueText}
+    </>
+  );
+}
+
 export function Disclosure({
   title,
   value,
@@ -192,7 +247,6 @@ export function Disclosure({
 }>) {
   const [open, setOpen] = useState(initiallyOpen);
   const arrival = useArrival();
-  const stacked = useLargeText();
 
   return (
     <Panel style={{ gap: open ? 10 : 0 }}>
@@ -203,19 +257,9 @@ export function Disclosure({
         onPress={() => setOpen(!open)}
         style={[styles.row, { minHeight: 44 }]}
       >
-        <View style={{ flex: 1, gap: 4 }}>
+        <TitleValue value={value} role="detail" weight="400" muted>
           <Copy weight="600">{title}</Copy>
-          {stacked && !!value && (
-            <Copy role="detail" muted>
-              {value}
-            </Copy>
-          )}
-        </View>
-        {!stacked && !!value && (
-          <Copy role="detail" muted style={{ flexShrink: 1 }}>
-            {value}
-          </Copy>
-        )}
+        </TitleValue>
         <ExpandChevron open={open} />
       </Press>
       {/* Detail that is open from the start is already there; only a tap brings it in. */}
@@ -382,8 +426,6 @@ export function Row({
   onPress?: () => void;
   selected?: boolean;
 }>) {
-  const stacked = useLargeText();
-
   return (
     <Press
       feedback="highlight"
@@ -394,23 +436,14 @@ export function Row({
       style={[styles.row, { minHeight: 52, paddingVertical: 10 }]}
     >
       {icon && <IconTile icon={icon} />}
-      <View style={{ flex: 1, gap: 4 }}>
+      <TitleValue value={value}>
         <Copy weight="600">{title}</Copy>
         {!!detail && (
           <Copy role="detail" muted>
             {detail}
           </Copy>
         )}
-        {stacked && !!value && <Copy weight="600">{value}</Copy>}
-      </View>
-      {!stacked && !!value && (
-        <Copy
-          weight="600"
-          style={{ flexShrink: 1, maxWidth: "45%", textAlign: "right" }}
-        >
-          {value}
-        </Copy>
-      )}
+      </TitleValue>
       {selected && <Icon name="checkmark" size={15} weight="semibold" />}
       {onPress && !selected && <Chevron />}
     </Press>

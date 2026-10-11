@@ -11,6 +11,7 @@ import { api } from "../../convex/_generated/api";
 import type { Id } from "../../convex/_generated/dataModel";
 import {
   Button,
+  ButtonRow,
   Chip,
   Copy,
   ExpandChevron,
@@ -21,6 +22,7 @@ import {
   Press,
   Row,
   Select,
+  TitleValue,
   useLargeText,
 } from "@/components/ui";
 import { MoneyField } from "@/components/money-field";
@@ -324,22 +326,6 @@ function LineHeader({
   const largeText = useLargeText();
   const detail = lineDetail(line);
 
-  // The amount sits beside the name, or under it at large text, as a row does.
-  const amount = (
-    <Copy
-      weight="600"
-      style={[
-        largeText ? undefined : { flexShrink: 1, maxWidth: "45%" },
-        {
-          textAlign: largeText ? undefined : "right",
-          color: missingAmount ? colors.warning : colors.text,
-        },
-      ]}
-    >
-      {missingAmount ? "Beløp?" : Ore.format(line.amountOre)}
-    </Copy>
-  );
-
   return (
     <Press
       feedback="highlight"
@@ -354,7 +340,11 @@ function LineHeader({
         gap: 10,
       }}
     >
-      <View style={{ flex: 1, gap: 1 }}>
+      <TitleValue
+        value={missingAmount ? "Beløp?" : Ore.format(line.amountOre)}
+        color={missingAmount ? colors.warning : undefined}
+        gap={1}
+      >
         <Copy weight="600" numberOfLines={largeText ? undefined : 2}>
           {line.name || (missingName ? "Navn mangler" : "Ny vare")}
         </Copy>
@@ -363,9 +353,7 @@ function LineHeader({
             {detail}
           </Copy>
         )}
-        {largeText && amount}
-      </View>
-      {!largeText && amount}
+      </TitleValue>
       <ExpandChevron open={expanded} />
     </Press>
   );
@@ -708,24 +696,20 @@ function ProductSelector({
       <Copy role="detail" muted>
         {line.productName || "Ingen sikker produktkobling"}
       </Copy>
-      <View style={{ flexDirection: "row", gap: 8 }}>
-        <View style={{ flex: 1 }}>
-          <Button
-            title="Opprett eget produkt"
-            variant="secondary"
-            compact
-            onPress={() => onChange({ kind: "new_household" })}
-          />
-        </View>
-        <View style={{ flex: 1 }}>
-          <Button
-            title="Hold varen separat"
-            variant="secondary"
-            compact
-            onPress={() => onChange({ kind: "separate" })}
-          />
-        </View>
-      </View>
+      <ButtonRow>
+        <Button
+          title="Opprett eget produkt"
+          variant="secondary"
+          compact
+          onPress={() => onChange({ kind: "new_household" })}
+        />
+        <Button
+          title="Hold varen separat"
+          variant="secondary"
+          compact
+          onPress={() => onChange({ kind: "separate" })}
+        />
+      </ButtonRow>
       {products?.map((product) => (
         <Row
           key={product._id}

@@ -14,9 +14,7 @@ import {
   Switch,
   TextInput,
   View,
-  type StyleProp,
   type TextInputProps,
-  type ViewStyle,
 } from "react-native";
 import { type SymbolViewProps } from "expo-symbols";
 import { radius, useTheme } from "@/constants/theme";
@@ -77,7 +75,6 @@ export function Button({
   busy = false,
   compact = false,
   icon,
-  style,
   testID,
   accessibilityLabel,
 }: Readonly<{
@@ -89,7 +86,6 @@ export function Button({
   busy?: boolean;
   compact?: boolean;
   icon?: SymbolViewProps["name"];
-  style?: StyleProp<ViewStyle>;
   /** Identifies the button for end-to-end flows. */
   testID?: string;
   /** Names the object when the title alone would not, such as "Bekreft". */
@@ -125,7 +121,6 @@ export function Button({
           justifyContent: "center",
           gap: 8,
         },
-        style,
         faded(disabled && !busy),
       ]}
     >
@@ -153,7 +148,8 @@ export function Button({
  * Actions side by side. Each button is as wide as its title needs and they
  * share the spare width; when the titles cannot fit on one line, at large
  * text or on a narrow phone, a button moves to its own line below rather
- * than its title wrapping inside it.
+ * than its title wrapping inside it. Pass the buttons directly: a fragment
+ * counts as one item.
  */
 export function ButtonRow({ children }: Readonly<{ children: ReactNode }>) {
   return (

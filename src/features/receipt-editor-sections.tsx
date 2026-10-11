@@ -13,7 +13,9 @@ import {
   IconButton,
   List,
   Panel,
+  styles,
   SummaryBand,
+  TitleValue,
   useLargeText,
 } from "@/components/ui";
 import { ReceiptImages } from "@/features/receipt-images";
@@ -140,7 +142,6 @@ export function PurchaseTotals({
   totals,
 }: Readonly<{ data: ReceiptData; totals: Totals }>) {
   const colors = useTheme();
-  const largeText = useLargeText();
 
   // Components appear only when present; the line sum and paid amount always do.
   // The next-step notice names an open difference; the paid row only marks it.
@@ -162,46 +163,30 @@ export function PurchaseTotals({
 
   return (
     <Panel>
-      <View
-        style={{
-          flexDirection: largeText ? "column" : "row",
-          alignItems: largeText ? "stretch" : "baseline",
-          gap: largeText ? 2 : 12,
-        }}
-      >
-        <Copy
-          weight="600"
-          accessibilityRole="header"
-          style={largeText ? undefined : { flex: 1 }}
+      <View style={styles.row}>
+        <TitleValue
+          value={`${data.lines.filter((line) => line.kind === "product").length} varer`}
+          role="detail"
+          weight="400"
+          muted
         >
-          Kjøpsoversikt
-        </Copy>
-        <Copy role="detail" muted>
-          {data.lines.filter((line) => line.kind === "product").length} varer
-        </Copy>
+          <Copy weight="600" accessibilityRole="header">
+            Kjøpsoversikt
+          </Copy>
+        </TitleValue>
       </View>
       {rows.map((row) => (
-        <View
-          key={row.label}
-          style={{
-            flexDirection: largeText ? "column" : "row",
-            justifyContent: "space-between",
-            gap: largeText ? 4 : 16,
-            paddingVertical: 6,
-          }}
-        >
-          <Copy role="detail" muted style={{ flexShrink: 1 }}>
-            {row.label}
-          </Copy>
-          <Copy
+        <View key={row.label} style={[styles.row, { paddingVertical: 6 }]}>
+          <TitleValue
+            value={Ore.format(row.amount)}
             role="detail"
             weight={row.paid ? "700" : "500"}
-            style={
-              row.paid && paidUnsettled ? { color: colors.warning } : undefined
-            }
+            color={row.paid && paidUnsettled ? colors.warning : undefined}
           >
-            {Ore.format(row.amount)}
-          </Copy>
+            <Copy role="detail" muted>
+              {row.label}
+            </Copy>
+          </TitleValue>
         </View>
       ))}
     </Panel>
