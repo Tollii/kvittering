@@ -15,8 +15,8 @@ import Animated, {
   cubicBezier,
   useReducedMotion,
 } from "react-native-reanimated";
-import { motion, useTheme } from "@/constants/theme";
-import { Icon } from "./typography";
+import { motion } from "@/constants/theme";
+import { Chevron } from "./typography";
 
 const AnimatedPressable = createAnimatedComponent(Pressable);
 
@@ -82,8 +82,6 @@ export function Press({
  * swapping symbols, so the change reads as one control changing state.
  */
 export function ExpandChevron({ open }: Readonly<{ open: boolean }>) {
-  const colors = useTheme();
-
   return (
     <Animated.View
       style={{
@@ -93,7 +91,7 @@ export function ExpandChevron({ open }: Readonly<{ open: boolean }>) {
         transitionTimingFunction: easeInOut,
       }}
     >
-      <Icon name="chevron.down" size={12} color={colors.secondary} />
+      <Chevron direction="down" />
     </Animated.View>
   );
 }

@@ -132,7 +132,12 @@ export function CaptureReview({
                 justifyContent: "center",
               }}
             >
-              <Icon name="xmark" size={12} color={colors.onCamera} />
+              <Icon
+                name="xmark"
+                size={12}
+                weight="semibold"
+                color={colors.onCamera}
+              />
             </Press>
           </View>
         ))}

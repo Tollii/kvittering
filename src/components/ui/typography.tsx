@@ -38,6 +38,8 @@ function Type({ role, weight, muted = false, style, ...props }: TypeProps) {
 
   return (
     <Text
+      // iOS pushes a lone last word onto the line before it, as UILabel does.
+      lineBreakStrategyIOS="standard"
       {...props}
       style={[
         {
@@ -124,6 +126,33 @@ export function Icon({
       size={size}
       weight={weight}
       tintColor={color ?? colors.primary}
+    />
+  );
+}
+
+/**
+ * The chevron of anything that navigates, opens, expands, or goes back. One
+ * size and weight everywhere, semibold like the text it sits beside and the
+ * system's own disclosure indicators; `compact` is the smaller one inside a
+ * chip, and a back link colours it `primary`.
+ */
+export function Chevron({
+  direction = "right",
+  color,
+  compact = false,
+}: Readonly<{
+  direction?: "right" | "down" | "left";
+  color?: string;
+  compact?: boolean;
+}>) {
+  const colors = useTheme();
+
+  return (
+    <Icon
+      name={`chevron.${direction}`}
+      size={compact ? 10 : 13}
+      weight="semibold"
+      color={color ?? colors.secondary}
     />
   );
 }

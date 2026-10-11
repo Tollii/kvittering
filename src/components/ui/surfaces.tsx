@@ -9,7 +9,7 @@ import {
 import { type SymbolViewProps } from "expo-symbols";
 import Animated, { LayoutAnimationConfig } from "react-native-reanimated";
 import { radius, useTheme } from "@/constants/theme";
-import { Copy, Icon, styles } from "./typography";
+import { Chevron, Copy, Icon, styles } from "./typography";
 import { ExpandChevron, Press, useArrival } from "./motion";
 
 export function Panel({
@@ -270,7 +270,13 @@ export function Notice({
   const content = (
     <>
       <View style={{ paddingTop: title ? 0 : 2 }}>
-        <Icon name={icon ?? palette.icon} size={16} color={palette.accent} />
+        {/* The icon carries the weight of the text beside it: a bold title or regular copy. */}
+        <Icon
+          name={icon ?? palette.icon}
+          size={16}
+          weight={title ? "semibold" : undefined}
+          color={palette.accent}
+        />
       </View>
       <View style={{ flex: 1, gap: 1 }}>
         {!!title && (
@@ -288,9 +294,7 @@ export function Notice({
           {children}
         </Copy>
       </View>
-      {onPress && (
-        <Icon name="chevron.right" size={12} color={colors.secondary} />
-      )}
+      {onPress && <Chevron />}
     </>
   );
 
@@ -360,7 +364,6 @@ export function Row({
   onPress?: () => void;
   selected?: boolean;
 }>) {
-  const colors = useTheme();
   const { fontScale } = useWindowDimensions();
   const stacked = fontScale > 1.3;
 
@@ -392,9 +395,7 @@ export function Row({
         </Copy>
       )}
       {selected && <Icon name="checkmark" size={15} weight="semibold" />}
-      {onPress && !selected && (
-        <Icon name="chevron.right" size={13} color={colors.secondary} />
-      )}
+      {onPress && !selected && <Chevron />}
     </Press>
   );
 }

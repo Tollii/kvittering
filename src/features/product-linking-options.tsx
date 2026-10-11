@@ -3,7 +3,15 @@ import { View } from "react-native";
 import { Image } from "expo-image";
 import { useQuery } from "convex-helpers/react/cache";
 import { api } from "../../convex/_generated/api";
-import { Copy, Icon, Loading, Notice, faded, Press } from "@/components/ui";
+import {
+  Chevron,
+  Copy,
+  Icon,
+  Loading,
+  Notice,
+  faded,
+  Press,
+} from "@/components/ui";
 import { radius, useTheme } from "@/constants/theme";
 import { useCatalogSearch } from "./catalog-queries";
 import { useFeatureFlag } from "./featureFlags";
@@ -171,7 +179,7 @@ export function ProductLinkingOptions({
                 </Copy>
               )}
             </View>
-            <Icon name="chevron.right" size={14} color={colors.secondary} />
+            <Chevron />
           </Press>
         ))}
       </View>

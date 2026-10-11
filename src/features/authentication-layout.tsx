@@ -2,7 +2,7 @@ import type { ReactNode } from "react";
 import { KeyboardAvoidingView, Platform, ScrollView, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { StatusBar } from "expo-status-bar";
-import { Copy, Icon, faded, Press } from "@/components/ui";
+import { Chevron, Copy, faded, Press } from "@/components/ui";
 import { ArchMark } from "@/components/monument-artwork";
 import { radius, useTheme } from "@/constants/theme";
 
@@ -128,7 +128,7 @@ export function AuthenticationLink({
         faded(disabled),
       ]}
     >
-      {back && <Icon name="chevron.left" size={16} color={colors.primary} />}
+      {back && <Chevron direction="left" color={colors.primary} />}
       <Copy weight="500" style={{ color: colors.primary, flexShrink: 1 }}>
         {title}
       </Copy>
