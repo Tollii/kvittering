@@ -186,8 +186,9 @@ export function SectionTitle({
 }
 
 /**
- * A title column and the value that belongs to it: beside it, right-aligned
- * and at most 45 % wide, or on its own line under it at large text. Render it
+ * A title column and the value that belongs to it: beside it, right-aligned,
+ * at most 45 % wide and on one line, or on its own line under it at large
+ * text. Render it
  * inside a row; `children` is the title column (a title and its detail).
  */
 export function TitleValue({
@@ -214,6 +215,9 @@ export function TitleValue({
       role={role}
       weight={weight}
       muted={muted}
+      // Beside the title a value stays whole on one line and shrinks to fit.
+      numberOfLines={stacked ? undefined : 1}
+      adjustsFontSizeToFit={!stacked}
       style={[
         !stacked && { flexShrink: 1, maxWidth: "45%", textAlign: "right" },
         !!color && { color },
