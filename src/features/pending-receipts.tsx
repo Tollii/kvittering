@@ -3,12 +3,7 @@ import { ReceiptActivityButton } from "@/features/receipt-activity";
 import { useCompleteReceipts } from "@/features/receipt-queries";
 import { UploadQueueCard } from "@/features/upload-queue-card";
 import Animated, { LayoutAnimationConfig } from "react-native-reanimated";
-import {
-  SectionTitle,
-  useArrival,
-  useDeparture,
-  useSettle,
-} from "@/components/ui";
+import { SectionTitle, useArrival, useDeparture } from "@/components/ui";
 import { ReceiptCard, openReceipt } from "@/components/receipt-card";
 import { SwipeToApprove } from "@/features/swipe-approve";
 import { useHousehold } from "@/features/household-context";
@@ -51,11 +46,13 @@ export function PendingReceipts({
 }: Readonly<ReturnType<typeof usePendingReceipts>>) {
   const { online, retryFailedUploads } = useHousehold();
   const arrival = useArrival();
-  const approved = useDeparture("left");
-  const settle = useSettle();
+  // A swipe to approve is the usual reason a card leaves, so it leaves to the left.
+  const departure = useDeparture("left");
 
+  // Mounted with the screen, so cards already waiting are just there and one
+  // that finishes processing later arrives.
   return (
-    <>
+    <LayoutAnimationConfig skipEntering>
       {attention.length > 0 && (
         <>
           <SectionTitle
@@ -78,21 +75,17 @@ export function PendingReceipts({
               if (next) openReceipt(next);
             }}
           />
-          {/* Cards already waiting are just there; one that finishes processing arrives. */}
-          <LayoutAnimationConfig skipEntering>
-            {attention.map((receipt) => (
-              <Animated.View
-                key={receipt._id}
-                entering={arrival}
-                exiting={approved}
-                layout={settle}
-              >
-                <SwipeToApprove receipt={receipt} enabled={online}>
-                  <ReceiptCard receipt={receipt} />
-                </SwipeToApprove>
-              </Animated.View>
-            ))}
-          </LayoutAnimationConfig>
+          {attention.map((receipt) => (
+            <Animated.View
+              key={receipt._id}
+              entering={arrival}
+              exiting={departure}
+            >
+              <SwipeToApprove receipt={receipt} enabled={online}>
+                <ReceiptCard receipt={receipt} />
+              </SwipeToApprove>
+            </Animated.View>
+          ))}
         </>
       )}
       {(working.length > 0 || queue.length > 0) && (
@@ -121,6 +114,6 @@ export function PendingReceipts({
           ))}
         </>
       )}
-    </>
+    </LayoutAnimationConfig>
   );
 }

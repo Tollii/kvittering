@@ -366,7 +366,7 @@ function LineHeader({
       >
         {missingAmount ? "Beløp?" : Ore.format(line.amountOre)}
       </Copy>
-      <ExpandChevron open={expanded} size={11} />
+      <ExpandChevron open={expanded} />
     </Press>
   );
 }

@@ -10,7 +10,6 @@ import Animated, {
   FadeIn,
   FadeOut,
   Keyframe,
-  LinearTransition,
   ReduceMotion,
   createAnimatedComponent,
   cubicBezier,
@@ -82,10 +81,7 @@ export function Press({
  * The chevron of something that expands in place. It turns rather than
  * swapping symbols, so the change reads as one control changing state.
  */
-export function ExpandChevron({
-  open,
-  size = 12,
-}: Readonly<{ open: boolean; size?: number }>) {
+export function ExpandChevron({ open }: Readonly<{ open: boolean }>) {
   const colors = useTheme();
 
   return (
@@ -97,7 +93,7 @@ export function ExpandChevron({
         transitionTimingFunction: easeInOut,
       }}
     >
-      <Icon name="chevron.down" size={size} color={colors.secondary} />
+      <Icon name="chevron.down" size={12} color={colors.secondary} />
     </Animated.View>
   );
 }
@@ -137,28 +133,18 @@ export function useDeparture(toward: "up" | "left" = "up") {
       .easing(easing)
       .reduceMotion(ReduceMotion.Never);
 
-  // Every keyframe must name the same transforms, in the same order.
-  const left = toward === "left";
+  const exit = {
+    up: { x: 0, y: -6 },
+    left: { x: -motion.swipeExit, y: 0 },
+  }[toward];
 
+  // Every keyframe must name the same transforms, in the same order.
   return new Keyframe({
     0: { opacity: 1, transform: [{ translateX: 0 }, { translateY: 0 }] },
     100: {
       opacity: 0,
-      transform: [
-        { translateX: left ? -motion.swipeExit : 0 },
-        { translateY: left ? 0 : -6 },
-      ],
+      transform: [{ translateX: exit.x }, { translateY: exit.y }],
       easing,
     },
   }).duration(motion.press);
-}
-
-/**
- * How the rest of a list closes up after one of its items leaves. Reduce
- * Motion snaps it into place.
- */
-export function useSettle() {
-  return LinearTransition.duration(motion.state).easing(
-    Easing.bezier(...motion.easeInOut),
-  );
 }

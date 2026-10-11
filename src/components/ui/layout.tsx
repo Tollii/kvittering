@@ -1,4 +1,4 @@
-import { useEffect, useState, type ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import {
   KeyboardAvoidingView,
   Platform,
@@ -219,47 +219,36 @@ export function Sheet({
   dismissible = true,
   scrollable = true,
   ...content
-}: Readonly<{
-  title: string;
-  visible: boolean;
-  dismissible?: boolean;
-  scrollable?: boolean;
-  onClose: () => void;
-  children: ReactNode;
-  header?: ReactNode;
-  footer?: ReactNode;
-}>) {
+}: SheetContent &
+  Readonly<{
+    visible: boolean;
+    dismissible?: boolean;
+    scrollable?: boolean;
+    onClose: () => void;
+  }>) {
   const colors = useTheme();
 
   // Callers often clear what a sheet shows in the same update that closes it,
-  // so a closing sheet keeps its last content while it slides away.
-  const [lastOpen, setLastOpen] = useState(content);
-  const [wasVisible, setWasVisible] = useState(visible);
-  const [closing, setClosing] = useState(false);
+  // so a closing sheet holds its last content, untouchable, until it is gone.
+  const [held, setHeld] = useState<SheetContent | null>(null);
 
-  if (visible && !sameContent(lastOpen, content)) setLastOpen(content);
+  if (visible && (held === null || !sameContent(held, content)))
+    setHeld(content);
 
-  if (wasVisible !== visible) {
-    setWasVisible(visible);
-    setClosing(!visible);
-  }
-
-  useEffect(() => {
-    if (!closing) return undefined;
-    const timeout = setTimeout(() => setClosing(false), sheetDismissal);
-
-    return () => clearTimeout(timeout);
-  }, [closing]);
-
-  const { title, header, footer, children } = closing ? lastOpen : content;
+  const closing = !visible && held !== null;
+  const { title, header, footer, children } = closing ? held : content;
 
   return (
     <SheetPresentation
       visible={visible}
       onClose={onClose}
+      onDismissed={() => setHeld(null)}
       dismissible={dismissible}
     >
-      <SafeAreaView style={{ flex: 1, backgroundColor: colors.background }}>
+      <SafeAreaView
+        pointerEvents={closing ? "none" : "auto"}
+        style={{ flex: 1, backgroundColor: colors.background }}
+      >
         <View
           style={[
             styles.row,
@@ -328,9 +317,6 @@ export function Sheet({
     </SheetPresentation>
   );
 }
-
-/** Longer than the system's sheet dismissal, which runs about 350 ms. */
-const sheetDismissal = 500;
 
 type SheetContent = Readonly<{
   title: string;

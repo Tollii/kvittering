@@ -12,6 +12,7 @@ import type { SheetPresentationProps } from "./sheet-presentation";
 export function SheetPresentation({
   visible,
   onClose,
+  onDismissed,
   dismissible = true,
   children,
 }: SheetPresentationProps) {
@@ -25,6 +26,7 @@ export function SheetPresentation({
         onIsPresentedChange={(shown) => {
           if (!shown) onClose();
         }}
+        onDismiss={onDismissed}
       >
         <Group
           modifiers={[
