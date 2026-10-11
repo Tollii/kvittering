@@ -159,7 +159,7 @@ export default function Corrections() {
             />
           )}
           <Disclosure title="Om rettelser">
-            <Copy size={14} muted>
+            <Copy role="detail" muted>
               Nye kategori- og produktrettelser lagres fra nå av. Automatisk
               godkjenning teller ikke som en rettelse.
             </Copy>

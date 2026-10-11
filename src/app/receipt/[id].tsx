@@ -57,7 +57,7 @@ function ReceiptDetail({ id }: Readonly<{ id: string }>) {
           <Icon name="doc.questionmark" size={44} />
           <Copy
             accessibilityRole="header"
-            size={22}
+            role="sheetTitle"
             weight="600"
             style={{ textAlign: "center" }}
           >

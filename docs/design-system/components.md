@@ -14,7 +14,7 @@ When a second screen needs a feature's component, move it up to `src/components`
 
 ## Text and icons
 
-**`Copy`** ([typography](../../src/components/ui/typography.tsx)) is the only text component. It takes `size`, `weight`, and `muted`, and sets line height, tracking, and tabular numerals. See [typography](foundations.md#typography) for the size of each role.
+**`Copy`** ([typography](../../src/components/ui/typography.tsx)) is the only text component. It takes a `role` (default `body`), an optional `weight` override, and `muted`, and draws the role's size, line height, tracking, and tabular numerals. See [typography](foundations.md#typography) for the roles and where each one appears.
 
 **`Amount`** is the large number a screen or sheet leads with, and `detail` is its one-line explanation under it, such as "3 kjøp" or "12 poster i perioden". `hero` puts it on a `SummaryBand` in `onHero`; otherwise it sits on paper at the top of a sheet or a detail view.
 
@@ -89,7 +89,7 @@ States: `disabled` fades the button; `busy` shows a spinner in place of the icon
 
 Pass `insetTop={false}` when a native stack header already covers the top inset.
 
-**`SummaryBand`** is the cobalt band with a screen's key number: the month menu and total on Forbruk, the paid amount and status chips on a receipt, the current item in Koble produkter. It owns the hero fill and padding; screens put an `Amount size="hero"` and `onHero` text inside it.
+**`SummaryBand`** is the cobalt band with a screen's key number: the month menu and total on Forbruk, the paid amount and status chips on a receipt, the current item in Koble produkter. It owns the hero fill and padding; screens put an `Amount hero` and `onHero` text inside it.
 
 **`Sheet`** is a bottom sheet with a title, a close button ("Lukk"), optional fixed `header` and `footer`, and scrolling content. On iOS it is a native sheet with medium and large detents and a drag indicator. Set `dismissible={false}` while closing would lose work or leave an invalid value: while a save is busy, or while the paid amount is invalid in Kvitteringsdetaljer. A sheet closed from code keeps showing its last content, without taking taps, until it has left the screen, so a caller can clear its selection in the same update that closes it.
 

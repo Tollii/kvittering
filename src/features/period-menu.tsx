@@ -25,9 +25,7 @@ export function PeriodMenu({ value }: PeriodMenuProps) {
       }}
     >
       <Icon name="calendar" size={18} color={colors.onHero} />
-      <Copy size={17} style={{ color: colors.onHero }}>
-        {CalendarMonth.title(value)}
-      </Copy>
+      <Copy style={{ color: colors.onHero }}>{CalendarMonth.title(value)}</Copy>
     </View>
   );
 }

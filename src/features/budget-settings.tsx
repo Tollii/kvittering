@@ -91,7 +91,7 @@ export function BudgetSettings() {
         )}
       </View>
       {saved && current !== null && (
-        <Copy size={13} muted>
+        <Copy role="detail" muted>
           {Ore.format(current)} per måned
         </Copy>
       )}

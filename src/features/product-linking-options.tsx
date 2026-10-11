@@ -164,11 +164,9 @@ export function ProductLinkingOptions({
           >
             <ProductImage product={product} />
             <View style={{ flex: 1, gap: 4 }}>
-              <Copy size={16} weight="600">
-                {product.name}
-              </Copy>
+              <Copy weight="600">{product.name}</Copy>
               {!!product.brand && (
-                <Copy size={12} muted>
+                <Copy role="caption" muted>
                   {product.brand}
                 </Copy>
               )}

@@ -81,7 +81,7 @@ export function AccountSettings({ disabled }: Readonly<{ disabled: boolean }>) {
           <Copy weight="600">
             {connected ? "Apple er koblet til" : "Koble til Apple"}
           </Copy>
-          <Copy muted size={14}>
+          <Copy muted role="detail">
             {connected === true
               ? "Du kan logge inn på denne kontoen med Apple."
               : connected === false
@@ -97,7 +97,7 @@ export function AccountSettings({ disabled }: Readonly<{ disabled: boolean }>) {
           )}
         </>
       )}
-      <Copy muted size={14}>
+      <Copy muted role="detail">
         {queue.length === 0
           ? "Ingenting venter på opplasting"
           : `${queue.length} ${queue.length === 1 ? "kvittering" : "kvitteringer"} venter på opplasting`}

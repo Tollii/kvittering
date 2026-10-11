@@ -60,7 +60,11 @@ export function ReceiptSummary({
             gap: 4,
           }}
         >
-          <Copy size={13} weight="600" style={{ color: colors.onHeroMuted }}>
+          <Copy
+            role="detail"
+            weight="600"
+            style={{ color: colors.onHeroMuted }}
+          >
             {CalendarDate.format(data?.purchaseDate)}
             {data?.purchaseDate && data.purchaseTime
               ? ` kl. ${data.purchaseTime}`
@@ -119,7 +123,7 @@ export function ReceiptSummary({
         {excluded && <Chip label="Utelatt" icon="eye.slash" />}
       </View>
       {receipt.status === "reviewed" && !dirty && !excluded && (
-        <Copy size={14} style={{ color: colors.onHeroMuted }}>
+        <Copy role="detail" style={{ color: colors.onHeroMuted }}>
           Kvitteringen er med i forbruket. Du trenger ikke kontrollere hver
           vare. Produktkobling er valgfritt.
         </Copy>
@@ -166,7 +170,7 @@ export function PurchaseTotals({
         <Copy weight="600" accessibilityRole="header" style={{ flex: 1 }}>
           Kjøpsoversikt
         </Copy>
-        <Copy size={13} muted>
+        <Copy role="detail" muted>
           {data.lines.filter((line) => line.kind === "product").length} varer
         </Copy>
       </View>
@@ -180,11 +184,11 @@ export function PurchaseTotals({
             paddingVertical: 6,
           }}
         >
-          <Copy size={14} muted style={{ flexShrink: 1 }}>
+          <Copy role="detail" muted style={{ flexShrink: 1 }}>
             {row.label}
           </Copy>
           <Copy
-            size={14}
+            role="detail"
             weight={row.paid ? "700" : "500"}
             style={
               row.paid && paidUnsettled ? { color: colors.warning } : undefined
@@ -227,7 +231,7 @@ export function ReceiptFooter({
     <>
       {!!error && (
         <Copy
-          size={13}
+          role="detail"
           style={{ color: colors.danger }}
           accessibilityRole="alert"
         >
@@ -241,7 +245,7 @@ export function ReceiptFooter({
           color={ready || approved ? colors.success : colors.primary}
         />
         <Copy
-          size={13}
+          role="detail"
           weight="500"
           muted
           style={{ flex: 1 }}

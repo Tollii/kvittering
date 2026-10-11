@@ -108,19 +108,19 @@ export default function ProductLinking() {
       summary={
         item && (
           <SummaryBand>
-            <Copy size={13} style={{ color: colors.onHeroMuted }}>
+            <Copy role="detail" style={{ color: colors.onHeroMuted }}>
               {item.store} · {CalendarDate.format(item.date)}
             </Copy>
-            <Copy size={24} weight="600" style={{ color: colors.onHero }}>
+            <Copy role="screenTitle" style={{ color: colors.onHero }}>
               {item.line.name}
             </Copy>
             {!!item.line.receiptName &&
               item.line.receiptName !== item.line.name && (
-                <Copy size={13} style={{ color: colors.onHeroMuted }}>
+                <Copy role="detail" style={{ color: colors.onHeroMuted }}>
                   På kvitteringen: {item.line.receiptName}
                 </Copy>
               )}
-            <Copy size={14} style={{ color: colors.onHero }}>
+            <Copy role="detail" style={{ color: colors.onHero }}>
               {[
                 item.line.brand,
                 item.line.packageSize && item.line.packageUnit
@@ -218,7 +218,7 @@ export default function ProductLinking() {
       {busy && <ActivityIndicator accessibilityLabel="Lagrer produktvalg" />}
       {item ? (
         <>
-          <Copy size={13} muted>
+          <Copy role="detail" muted>
             {queue.complete ? queue.items.length : `${queue.items.length}+`}{" "}
             varer igjen
           </Copy>
