@@ -1,0 +1,68 @@
+name: Code scanning alerts
+
+# Cloud agent sessions get 403 from the code scanning API, so the weekly
+# security routine lists and dismisses alerts through this workflow's token.
+# The list job prints one JSON object per open alert to its log.
+on:
+  workflow_dispatch:
+    inputs:
+      dismiss:
+        description: Number of the alert to dismiss. Leave empty to list open alerts.
+        required: false
+        type: string
+      reason:
+        description: Why the alert is dismissed
+        required: false
+        type: choice
+        default: false positive
+        options:
+          - false positive
+          - won't fix
+          - used in tests
+      comment:
+        description: Evidence for the dismissal, shown on the alert (280 characters at most)
+        required: false
+        type: string
+
+permissions: {}
+
+jobs:
+  list:
+    if: inputs.dismiss == ''
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      security-events: read
+    steps:
+      - name: List open alerts
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh api --paginate "repos/$GITHUB_REPOSITORY/code-scanning/alerts?state=open&per_page=100" \
+            --jq '.[] | {number, rule: .rule.id, severity: (.rule.security_severity_level // .rule.severity), tool: .tool.name, path: .most_recent_instance.location.path, line: .most_recent_instance.location.start_line, message: .most_recent_instance.message.text, url: .html_url} | tojson'
+
+  dismiss:
+    if: inputs.dismiss != ''
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      security-events: write
+    steps:
+      - name: Dismiss alert
+        env:
+          GH_TOKEN: ${{ github.token }}
+          ALERT: ${{ inputs.dismiss }}
+          REASON: ${{ inputs.reason }}
+          COMMENT: ${{ inputs.comment }}
+        run: |
+          if ! [[ "$ALERT" =~ ^[0-9]+$ ]]; then
+            echo "::error::dismiss must be an alert number, got '$ALERT'"
+            exit 1
+          fi
+          if [ -z "$COMMENT" ]; then
+            echo "::error::A dismissal needs a comment with the evidence"
+            exit 1
+          fi
+          gh api -X PATCH "repos/$GITHUB_REPOSITORY/code-scanning/alerts/$ALERT" \
+            -f state=dismissed -f dismissed_reason="$REASON" -f dismissed_comment="$COMMENT" \
+            --jq '{number, state, dismissed_reason, dismissed_comment, url: .html_url} | tojson'
