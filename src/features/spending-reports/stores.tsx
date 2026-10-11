@@ -89,11 +89,11 @@ function StoreReport({
         />
         <Panel>
           <View style={{ gap: 2 }}>
-            <Copy size={19} weight="700">
+            <Copy accessibilityRole="header" role="sectionTitle">
               {storeName(selected)}
             </Copy>
             {!!selected.address && (
-              <Copy size={13} muted>
+              <Copy role="detail" muted>
                 {selected.address}
               </Copy>
             )}
@@ -152,7 +152,7 @@ function StoreReport({
           { value: "chains", label: "Kjeder" },
         ]}
       />
-      <Copy size={14} muted>
+      <Copy role="detail" muted>
         Vareforbruk etter rabatter, uten pant. Samme periode og utvalg som i
         Forbruk.
       </Copy>

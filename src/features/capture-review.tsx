@@ -106,7 +106,11 @@ export function CaptureReview({
                 justifyContent: "center",
               }}
             >
-              <Copy size={12} weight="700" style={{ color: colors.onCamera }}>
+              <Copy
+                role="caption"
+                weight="700"
+                style={{ color: colors.onCamera }}
+              >
                 {index + 1}
               </Copy>
             </View>

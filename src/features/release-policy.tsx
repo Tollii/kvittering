@@ -196,7 +196,7 @@ function PolicyProvider({
                 gap: 8,
               }}
             >
-              <Copy size={14} style={{ flex: 1 }}>
+              <Copy role="detail" style={{ flex: 1 }}>
                 En oppdatering er tilgjengelig.
               </Copy>
               <Button
@@ -243,7 +243,7 @@ function PolicyProvider({
             onPress={() => void refresh()}
           />
           {!!error && <Notice tone="error">{error}</Notice>}
-          <Copy muted size={13}>
+          <Copy muted role="detail">
             Versjon {installedRelease.version} ({installedRelease.build})
           </Copy>
         </Screen>

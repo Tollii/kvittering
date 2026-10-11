@@ -55,20 +55,17 @@ export function SpendingBars<
               }}
             >
               <Copy
-                size={15}
                 weight="500"
                 style={fontScale > 1.3 ? { width: "100%" } : { flex: 1 }}
               >
                 {row.name}
               </Copy>
               {share !== null && (
-                <Copy size={12} muted>
+                <Copy role="caption" muted>
                   {share} %
                 </Copy>
               )}
-              <Copy size={15} weight="600">
-                {Ore.format(row.amountOre)}
-              </Copy>
+              <Copy weight="600">{Ore.format(row.amountOre)}</Copy>
             </View>
             <View
               style={{

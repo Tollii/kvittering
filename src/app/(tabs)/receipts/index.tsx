@@ -248,10 +248,10 @@ function ProductsView({
                 { label: "Laveste", amount: prices.lowest },
               ].map((metric) => (
                 <View key={metric.label} style={{ flex: 1, gap: 2 }}>
-                  <Copy muted size={12} weight="600">
+                  <Copy muted role="caption" weight="600">
                     {metric.label}
                   </Copy>
-                  <Copy weight="700" size={17}>
+                  <Copy weight="700" role="cardTitle">
                     {Ore.format(metric.amount)}
                   </Copy>
                 </View>

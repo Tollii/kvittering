@@ -41,7 +41,7 @@ export function FamilyPurchases({
           }}
         >
           <Icon name="chevron.left" size={12} />
-          <Copy size={14} weight="600" style={{ color: colors.primary }}>
+          <Copy role="detail" weight="600" style={{ color: colors.primary }}>
             Alle
           </Copy>
         </Press>
@@ -81,7 +81,7 @@ export function FamilyPurchases({
         ))}
       </List>
       {report.linked < report.total && (
-        <Copy muted size={12}>
+        <Copy muted role="caption">
           {report.linked} av {report.total} varelinjer gruppert
           {report.pending ? " · analyserer …" : ""}
         </Copy>

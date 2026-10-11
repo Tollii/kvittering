@@ -59,23 +59,21 @@ Some backdrops do not follow the colour scheme, so their tokens do not either:
 
 ## Typography
 
-The app uses the system font (San Francisco) through `Copy` ([typography](../../src/components/ui/typography.tsx)). There is no named type scale: `Copy` takes a size and weight, derives line height and tracking from the size, and sets tabular numerals so amounts align. Style any text outside `Copy` with `tracking(size)`.
+The app uses the system font (San Francisco) through `Copy` ([typography](../../src/components/ui/typography.tsx)). Every text is one role of the type scale, which [theme](../../src/constants/theme.ts) owns as `typeScale`: `Copy` takes a `role` and `Amount` draws the two amounts. A role owns its size, line height, tracking, and default weight, and every role sets tabular numerals so amounts align. There is no size prop, so new text picks a role instead of a number. The one text outside the scale is the native input of `Field`, which keeps the system's 17-point input size.
 
-Text sizes cluster into roles. For new text, copy the size and weight of the role it plays from the place named here rather than picking a new one.
+| Role           | Draw it with                                                                                                                           | Where it appears                                                                                                                                                            |
+| -------------- | -------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `heroAmount`   | `Amount hero`                                                                                                                          | The month total on Forbruk and the paid amount on a receipt.                                                                                                                |
+| `amount`       | `Amount`                                                                                                                               | The total that opens a detail sheet, the store total in Butikker, the analysis total, the Rettelser headline.                                                               |
+| `screenTitle`  | `Copy role="screenTitle"`                                                                                                              | The `Screen` header ([layout](../../src/components/ui/layout.tsx)), `IllustratedEmpty`, the camera's empty state, the current item in Koble produkter, the sign-in welcome. |
+| `sheetTitle`   | `Copy role="sheetTitle"`                                                                                                               | The `Sheet` header, the `Empty` title, a product sheet's name.                                                                                                              |
+| `sectionTitle` | `SectionTitle` ([surfaces](../../src/components/ui/surfaces.tsx)), or `Copy role="sectionTitle"` for the name a store sheet leads with | A heading over a group of cards or rows.                                                                                                                                    |
+| `cardTitle`    | `Copy role="cardTitle"`                                                                                                                | Store and amount in [`ReceiptCard`](../../src/components/receipt-card.tsx), the price metrics in Historikk, the receipt placeholder's status line.                          |
+| `body`         | `Copy`                                                                                                                                 | Reading copy, `Row` titles, buttons, `Notice` text: anything a person reads or taps.                                                                                        |
+| `detail`       | `Copy role="detail"`                                                                                                                   | `Row` detail, `Field` labels, dates under titles, chips, segmented labels, inline links such as "Vis alle".                                                                 |
+| `caption`      | `Copy role="caption"`                                                                                                                  | `Field` hints, percentages, the hero eyebrow, counters and badges.                                                                                                          |
 
-| Role                | Copy it from                                                                                                                    |
-| ------------------- | ------------------------------------------------------------------------------------------------------------------------------- |
-| Key amount on hero  | `Amount hero`: the month total on Forbruk, the paid amount on a receipt.                                                        |
-| Amount in a sheet   | `Amount`: the total that opens a detail sheet, the store total in Butikker, the analysis total.                                 |
-| Screen title        | The `Screen` header ([layout](../../src/components/ui/layout.tsx)); `IllustratedEmpty` uses the same size on an empty tab root. |
-| Sheet title         | The `Sheet` header; `Empty` uses the same size for its title.                                                                   |
-| Section title       | `SectionTitle` ([surfaces](../../src/components/ui/surfaces.tsx)).                                                              |
-| Card title          | Store and amount in [`ReceiptCard`](../../src/components/receipt-card.tsx).                                                     |
-| Body and row titles | The `Copy` default; `Row` titles and buttons use the same size, heavier.                                                        |
-| Detail              | `Row` detail and the labels of `Field` ([controls](../../src/components/ui/controls.tsx)).                                      |
-| Caption             | `Field` hints.                                                                                                                  |
-
-Weight carries meaning: regular for reading, semibold (600) for labels, interactive text, and the hero amount, bold (700) for titles and amounts on paper. Mark each title with `accessibilityRole="header"`.
+Weight carries meaning, so a caller may override the role's default: regular for reading, semibold (600) for labels, interactive text, and the hero amount, bold (700) for titles and amounts on paper. `weight` is the only override; a role that needs a different size is a new role in `typeScale`, added with its users named here. Mark each title with `accessibilityRole="header"`; `Copy`'s `role` names the type role and never an accessibility role.
 
 ## Spacing
 

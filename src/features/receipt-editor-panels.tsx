@@ -190,7 +190,7 @@ export function ReceiptPlaceholder({
   return (
     <Panel style={{ alignItems: "center", paddingVertical: 28, gap: 8 }}>
       {processing && <ActivityIndicator color={colors.primary} />}
-      <Copy weight="600" size={18}>
+      <Copy role="cardTitle">
         {processing ? "Kvitteringen leses" : "Ingen resultater ennå"}
       </Copy>
       {hasResult && <Button title="Vis resultatet" onPress={onShowResult} />}

@@ -77,7 +77,7 @@ export function SpendingCalendar({
         {weekdays.map(([day, label]) => (
           <Copy
             key={day}
-            size={12}
+            role="caption"
             weight="600"
             muted
             style={{ flex: 1, textAlign: "center" }}
@@ -123,7 +123,7 @@ export function SpendingCalendar({
                       }}
                     >
                       <Copy
-                        size={14}
+                        role="detail"
                         weight={day.level ? "700" : "400"}
                         style={{
                           color: day.level
@@ -135,8 +135,10 @@ export function SpendingCalendar({
                       </Copy>
                       {day.contributions.length > 0 && (
                         <Copy
-                          size={10}
+                          role="caption"
                           weight="600"
+                          numberOfLines={1}
+                          adjustsFontSizeToFit
                           style={{
                             color: day.level
                               ? colors.onChart[Math.max(0, 4 - day.level)]

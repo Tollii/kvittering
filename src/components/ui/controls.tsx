@@ -135,7 +135,6 @@ export function Button({
       ) : null}
       <Copy
         weight="600"
-        size={compact ? 15 : 16}
         style={{ color: foreground, flexShrink: 1, textAlign: "center" }}
       >
         {title}
@@ -190,7 +189,7 @@ export function Chip({
     >
       {icon && <Icon name={icon} size={12} color={palette.text} />}
       <Copy
-        size={14}
+        role="detail"
         weight="600"
         style={{ color: palette.text, flexShrink: 1 }}
       >
@@ -217,7 +216,7 @@ export function Field({
 
   return (
     <View style={{ gap: 6 }}>
-      <Copy size={13} weight="600" muted>
+      <Copy role="detail" weight="600" muted>
         {label}
       </Copy>
       <TextInput
@@ -266,7 +265,7 @@ export function Field({
         </InputAccessoryView>
       )}
       {!!hint && (
-        <Copy size={12} muted>
+        <Copy role="caption" muted>
           {hint}
         </Copy>
       )}
@@ -294,7 +293,7 @@ export function Toggle({
       <View style={{ flex: 1, gap: 2 }}>
         <Copy>{label}</Copy>
         {!!detail && (
-          <Copy size={13} muted>
+          <Copy role="detail" muted>
             {detail}
           </Copy>
         )}
@@ -378,7 +377,7 @@ export function Segments<T extends string>({
             }}
           >
             <Copy
-              size={14}
+              role="detail"
               weight="600"
               style={{
                 color: active ? colors.primary : colors.secondary,

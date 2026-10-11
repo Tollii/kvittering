@@ -132,7 +132,7 @@ export function NotificationSettings() {
   return (
     <View style={{ gap: 12 }}>
       {!available && (
-        <Copy size={13} muted>
+        <Copy role="detail" muted>
           Ikke tilgjengelig i denne versjonen
         </Copy>
       )}

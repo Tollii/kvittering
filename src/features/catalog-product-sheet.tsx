@@ -129,7 +129,7 @@ function CatalogSearchResults({
         />
       )}
       <Row title="Ingen av produktene passer" onPress={() => onSelect(null)} />
-      <Copy muted size={12}>
+      <Copy muted role="caption">
         Produktdata fra Kassalapp
       </Copy>
     </>
@@ -234,9 +234,7 @@ function CatalogProductDetails({
           name={full?.name ?? product.name}
         />
       )}
-      <Copy size={21} weight="700">
-        {full?.name ?? product.name}
-      </Copy>
+      <Copy role="sheetTitle">{full?.name ?? product.name}</Copy>
       <Copy muted>
         {[
           full?.brand ?? product.brand,
@@ -248,7 +246,7 @@ function CatalogProductDetails({
           .join(" · ")}
       </Copy>
       {!!full?.categories.length && (
-        <Copy size={13} muted>
+        <Copy role="detail" muted>
           {full.categories.join(" › ")}
         </Copy>
       )}
@@ -265,7 +263,7 @@ function CatalogProductDetails({
         <Panel>
           <Copy weight="600">Deres kjøp</Copy>
           <Row title="Kjøpt for" value={Ore.format(purchases.amountOre)} />
-          <Copy muted size={13}>
+          <Copy muted role="detail">
             {
               new Set(purchases.contributions.map((item) => item.receipt._id))
                 .size
@@ -293,7 +291,7 @@ function CatalogProductDetails({
       )}
       {!!full?.ingredients && (
         <Disclosure title="Ingredienser">
-          <Copy size={14}>{full.ingredients}</Copy>
+          <Copy role="detail">{full.ingredients}</Copy>
         </Disclosure>
       )}
       {!!full?.nutrition.length && (
@@ -308,14 +306,14 @@ function CatalogProductDetails({
         </Disclosure>
       )}
       {!!full?.labels.length && (
-        <Copy size={13}>{full.labels.join(" · ")}</Copy>
+        <Copy role="detail">{full.labels.join(" · ")}</Copy>
       )}
       {!!product.ean && (
-        <Copy muted size={12}>
+        <Copy muted role="caption">
           Strekkode: {product.ean}
         </Copy>
       )}
-      <Copy size={12} muted>
+      <Copy role="caption" muted>
         Produktdata fra {catalogSource(product.key)}
         {query.data?.fetchedAt
           ? ` · hentet ${CalendarDate.format(CalendarDate.ofInstant(query.data.fetchedAt))}`

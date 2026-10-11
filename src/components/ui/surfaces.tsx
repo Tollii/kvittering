@@ -141,11 +141,11 @@ export function SectionTitle({
   return (
     <View style={[styles.row, { paddingTop: 16, paddingBottom: 4 }]}>
       <View style={{ flex: 1, gap: 4 }}>
-        <Copy accessibilityRole="header" size={19} weight="700">
+        <Copy accessibilityRole="header" role="sectionTitle">
           {title}
         </Copy>
         {!!detail && (
-          <Copy size={13} muted>
+          <Copy role="detail" muted>
             {detail}
           </Copy>
         )}
@@ -158,7 +158,7 @@ export function SectionTitle({
           onPress={onAction}
           style={{ minHeight: 44, justifyContent: "center", paddingLeft: 12 }}
         >
-          <Copy size={14} weight="600" style={{ color: colors.primary }}>
+          <Copy role="detail" weight="600" style={{ color: colors.primary }}>
             {action}
           </Copy>
         </Press>
@@ -195,7 +195,7 @@ export function Disclosure({
           {title}
         </Copy>
         {!!value && (
-          <Copy size={13} muted>
+          <Copy role="detail" muted>
             {value}
           </Copy>
         )}
@@ -284,12 +284,12 @@ export function Notice({
       </View>
       <View style={{ flex: 1, gap: 1 }}>
         {!!title && (
-          <Copy size={15} weight="600" style={{ color: palette.text }}>
+          <Copy weight="600" style={{ color: palette.text }}>
             {title}
           </Copy>
         )}
         <Copy
-          size={title ? 13 : 15}
+          role={title ? "detail" : "body"}
           muted={!!title && tone === "info"}
           accessibilityRole={tone === "error" ? "alert" : undefined}
           // An explicit `undefined` colour would override the muted colour.
@@ -340,8 +340,7 @@ export function Empty({
       </View>
       <Copy
         accessibilityRole="header"
-        size={20}
-        weight="700"
+        role="sheetTitle"
         style={{ textAlign: "center" }}
       >
         {title}
@@ -388,7 +387,7 @@ export function Row({
       <View style={{ flex: 1, gap: 4 }}>
         <Copy weight="600">{title}</Copy>
         {!!detail && (
-          <Copy size={13} muted>
+          <Copy role="detail" muted>
             {detail}
           </Copy>
         )}

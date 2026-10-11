@@ -37,7 +37,7 @@ export function ReceiptCategorySpending({
         <Notice>Kategorifordeling vises bare for kvitteringer i NOK.</Notice>
       ) : (
         <>
-          <Copy size={13} muted>
+          <Copy role="detail" muted>
             Etter rabatt, uten pant og pantretur.
           </Copy>
           {totals.unknown > 0 && (

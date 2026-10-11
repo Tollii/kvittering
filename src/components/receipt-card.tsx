@@ -78,15 +78,15 @@ export function ReceiptCard({
       >
         <View style={{ flexDirection: "row", alignItems: "center", gap: 10 }}>
           <View style={{ flex: 1, gap: 2 }}>
-            <Copy weight="600" size={17}>
+            <Copy role="cardTitle">
               {receipt.data?.store || "Ny kvittering"}
             </Copy>
-            <Copy size={13} muted>
+            <Copy role="detail" muted>
               {CalendarDate.format(receipt.data?.purchaseDate)}
               {receipt.data?.branch ? ` · ${receipt.data.branch}` : ""}
             </Copy>
             {stacked && !busy && receipt.data && (
-              <Copy weight="700" size={17}>
+              <Copy weight="700" role="cardTitle">
                 {Ore.format(receipt.data.totalOre)}
               </Copy>
             )}
@@ -98,7 +98,7 @@ export function ReceiptCard({
             receipt.data && (
               <Copy
                 weight="700"
-                size={17}
+                role="cardTitle"
                 style={{ flexShrink: 1, textAlign: "right" }}
               >
                 {Ore.format(receipt.data.totalOre)}
@@ -108,9 +108,9 @@ export function ReceiptCard({
           <Icon name="chevron.right" size={12} color={colors.secondary} />
         </View>
         {!!(!compact || needs.length > 0 || receipt.error) && (
-          <Copy size={13} weight="500" muted>
+          <Copy role="detail" weight="500" muted>
             <Copy
-              size={13}
+              role="detail"
               weight="600"
               style={{
                 color:
@@ -129,7 +129,7 @@ export function ReceiptCard({
           </Copy>
         )}
         {!!receipt.error && (
-          <Copy size={13} style={{ color: colors.danger }}>
+          <Copy role="detail" style={{ color: colors.danger }}>
             {receipt.error}
           </Copy>
         )}

@@ -151,11 +151,11 @@ export function CategoryPicker({
       onClose={onClose}
       header={
         <>
-          <Copy size={15} weight="600" numberOfLines={2}>
+          <Copy weight="600" numberOfLines={2}>
             {name}
           </Copy>
           {!!(originalText || brand || confidence != null) && (
-            <Copy size={12} muted numberOfLines={2}>
+            <Copy role="caption" muted numberOfLines={2}>
               {suggestionSource({ name, originalText, brand, confidence })}
             </Copy>
           )}

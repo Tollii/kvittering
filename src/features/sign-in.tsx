@@ -186,7 +186,7 @@ export function SignIn() {
                   backgroundColor: colors.line,
                 }}
               />
-              <Copy muted size={14}>
+              <Copy muted role="detail">
                 eller
               </Copy>
               <View
@@ -206,7 +206,7 @@ export function SignIn() {
               />
             )}
             <View style={{ paddingTop: 12, gap: 2 }}>
-              <Copy muted size={14} style={{ textAlign: "center" }}>
+              <Copy muted role="detail" style={{ textAlign: "center" }}>
                 Har du allerede en konto?
               </Copy>
               <AuthenticationLink

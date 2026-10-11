@@ -96,7 +96,11 @@ export function StoreMap({ stores, onSelect }: Readonly<StoreMapProps>) {
                     justifyContent: "center",
                   }}
                 >
-                  <Copy size={14} weight="700" style={{ color: colors.onHero }}>
+                  <Copy
+                    role="detail"
+                    weight="700"
+                    style={{ color: colors.onHero }}
+                  >
                     {index + 1}
                   </Copy>
                 </View>
@@ -105,7 +109,7 @@ export function StoreMap({ stores, onSelect }: Readonly<StoreMapProps>) {
           })}
         </MapView>
       </View>
-      <Copy size={13} muted>
+      <Copy role="detail" muted>
         Større sirkler viser høyere vareforbruk. Trykk på en butikk for å se
         kjøpene.
       </Copy>
