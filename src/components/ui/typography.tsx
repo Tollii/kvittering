@@ -54,9 +54,8 @@ function Type({ role, weight, muted = false, style, ...props }: TypeProps) {
     <Text
       // iOS pushes a lone last word onto the line before it, as UILabel does.
       lineBreakStrategyIOS="standard"
-      // A display role stops growing where the system's titles do; zero lets
-      // reading text grow all the way, whatever a parent text set.
-      maxFontSizeMultiplier={"maxScale" in scale ? scale.maxScale : 0}
+      // Each role stops growing where its iOS text style does.
+      maxFontSizeMultiplier={scale.maxScale}
       {...props}
       style={[
         {

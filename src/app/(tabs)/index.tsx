@@ -34,6 +34,7 @@ import {
   SettingsButton,
   useArrival,
   useDeparture,
+  useLargeText,
 } from "@/components/ui";
 import { useHousehold } from "@/features/household-context";
 import { OfflineNotice } from "@/features/offline-notice";
@@ -67,6 +68,7 @@ function uploadStatusTitle(
 
 export default function Capture() {
   const colors = useTheme();
+  const largeText = useLargeText();
   const { owner, household, online, synchronize, queue } = useHousehold();
   const [permission, requestPermission] = useCameraPermissions();
   const camera = useRef<CameraView>(null);
@@ -303,6 +305,24 @@ export default function Capture() {
     </View>
   );
 
+  const label = overlay(
+    <>
+      <Copy weight="700" style={{ color: colors.onCamera }}>
+        Ny kvittering
+      </Copy>
+      <Copy
+        role="detail"
+        numberOfLines={largeText ? undefined : 1}
+        style={{ color: colors.onCameraMuted, flexShrink: 1 }}
+      >
+        {household.name}
+      </Copy>
+    </>,
+    largeText
+      ? { flexWrap: "wrap", alignSelf: "flex-start", maxWidth: "100%" }
+      : { flexShrink: 1 },
+  );
+
   return (
     <View style={{ flex: 1, backgroundColor: colors.cameraBackground }}>
       {live && (
@@ -324,21 +344,7 @@ export default function Capture() {
         style={{ flex: 1, padding: 16, gap: 12 }}
       >
         <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
-          {overlay(
-            <>
-              <Copy weight="700" style={{ color: colors.onCamera }}>
-                Ny kvittering
-              </Copy>
-              <Copy
-                role="detail"
-                numberOfLines={1}
-                style={{ color: colors.onCameraMuted, flexShrink: 1 }}
-              >
-                {household.name}
-              </Copy>
-            </>,
-            { flexShrink: 1 },
-          )}
+          {!largeText && label}
           <View style={{ flex: 1 }} />
           <Press
             accessibilityRole="button"
@@ -359,6 +365,8 @@ export default function Capture() {
           </Press>
           <SettingsButton surface="camera" />
         </View>
+        {/* At large text the label takes its own line under the buttons. */}
+        {largeText && label}
         <OfflineNotice />
         {saved > 0 && (
           <Animated.View entering={arrival} exiting={departure}>

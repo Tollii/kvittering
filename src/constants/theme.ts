@@ -133,12 +133,12 @@ export type FontWeight = "400" | "500" | "600" | "700";
  * tracking and small text loosens it. Weight carries meaning, so a caller may
  * override it; the other values belong to the role.
  *
- * Every role grows with the person's text size. Reading text grows all the
- * way, to about three and a half times its size at the largest accessibility
- * size (AX5). The display roles cap their growth (`maxScale`) so that there
- * they land just above body text, about 60 points, as the system's own text
- * styles converge, and a title still fits a phone's width. `counter` is the
- * number in a small badge over a photo, capped so the badge stays small.
+ * Every role grows with the person's text size and stops where the matching
+ * iOS text style stops at the largest accessibility size (AX5): reading text
+ * at about the system's Body, 53 points, and titles and amounts a little
+ * above it, up to about 60. React Native would otherwise grow every role 3.6
+ * times, past the system's own sizes. `counter` is the number in a small
+ * badge over a photo, capped lower so the badge stays small.
  */
 export const typeScale = {
   heroAmount: {
@@ -153,33 +153,51 @@ export const typeScale = {
     lineHeight: 36,
     tracking: -0.7,
     weight: "700",
-    maxScale: 1.9,
+    maxScale: 1.8,
   },
   screenTitle: {
     size: 24,
     lineHeight: 29,
     tracking: -0.4,
     weight: "600",
-    maxScale: 2.55,
+    maxScale: 2.4,
   },
   sheetTitle: {
     size: 20,
     lineHeight: 26,
     tracking: -0.15,
     weight: "700",
-    maxScale: 3.05,
+    maxScale: 2.8,
   },
   sectionTitle: {
     size: 19,
     lineHeight: 25,
     tracking: -0.15,
     weight: "700",
-    maxScale: 3.2,
+    maxScale: 2.9,
   },
-  cardTitle: { size: 17, lineHeight: 22, tracking: -0.15, weight: "600" },
-  body: { size: 16, lineHeight: 21, tracking: 0, weight: "400" },
-  detail: { size: 13, lineHeight: 17, tracking: 0.05, weight: "400" },
-  caption: { size: 12, lineHeight: 16, tracking: 0.15, weight: "400" },
+  cardTitle: {
+    size: 17,
+    lineHeight: 22,
+    tracking: -0.15,
+    weight: "600",
+    maxScale: 3.1,
+  },
+  body: { size: 16, lineHeight: 21, tracking: 0, weight: "400", maxScale: 3.2 },
+  detail: {
+    size: 13,
+    lineHeight: 17,
+    tracking: 0.05,
+    weight: "400",
+    maxScale: 3.4,
+  },
+  caption: {
+    size: 12,
+    lineHeight: 16,
+    tracking: 0.15,
+    weight: "400",
+    maxScale: 3.3,
+  },
   counter: {
     size: 12,
     lineHeight: 16,
@@ -194,7 +212,7 @@ export const typeScale = {
     lineHeight: number;
     tracking: number;
     weight: FontWeight;
-    maxScale?: number;
+    maxScale: number;
   }
 >;
 
