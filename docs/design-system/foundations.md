@@ -75,6 +75,8 @@ The app uses the system font (San Francisco) through `Copy` ([typography](../../
 
 Weight carries meaning, so a caller may override the role's default: regular for reading, semibold (600) for labels, interactive text, and the hero amount, bold (700) for titles and amounts on paper. `weight` is the only override; a role that needs a different size is a new role in `typeScale`, added with its users named here. Mark each title with `accessibilityRole="header"`; `Copy`'s `role` names the type role and never an accessibility role.
 
+Text wraps as the system's own labels do: `Copy` uses the standard iOS line-break strategy, which pulls a lone last word up onto the line before it, so a two-line notice or caption does not end in a single orphaned word. A value with no word to break at, such as the invitation code, stays on one line and shrinks instead.
+
 ## Spacing
 
 There are no spacing tokens. Spacing follows a 4-point rhythm, and the shared components own it: copy the padding and gaps of `Screen`, `Sheet`, `Panel`, `List`, and `Row` instead of setting new ones. `Amount` owns the gap between a large amount and its `detail` line. `Screen` also caps content width and centres it, so layouts stay readable on iPad.
@@ -98,6 +100,8 @@ The app is flat. Cards separate from the background by colour (`surface` on `bac
 ## Iconography
 
 Icons are SF Symbols through `Icon`, tinted `primary` by default and hidden from VoiceOver, so the control that holds an icon carries the label. Prefer the outline symbol and let the tab bar use the `.fill` variant for its selected state. Size an icon like the same element in a shared component: `IconButton`, `IconTile`, `Notice`, `Chip`, and `Empty` each set theirs.
+
+An icon carries the weight of the text beside it: semibold next to a semibold label, as in `Button`, `Chip`, a `Row`'s tile, and a `Notice` with a title; regular next to reading copy. Trailing chevrons and the close `xmark` are semibold everywhere, as the system's own disclosure indicators and close buttons are; `Chevron` draws the chevrons so they share one size.
 
 Recurring meanings: `wifi.slash` offline, `checkmark.seal` reviewed or approve, `exclamationmark.triangle` warning, `exclamationmark.circle` error, `arrow.clockwise` retry, `arrow.clockwise.circle` an upload waiting to retry, `barcode` product linking, `person.2` household and settings, `xmark` close, `chevron.right` navigates, `chevron.down` opens a menu or picker.
 

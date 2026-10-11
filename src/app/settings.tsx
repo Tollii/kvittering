@@ -110,7 +110,15 @@ export default function Settings() {
                 }}
               >
                 <Icon name="key" size={16} />
-                <Copy selectable role="detail" weight="600" style={{ flex: 1 }}>
+                <Copy
+                  selectable
+                  role="detail"
+                  weight="600"
+                  // A code has no word to break at, so it shrinks instead of wrapping mid-code.
+                  numberOfLines={1}
+                  adjustsFontSizeToFit
+                  style={{ flex: 1 }}
+                >
                   {details?.household.invitation ??
                     "Koble til nettet for å hente koden."}
                 </Copy>

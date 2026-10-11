@@ -3,7 +3,7 @@ import { Ore } from "@/lib/domain/ore";
 import { isReceiptProcessing } from "@/lib/domain/receipt-state";
 import { router } from "expo-router";
 import { ActivityIndicator, View, useWindowDimensions } from "react-native";
-import { Copy, Icon, Press } from "./ui";
+import { Chevron, Copy, Press } from "./ui";
 import { radius, useTheme } from "@/constants/theme";
 import { reviewSummary } from "@/lib/domain/receipt-review";
 import type { Receipt } from "@/lib/domain/insights";
@@ -105,7 +105,7 @@ export function ReceiptCard({
               </Copy>
             )
           )}
-          <Icon name="chevron.right" size={12} color={colors.secondary} />
+          <Chevron />
         </View>
         {!!(!compact || needs.length > 0 || receipt.error) && (
           <Copy role="detail" weight="500" muted>

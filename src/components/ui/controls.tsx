@@ -15,7 +15,7 @@ import {
 } from "react-native";
 import { type SymbolViewProps } from "expo-symbols";
 import { radius, useTheme } from "@/constants/theme";
-import { Copy, Icon, faded, styles } from "./typography";
+import { Chevron, Copy, Icon, faded, styles } from "./typography";
 import { Press } from "./motion";
 
 export function IconButton({
@@ -26,6 +26,7 @@ export function IconButton({
   filled = false,
   size = 22,
   color,
+  weight,
 }: Readonly<{
   name: SymbolViewProps["name"];
   label: string;
@@ -35,6 +36,7 @@ export function IconButton({
   filled?: boolean | string;
   size?: number;
   color?: string;
+  weight?: SymbolViewProps["weight"];
 }>) {
   const colors = useTheme();
 
@@ -56,7 +58,7 @@ export function IconButton({
         faded(disabled),
       ]}
     >
-      <Icon name={name} size={size} color={color} />
+      <Icon name={name} size={size} color={color} weight={weight} />
     </Press>
   );
 }
@@ -173,11 +175,14 @@ export function Chip({
       accessibilityLabel={accessibilityLabel ?? label}
       disabled={!onPress}
       onPress={onPress}
+      // A chip looks the same whether or not it opens something; the touch
+      // target grows to 44 points around it instead of the chip itself.
+      hitSlop={onPress ? { top: 7, bottom: 7 } : undefined}
       style={{
         flexDirection: "row",
         alignItems: "center",
         gap: 5,
-        minHeight: onPress ? 44 : 30,
+        minHeight: 30,
         paddingHorizontal: 10,
         paddingVertical: 5,
         borderRadius: radius.chip,
@@ -187,7 +192,9 @@ export function Chip({
         maxWidth: "100%",
       }}
     >
-      {icon && <Icon name={icon} size={12} color={palette.text} />}
+      {icon && (
+        <Icon name={icon} size={12} weight="semibold" color={palette.text} />
+      )}
       <Copy
         role="detail"
         weight="600"
@@ -196,7 +203,7 @@ export function Chip({
         {label}
       </Copy>
       {onPress && trailing === "chevron" && (
-        <Icon name="chevron.down" size={9} color={palette.text} />
+        <Chevron direction="down" size={10} color={palette.text} />
       )}
     </Press>
   );

@@ -269,6 +269,7 @@ export function Sheet({
             name="xmark"
             label="Lukk"
             size={15}
+            weight="semibold"
             filled
             disabled={!dismissible}
             color={colors.text}
