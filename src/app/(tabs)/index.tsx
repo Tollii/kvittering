@@ -386,7 +386,6 @@ export default function Capture() {
                   name="xmark"
                   label="Lukk"
                   size={14}
-                  weight="semibold"
                   color={colors.secondary}
                   onPress={() => setSaved(0)}
                 />

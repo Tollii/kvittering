@@ -53,6 +53,7 @@ export default function Settings() {
   }
 
   const full = (details?.members.length ?? 0) >= 2;
+  const invitation = details?.household.invitation;
 
   return (
     <Screen insetTop={false} scrollable={false}>
@@ -114,13 +115,13 @@ export default function Settings() {
                   selectable
                   role="detail"
                   weight="600"
-                  // A code has no word to break at, so it shrinks instead of wrapping mid-code.
-                  numberOfLines={1}
-                  adjustsFontSizeToFit
+                  // A code has no word to break at, so it shrinks instead of
+                  // wrapping mid-code; the offline sentence wraps as usual.
+                  numberOfLines={invitation ? 1 : undefined}
+                  adjustsFontSizeToFit={!!invitation}
                   style={{ flex: 1 }}
                 >
-                  {details?.household.invitation ??
-                    "Koble til nettet for å hente koden."}
+                  {invitation ?? "Koble til nettet for å hente koden."}
                 </Copy>
               </View>
               <View style={{ flexDirection: "row", gap: 8 }}>

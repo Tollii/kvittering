@@ -131,25 +131,26 @@ export function Icon({
 }
 
 /**
- * The trailing chevron of anything that navigates, opens, or expands. One
+ * The chevron of anything that navigates, opens, expands, or goes back. One
  * size and weight everywhere, semibold like the text it sits beside and the
- * system's own disclosure indicators.
+ * system's own disclosure indicators; `compact` is the smaller one inside a
+ * chip, and a back link colours it `primary`.
  */
 export function Chevron({
   direction = "right",
   color,
-  size = 13,
+  compact = false,
 }: Readonly<{
   direction?: "right" | "down" | "left";
   color?: string;
-  size?: number;
+  compact?: boolean;
 }>) {
   const colors = useTheme();
 
   return (
     <Icon
       name={`chevron.${direction}`}
-      size={size}
+      size={compact ? 10 : 13}
       weight="semibold"
       color={color ?? colors.secondary}
     />

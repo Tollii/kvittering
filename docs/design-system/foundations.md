@@ -101,7 +101,7 @@ The app is flat. Cards separate from the background by colour (`surface` on `bac
 
 Icons are SF Symbols through `Icon`, tinted `primary` by default and hidden from VoiceOver, so the control that holds an icon carries the label. Prefer the outline symbol and let the tab bar use the `.fill` variant for its selected state. Size an icon like the same element in a shared component: `IconButton`, `IconTile`, `Notice`, `Chip`, and `Empty` each set theirs.
 
-An icon carries the weight of the text beside it: semibold next to a semibold label, as in `Button`, `Chip`, a `Row`'s tile, and a `Notice` with a title; regular next to reading copy. Trailing chevrons and the close `xmark` are semibold everywhere, as the system's own disclosure indicators and close buttons are; `Chevron` draws the chevrons so they share one size.
+An icon carries the weight of the text beside it: semibold next to a semibold label, as in `Button`, `Chip`, a `Row`'s tile, and a `Notice` with a title; regular next to reading copy. A glyph alone in a control, as in `IconButton`, is semibold too, so every close mark and pager chevron matches a button's label. `Chevron` draws the chevrons, as the system's own disclosure indicators are drawn, so they share one size and weight.
 
 Recurring meanings: `wifi.slash` offline, `checkmark.seal` reviewed or approve, `exclamationmark.triangle` warning, `exclamationmark.circle` error, `arrow.clockwise` retry, `arrow.clockwise.circle` an upload waiting to retry, `barcode` product linking, `person.2` household and settings, `xmark` close, `chevron.right` navigates, `chevron.down` opens a menu or picker.
 

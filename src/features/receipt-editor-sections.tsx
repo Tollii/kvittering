@@ -202,6 +202,9 @@ export function PurchaseTotals({
   );
 }
 
+/** A footer button that is as wide as its title and wraps as a whole. */
+const wholeButton = { flexGrow: 1, flexShrink: 0, flexBasis: "auto" } as const;
+
 export function ReceiptFooter({
   error,
   ready,
@@ -263,14 +266,14 @@ export function ReceiptFooter({
           <Button
             title="Til kvitteringene"
             variant="secondary"
-            style={{ flexGrow: 1, flexShrink: 0, flexBasis: "auto" }}
+            style={wholeButton}
             onPress={() => router.dismissTo("/(tabs)/receipts")}
           />
           {nextPending && (
             <Button
               title="Neste til kontroll"
               icon="arrow.right"
-              style={{ flexGrow: 1, flexShrink: 0, flexBasis: "auto" }}
+              style={wholeButton}
               onPress={() =>
                 router.replace({
                   pathname: "/receipt/[id]",

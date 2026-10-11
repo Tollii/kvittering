@@ -26,7 +26,6 @@ export function IconButton({
   filled = false,
   size = 22,
   color,
-  weight,
 }: Readonly<{
   name: SymbolViewProps["name"];
   label: string;
@@ -36,7 +35,6 @@ export function IconButton({
   filled?: boolean | string;
   size?: number;
   color?: string;
-  weight?: SymbolViewProps["weight"];
 }>) {
   const colors = useTheme();
 
@@ -58,7 +56,8 @@ export function IconButton({
         faded(disabled),
       ]}
     >
-      <Icon name={name} size={size} color={color} weight={weight} />
+      {/* A glyph alone in a control reads at the weight of a button's label. */}
+      <Icon name={name} size={size} color={color} weight="semibold" />
     </Press>
   );
 }
@@ -203,7 +202,7 @@ export function Chip({
         {label}
       </Copy>
       {onPress && trailing === "chevron" && (
-        <Chevron direction="down" size={10} color={palette.text} />
+        <Chevron direction="down" compact color={palette.text} />
       )}
     </Press>
   );

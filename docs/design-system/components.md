@@ -20,7 +20,7 @@ When a second screen needs a feature's component, move it up to `src/components`
 
 **`Icon`** renders an SF Symbol, `primary` by default, hidden from VoiceOver. Label the control that contains it instead. The web build shows the closest Material Symbol from [symbol.web.tsx](../../src/components/ui/symbol.web.tsx); a new symbol needs an entry there, or browser checks show a question mark and log an error.
 
-**`Chevron`** is the trailing chevron of anything that navigates, opens, or expands: `Row`, `Notice`, `ReceiptCard`, a `Chip` that opens a picker, and the `Disclosure` chevron that turns. It has one size and weight everywhere, so a new control that needs a chevron uses it rather than drawing its own `Icon`.
+**`Chevron`** is the chevron of anything that navigates, opens, expands, or goes back: `Row`, `Notice`, `ReceiptCard`, the `Disclosure` chevron that turns, and the text back links on sign-in and in Forbruk, which colour it `primary`. It has one size and weight, with `compact` as the only smaller one, inside a `Chip` that opens a picker; a new control that needs a chevron uses it rather than drawing its own `Icon`.
 
 **`Press`** ([motion](../../src/components/ui/motion.tsx)) is the pressable every control is built on, and the one to use for any custom tappable surface: `feedback="scale"` for objects and `"highlight"` for rows and links, as [motion and feedback](foundations.md#motion-and-feedback) describes. **`faded(disabled)`** is the shared disabled style.
 
@@ -41,7 +41,7 @@ States: `disabled` fades the button; `busy` shows a spinner in place of the icon
 
 **`SettingsButton`** ([layout](../../src/components/ui/layout.tsx)) opens household settings. Every tab places it at the top right; `surface="camera"` adapts it to the viewfinder.
 
-**`Chip`** shows a short status or opens a picker. Tones are `muted`, `success`, and `warning`. A chip looks the same whether or not it opens something; one with `onPress` extends its touch target to 44 points around the chip and shows a chevron, unless `trailing="none"` marks it as an action rather than a dropdown. A chip without `onPress` is read as text.
+**`Chip`** shows a short status or opens a picker. Tones are `muted`, `success`, and `warning`. A chip looks the same whether or not it opens something; one with `onPress` extends its touch target above and below the chip to 44 points and shows a chevron, unless `trailing="none"` marks it as an action rather than a dropdown. A chip without `onPress` is read as text.
 
 ## Inputs
 
