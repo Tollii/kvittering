@@ -4,7 +4,7 @@ import { useState } from "react";
 import { View } from "react-native";
 import { useConvex } from "convex/react";
 import { api } from "../../convex/_generated/api";
-import { Button, Copy, Notice } from "@/components/ui";
+import { Button, ButtonRow, Copy, Notice } from "@/components/ui";
 import { MoneyField } from "@/components/money-field";
 import { useHousehold } from "./household-context";
 import { failureMessage } from "@/lib/failure-message";
@@ -70,26 +70,22 @@ export function BudgetSettings() {
         </Notice>
       )}
       {!!error && <Notice tone="error">{error}</Notice>}
-      <View style={{ flexDirection: "row", gap: 8 }}>
-        <View style={{ flex: 1 }}>
-          <Button
-            title="Lagre"
-            disabled={!online || !dirty || !!error || !value}
-            busy={busy}
-            onPress={() => void save(value)}
-          />
-        </View>
+      <ButtonRow>
+        <Button
+          title="Lagre"
+          disabled={!online || !dirty || !!error || !value}
+          busy={busy}
+          onPress={() => void save(value)}
+        />
         {current !== null && (
-          <View style={{ flex: 1 }}>
-            <Button
-              title="Fjern budsjett"
-              variant="secondary"
-              disabled={!online || busy}
-              onPress={() => void save(null)}
-            />
-          </View>
+          <Button
+            title="Fjern budsjett"
+            variant="secondary"
+            disabled={!online || busy}
+            onPress={() => void save(null)}
+          />
         )}
-      </View>
+      </ButtonRow>
       {saved && current !== null && (
         <Copy role="detail" muted>
           {Ore.format(current)} per måned

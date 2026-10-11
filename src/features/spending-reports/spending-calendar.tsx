@@ -1,7 +1,7 @@
 import { CalendarDate, CalendarMonth } from "@/lib/domain/calendar";
 import { Ore } from "@/lib/domain/ore";
 import { View, useWindowDimensions } from "react-native";
-import { Copy, Empty, Row, faded, Press } from "@/components/ui";
+import { Copy, Empty, Row, faded, Press, useLargeText } from "@/components/ui";
 import { radius, useTheme } from "@/constants/theme";
 import {
   spendingCalendar,
@@ -29,7 +29,8 @@ export function SpendingCalendar({
   onSelect: (group: SpendingGroup) => void;
 }>) {
   const colors = useTheme();
-  const { fontScale, width } = useWindowDimensions();
+  const { width } = useWindowDimensions();
+  const largeText = useLargeText();
 
   const days = spendingCalendar(receipts, CalendarMonth.year(month)).filter(
     (day) => CalendarDate.month(day.date) === month,
@@ -50,7 +51,7 @@ export function SpendingCalendar({
     });
 
   // A list preserves readable amounts and separate touch targets at large text sizes.
-  if (fontScale > 1.3 || width < 380) {
+  if (largeText || width < 380) {
     const purchases = days.filter((day) => day.contributions.length > 0);
 
     return (

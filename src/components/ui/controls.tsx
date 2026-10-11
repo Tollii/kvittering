@@ -1,5 +1,11 @@
 import { SegmentedControl } from "@expo/ui/community/segmented-control";
-import { useId, useState } from "react";
+import {
+  Children,
+  isValidElement,
+  useId,
+  useState,
+  type ReactNode,
+} from "react";
 import {
   ActivityIndicator,
   InputAccessoryView,
@@ -7,15 +13,12 @@ import {
   Platform,
   Switch,
   TextInput,
-  useWindowDimensions,
   View,
-  type StyleProp,
   type TextInputProps,
-  type ViewStyle,
 } from "react-native";
 import { type SymbolViewProps } from "expo-symbols";
 import { radius, useTheme } from "@/constants/theme";
-import { Chevron, Copy, Icon, faded, styles } from "./typography";
+import { Chevron, Copy, Icon, faded, styles, useLargeText } from "./typography";
 import { Press } from "./motion";
 
 export function IconButton({
@@ -72,7 +75,6 @@ export function Button({
   busy = false,
   compact = false,
   icon,
-  style,
   testID,
   accessibilityLabel,
 }: Readonly<{
@@ -84,7 +86,6 @@ export function Button({
   busy?: boolean;
   compact?: boolean;
   icon?: SymbolViewProps["name"];
-  style?: StyleProp<ViewStyle>;
   /** Identifies the button for end-to-end flows. */
   testID?: string;
   /** Names the object when the title alone would not, such as "Bekreft". */
@@ -120,7 +121,6 @@ export function Button({
           justifyContent: "center",
           gap: 8,
         },
-        style,
         faded(disabled && !busy),
       ]}
     >
@@ -141,6 +141,36 @@ export function Button({
         {title}
       </Copy>
     </Press>
+  );
+}
+
+/**
+ * Actions side by side. Each button is as wide as its title needs and they
+ * share the spare width; when the titles cannot fit on one line, at large
+ * text or on a narrow phone, a button moves to its own line below rather
+ * than its title wrapping inside it. Pass the buttons directly: a fragment
+ * counts as one item.
+ */
+export function ButtonRow({ children }: Readonly<{ children: ReactNode }>) {
+  return (
+    <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8 }}>
+      {Children.toArray(children)
+        .filter(isValidElement)
+        .map((child) => (
+          // `toArray` gives every element a key, from its own key or its position.
+          <View
+            key={child.key}
+            style={{
+              flexGrow: 1,
+              flexShrink: 0,
+              flexBasis: "auto",
+              maxWidth: "100%",
+            }}
+          >
+            {child}
+          </View>
+        ))}
+    </View>
   );
 }
 
@@ -326,10 +356,10 @@ export function Segments<T extends string>({
 }>) {
   const colors = useTheme();
 
-  const { fontScale } = useWindowDimensions();
+  const largeText = useLargeText();
 
   // The web build draws the same control in JavaScript for browser checks.
-  if (Platform.OS !== "android" && fontScale <= 1.3)
+  if (Platform.OS !== "android" && !largeText)
     return (
       <View style={{ minHeight: 44, justifyContent: "center" }}>
         <SegmentedControl
@@ -351,7 +381,7 @@ export function Segments<T extends string>({
   return (
     <View
       style={{
-        flexDirection: fontScale > 1.3 ? "column" : "row",
+        flexDirection: largeText ? "column" : "row",
         backgroundColor: colors.muted,
         padding: 4,
         borderRadius: radius.control,
@@ -370,7 +400,7 @@ export function Segments<T extends string>({
             accessibilityState={{ selected: active }}
             onPress={() => onChange(option.value)}
             style={{
-              flex: fontScale > 1.3 ? undefined : 1,
+              flex: largeText ? undefined : 1,
               minHeight: 44,
               justifyContent: "center",
               alignItems: "center",

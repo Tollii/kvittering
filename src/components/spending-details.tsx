@@ -1,8 +1,8 @@
 import { CalendarDate } from "@/lib/domain/calendar";
 import { Ore } from "@/lib/domain/ore";
-import { View, useWindowDimensions } from "react-native";
+import { View } from "react-native";
 import { useTheme } from "@/constants/theme";
-import { Amount, Copy, List, Row, Sheet, Press } from "./ui";
+import { Amount, Copy, List, Row, Sheet, Press, useLargeText } from "./ui";
 import { openReceipt, receiptStatusLabel } from "./receipt-card";
 import { contributionKey, type SpendingGroup } from "@/lib/domain/insights";
 
@@ -19,7 +19,7 @@ export function SpendingBars<
   onSelect: (row: Group) => void;
 }>) {
   const colors = useTheme();
-  const { fontScale } = useWindowDimensions();
+  const largeText = useLargeText();
   const maximum = Math.max(1, ...rows.map((row) => Math.abs(row.amountOre)));
 
   return (
@@ -56,7 +56,7 @@ export function SpendingBars<
             >
               <Copy
                 weight="500"
-                style={fontScale > 1.3 ? { width: "100%" } : { flex: 1 }}
+                style={largeText ? { width: "100%" } : { flex: 1 }}
               >
                 {row.name}
               </Copy>

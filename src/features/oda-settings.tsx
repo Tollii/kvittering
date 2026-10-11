@@ -5,7 +5,7 @@ import * as Linking from "expo-linking";
 import * as WebBrowser from "expo-web-browser";
 import { randomUUID } from "expo-crypto";
 import { api } from "../../convex/_generated/api";
-import { Button, Copy, Notice, Row } from "@/components/ui";
+import { Button, ButtonRow, Copy, Notice, Row } from "@/components/ui";
 import { releaseMutation } from "@/lib/releases/requests";
 import { failureMessage } from "@/lib/failure-message";
 import { useHousehold } from "./household-context";
@@ -124,55 +124,49 @@ export function OdaSettings() {
           ) : (
             !!status.error && <Notice tone="warning">{status.error}</Notice>
           )}
-          <View style={{ flexDirection: "row", gap: 8 }}>
+          <ButtonRow>
             {!status.expired && (
-              <View style={{ flex: 1 }}>
-                <Button
-                  title="Hent nå"
-                  variant="tint"
-                  icon="arrow.clockwise"
-                  disabled={blocked}
-                  busy={busy === "sync"}
-                  onPress={() =>
-                    void run("sync", async () => {
-                      await releaseMutation(client, api.oda.sync, {});
-
-                      return "Ser etter nye bestillinger.";
-                    })
-                  }
-                />
-              </View>
-            )}
-            <View style={{ flex: 1 }}>
               <Button
-                title="Koble fra"
-                variant="secondary"
+                title="Hent nå"
+                variant="tint"
+                icon="arrow.clockwise"
                 disabled={blocked}
-                busy={busy === "disconnect"}
+                busy={busy === "sync"}
                 onPress={() =>
-                  Alert.alert(
-                    "Koble fra Oda?",
-                    "Kvitteringene som allerede er hentet, blir liggende.",
-                    [
-                      { text: "Avbryt", style: "cancel" },
-                      {
-                        text: "Koble fra",
-                        style: "destructive",
-                        onPress: () =>
-                          void run("disconnect", () =>
-                            releaseMutation(
-                              client,
-                              api.oda.disconnect,
-                              {},
-                            ).then(() => ""),
-                          ),
-                      },
-                    ],
-                  )
+                  void run("sync", async () => {
+                    await releaseMutation(client, api.oda.sync, {});
+
+                    return "Ser etter nye bestillinger.";
+                  })
                 }
               />
-            </View>
-          </View>
+            )}
+            <Button
+              title="Koble fra"
+              variant="secondary"
+              disabled={blocked}
+              busy={busy === "disconnect"}
+              onPress={() =>
+                Alert.alert(
+                  "Koble fra Oda?",
+                  "Kvitteringene som allerede er hentet, blir liggende.",
+                  [
+                    { text: "Avbryt", style: "cancel" },
+                    {
+                      text: "Koble fra",
+                      style: "destructive",
+                      onPress: () =>
+                        void run("disconnect", () =>
+                          releaseMutation(client, api.oda.disconnect, {}).then(
+                            () => "",
+                          ),
+                        ),
+                    },
+                  ],
+                )
+              }
+            />
+          </ButtonRow>
         </>
       )}
       {!!message && <Notice tone="success">{message}</Notice>}

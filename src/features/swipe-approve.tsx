@@ -5,7 +5,7 @@ import ReanimatedSwipeable from "react-native-gesture-handler/ReanimatedSwipeabl
 import type { SwipeableMethods } from "react-native-gesture-handler/ReanimatedSwipeable";
 import { useConvex } from "convex/react";
 import { api } from "../../convex/_generated/api";
-import { Copy, Icon } from "@/components/ui";
+import { Copy, Icon, useLargeText } from "@/components/ui";
 import { radius, useTheme } from "@/constants/theme";
 import type { Receipt } from "@/lib/domain/insights";
 import { quickApproveData } from "@/lib/domain/receipt-review";
@@ -26,6 +26,7 @@ export function SwipeToApprove({
   children: ReactNode;
 }>) {
   const colors = useTheme();
+  const largeText = useLargeText();
   const client = useConvex();
   const swipeable = useRef<SwipeableMethods>(null);
   const [busy, setBusy] = useState(false);
@@ -95,9 +96,13 @@ export function SwipeToApprove({
           }}
         >
           <Icon name="checkmark.seal" size={22} color={colors.success} />
-          <Copy role="detail" weight="700" style={{ color: colors.success }}>
-            Godkjenn
-          </Copy>
+          {/* At large text the word no longer fits; the system's own swipe
+              actions keep only their symbol then. */}
+          {!largeText && (
+            <Copy role="detail" weight="700" style={{ color: colors.success }}>
+              Godkjenn
+            </Copy>
+          )}
         </View>
       )}
     >
