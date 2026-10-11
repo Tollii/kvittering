@@ -17,6 +17,7 @@ Kvitto captures household grocery receipts and explains purchases. It uses Expo 
 - [Open work](plans/README.md): unresolved findings and design decisions.
 - [Release review](.agents/skills/release-review/SKILL.md): assess installed-client compatibility.
 - [Release operations](.agents/skills/release-operations/SKILL.md): publish a reviewed release or change live release controls.
+- [Security triage](.agents/skills/security-triage/SKILL.md): fix or dismiss Dependabot pull requests and security alerts.
 
 Configuration and source own exact values and behavior. [AGENTS.md](AGENTS.md) contains the shared agent instructions (`CLAUDE.md` links to it); [package.json](package.json) defines the commands.
 
