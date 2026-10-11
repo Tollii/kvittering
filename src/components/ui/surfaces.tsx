@@ -224,11 +224,14 @@ export function TitleValue({
       role={role}
       weight={weight}
       muted={muted}
-      // Beside the title a value stays whole on one line and shrinks to fit.
+      // Beside the title a value stays whole on one line and shrinks to fit;
+      // where it cannot shrink, it keeps its width and the title wraps.
       numberOfLines={stacked ? undefined : 1}
       adjustsFontSizeToFit={!stacked && shrink}
       style={[
-        !stacked && { flexShrink: 1, maxWidth: "45%", textAlign: "right" },
+        !stacked && { textAlign: "right" },
+        !stacked &&
+          (shrink ? { flexShrink: 1, maxWidth: "45%" } : { flexShrink: 0 }),
         !!color && { color },
       ]}
     >

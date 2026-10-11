@@ -65,7 +65,7 @@ States: `disabled` fades the button; `busy` shows a spinner in place of the icon
 
 **`Row`** is the list item: an optional `IconTile`, a title, detail text, a trailing value, and a chevron when tappable. `selected` swaps the chevron for a checkmark. Large text moves the value under the title (see [accessibility](foundations.md#accessibility)).
 
-**`TitleValue`** is the title column and value that `Row`, `Disclosure`, a receipt line and the purchase totals share: the value sits beside the title, right-aligned, at most 45 % wide and on one line, shrinking to fit rather than wrapping (except inside a SwiftUI host that turns `ShrinkToFit` off, such as the receipt row's context menu), or under it at large text. Use it inside a row whenever a value belongs to a title, rather than placing the value yourself.
+**`TitleValue`** is the title column and value that `Row`, `Disclosure`, a receipt line and the purchase totals share: the value sits beside the title, right-aligned, at most 45 % wide and on one line, shrinking to fit rather than wrapping, or under it at large text. In the receipt row's context menu, which turns `ShrinkToFit` off, the value keeps its full width and the title wraps instead. Use it inside a row whenever a value belongs to a title, rather than placing the value yourself.
 
 **`IconTile`** is the soft cobalt tile behind an icon: a 32-point squircle with the `tile` radius in a `Row` and the upload queue, where it can hold a spinner instead, or the 64-point `circle` that `Empty` leads with.
 

@@ -30,10 +30,10 @@ export function useLargeText(): boolean {
 }
 
 /**
- * Whether a one-line value may shrink to fit. Inside a SwiftUI host that sizes
- * to its React Native content (`RNHostView matchContents`), React Native lays
- * shrinking text out at its smallest size, so content hosted there provides
- * `false` and keeps the role's size.
+ * Whether a one-line value may shrink to fit. The receipt row's native context
+ * menu provides `false`: inside its SwiftUI host React Native lays shrinking
+ * text out at its smallest size, about 4 points. `TitleValue` and `Amount`
+ * read it; any other text that shrinks inside such a host must read it too.
  */
 export const ShrinkToFit = createContext(true);
 
