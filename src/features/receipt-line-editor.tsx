@@ -468,6 +468,7 @@ function LineProductRow({
           onPress={onOpenCatalog}
           style={{
             minHeight: 44,
+            maxWidth: "100%",
             flexDirection: "row",
             alignItems: "center",
             gap: 5,
@@ -479,7 +480,11 @@ function LineProductRow({
             size={13}
             color={colors.primary}
           />
-          <Copy role="detail" weight="600" style={{ color: colors.primary }}>
+          <Copy
+            role="detail"
+            weight="600"
+            style={{ color: colors.primary, flexShrink: 1 }}
+          >
             {productLabel}
           </Copy>
         </Press>

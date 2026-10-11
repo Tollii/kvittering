@@ -133,10 +133,11 @@ export type FontWeight = "400" | "500" | "600" | "700";
  * tracking and small text loosens it. Weight carries meaning, so a caller may
  * override it; the other values belong to the role.
  *
- * Every role grows with the person's text size. The display roles cap their
- * growth (`maxScale`) so that at the largest accessibility size every role
- * lands between 50 and 65 points, as the system's own text styles converge;
- * reading text grows all the way, to about three times its size.
+ * Every role grows with the person's text size. Reading text grows all the
+ * way, to about three times its size at the largest accessibility size. The
+ * display roles cap their growth (`maxScale`) so that there every role lands
+ * near body text, about 50 points, as the system's own text styles converge
+ * and a title or amount still fits a phone's width.
  */
 export const typeScale = {
   heroAmount: {
@@ -144,35 +145,35 @@ export const typeScale = {
     lineHeight: 40,
     tracking: -0.7,
     weight: "600",
-    maxScale: 1.8,
+    maxScale: 1.4,
   },
   amount: {
     size: 32,
     lineHeight: 36,
     tracking: -0.7,
     weight: "700",
-    maxScale: 1.9,
+    maxScale: 1.55,
   },
   screenTitle: {
     size: 24,
     lineHeight: 29,
     tracking: -0.4,
     weight: "600",
-    maxScale: 2.4,
+    maxScale: 2.1,
   },
   sheetTitle: {
     size: 20,
     lineHeight: 26,
     tracking: -0.15,
     weight: "700",
-    maxScale: 2.7,
+    maxScale: 2.5,
   },
   sectionTitle: {
     size: 19,
     lineHeight: 25,
     tracking: -0.15,
     weight: "700",
-    maxScale: 2.8,
+    maxScale: 2.6,
   },
   cardTitle: { size: 17, lineHeight: 22, tracking: -0.15, weight: "600" },
   body: { size: 16, lineHeight: 21, tracking: 0, weight: "400" },
