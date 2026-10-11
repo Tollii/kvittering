@@ -5,7 +5,7 @@ import { useDebouncedSearch } from "./catalog-queries";
 import { productSearch } from "@/lib/catalog/search";
 import { productReference } from "@/lib/domain/product-reference";
 import { useState } from "react";
-import { Pressable, View, useWindowDimensions } from "react-native";
+import { View, useWindowDimensions } from "react-native";
 import { useQuery } from "convex-helpers/react/cache";
 import { api } from "../../convex/_generated/api";
 import type { Id } from "../../convex/_generated/dataModel";
@@ -19,7 +19,8 @@ import {
   Panel,
   Row,
   Select,
-  pressed,
+  ExpandChevron,
+  Press,
 } from "@/components/ui";
 import { MoneyField } from "@/components/money-field";
 import {
@@ -326,20 +327,18 @@ function LineHeader({
   const detail = lineDetail(line);
 
   return (
-    <Pressable
+    <Press
+      feedback="highlight"
       accessibilityRole="button"
       accessibilityLabel={`${expanded ? "Skjul" : "Rediger"} ${line.name || "ny vare"}, ${Ore.format(line.amountOre)}`}
       accessibilityState={{ expanded }}
       onPress={onPress}
-      style={(state) => [
-        {
-          minHeight: 44,
-          flexDirection: "row",
-          alignItems: "center",
-          gap: 10,
-        },
-        pressed(state),
-      ]}
+      style={{
+        minHeight: 44,
+        flexDirection: "row",
+        alignItems: "center",
+        gap: 10,
+      }}
     >
       <View style={{ flex: 1, gap: 1 }}>
         <Copy weight="600" numberOfLines={fontScale > 1.3 ? undefined : 2}>
@@ -362,12 +361,8 @@ function LineHeader({
       >
         {missingAmount ? "Beløp?" : Ore.format(line.amountOre)}
       </Copy>
-      <Icon
-        name={expanded ? "chevron.up" : "chevron.down"}
-        size={11}
-        color={colors.secondary}
-      />
-    </Pressable>
+      <ExpandChevron open={expanded} />
+    </Press>
   );
 }
 
@@ -457,7 +452,8 @@ function LineProductRow({
       {!review && priceSignal && <PriceSignalChip signal={priceSignal} />}
       {/* Product linking is optional, so review mode keeps the category decision alone. */}
       {!review && (
-        <Pressable
+        <Press
+          feedback="highlight"
           accessibilityRole="button"
           accessibilityLabel={
             catalogProduct
@@ -465,16 +461,13 @@ function LineProductRow({
               : `${productLabel} for ${line.name}. Endre produktkobling`
           }
           onPress={onOpenCatalog}
-          style={(state) => [
-            {
-              minHeight: 44,
-              flexDirection: "row",
-              alignItems: "center",
-              gap: 5,
-              marginLeft: "auto",
-            },
-            pressed(state),
-          ]}
+          style={{
+            minHeight: 44,
+            flexDirection: "row",
+            alignItems: "center",
+            gap: 5,
+            marginLeft: "auto",
+          }}
         >
           <Icon
             name={productMissing ? "link" : "checkmark.circle"}
@@ -484,7 +477,7 @@ function LineProductRow({
           <Copy role="detail" weight="600" style={{ color: colors.primary }}>
             {productLabel}
           </Copy>
-        </Pressable>
+        </Press>
       )}
     </View>
   );

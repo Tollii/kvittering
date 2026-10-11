@@ -27,6 +27,15 @@ test("opens the category's items and updates the selected total from the draft",
   expect(screen.getByText("BATTERY REMIX")).toBeTruthy();
   expect(screen.queryByText(Ore.format(Ore.of(2331)))).toBeNull();
   await fireEvent.press(screen.getByRole("button", { name: "Lukk" }));
+  // The sheet keeps its content while it slides away, and lets it go once it is gone.
+  expect(screen.getByText("BATTERY REMIX")).toBeTruthy();
+
+  const [sheet] = screen.container.queryAll(
+    (node) => node.props.isPresented === false,
+  );
+
+  if (!sheet) throw new Error("The closed sheet is not rendered.");
+  await fireEvent(sheet, "dismiss");
   expect(screen.queryByText("BATTERY REMIX")).toBeNull();
 });
 

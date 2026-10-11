@@ -5,7 +5,7 @@ import {
   type StyleProp,
   type ViewStyle,
 } from "react-native";
-import {
+import Animated, {
   Easing,
   FadeIn,
   FadeOut,
@@ -15,7 +15,8 @@ import {
   cubicBezier,
   useReducedMotion,
 } from "react-native-reanimated";
-import { motion } from "@/constants/theme";
+import { motion, useTheme } from "@/constants/theme";
+import { Icon } from "./typography";
 
 const AnimatedPressable = createAnimatedComponent(Pressable);
 
@@ -77,6 +78,27 @@ export function Press({
 }
 
 /**
+ * The chevron of something that expands in place. It turns rather than
+ * swapping symbols, so the change reads as one control changing state.
+ */
+export function ExpandChevron({ open }: Readonly<{ open: boolean }>) {
+  const colors = useTheme();
+
+  return (
+    <Animated.View
+      style={{
+        transform: [{ rotate: open ? "180deg" : "0deg" }],
+        transitionProperty: "transform",
+        transitionDuration: motion.state,
+        transitionTimingFunction: easeInOut,
+      }}
+    >
+      <Icon name="chevron.down" size={12} color={colors.secondary} />
+    </Animated.View>
+  );
+}
+
+/**
  * How content a person asked for arrives in place, such as a disclosure's
  * detail or Kamera's upload note: it settles a few points down from where it
  * came from. Reduce Motion keeps only the fade.
@@ -98,10 +120,11 @@ export function useArrival() {
 }
 
 /**
- * How such content leaves on its own: back the way it came, faster than it
- * arrived, because the person is not waiting on it.
+ * How content leaves on its own: back the way it came, faster than it
+ * arrived, because the person is not waiting on it. `left` continues a swipe
+ * to the left, as an approved receipt does.
  */
-export function useDeparture() {
+export function useDeparture(toward: "up" | "left" = "up") {
   const reduced = useReducedMotion();
   const easing = Easing.bezier(...motion.easeOut);
 
@@ -110,8 +133,18 @@ export function useDeparture() {
       .easing(easing)
       .reduceMotion(ReduceMotion.Never);
 
+  const exit = {
+    up: { x: 0, y: -6 },
+    left: { x: -motion.swipeExit, y: 0 },
+  }[toward];
+
+  // Every keyframe must name the same transforms, in the same order.
   return new Keyframe({
-    0: { opacity: 1, transform: [{ translateY: 0 }] },
-    100: { opacity: 0, transform: [{ translateY: -6 }], easing },
+    0: { opacity: 1, transform: [{ translateX: 0 }, { translateY: 0 }] },
+    100: {
+      opacity: 0,
+      transform: [{ translateX: exit.x }, { translateY: exit.y }],
+      easing,
+    },
   }).duration(motion.press);
 }

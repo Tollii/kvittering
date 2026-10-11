@@ -117,6 +117,8 @@ export const motion = {
   highlightOpacity: 0.72,
   /** A small change a person asked for: a disclosure opening, a note arriving. */
   state: 200,
+  /** How far an approved receipt keeps travelling after its swipe. */
+  swipeExit: 48,
   /** Strong ease-out: starts fast, so the response feels immediate. */
   easeOut: [0.23, 1, 0.32, 1],
   /** Strong ease-in-out for something that turns or moves in place. */

@@ -2,7 +2,8 @@ import { needsAttention } from "@/lib/domain/receipt-state";
 import { ReceiptActivityButton } from "@/features/receipt-activity";
 import { useCompleteReceipts } from "@/features/receipt-queries";
 import { UploadQueueCard } from "@/features/upload-queue-card";
-import { SectionTitle } from "@/components/ui";
+import Animated, { LayoutAnimationConfig } from "react-native-reanimated";
+import { SectionTitle, useArrival, useDeparture } from "@/components/ui";
 import { ReceiptCard, openReceipt } from "@/components/receipt-card";
 import { SwipeToApprove } from "@/features/swipe-approve";
 import { useHousehold } from "@/features/household-context";
@@ -44,9 +45,14 @@ export function PendingReceipts({
   queue,
 }: Readonly<ReturnType<typeof usePendingReceipts>>) {
   const { online, retryFailedUploads } = useHousehold();
+  const arrival = useArrival();
+  // A swipe to approve is the usual reason a card leaves, so it leaves to the left.
+  const departure = useDeparture("left");
 
+  // Mounted with the screen, so cards already waiting are just there and one
+  // that finishes processing later arrives.
   return (
-    <>
+    <LayoutAnimationConfig skipEntering>
       {attention.length > 0 && (
         <>
           <SectionTitle
@@ -70,13 +76,15 @@ export function PendingReceipts({
             }}
           />
           {attention.map((receipt) => (
-            <SwipeToApprove
+            <Animated.View
               key={receipt._id}
-              receipt={receipt}
-              enabled={online}
+              entering={arrival}
+              exiting={departure}
             >
-              <ReceiptCard receipt={receipt} />
-            </SwipeToApprove>
+              <SwipeToApprove receipt={receipt} enabled={online}>
+                <ReceiptCard receipt={receipt} />
+              </SwipeToApprove>
+            </Animated.View>
           ))}
         </>
       )}
@@ -106,6 +114,6 @@ export function PendingReceipts({
           ))}
         </>
       )}
-    </>
+    </LayoutAnimationConfig>
   );
 }

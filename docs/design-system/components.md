@@ -91,7 +91,7 @@ Pass `insetTop={false}` when a native stack header already covers the top inset.
 
 **`SummaryBand`** is the cobalt band with a screen's key number: the month menu and total on Forbruk, the paid amount and status chips on a receipt, the current item in Koble produkter. It owns the hero fill and padding; screens put an `Amount hero` and `onHero` text inside it.
 
-**`Sheet`** is a bottom sheet with a title, a close button ("Lukk"), optional fixed `header` and `footer`, and scrolling content. On iOS it is a native sheet with medium and large detents and a drag indicator. Set `dismissible={false}` while closing would lose work or leave an invalid value: while a save is busy, or while the paid amount is invalid in Kvitteringsdetaljer.
+**`Sheet`** is a bottom sheet with a title, a close button ("Lukk"), optional fixed `header` and `footer`, and scrolling content. On iOS it is a native sheet with medium and large detents and a drag indicator. Set `dismissible={false}` while closing would lose work or leave an invalid value: while a save is busy, or while the paid amount is invalid in Kvitteringsdetaljer. A sheet closed from code keeps showing its last content, without taking taps, until it has left the screen, so a caller can clear its selection in the same update that closes it.
 
 **`NativeForm`** and **`FormSection`** ([native form](../../src/components/ui/native-form.ios.tsx)) render a SwiftUI grouped form on iOS for settings-style screens and field sheets, with React Native content inside each section. Each section takes the theme's `surface` as its row background, so settings cards match every other card in both colour schemes.
 

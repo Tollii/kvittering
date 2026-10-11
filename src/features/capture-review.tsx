@@ -1,14 +1,14 @@
 import type { ReactNode } from "react";
-import { Image, Pressable, View } from "react-native";
+import { Image, View } from "react-native";
 import {
   Button,
   Copy,
   Icon,
   Notice,
   Panel,
+  Press,
   Sheet,
   Toggle,
-  pressed,
 } from "@/components/ui";
 import { radius, useTheme } from "@/constants/theme";
 import { maxReceiptImages } from "@/lib/receipt-import";
@@ -114,29 +114,26 @@ export function CaptureReview({
                 {index + 1}
               </Copy>
             </View>
-            <Pressable
+            <Press
               accessibilityRole="button"
               accessibilityLabel={`Fjern bilde ${index + 1}`}
               disabled={busy}
               accessibilityState={{ disabled: busy }}
               onPress={() => onRemovePhoto(uri)}
-              style={(state) => [
-                {
-                  position: "absolute",
-                  right: 4,
-                  top: 4,
-                  width: 44,
-                  height: 44,
-                  borderRadius: 22,
-                  backgroundColor: colors.cameraOverlayStrong,
-                  alignItems: "center",
-                  justifyContent: "center",
-                },
-                pressed(state),
-              ]}
+              style={{
+                position: "absolute",
+                right: 4,
+                top: 4,
+                width: 44,
+                height: 44,
+                borderRadius: 22,
+                backgroundColor: colors.cameraOverlayStrong,
+                alignItems: "center",
+                justifyContent: "center",
+              }}
             >
               <Icon name="xmark" size={12} color={colors.onCamera} />
-            </Pressable>
+            </Press>
           </View>
         ))}
       </View>

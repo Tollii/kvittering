@@ -1,4 +1,4 @@
-import { type ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import {
   KeyboardAvoidingView,
   Platform,
@@ -217,33 +217,41 @@ export function Screen({
 }
 
 export function Sheet({
-  title,
   visible,
   onClose,
-  children,
-  header,
-  footer,
   dismissible = true,
   scrollable = true,
-}: Readonly<{
-  title: string;
-  visible: boolean;
-  dismissible?: boolean;
-  scrollable?: boolean;
-  onClose: () => void;
-  children: ReactNode;
-  header?: ReactNode;
-  footer?: ReactNode;
-}>) {
+  ...content
+}: SheetContent &
+  Readonly<{
+    visible: boolean;
+    dismissible?: boolean;
+    scrollable?: boolean;
+    onClose: () => void;
+  }>) {
   const colors = useTheme();
+
+  // Callers often clear what a sheet shows in the same update that closes it,
+  // so a closing sheet holds its last content, untouchable, until it is gone.
+  const [held, setHeld] = useState<SheetContent | null>(null);
+
+  if (visible && (held === null || !sameContent(held, content)))
+    setHeld(content);
+
+  const closing = !visible && held !== null;
+  const { title, header, footer, children } = closing ? held : content;
 
   return (
     <SheetPresentation
       visible={visible}
       onClose={onClose}
+      onDismissed={() => setHeld(null)}
       dismissible={dismissible}
     >
-      <SafeAreaView style={{ flex: 1, backgroundColor: colors.background }}>
+      <SafeAreaView
+        pointerEvents={closing ? "none" : "auto"}
+        style={{ flex: 1, backgroundColor: colors.background }}
+      >
         <View
           style={[
             styles.row,
@@ -309,5 +317,21 @@ export function Sheet({
         </KeyboardAvoidingView>
       </SafeAreaView>
     </SheetPresentation>
+  );
+}
+
+type SheetContent = Readonly<{
+  title: string;
+  children: ReactNode;
+  header?: ReactNode;
+  footer?: ReactNode;
+}>;
+
+function sameContent(a: SheetContent, b: SheetContent) {
+  return (
+    a.title === b.title &&
+    a.children === b.children &&
+    a.header === b.header &&
+    a.footer === b.footer
   );
 }
