@@ -246,8 +246,11 @@ export function Sheet({
 
   const closing = !visible && held !== null;
   const { title, header, footer, children } = closing ? held : content;
-  // As on a screen, a footer scrolls with the content at large text.
-  const inlineFooter = useLargeText() && scrollable && !!footer;
+  // At large text a fixed header or footer would leave the content a sliver,
+  // so both scroll with it, as a screen's footer does.
+  const inline = useLargeText() && scrollable;
+  const inlineHeader = inline && !!header;
+  const inlineFooter = inline && !!footer;
 
   return (
     <SheetPresentation
@@ -283,7 +286,7 @@ export function Sheet({
             onPress={onClose}
           />
         </View>
-        {!!header && (
+        {!!header && !inlineHeader && (
           <View style={{ paddingHorizontal: 16, paddingBottom: 10, gap: 10 }}>
             {header}
           </View>
@@ -303,6 +306,7 @@ export function Sheet({
                 paddingBottom: 24,
               }}
             >
+              {inlineHeader && <View style={{ gap: 10 }}>{header}</View>}
               {children}
               {inlineFooter && <View style={{ gap: 8 }}>{footer}</View>}
             </ScrollView>
