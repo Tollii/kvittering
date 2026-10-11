@@ -5,22 +5,25 @@ import { useDebouncedSearch } from "./catalog-queries";
 import { productSearch } from "@/lib/catalog/search";
 import { productReference } from "@/lib/domain/product-reference";
 import { useState } from "react";
-import { View, useWindowDimensions } from "react-native";
+import { View } from "react-native";
 import { useQuery } from "convex-helpers/react/cache";
 import { api } from "../../convex/_generated/api";
 import type { Id } from "../../convex/_generated/dataModel";
 import {
   Button,
+  ButtonRow,
   Chip,
   Copy,
+  ExpandChevron,
   Field,
   Icon,
   Notice,
   Panel,
+  Press,
   Row,
   Select,
-  ExpandChevron,
-  Press,
+  TitleValue,
+  useLargeText,
 } from "@/components/ui";
 import { MoneyField } from "@/components/money-field";
 import {
@@ -93,7 +96,6 @@ export function ReceiptLineEditor({
   onMoneyError,
 }: Readonly<Props>) {
   const colors = useTheme();
-  const { fontScale } = useWindowDimensions();
   const issues = lineReviewIssues(line);
   const categoryUncertain = line.issues.some(isCategoryUncertain);
 
@@ -145,7 +147,6 @@ export function ReceiptLineEditor({
         expanded={expanded}
         missingName={missingName}
         missingAmount={missingAmount}
-        fontScale={fontScale}
         onPress={() => setExpanded(!expanded)}
       />
       {line.kind === "product" && (
@@ -313,17 +314,16 @@ function LineHeader({
   expanded,
   missingName,
   missingAmount,
-  fontScale,
   onPress,
 }: Readonly<{
   line: ReceiptLine;
   expanded: boolean;
   missingName: boolean;
   missingAmount: boolean;
-  fontScale: number;
   onPress: () => void;
 }>) {
   const colors = useTheme();
+  const largeText = useLargeText();
   const detail = lineDetail(line);
 
   return (
@@ -340,8 +340,12 @@ function LineHeader({
         gap: 10,
       }}
     >
-      <View style={{ flex: 1, gap: 1 }}>
-        <Copy weight="600" numberOfLines={fontScale > 1.3 ? undefined : 2}>
+      <TitleValue
+        value={missingAmount ? "Beløp?" : Ore.format(line.amountOre)}
+        color={missingAmount ? colors.warning : undefined}
+        gap={1}
+      >
+        <Copy weight="600" numberOfLines={largeText ? undefined : 2}>
           {line.name || (missingName ? "Navn mangler" : "Ny vare")}
         </Copy>
         {!!detail && (
@@ -349,18 +353,7 @@ function LineHeader({
             {detail}
           </Copy>
         )}
-      </View>
-      <Copy
-        weight="600"
-        style={{
-          flexShrink: 1,
-          maxWidth: "45%",
-          textAlign: "right",
-          color: missingAmount ? colors.warning : colors.text,
-        }}
-      >
-        {missingAmount ? "Beløp?" : Ore.format(line.amountOre)}
-      </Copy>
+      </TitleValue>
       <ExpandChevron open={expanded} />
     </Press>
   );
@@ -463,6 +456,7 @@ function LineProductRow({
           onPress={onOpenCatalog}
           style={{
             minHeight: 44,
+            maxWidth: "100%",
             flexDirection: "row",
             alignItems: "center",
             gap: 5,
@@ -474,7 +468,11 @@ function LineProductRow({
             size={13}
             color={colors.primary}
           />
-          <Copy role="detail" weight="600" style={{ color: colors.primary }}>
+          <Copy
+            role="detail"
+            weight="600"
+            style={{ color: colors.primary, flexShrink: 1 }}
+          >
             {productLabel}
           </Copy>
         </Press>
@@ -689,24 +687,20 @@ function ProductSelector({
       <Copy role="detail" muted>
         {line.productName || "Ingen sikker produktkobling"}
       </Copy>
-      <View style={{ flexDirection: "row", gap: 8 }}>
-        <View style={{ flex: 1 }}>
-          <Button
-            title="Opprett eget produkt"
-            variant="secondary"
-            compact
-            onPress={() => onChange({ kind: "new_household" })}
-          />
-        </View>
-        <View style={{ flex: 1 }}>
-          <Button
-            title="Hold varen separat"
-            variant="secondary"
-            compact
-            onPress={() => onChange({ kind: "separate" })}
-          />
-        </View>
-      </View>
+      <ButtonRow>
+        <Button
+          title="Opprett eget produkt"
+          variant="secondary"
+          compact
+          onPress={() => onChange({ kind: "new_household" })}
+        />
+        <Button
+          title="Hold varen separat"
+          variant="secondary"
+          compact
+          onPress={() => onChange({ kind: "separate" })}
+        />
+      </ButtonRow>
       {products?.map((product) => (
         <Row
           key={product._id}

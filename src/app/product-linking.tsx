@@ -4,10 +4,11 @@ import { completeReceiptTip } from "@/components/receipt-tip";
 import { useTheme } from "@/constants/theme";
 import { useRef, useState } from "react";
 import { Stack, router } from "expo-router";
-import { ActivityIndicator, Platform, View } from "react-native";
+import { ActivityIndicator, Platform } from "react-native";
 import { api } from "../../convex/_generated/api";
 import {
   Button,
+  ButtonRow,
   Copy,
   Empty,
   Loading,
@@ -139,39 +140,33 @@ export default function ProductLinking() {
       statusBarStyle="light"
       footer={
         Platform.OS !== "ios" && (last || item) ? (
-          <View style={{ flexDirection: "row", gap: 8 }}>
-            <View style={{ flexGrow: 1, flexShrink: 1 }}>
+          <ButtonRow>
+            <Button
+              title="Angre"
+              variant="secondary"
+              compact
+              disabled={!last || busy || !online}
+              onPress={() => void undoLast()}
+            />
+            {item && (
               <Button
-                title="Angre"
+                title="Søk"
                 variant="secondary"
                 compact
-                disabled={!last || busy || !online}
-                onPress={() => void undoLast()}
+                disabled={busy || !online}
+                onPress={() => setSearchKey(itemKey)}
               />
-            </View>
-            {item && (
-              <>
-                <View style={{ flexGrow: 1, flexShrink: 1 }}>
-                  <Button
-                    title="Søk"
-                    variant="secondary"
-                    compact
-                    disabled={busy || !online}
-                    onPress={() => setSearchKey(itemKey)}
-                  />
-                </View>
-                <View style={{ flexGrow: 1, flexShrink: 1 }}>
-                  <Button
-                    title="Ingen passer"
-                    variant="tint"
-                    compact
-                    disabled={busy || !online}
-                    onPress={() => void select({ kind: "separate" })}
-                  />
-                </View>
-              </>
             )}
-          </View>
+            {item && (
+              <Button
+                title="Ingen passer"
+                variant="tint"
+                compact
+                disabled={busy || !online}
+                onPress={() => void select({ kind: "separate" })}
+              />
+            )}
+          </ButtonRow>
         ) : undefined
       }
     >

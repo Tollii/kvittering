@@ -1,15 +1,20 @@
-import { Children, isValidElement, useState, type ReactNode } from "react";
+import {
+  Children,
+  isValidElement,
+  useState,
+  type ComponentProps,
+  type ReactNode,
+} from "react";
 import {
   ActivityIndicator,
   View,
-  useWindowDimensions,
   type StyleProp,
   type ViewStyle,
 } from "react-native";
 import { type SymbolViewProps } from "expo-symbols";
 import Animated, { LayoutAnimationConfig } from "react-native-reanimated";
 import { radius, useTheme } from "@/constants/theme";
-import { Chevron, Copy, Icon, styles } from "./typography";
+import { Chevron, Copy, Icon, styles, useLargeText } from "./typography";
 import { ExpandChevron, Press, useArrival } from "./motion";
 
 export function Panel({
@@ -137,9 +142,17 @@ export function SectionTitle({
   onAction?: () => void;
 }>) {
   const colors = useTheme();
+  const largeText = useLargeText();
 
   return (
-    <View style={[styles.row, { paddingTop: 16, paddingBottom: 4 }]}>
+    <View
+      style={[
+        styles.row,
+        { paddingTop: 16, paddingBottom: 4 },
+        // At large text the action takes its own line under the heading.
+        largeText && { flexDirection: "column", alignItems: "stretch", gap: 0 },
+      ]}
+    >
       <View style={{ flex: 1, gap: 4 }}>
         <Copy accessibilityRole="header" role="sectionTitle">
           {title}
@@ -156,7 +169,12 @@ export function SectionTitle({
           accessibilityRole="button"
           accessibilityLabel={actionLabel}
           onPress={onAction}
-          style={{ minHeight: 44, justifyContent: "center", paddingLeft: 12 }}
+          style={{
+            minHeight: 44,
+            justifyContent: "center",
+            paddingLeft: largeText ? 0 : 12,
+            alignSelf: largeText ? "flex-start" : undefined,
+          }}
         >
           <Copy role="detail" weight="600" style={{ color: colors.primary }}>
             {action}
@@ -164,6 +182,59 @@ export function SectionTitle({
         </Press>
       )}
     </View>
+  );
+}
+
+/**
+ * A title column and the value that belongs to it: beside it, right-aligned,
+ * at most 45 % wide and on one line, or on its own line under it at large
+ * text. Render it
+ * inside a row; `children` is the title column (a title and its detail).
+ */
+export function TitleValue({
+  children,
+  value,
+  role = "body",
+  weight = "600",
+  muted = false,
+  color,
+  gap = 4,
+}: Readonly<{
+  children: ReactNode;
+  value?: string;
+  role?: NonNullable<ComponentProps<typeof Copy>["role"]>;
+  weight?: NonNullable<ComponentProps<typeof Copy>["weight"]>;
+  muted?: boolean;
+  color?: string;
+  gap?: number;
+}>) {
+  const stacked = useLargeText();
+
+  const valueText = !!value && (
+    <Copy
+      role={role}
+      weight={weight}
+      muted={muted}
+      // Beside the title a value stays whole on one line and shrinks to fit.
+      numberOfLines={stacked ? undefined : 1}
+      adjustsFontSizeToFit={!stacked}
+      style={[
+        !stacked && { flexShrink: 1, maxWidth: "45%", textAlign: "right" },
+        !!color && { color },
+      ]}
+    >
+      {value}
+    </Copy>
+  );
+
+  return (
+    <>
+      <View style={{ flex: 1, gap }}>
+        {children}
+        {stacked && valueText}
+      </View>
+      {!stacked && valueText}
+    </>
   );
 }
 
@@ -190,14 +261,9 @@ export function Disclosure({
         onPress={() => setOpen(!open)}
         style={[styles.row, { minHeight: 44 }]}
       >
-        <Copy weight="600" style={{ flex: 1 }}>
-          {title}
-        </Copy>
-        {!!value && (
-          <Copy role="detail" muted>
-            {value}
-          </Copy>
-        )}
+        <TitleValue value={value} role="detail" weight="400" muted>
+          <Copy weight="600">{title}</Copy>
+        </TitleValue>
         <ExpandChevron open={open} />
       </Press>
       {/* Detail that is open from the start is already there; only a tap brings it in. */}
@@ -364,9 +430,6 @@ export function Row({
   onPress?: () => void;
   selected?: boolean;
 }>) {
-  const { fontScale } = useWindowDimensions();
-  const stacked = fontScale > 1.3;
-
   return (
     <Press
       feedback="highlight"
@@ -377,23 +440,14 @@ export function Row({
       style={[styles.row, { minHeight: 52, paddingVertical: 10 }]}
     >
       {icon && <IconTile icon={icon} />}
-      <View style={{ flex: 1, gap: 4 }}>
+      <TitleValue value={value}>
         <Copy weight="600">{title}</Copy>
         {!!detail && (
           <Copy role="detail" muted>
             {detail}
           </Copy>
         )}
-        {stacked && !!value && <Copy weight="600">{value}</Copy>}
-      </View>
-      {!stacked && !!value && (
-        <Copy
-          weight="600"
-          style={{ flexShrink: 1, maxWidth: "45%", textAlign: "right" }}
-        >
-          {value}
-        </Copy>
-      )}
+      </TitleValue>
       {selected && <Icon name="checkmark" size={15} weight="semibold" />}
       {onPress && !selected && <Chevron />}
     </Press>

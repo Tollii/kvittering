@@ -98,19 +98,17 @@ export function CaptureReview({
                 position: "absolute",
                 left: 8,
                 top: 8,
-                width: 24,
-                height: 24,
+                minWidth: 24,
+                minHeight: 24,
+                paddingHorizontal: 6,
                 borderRadius: 12,
+                borderCurve: "continuous",
                 backgroundColor: colors.cameraOverlayStrong,
                 alignItems: "center",
                 justifyContent: "center",
               }}
             >
-              <Copy
-                role="caption"
-                weight="700"
-                style={{ color: colors.onCamera }}
-              >
+              <Copy role="counter" style={{ color: colors.onCamera }}>
                 {index + 1}
               </Copy>
             </View>

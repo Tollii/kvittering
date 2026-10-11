@@ -5,8 +5,9 @@ import {
   presentationDetents,
   presentationDragIndicator,
 } from "@expo/ui/swift-ui/modifiers";
-import { View, useWindowDimensions } from "react-native";
+import { View } from "react-native";
 import { useTheme } from "@/constants/theme";
+import { useLargeText } from "./typography";
 import type { SheetPresentationProps } from "./sheet-presentation";
 
 export function SheetPresentation({
@@ -17,7 +18,7 @@ export function SheetPresentation({
   children,
 }: SheetPresentationProps) {
   const colors = useTheme();
-  const { fontScale } = useWindowDimensions();
+  const largeText = useLargeText();
 
   return (
     <Host style={{ position: "absolute", width: 0, height: 0 }}>
@@ -30,9 +31,7 @@ export function SheetPresentation({
       >
         <Group
           modifiers={[
-            presentationDetents(
-              fontScale > 1.3 ? ["large"] : ["medium", "large"],
-            ),
+            presentationDetents(largeText ? ["large"] : ["medium", "large"]),
             presentationDragIndicator("visible"),
             presentationBackground(colors.background),
             interactiveDismissDisabled(!dismissible),

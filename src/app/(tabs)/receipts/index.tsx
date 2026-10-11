@@ -15,7 +15,7 @@ import {
 } from "@/features/receipt-queries";
 import { useDebouncedSearch } from "@/features/catalog-queries";
 import { useEffect, useRef, useState } from "react";
-import { Platform, View, useWindowDimensions } from "react-native";
+import { Platform, View } from "react-native";
 import {
   Amount,
   Button,
@@ -32,6 +32,7 @@ import {
   Segments,
   SettingsButton,
   Sheet,
+  useLargeText,
 } from "@/components/ui";
 import { IllustratedEmpty } from "@/components/monument-artwork";
 import { openReceipt, receiptStatusLabel } from "@/components/receipt-card";
@@ -191,7 +192,7 @@ function ProductsView({
   products: ReturnType<typeof productHistory>;
   complete: boolean;
 }>) {
-  const { fontScale } = useWindowDimensions();
+  const largeText = useLargeText();
   const [selectedKey, setSelectedKey] = useState<string | null>(null);
   const selected = allProducts.find((product) => product.key === selectedKey);
   const prices = selected ? productPrices(selected.contributions) : null;
@@ -238,7 +239,7 @@ function ProductsView({
             </Amount>
             <Panel
               style={{
-                flexDirection: fontScale > 1.3 ? "column" : "row",
+                flexDirection: largeText ? "column" : "row",
                 gap: 16,
               }}
             >

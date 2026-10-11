@@ -50,7 +50,7 @@ Sign-in is a full-screen form outside the tabs ([sign-in](../../src/features/sig
 
 ### Capture
 
-1. Kamera is a full-bleed viewfinder with controls on overlay discs; importing from Bilder or Filer sits beside the shutter.
+1. Kamera is a full-bleed viewfinder with controls on overlay discs; importing from Bilder or Filer sits beside the shutter. At large text the "Ny kvittering" label moves under the import and settings buttons.
 2. Each photo opens a review sheet ([capture review](../../src/features/capture-review.tsx)) where pages can be combined into one receipt before saving. Shared images and PDFs from other apps arrive in the same sheet. The footer holds the one primary action, "Lagre kvittering"; the one secondary button, "Legg til flere bilder", returns to the camera, where both the shutter and the import buttons are.
 3. Saving returns to the camera at once. A note follows the upload and fades when it lands; processing continues under "Under behandling" at the top of Kvitteringer and in a Live Activity, never on a blocking screen. There the upload is an [upload queue card](../../src/features/upload-queue-card.tsx) with its progress and, after a failure, "Prøv igjen" as its one button.
 

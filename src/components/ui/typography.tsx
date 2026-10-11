@@ -2,6 +2,7 @@ import {
   StyleSheet,
   Text,
   View,
+  useWindowDimensions,
   type StyleProp,
   type TextProps,
   type TextStyle,
@@ -11,6 +12,7 @@ import { type SymbolViewProps } from "expo-symbols";
 import { SymbolView } from "./symbol";
 import {
   disabledOpacity,
+  largeTextScale,
   typeScale,
   useTheme,
   type FontWeight,
@@ -18,10 +20,22 @@ import {
 } from "@/constants/theme";
 
 /**
+ * Whether the person uses an accessibility text size, where a layout changes
+ * shape rather than squeezing. Every component that adapts reads this one
+ * threshold, so the whole app changes shape at the same size.
+ */
+export function useLargeText(): boolean {
+  return useWindowDimensions().fontScale > largeTextScale;
+}
+
+/**
  * `role` names the type role; accessibility semantics go through
  * `accessibilityRole`. `style` cannot touch what the role owns.
  */
-type TypeProps = Omit<TextProps, "role" | "style"> & {
+type TypeProps = Omit<
+  TextProps,
+  "role" | "style" | "maxFontSizeMultiplier" | "allowFontScaling"
+> & {
   role: TypeRole;
   /** Overrides the role's weight; weight carries meaning, size does not. */
   weight?: FontWeight;
@@ -40,6 +54,8 @@ function Type({ role, weight, muted = false, style, ...props }: TypeProps) {
     <Text
       // iOS pushes a lone last word onto the line before it, as UILabel does.
       lineBreakStrategyIOS="standard"
+      // Each role stops growing where its iOS text style does.
+      maxFontSizeMultiplier={scale.maxScale}
       {...props}
       style={[
         {
@@ -82,6 +98,10 @@ export function Amount({
   const amount = (
     <Type
       selectable
+      // A number never breaks across lines; a long one shrinks to fit.
+      numberOfLines={1}
+      adjustsFontSizeToFit
+      minimumFontScale={0.5}
       role={hero ? "heroAmount" : "amount"}
       style={[hero && { color: colors.onHero }, style]}
       {...props}

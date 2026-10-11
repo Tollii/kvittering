@@ -37,6 +37,8 @@ When a second screen needs a feature's component, move it up to `src/components`
 
 States: `disabled` fades the button; `busy` shows a spinner in place of the icon, or before the title when there is no icon, and disables the button while keeping the title. `compact` is the shorter size for inline and footer use. A "show more" control under a list is a `compact` `secondary` button, not a row. A short title next to the thing it acts on, such as "Bekreft" beside a category suggestion, gets an `accessibilityLabel` that names the object.
 
+**`ButtonRow`** puts two or three buttons side by side, such as "Kopier" and "Del" under the invitation code or "Til kvitteringene" and "Neste til kontroll" under an approved receipt. Each button is as wide as its title needs and they share the spare width; when the titles cannot fit on one line, at large text or on a narrow phone, a button moves to its own line rather than its title wrapping inside it. Side-by-side buttons always go in one of these, never in a row of halves. Pass the buttons directly; a fragment counts as one item.
+
 **`IconButton`** is an icon-only control with a required Norwegian `label`. `filled` adds the muted disc, or pass a colour such as `heroControl` on the hero.
 
 **`SettingsButton`** ([layout](../../src/components/ui/layout.tsx)) opens household settings. Every tab places it at the top right; `surface="camera"` adapts it to the viewfinder.
@@ -63,11 +65,13 @@ States: `disabled` fades the button; `busy` shows a spinner in place of the icon
 
 **`Row`** is the list item: an optional `IconTile`, a title, detail text, a trailing value, and a chevron when tappable. `selected` swaps the chevron for a checkmark. Large text moves the value under the title (see [accessibility](foundations.md#accessibility)).
 
+**`TitleValue`** is the title column and value that `Row`, `Disclosure`, a receipt line and the purchase totals share: the value sits beside the title, right-aligned, at most 45 % wide and on one line, shrinking to fit rather than wrapping, or under it at large text. Use it inside a row whenever a value belongs to a title, rather than placing the value yourself.
+
 **`IconTile`** is the soft cobalt tile behind an icon: a 32-point squircle with the `tile` radius in a `Row` and the upload queue, where it can hold a spinner instead, or the 64-point `circle` that `Empty` leads with.
 
-**`SectionTitle`** heads a group with optional detail text under it and an optional text action on the right, such as "Start" over the receipts to review or "Bekreft alle" over the review lines; `actionLabel` names the object for VoiceOver when the short action text does not. Kvitteringer uses the detail for the month's count and total.
+**`SectionTitle`** heads a group with optional detail text under it and an optional text action on the right, such as "Start" over the receipts to review or "Bekreft alle" over the review lines; `actionLabel` names the object for VoiceOver when the short action text does not. Kvitteringer uses the detail for the month's count and total. At large text the action takes its own line under the heading.
 
-**`Disclosure`** is a card that expands in place for secondary detail, such as "Om kvitteringen" or "Slik er endringen beregnet".
+**`Disclosure`** is a card that expands in place for secondary detail, such as "Om kvitteringen" or "Slik er endringen beregnet". An optional `value` sits beside the title, or under it at large text, as in a `Row`.
 
 **`ReceiptCard`** ([receipt card](../../src/components/receipt-card.tsx)) summarises a receipt that waits for a person or is still on its way in: store, date and branch, total, and a coloured status line (warning for review, danger for failure) followed by what needs attention. A receipt still being processed shows a spinner in place of the total; `compact`, used for those receipts under "Under behandling", tightens the padding and drops an empty status line.
 
@@ -87,13 +91,13 @@ States: `disabled` fades the button; `busy` shows a spinner in place of the icon
 
 - `title` and `subtitle` draw the cobalt hero header with the arch mark; `settings` adds `SettingsButton`.
 - `summary` takes a `SummaryBand`, which sits under the header edge to edge.
-- `footer` pins an action bar to the bottom, above the home indicator, on `surface` with a hairline top border.
+- `footer` pins an action bar to the bottom, above the home indicator, on `surface` with a hairline top border. At large text it scrolls in after the content instead, so it never covers most of the screen.
 
 Pass `insetTop={false}` when a native stack header already covers the top inset.
 
 **`SummaryBand`** is the cobalt band with a screen's key number: the month menu and total on Forbruk, the paid amount and status chips on a receipt, the current item in Koble produkter. It owns the hero fill and padding; screens put an `Amount hero` and `onHero` text inside it.
 
-**`Sheet`** is a bottom sheet with a title, a close button ("Lukk"), optional fixed `header` and `footer`, and scrolling content. On iOS it is a native sheet with medium and large detents and a drag indicator. Set `dismissible={false}` while closing would lose work or leave an invalid value: while a save is busy, or while the paid amount is invalid in Kvitteringsdetaljer. A sheet closed from code keeps showing its last content, without taking taps, until it has left the screen, so a caller can clear its selection in the same update that closes it.
+**`Sheet`** is a bottom sheet with a title, a close button ("Lukk"), optional fixed `header` and `footer`, and scrolling content. At large text the header and footer scroll with the content, so they never leave it a sliver of the sheet. On iOS it is a native sheet with medium and large detents and a drag indicator. Set `dismissible={false}` while closing would lose work or leave an invalid value: while a save is busy, or while the paid amount is invalid in Kvitteringsdetaljer. A sheet closed from code keeps showing its last content, without taking taps, until it has left the screen, so a caller can clear its selection in the same update that closes it.
 
 **`NativeForm`** and **`FormSection`** ([native form](../../src/components/ui/native-form.ios.tsx)) render a SwiftUI grouped form on iOS for settings-style screens and field sheets, with React Native content inside each section. Each section takes the theme's `surface` as its row background, so settings cards match every other card in both colour schemes.
 

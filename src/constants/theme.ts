@@ -132,20 +132,96 @@ export type FontWeight = "400" | "500" | "600" | "700";
  * draws the text roles and `Amount` the two amounts. Large text tightens its
  * tracking and small text loosens it. Weight carries meaning, so a caller may
  * override it; the other values belong to the role.
+ *
+ * Every role grows with the person's text size and stops where the matching
+ * iOS text style stops at the largest accessibility size (AX5): reading text
+ * at about the system's Body, 53 points, and titles and amounts a little
+ * above it, up to about 60. React Native would otherwise grow every role 3.6
+ * times, past the system's own sizes. `counter` is the number in a small
+ * badge over a photo, capped lower so the badge stays small.
  */
 export const typeScale = {
-  heroAmount: { size: 36, lineHeight: 40, tracking: -0.7, weight: "600" },
-  amount: { size: 32, lineHeight: 36, tracking: -0.7, weight: "700" },
-  screenTitle: { size: 24, lineHeight: 29, tracking: -0.4, weight: "600" },
-  sheetTitle: { size: 20, lineHeight: 26, tracking: -0.15, weight: "700" },
-  sectionTitle: { size: 19, lineHeight: 25, tracking: -0.15, weight: "700" },
-  cardTitle: { size: 17, lineHeight: 22, tracking: -0.15, weight: "600" },
-  body: { size: 16, lineHeight: 21, tracking: 0, weight: "400" },
-  detail: { size: 13, lineHeight: 17, tracking: 0.05, weight: "400" },
-  caption: { size: 12, lineHeight: 16, tracking: 0.15, weight: "400" },
+  heroAmount: {
+    size: 36,
+    lineHeight: 40,
+    tracking: -0.7,
+    weight: "600",
+    maxScale: 1.7,
+  },
+  amount: {
+    size: 32,
+    lineHeight: 36,
+    tracking: -0.7,
+    weight: "700",
+    maxScale: 1.8,
+  },
+  screenTitle: {
+    size: 24,
+    lineHeight: 29,
+    tracking: -0.4,
+    weight: "600",
+    maxScale: 2.4,
+  },
+  sheetTitle: {
+    size: 20,
+    lineHeight: 26,
+    tracking: -0.15,
+    weight: "700",
+    maxScale: 2.8,
+  },
+  sectionTitle: {
+    size: 19,
+    lineHeight: 25,
+    tracking: -0.15,
+    weight: "700",
+    maxScale: 2.9,
+  },
+  cardTitle: {
+    size: 17,
+    lineHeight: 22,
+    tracking: -0.15,
+    weight: "600",
+    maxScale: 3.1,
+  },
+  body: { size: 16, lineHeight: 21, tracking: 0, weight: "400", maxScale: 3.2 },
+  detail: {
+    size: 13,
+    lineHeight: 17,
+    tracking: 0.05,
+    weight: "400",
+    maxScale: 3.4,
+  },
+  caption: {
+    size: 12,
+    lineHeight: 16,
+    tracking: 0.15,
+    weight: "400",
+    maxScale: 3.3,
+  },
+  counter: {
+    size: 12,
+    lineHeight: 16,
+    tracking: 0.15,
+    weight: "700",
+    maxScale: 1.5,
+  },
 } as const satisfies Record<
   string,
-  { size: number; lineHeight: number; tracking: number; weight: FontWeight }
+  {
+    size: number;
+    lineHeight: number;
+    tracking: number;
+    weight: FontWeight;
+    maxScale: number;
+  }
 >;
+
+/**
+ * The font scale above which layouts change shape instead of squeezing:
+ * values move under titles, metrics and segments stack, sheets open at full
+ * height. iOS reports 1.353 at the largest standard size (XXXL) and 1.786 at
+ * the first accessibility size, so the change starts at XXXL.
+ */
+export const largeTextScale = 1.3;
 
 export type TypeRole = keyof typeof typeScale;
