@@ -205,9 +205,12 @@ function receiveRemote(state: ReceiptDraft, receipt: Receipt): ReceiptDraft {
 
   if (state.dirty || isRequestRunning(state.operation)) return next;
 
+  // A save result outlives later snapshots, so the next-receipt actions stay until an edit.
   return {
     ...createReceiptDraft(receipt),
     generation: state.generation + 1,
+    operation:
+      state.operation.kind === "saved" ? state.operation : { kind: "idle" },
   };
 }
 

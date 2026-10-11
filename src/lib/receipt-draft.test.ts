@@ -40,6 +40,27 @@ describe("receipt draft", () => {
     },
   );
 
+  it("keeps an approval's outcome when a later snapshot arrives", () => {
+    let state = createReceiptDraft(receipt);
+    state = reduceReceiptDraft(state, { type: "start", operation: "saving" });
+    state = reduceReceiptDraft(state, {
+      type: "saved",
+      revision: 2,
+      approved: true,
+    });
+    state = reduceReceiptDraft(state, {
+      type: "remote",
+      receipt: { ...receipt, revision: 2 },
+    });
+    // Catalog matching or analysis can update the receipt right after approval.
+    state = reduceReceiptDraft(state, {
+      type: "remote",
+      receipt: { ...receipt, revision: 3 },
+    });
+    expect(state.baseline.revision).toBe(3);
+    expect(state.operation).toEqual({ kind: "saved", approved: true });
+  });
+
   it.each([true, false])(
     "accepts query and acknowledgement in either order: %s",
     (queryFirst) => {
