@@ -13,6 +13,7 @@ import { randomUUID } from "expo-crypto";
 import { api } from "../../convex/_generated/api";
 import {
   Button,
+  ButtonRow,
   Copy,
   Icon,
   List,
@@ -124,40 +125,36 @@ export default function Settings() {
                   {invitation ?? "Koble til nettet for å hente koden."}
                 </Copy>
               </View>
-              <View style={{ flexDirection: "row", gap: 8 }}>
-                <View style={{ flex: 1 }}>
-                  <Button
-                    title="Kopier"
-                    variant="tint"
-                    icon="doc.on.doc"
-                    disabled={!details || busy}
-                    onPress={() => {
-                      if (details)
-                        void run(async () => {
-                          await Clipboard.setStringAsync(
-                            details.household.invitation,
-                          );
-                          setMessage("Koden er kopiert.");
-                        });
-                    }}
-                  />
-                </View>
-                <View style={{ flex: 1 }}>
-                  <Button
-                    title="Del"
-                    icon="square.and.arrow.up"
-                    disabled={!details || busy}
-                    onPress={() => {
-                      if (details)
-                        void run(() =>
-                          Share.share({
-                            message: `Bli med i ${household.name} i Kvitto. Invitasjonskode: ${details.household.invitation}`,
-                          }),
+              <ButtonRow>
+                <Button
+                  title="Kopier"
+                  variant="tint"
+                  icon="doc.on.doc"
+                  disabled={!details || busy}
+                  onPress={() => {
+                    if (details)
+                      void run(async () => {
+                        await Clipboard.setStringAsync(
+                          details.household.invitation,
                         );
-                    }}
-                  />
-                </View>
-              </View>
+                        setMessage("Koden er kopiert.");
+                      });
+                  }}
+                />
+                <Button
+                  title="Del"
+                  icon="square.and.arrow.up"
+                  disabled={!details || busy}
+                  onPress={() => {
+                    if (details)
+                      void run(() =>
+                        Share.share({
+                          message: `Bli med i ${household.name} i Kvitto. Invitasjonskode: ${details.household.invitation}`,
+                        }),
+                      );
+                  }}
+                />
+              </ButtonRow>
               {!!message && (
                 <Copy role="detail" style={{ color: colors.success }}>
                   {message}

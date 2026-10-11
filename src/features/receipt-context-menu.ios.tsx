@@ -21,7 +21,14 @@ export function ReceiptContextMenu({
         <ContextMenu>
           <ContextMenu.Trigger>
             <RNHostView matchContents>
-              <View style={{ width }}>{children}</View>
+              {/* The host keeps the height it first measures, so the row
+                  renders only once its width is known and its text has
+                  wrapped, as a stacked row at large text does. */}
+              {width === undefined ? (
+                <View />
+              ) : (
+                <View style={{ width }}>{children}</View>
+              )}
             </RNHostView>
           </ContextMenu.Trigger>
           <ContextMenu.Items>

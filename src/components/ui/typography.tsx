@@ -2,6 +2,7 @@ import {
   StyleSheet,
   Text,
   View,
+  useWindowDimensions,
   type StyleProp,
   type TextProps,
   type TextStyle,
@@ -11,11 +12,21 @@ import { type SymbolViewProps } from "expo-symbols";
 import { SymbolView } from "./symbol";
 import {
   disabledOpacity,
+  largeTextScale,
   typeScale,
   useTheme,
   type FontWeight,
   type TypeRole,
 } from "@/constants/theme";
+
+/**
+ * Whether the person uses an accessibility text size, where a layout changes
+ * shape rather than squeezing. Every component that adapts reads this one
+ * threshold, so the whole app changes shape at the same size.
+ */
+export function useLargeText(): boolean {
+  return useWindowDimensions().fontScale > largeTextScale;
+}
 
 /**
  * `role` names the type role; accessibility semantics go through
@@ -40,6 +51,9 @@ function Type({ role, weight, muted = false, style, ...props }: TypeProps) {
     <Text
       // iOS pushes a lone last word onto the line before it, as UILabel does.
       lineBreakStrategyIOS="standard"
+      // A display role stops growing where the system's titles do; zero lets
+      // reading text grow all the way, whatever a parent text set.
+      maxFontSizeMultiplier={"maxScale" in scale ? scale.maxScale : 0}
       {...props}
       style={[
         {

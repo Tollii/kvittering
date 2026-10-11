@@ -2,8 +2,8 @@ import { CalendarDate } from "@/lib/domain/calendar";
 import { Ore } from "@/lib/domain/ore";
 import { isReceiptProcessing } from "@/lib/domain/receipt-state";
 import { router } from "expo-router";
-import { ActivityIndicator, View, useWindowDimensions } from "react-native";
-import { Chevron, Copy, Press } from "./ui";
+import { ActivityIndicator, View } from "react-native";
+import { Chevron, Copy, Press, useLargeText } from "./ui";
 import { radius, useTheme } from "@/constants/theme";
 import { reviewSummary } from "@/lib/domain/receipt-review";
 import type { Receipt } from "@/lib/domain/insights";
@@ -47,8 +47,7 @@ export function ReceiptCard({
   compact?: boolean;
 }>) {
   const colors = useTheme();
-  const { fontScale } = useWindowDimensions();
-  const stacked = fontScale > 1.3;
+  const stacked = useLargeText();
   const busy = isReceiptProcessing(receipt.status);
   const needs = receipt.status === "needs_review" ? receiptNeeds(receipt) : [];
 

@@ -1,11 +1,12 @@
 import { CalendarDate } from "@/lib/domain/calendar";
 import { Ore } from "@/lib/domain/ore";
 import type { ReactNode } from "react";
-import { View, useWindowDimensions } from "react-native";
+import { View } from "react-native";
 import { router } from "expo-router";
 import {
   Amount,
   Button,
+  ButtonRow,
   Chip,
   Copy,
   Icon,
@@ -13,6 +14,7 @@ import {
   List,
   Panel,
   SummaryBand,
+  useLargeText,
 } from "@/components/ui";
 import { ReceiptImages } from "@/features/receipt-images";
 import { type reconcile, type ReceiptData } from "@/lib/domain/receipt";
@@ -41,7 +43,7 @@ export function ReceiptSummary({
   onEditFields: () => void;
 }>) {
   const colors = useTheme();
-  const { fontScale } = useWindowDimensions();
+  const largeText = useLargeText();
 
   return (
     <SummaryBand style={{ gap: 12 }}>
@@ -56,7 +58,7 @@ export function ReceiptSummary({
         <View
           style={{
             flex: 1,
-            minWidth: fontScale > 1.3 ? "100%" : undefined,
+            minWidth: largeText ? "100%" : undefined,
             gap: 4,
           }}
         >
@@ -138,7 +140,7 @@ export function PurchaseTotals({
   totals,
 }: Readonly<{ data: ReceiptData; totals: Totals }>) {
   const colors = useTheme();
-  const { fontScale } = useWindowDimensions();
+  const largeText = useLargeText();
 
   // Components appear only when present; the line sum and paid amount always do.
   // The next-step notice names an open difference; the paid row only marks it.
@@ -162,12 +164,16 @@ export function PurchaseTotals({
     <Panel>
       <View
         style={{
-          flexDirection: "row",
-          alignItems: "baseline",
-          gap: 12,
+          flexDirection: largeText ? "column" : "row",
+          alignItems: largeText ? "stretch" : "baseline",
+          gap: largeText ? 2 : 12,
         }}
       >
-        <Copy weight="600" accessibilityRole="header" style={{ flex: 1 }}>
+        <Copy
+          weight="600"
+          accessibilityRole="header"
+          style={largeText ? undefined : { flex: 1 }}
+        >
           Kjøpsoversikt
         </Copy>
         <Copy role="detail" muted>
@@ -178,9 +184,9 @@ export function PurchaseTotals({
         <View
           key={row.label}
           style={{
-            flexDirection: fontScale > 1.3 ? "column" : "row",
+            flexDirection: largeText ? "column" : "row",
             justifyContent: "space-between",
-            gap: fontScale > 1.3 ? 4 : 16,
+            gap: largeText ? 4 : 16,
             paddingVertical: 6,
           }}
         >
@@ -201,9 +207,6 @@ export function PurchaseTotals({
     </Panel>
   );
 }
-
-/** A footer button that is as wide as its title and wraps as a whole. */
-const wholeButton = { flexGrow: 1, flexShrink: 0, flexBasis: "auto" } as const;
 
 export function ReceiptFooter({
   error,
@@ -258,22 +261,16 @@ export function ReceiptFooter({
         </Copy>
       </View>
       {approved ? (
-        // Each button is as wide as its title needs. Side by side they share
-        // the spare width; when both titles cannot fit on one line, as on a
-        // phone, the primary action moves to its own line below rather than
-        // either title wrapping inside its button.
-        <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8 }}>
+        <ButtonRow>
           <Button
             title="Til kvitteringene"
             variant="secondary"
-            style={wholeButton}
             onPress={() => router.dismissTo("/(tabs)/receipts")}
           />
           {nextPending && (
             <Button
               title="Neste til kontroll"
               icon="arrow.right"
-              style={wholeButton}
               onPress={() =>
                 router.replace({
                   pathname: "/receipt/[id]",
@@ -282,7 +279,7 @@ export function ReceiptFooter({
               }
             />
           )}
-        </View>
+        </ButtonRow>
       ) : (
         (dirty || receipt.status !== "reviewed") && (
           <Button

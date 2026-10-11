@@ -37,6 +37,8 @@ When a second screen needs a feature's component, move it up to `src/components`
 
 States: `disabled` fades the button; `busy` shows a spinner in place of the icon, or before the title when there is no icon, and disables the button while keeping the title. `compact` is the shorter size for inline and footer use. A "show more" control under a list is a `compact` `secondary` button, not a row. A short title next to the thing it acts on, such as "Bekreft" beside a category suggestion, gets an `accessibilityLabel` that names the object.
 
+**`ButtonRow`** puts two or three buttons side by side, such as "Kopier" and "Del" under the invitation code or "Til kvitteringene" and "Neste til kontroll" under an approved receipt. Each button is as wide as its title needs and they share the spare width; when the titles cannot fit on one line, at large text or on a narrow phone, a button moves to its own line rather than its title wrapping inside it. Side-by-side buttons always go in one of these, never in a row of halves.
+
 **`IconButton`** is an icon-only control with a required Norwegian `label`. `filled` adds the muted disc, or pass a colour such as `heroControl` on the hero.
 
 **`SettingsButton`** ([layout](../../src/components/ui/layout.tsx)) opens household settings. Every tab places it at the top right; `surface="camera"` adapts it to the viewfinder.
@@ -65,9 +67,9 @@ States: `disabled` fades the button; `busy` shows a spinner in place of the icon
 
 **`IconTile`** is the soft cobalt tile behind an icon: a 32-point squircle with the `tile` radius in a `Row` and the upload queue, where it can hold a spinner instead, or the 64-point `circle` that `Empty` leads with.
 
-**`SectionTitle`** heads a group with optional detail text under it and an optional text action on the right, such as "Start" over the receipts to review or "Bekreft alle" over the review lines; `actionLabel` names the object for VoiceOver when the short action text does not. Kvitteringer uses the detail for the month's count and total.
+**`SectionTitle`** heads a group with optional detail text under it and an optional text action on the right, such as "Start" over the receipts to review or "Bekreft alle" over the review lines; `actionLabel` names the object for VoiceOver when the short action text does not. Kvitteringer uses the detail for the month's count and total. At large text the action takes its own line under the heading.
 
-**`Disclosure`** is a card that expands in place for secondary detail, such as "Om kvitteringen" or "Slik er endringen beregnet".
+**`Disclosure`** is a card that expands in place for secondary detail, such as "Om kvitteringen" or "Slik er endringen beregnet". An optional `value` sits beside the title, or under it at large text, as in a `Row`.
 
 **`ReceiptCard`** ([receipt card](../../src/components/receipt-card.tsx)) summarises a receipt that waits for a person or is still on its way in: store, date and branch, total, and a coloured status line (warning for review, danger for failure) followed by what needs attention. A receipt still being processed shows a spinner in place of the total; `compact`, used for those receipts under "Under behandling", tightens the padding and drops an empty status line.
 

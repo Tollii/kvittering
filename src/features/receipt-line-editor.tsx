@@ -5,7 +5,7 @@ import { useDebouncedSearch } from "./catalog-queries";
 import { productSearch } from "@/lib/catalog/search";
 import { productReference } from "@/lib/domain/product-reference";
 import { useState } from "react";
-import { View, useWindowDimensions } from "react-native";
+import { View } from "react-native";
 import { useQuery } from "convex-helpers/react/cache";
 import { api } from "../../convex/_generated/api";
 import type { Id } from "../../convex/_generated/dataModel";
@@ -13,14 +13,15 @@ import {
   Button,
   Chip,
   Copy,
+  ExpandChevron,
   Field,
   Icon,
   Notice,
   Panel,
+  Press,
   Row,
   Select,
-  ExpandChevron,
-  Press,
+  useLargeText,
 } from "@/components/ui";
 import { MoneyField } from "@/components/money-field";
 import {
@@ -93,7 +94,6 @@ export function ReceiptLineEditor({
   onMoneyError,
 }: Readonly<Props>) {
   const colors = useTheme();
-  const { fontScale } = useWindowDimensions();
   const issues = lineReviewIssues(line);
   const categoryUncertain = line.issues.some(isCategoryUncertain);
 
@@ -145,7 +145,6 @@ export function ReceiptLineEditor({
         expanded={expanded}
         missingName={missingName}
         missingAmount={missingAmount}
-        fontScale={fontScale}
         onPress={() => setExpanded(!expanded)}
       />
       {line.kind === "product" && (
@@ -313,18 +312,33 @@ function LineHeader({
   expanded,
   missingName,
   missingAmount,
-  fontScale,
   onPress,
 }: Readonly<{
   line: ReceiptLine;
   expanded: boolean;
   missingName: boolean;
   missingAmount: boolean;
-  fontScale: number;
   onPress: () => void;
 }>) {
   const colors = useTheme();
+  const largeText = useLargeText();
   const detail = lineDetail(line);
+
+  // The amount sits beside the name, or under it at large text, as a row does.
+  const amount = (
+    <Copy
+      weight="600"
+      style={[
+        largeText ? undefined : { flexShrink: 1, maxWidth: "45%" },
+        {
+          textAlign: largeText ? undefined : "right",
+          color: missingAmount ? colors.warning : colors.text,
+        },
+      ]}
+    >
+      {missingAmount ? "Beløp?" : Ore.format(line.amountOre)}
+    </Copy>
+  );
 
   return (
     <Press
@@ -341,7 +355,7 @@ function LineHeader({
       }}
     >
       <View style={{ flex: 1, gap: 1 }}>
-        <Copy weight="600" numberOfLines={fontScale > 1.3 ? undefined : 2}>
+        <Copy weight="600" numberOfLines={largeText ? undefined : 2}>
           {line.name || (missingName ? "Navn mangler" : "Ny vare")}
         </Copy>
         {!!detail && (
@@ -349,18 +363,9 @@ function LineHeader({
             {detail}
           </Copy>
         )}
+        {largeText && amount}
       </View>
-      <Copy
-        weight="600"
-        style={{
-          flexShrink: 1,
-          maxWidth: "45%",
-          textAlign: "right",
-          color: missingAmount ? colors.warning : colors.text,
-        }}
-      >
-        {missingAmount ? "Beløp?" : Ore.format(line.amountOre)}
-      </Copy>
+      {!largeText && amount}
       <ExpandChevron open={expanded} />
     </Press>
   );

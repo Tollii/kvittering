@@ -2,14 +2,13 @@ import { Children, isValidElement, useState, type ReactNode } from "react";
 import {
   ActivityIndicator,
   View,
-  useWindowDimensions,
   type StyleProp,
   type ViewStyle,
 } from "react-native";
 import { type SymbolViewProps } from "expo-symbols";
 import Animated, { LayoutAnimationConfig } from "react-native-reanimated";
 import { radius, useTheme } from "@/constants/theme";
-import { Chevron, Copy, Icon, styles } from "./typography";
+import { Chevron, Copy, Icon, styles, useLargeText } from "./typography";
 import { ExpandChevron, Press, useArrival } from "./motion";
 
 export function Panel({
@@ -137,9 +136,17 @@ export function SectionTitle({
   onAction?: () => void;
 }>) {
   const colors = useTheme();
+  const largeText = useLargeText();
 
   return (
-    <View style={[styles.row, { paddingTop: 16, paddingBottom: 4 }]}>
+    <View
+      style={[
+        styles.row,
+        { paddingTop: 16, paddingBottom: 4 },
+        // At large text the action takes its own line under the heading.
+        largeText && { flexDirection: "column", alignItems: "stretch", gap: 0 },
+      ]}
+    >
       <View style={{ flex: 1, gap: 4 }}>
         <Copy accessibilityRole="header" role="sectionTitle">
           {title}
@@ -156,7 +163,12 @@ export function SectionTitle({
           accessibilityRole="button"
           accessibilityLabel={actionLabel}
           onPress={onAction}
-          style={{ minHeight: 44, justifyContent: "center", paddingLeft: 12 }}
+          style={{
+            minHeight: 44,
+            justifyContent: "center",
+            paddingLeft: largeText ? 0 : 12,
+            alignSelf: largeText ? "flex-start" : undefined,
+          }}
         >
           <Copy role="detail" weight="600" style={{ color: colors.primary }}>
             {action}
@@ -180,6 +192,7 @@ export function Disclosure({
 }>) {
   const [open, setOpen] = useState(initiallyOpen);
   const arrival = useArrival();
+  const stacked = useLargeText();
 
   return (
     <Panel style={{ gap: open ? 10 : 0 }}>
@@ -190,11 +203,16 @@ export function Disclosure({
         onPress={() => setOpen(!open)}
         style={[styles.row, { minHeight: 44 }]}
       >
-        <Copy weight="600" style={{ flex: 1 }}>
-          {title}
-        </Copy>
-        {!!value && (
-          <Copy role="detail" muted>
+        <View style={{ flex: 1, gap: 4 }}>
+          <Copy weight="600">{title}</Copy>
+          {stacked && !!value && (
+            <Copy role="detail" muted>
+              {value}
+            </Copy>
+          )}
+        </View>
+        {!stacked && !!value && (
+          <Copy role="detail" muted style={{ flexShrink: 1 }}>
             {value}
           </Copy>
         )}
@@ -364,8 +382,7 @@ export function Row({
   onPress?: () => void;
   selected?: boolean;
 }>) {
-  const { fontScale } = useWindowDimensions();
-  const stacked = fontScale > 1.3;
+  const stacked = useLargeText();
 
   return (
     <Press
