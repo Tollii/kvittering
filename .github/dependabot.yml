@@ -11,6 +11,9 @@ updates:
       day: monday
     open-pull-requests-limit: 5
     groups:
+      # The React Query packages share one query-core, so they move together.
+      tanstack-query:
+        patterns: ["@tanstack/*"]
       development:
         dependency-type: development
         update-types: [minor, patch]
