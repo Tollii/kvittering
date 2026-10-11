@@ -4,7 +4,7 @@ import { Share, View, useWindowDimensions } from "react-native";
 import * as Clipboard from "expo-clipboard";
 import { reportError } from "@/lib/observability";
 import { useState } from "react";
-import { useLargeText } from "@/components/ui";
+import { ShrinkToFit, useLargeText } from "@/components/ui";
 import type { ReceiptContextMenuProps } from "./receipt-context-menu";
 
 export function ReceiptContextMenu({
@@ -30,7 +30,11 @@ export function ReceiptContextMenu({
         <ContextMenu>
           <ContextMenu.Trigger>
             <RNHostView matchContents>
-              <View style={{ width }}>{children}</View>
+              <View style={{ width }}>
+                <ShrinkToFit.Provider value={false}>
+                  {children}
+                </ShrinkToFit.Provider>
+              </View>
             </RNHostView>
           </ContextMenu.Trigger>
           <ContextMenu.Items>

@@ -1,6 +1,7 @@
 import {
   Children,
   isValidElement,
+  useContext,
   useState,
   type ComponentProps,
   type ReactNode,
@@ -14,7 +15,14 @@ import {
 import { type SymbolViewProps } from "expo-symbols";
 import Animated, { LayoutAnimationConfig } from "react-native-reanimated";
 import { radius, useTheme } from "@/constants/theme";
-import { Chevron, Copy, Icon, styles, useLargeText } from "./typography";
+import {
+  Chevron,
+  Copy,
+  Icon,
+  ShrinkToFit,
+  styles,
+  useLargeText,
+} from "./typography";
 import { ExpandChevron, Press, useArrival } from "./motion";
 
 export function Panel({
@@ -209,6 +217,7 @@ export function TitleValue({
   gap?: number;
 }>) {
   const stacked = useLargeText();
+  const shrink = useContext(ShrinkToFit);
 
   const valueText = !!value && (
     <Copy
@@ -217,7 +226,7 @@ export function TitleValue({
       muted={muted}
       // Beside the title a value stays whole on one line and shrinks to fit.
       numberOfLines={stacked ? undefined : 1}
-      adjustsFontSizeToFit={!stacked}
+      adjustsFontSizeToFit={!stacked && shrink}
       style={[
         !stacked && { flexShrink: 1, maxWidth: "45%", textAlign: "right" },
         !!color && { color },
