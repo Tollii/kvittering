@@ -24,8 +24,8 @@ import { View } from "react-native";
 import {
   Amount,
   Button,
+  Chevron,
   Copy,
-  Icon,
   IconButton,
   Sheet,
   Empty,
@@ -360,7 +360,7 @@ function Spending({ initialMonth }: Readonly<{ initialMonth: CalendarMonth }>) {
                   minHeight: 44,
                 }}
               >
-                <Icon name="chevron.left" size={12} />
+                <Chevron direction="left" color={colors.primary} />
                 <Copy
                   role="detail"
                   weight="600"

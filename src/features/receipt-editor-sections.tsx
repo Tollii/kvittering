@@ -202,6 +202,9 @@ export function PurchaseTotals({
   );
 }
 
+/** A footer button that is as wide as its title and wraps as a whole. */
+const wholeButton = { flexGrow: 1, flexShrink: 0, flexBasis: "auto" } as const;
+
 export function ReceiptFooter({
   error,
   ready,
@@ -255,27 +258,29 @@ export function ReceiptFooter({
         </Copy>
       </View>
       {approved ? (
-        <View style={{ flexDirection: "row", gap: 8 }}>
-          <View style={{ flex: 1 }}>
-            <Button
-              title="Til kvitteringene"
-              variant="secondary"
-              onPress={() => router.dismissTo("/(tabs)/receipts")}
-            />
-          </View>
+        // Each button is as wide as its title needs. Side by side they share
+        // the spare width; when both titles cannot fit on one line, as on a
+        // phone, the primary action moves to its own line below rather than
+        // either title wrapping inside its button.
+        <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8 }}>
+          <Button
+            title="Til kvitteringene"
+            variant="secondary"
+            style={wholeButton}
+            onPress={() => router.dismissTo("/(tabs)/receipts")}
+          />
           {nextPending && (
-            <View style={{ flex: 1.4 }}>
-              <Button
-                title="Neste til kontroll"
-                icon="arrow.right"
-                onPress={() =>
-                  router.replace({
-                    pathname: "/receipt/[id]",
-                    params: { id: nextPending._id },
-                  })
-                }
-              />
-            </View>
+            <Button
+              title="Neste til kontroll"
+              icon="arrow.right"
+              style={wholeButton}
+              onPress={() =>
+                router.replace({
+                  pathname: "/receipt/[id]",
+                  params: { id: nextPending._id },
+                })
+              }
+            />
           )}
         </View>
       ) : (

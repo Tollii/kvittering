@@ -1,7 +1,7 @@
 import { CalendarDate } from "@/lib/domain/calendar";
 import { Ore } from "@/lib/domain/ore";
 import { useState } from "react";
-import { Amount, Copy, Icon, List, Row, Press } from "@/components/ui";
+import { Amount, Chevron, Copy, List, Row, Press } from "@/components/ui";
 import { useTheme } from "@/constants/theme";
 import {
   familyInsights,
@@ -40,7 +40,7 @@ export function FamilyPurchases({
             minHeight: 44,
           }}
         >
-          <Icon name="chevron.left" size={12} />
+          <Chevron direction="left" color={colors.primary} />
           <Copy role="detail" weight="600" style={{ color: colors.primary }}>
             Alle
           </Copy>
