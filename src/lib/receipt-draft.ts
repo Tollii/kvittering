@@ -71,6 +71,21 @@ export function isDraftBusy(draft: ReceiptDraft): boolean {
   );
 }
 
+/**
+ * The draft has edits, a save in flight, or a save result to report. A save in
+ * flight counts because its snapshot can arrive before the save returns.
+ */
+export function hasDraftActivity(draft: ReceiptDraft): boolean {
+  const { operation } = draft;
+
+  return (
+    draft.dirty ||
+    isSaveInFlight(operation) ||
+    operation.kind === "saved" ||
+    operation.kind === "failed"
+  );
+}
+
 export function createReceiptDraft(receipt: Receipt): ReceiptDraft {
   return {
     baseline: receipt,

@@ -9,6 +9,7 @@ import { useConvex } from "convex/react";
 import { randomUUID } from "expo-crypto";
 import { api } from "../../convex/_generated/api";
 import {
+  hasDraftActivity,
   isDraftBusy,
   type ReceiptDraft,
   type ReceiptDraftAction,
@@ -136,12 +137,10 @@ export function ReceiptEditor({
   const reviewing = receipt.status !== "reviewed" && !approved;
 
   // The footer exists for an action or an outcome, not to repeat the band's status.
-  const outcome = !!message || !!error || draft.operation.kind === "saved";
-
   const showFooter =
     !!data &&
     !processing &&
-    (dirty || receipt.status !== "reviewed" || outcome);
+    (reviewing || !!message || hasDraftActivity(draft));
 
   const saveDisabled =
     !online || processing || stale || !!Object.keys(moneyErrors).length;
@@ -471,13 +470,13 @@ export function ReceiptEditor({
                 />
               )}
             />
-            {reviewing && <PurchaseTotals data={data} totals={totals} />}
-            {reviewing && <ReceiptCategorySpending data={data} />}
             {Object.entries(moneyErrors).map(([field, value]) => (
               <Notice key={field} tone="error">
                 {value}
               </Notice>
             ))}
+            {reviewing && <PurchaseTotals data={data} totals={totals} />}
+            {reviewing && <ReceiptCategorySpending data={data} />}
             <ReceiptDetails
               receipt={receipt}
               data={data}

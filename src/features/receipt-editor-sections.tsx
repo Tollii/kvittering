@@ -152,7 +152,7 @@ export function PurchaseTotals({
   const colors = useTheme();
   const { fontScale } = useWindowDimensions();
 
-  // Components appear only when present; the line sum and paid amount always do.
+  // Components appear only when present, and the line sum and paid amount follow.
   // The next-step notice names an open difference; the paid row only marks it.
   const adjustments = [
     { label: "Rabatter", amount: totals.discounts },
@@ -169,15 +169,17 @@ export function PurchaseTotals({
   const agrees =
     adjustments.length === 0 && totals.difference === 0 && !totals.unknown;
 
+  const paid = { label: "Betalt", amount: data.totalOre, paid: true };
+
   const rows: { label: string; amount: Ore | null; paid?: boolean }[] = agrees
-    ? [{ label: "Betalt", amount: data.totalOre, paid: true }]
+    ? [paid]
     : [
-        ...[{ label: "Varer før rabatt", amount: totals.products }].filter(
-          (row) => row.amount !== 0,
-        ),
+        ...(totals.products === 0
+          ? []
+          : [{ label: "Varer før rabatt", amount: totals.products }]),
         ...adjustments,
         { label: "Sum av linjene", amount: totals.calculated },
-        { label: "Betalt", amount: data.totalOre, paid: true },
+        paid,
       ];
 
   return (
@@ -212,7 +214,8 @@ export function PurchaseTotals({
           </Copy>
           <Copy
             role="detail"
-            weight={row.paid ? "700" : "500"}
+            weight={amountWeight(row)}
+            muted={row.amount === null}
             style={
               row.paid && paidUnsettled ? { color: colors.warning } : undefined
             }
@@ -223,6 +226,13 @@ export function PurchaseTotals({
       ))}
     </Panel>
   );
+}
+
+/** The paid amount stands out; an unknown amount is said quietly. */
+function amountWeight(row: Readonly<{ amount: Ore | null; paid?: boolean }>) {
+  if (row.amount === null) return "400";
+
+  return row.paid ? "700" : "500";
 }
 
 /** A footer button that is as wide as its title and wraps as a whole. */

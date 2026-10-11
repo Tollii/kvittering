@@ -75,7 +75,7 @@ function suggestionSource({
 export function CategoryPicker({
   name,
   value,
-  suggested = false,
+  suggested,
   originalText,
   brand,
   recent,
@@ -87,7 +87,7 @@ export function CategoryPicker({
   name: string;
   value: string | null;
   /** The current category is the reader's suggestion, not a decision. */
-  suggested?: boolean;
+  suggested: boolean;
   /** The raw receipt text the suggestion was based on. */
   originalText?: string;
   brand?: string | null;
@@ -111,6 +111,8 @@ export function CategoryPicker({
   );
 
   const recentCategories = mostUsedCategories(recent, currentId);
+
+  const source = suggestionSource({ name, originalText, brand });
 
   const choose = (id: CategoryId) => {
     onSelect(id);
@@ -149,9 +151,9 @@ export function CategoryPicker({
           <Copy weight="600" numberOfLines={2}>
             {name}
           </Copy>
-          {!!suggestionSource({ name, originalText, brand }) && (
+          {!!source && (
             <Copy role="caption" muted numberOfLines={2}>
-              {suggestionSource({ name, originalText, brand })}
+              {source}
             </Copy>
           )}
           <Field

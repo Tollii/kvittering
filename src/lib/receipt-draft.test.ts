@@ -1,6 +1,10 @@
 import { receiptFixture } from "./testing/receipts";
 import { describe, expect, it } from "vitest";
-import { createReceiptDraft, reduceReceiptDraft } from "./receipt-draft";
+import {
+  createReceiptDraft,
+  hasDraftActivity,
+  reduceReceiptDraft,
+} from "./receipt-draft";
 
 const receipt = receiptFixture({
   revision: 1,
@@ -52,6 +56,8 @@ describe("receipt draft", () => {
       const saved = { type: "saved", revision: 2, approved: true } as const;
       state = reduceReceiptDraft(state, queryFirst ? remote : saved);
       expect(state.baseline.revision).toBe(1);
+      // A reviewed snapshot may land first; the save is still reported.
+      expect(hasDraftActivity(state)).toBe(true);
       state = reduceReceiptDraft(state, queryFirst ? saved : remote);
       expect(state.baseline.revision).toBe(2);
       expect(state.dirty).toBe(false);

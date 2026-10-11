@@ -7,7 +7,7 @@ Every string the app writes is Norwegian Bokmål; system controls, such as the S
 - **Plain and short.** "Uten nett", "Ingen treff", "Prøv igjen". Prefer one clear sentence to an explanation.
 - **Calm about errors.** Say what failed and what still holds: "Importen er ikke fullført. Filene venter på nytt forsøk." Do not blame the person or apologise.
 - **Honest about uncertainty.** Reports describe household purchases, not consumption, and unknown values stay unknown: "Ukjent", "Dato ukjent", "Summene er foreløpige." Never show a guessed value as fact. The reader's statistics, such as confidence scores and model names, are not copy: a suggestion shows its tone and a verb, "Bekreft", and never a percentage.
-- **No pressure.** Optional work stays out of the way: product linking appears only in the all-lines view, never as a task.
+- **No pressure.** Optional work is called optional and never shown as a task.
 
 ## Address
 
@@ -15,7 +15,7 @@ Use **du** for the person using the app: "Alle kvitteringene dine er behandlet",
 
 ## Mechanics
 
-- **Sentence case** everywhere, including buttons, tab names, and titles. The one all-caps string is the eyebrow "DAGLIGVARER" on the Forbruk hero.
+- **Sentence case** everywhere, including buttons, tab names, and titles.
 - **Full stops** end sentences in messages, notices, hints, and alert bodies. Titles, buttons, labels, chips, and status lines have none.
 - **Ellipsis** is the single character "…" after a space, for work in progress: "Henter …", "Lagrer …", "Sletter kvittering …".
 - **Middle dot** " · " separates facts on one line: "23. sep. 2026 · Oslo", "3 kvitteringer · 412,40 kr".
