@@ -16,7 +16,7 @@ import { router } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { ArchMark } from "../monument-artwork";
 import { useTheme } from "@/constants/theme";
-import { Copy, Icon, styles } from "./typography";
+import { Copy, Icon, styles, useLargeText } from "./typography";
 import { Press } from "./motion";
 import { IconButton } from "./controls";
 import { SheetPresentation } from "./sheet-presentation";
@@ -108,6 +108,9 @@ export function Screen({
 }>) {
   const colors = useTheme();
   const insets = useSafeAreaInsets();
+  // At large text a pinned footer would cover most of the screen, so it
+  // scrolls in after the content instead.
+  const inlineFooter = useLargeText() && scrollable && !!footer;
 
   const header = !!title && (
     <View
@@ -159,13 +162,16 @@ export function Screen({
         style={{
           paddingHorizontal: 20,
           paddingTop: title || summary ? 12 : 16,
-          paddingBottom: footer ? 16 : 32,
+          paddingBottom: footer && !inlineFooter ? 16 : 32,
           gap: 16,
           flexGrow: 1,
           flex: scrollable ? undefined : 1,
         }}
       >
         {children}
+        {inlineFooter && (
+          <View style={{ gap: 8, paddingTop: 8 }}>{footer}</View>
+        )}
       </View>
     </View>
   );
@@ -196,7 +202,7 @@ export function Screen({
         ) : (
           content
         )}
-        {!!footer && (
+        {!!footer && !inlineFooter && (
           <View
             style={{
               paddingHorizontal: 16,
@@ -240,6 +246,8 @@ export function Sheet({
 
   const closing = !visible && held !== null;
   const { title, header, footer, children } = closing ? held : content;
+  // As on a screen, a footer scrolls with the content at large text.
+  const inlineFooter = useLargeText() && scrollable && !!footer;
 
   return (
     <SheetPresentation
@@ -296,11 +304,12 @@ export function Sheet({
               }}
             >
               {children}
+              {inlineFooter && <View style={{ gap: 8 }}>{footer}</View>}
             </ScrollView>
           ) : (
             children
           )}
-          {!!footer && (
+          {!!footer && !inlineFooter && (
             <View
               style={{
                 paddingHorizontal: 16,
