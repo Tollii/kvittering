@@ -55,6 +55,9 @@ updates:
         update-types: [version-update:semver-major]
       - dependency-name: "babel-jest"
         update-types: [version-update:semver-major]
+      # oxlint loads eslint-plugin-import, whose peer range caps the ESLint major.
+      - dependency-name: "eslint"
+        update-types: [version-update:semver-major]
       # typescript-eslint caps the TypeScript versions it supports.
       - dependency-name: "typescript"
         update-types: [version-update:semver-major]
