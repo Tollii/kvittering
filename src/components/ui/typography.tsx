@@ -8,6 +8,7 @@ import {
   type TextStyle,
   type ViewStyle,
 } from "react-native";
+import { createContext, useContext } from "react";
 import { type SymbolViewProps } from "expo-symbols";
 import { SymbolView } from "./symbol";
 import {
@@ -27,6 +28,14 @@ import {
 export function useLargeText(): boolean {
   return useWindowDimensions().fontScale > largeTextScale;
 }
+
+/**
+ * Whether a one-line value may shrink to fit. The receipt row's native context
+ * menu provides `false`: inside its SwiftUI host React Native lays shrinking
+ * text out at its smallest size, about 4 points. `TitleValue` and `Amount`
+ * read it; any other text that shrinks inside such a host must read it too.
+ */
+export const ShrinkToFit = createContext(true);
 
 /**
  * `role` names the type role; accessibility semantics go through
@@ -94,13 +103,14 @@ export function Amount({
   ...props
 }: Omit<TypeProps, "role" | "weight"> & { hero?: boolean; detail?: string }) {
   const colors = useTheme();
+  const shrink = useContext(ShrinkToFit);
 
   const amount = (
     <Type
       selectable
       // A number never breaks across lines; a long one shrinks to fit.
       numberOfLines={1}
-      adjustsFontSizeToFit
+      adjustsFontSizeToFit={shrink}
       minimumFontScale={0.5}
       role={hero ? "heroAmount" : "amount"}
       style={[hero && { color: colors.onHero }, style]}
