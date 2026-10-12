@@ -52,7 +52,7 @@ import {
   type SpendingGroup,
 } from "@/lib/domain/insights";
 import { isDiscountLine } from "@/lib/domain/receipt";
-import { categoryOf } from "@/lib/domain/categories";
+import { categoryGroups, categoryOf } from "@/lib/domain/categories";
 import { receiptNeeds } from "@/components/receipt-card";
 import { useTheme } from "@/constants/theme";
 import { budgetPace, paceLabel } from "@/lib/domain/budget";
@@ -377,7 +377,7 @@ function Spending({ initialMonth }: Readonly<{ initialMonth: CalendarMonth }>) {
             />
             {!!group && (
               <AllCategoriesLink
-                group={categoryOf(rows[0]?.id).groupName}
+                group={groupNames.get(group) ?? ""}
                 onPress={() => setGroup(null)}
               />
             )}
@@ -400,7 +400,7 @@ function Spending({ initialMonth }: Readonly<{ initialMonth: CalendarMonth }>) {
               />
             )}
             {!rows.length && (
-              <Empty title="Ingen kjøp denne måneden" icon="cart" />
+              <Empty title={emptyBreakdownTitle(group)} icon="cart" />
             )}
           </View>
           <View style={{ gap: 4 }}>
@@ -455,6 +455,9 @@ function Spending({ initialMonth }: Readonly<{ initialMonth: CalendarMonth }>) {
 
 type Breakdown = "category" | "store" | "type";
 
+// The trend can open a month in a group that month has no purchases in.
+const groupNames = new Map<string, string>(categoryGroups);
+
 /** The store breakdown opens the full store list from its heading; the others have no action. */
 function storesAction(breakdown: Breakdown, onAction: () => void) {
   return breakdown === "store" ? { action: "Alle butikker", onAction } : {};
@@ -481,6 +484,13 @@ function breakdownRows(
       categoryOf(category.id).group === group ||
       (group === "fallback" && category.id === "unallocated"),
   );
+}
+
+/** A chosen group can be empty in a month the trend opened. */
+function emptyBreakdownTitle(group: string | null) {
+  return group
+    ? "Ingen kjøp i kategorien denne måneden"
+    : "Ingen kjøp denne måneden";
 }
 
 /** The detail dimension of a row in the selected breakdown. */
