@@ -81,6 +81,8 @@ Kvitteringer searches from the native search bar and switches between receipts a
 
 Settings is a modal grouped native form ([settings](../../src/app/settings.tsx)), one section per area.
 
+Konto ends with "Slett kontoen", a `danger` button under "Logg ut". Its alert says what goes and what stays: alone, the household and every receipt; with a partner, only the account, while the receipts stay with them. An account linked to Apple is confirmed with Apple after the alert, before anything is deleted.
+
 ## Screen catalogue
 
 Screenshots from the iOS Simulator, taken on 10 October 2026. The first rows use the `reviewed-receipts` fixture from PR #102 at `cfab623`; the rows from "Kvitteringer, to review" on use the `needs-review` fixture at `d40dbc9`. The Kvitteringer rows and the approved receipt come from the web build (`npm run visual:start`) with the `needs-review` fixture at `d6ef758`, until simulator shots replace them; the web tab bar is a stand-in for the native one. Treat the code as current when they differ. The simulator has no camera, so Kamera shows an empty viewfinder and the capture review was reached by importing from Bilder; the upload card shows the retry state because the simulator's upload fails.
