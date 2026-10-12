@@ -44,15 +44,18 @@ export function useCompleteReceipts(
   const [select] = useState(createReceiptSelector);
   const selected = select(cache.receipts, scope);
 
+  // `knownReceipts` holds every receipt, though the cache may be a change behind the server.
   return cache.available
     ? {
         receipts: selected,
         completeReceipts: cache.synchronized,
+        knownReceipts: cache.complete,
         loadingReceipts: !cache.complete,
       }
     : {
         receipts: page.results,
         completeReceipts: active && status === "Exhausted",
+        knownReceipts: active && status === "Exhausted",
         loadingReceipts: active && status !== "Exhausted",
       };
 }
@@ -97,8 +100,9 @@ export function useReceiptHistory(search: string, enabled: boolean) {
     return {
       ...page,
       results,
-      /** Every receipt the history lists, once all of it is known. */
       total: page.status === "Exhausted" ? results.length : undefined,
+      // Server pages end at a row count, so the last month shown may be partial.
+      partialMonths: page.status !== "Exhausted",
     };
   }
 
@@ -116,6 +120,7 @@ export function useReceiptHistory(search: string, enabled: boolean) {
       setLimit((value) => Math.max(value, results.length) + count),
     isLoading: !cache.complete,
     total: cache.complete ? selected.length : undefined,
+    partialMonths: false,
   };
 }
 

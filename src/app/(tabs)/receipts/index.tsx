@@ -43,6 +43,7 @@ import {
   usePendingReceipts,
 } from "@/features/pending-receipts";
 import type { ReceiptListItem } from "@/lib/domain/receipt-summary";
+import { receiptMonth } from "@/lib/receipt-selection";
 
 export default function Receipts() {
   const [search, setSearch] = useState("");
@@ -72,10 +73,11 @@ export default function Receipts() {
   const history = useReceiptHistory(term, tab === "receipts");
   const pending = usePendingReceipts(tab === "receipts");
 
-  const { receipts, completeReceipts: completeProducts } = useCompleteReceipts(
-    { kind: "allProducts" },
-    tab === "products",
-  );
+  const {
+    receipts,
+    completeReceipts: completeProducts,
+    knownReceipts: knownProducts,
+  } = useCompleteReceipts({ kind: "allProducts" }, tab === "products");
 
   const allProducts = productHistory(receipts);
 
@@ -85,12 +87,13 @@ export default function Receipts() {
       .includes(search.trim().toLocaleLowerCase("nb-NO")),
   );
 
-  // Without a search the view also lists the pinned receipts. A count shows only once every receipt is known.
+  // A search hides the pinned sections. A count shows only once every receipt is known.
+  const showPinned = !term;
+
   const receiptCount =
-    history.total === undefined || (!term && pending.loading)
+    history.total === undefined || (showPinned && pending.loading)
       ? undefined
-      : history.total +
-        (term ? 0 : pending.attention.length + pending.working.length);
+      : history.total + (showPinned ? pending.count : 0);
 
   return (
     <Screen
@@ -135,14 +138,18 @@ export default function Receipts() {
             value: "products",
             label: counted(
               "Varer",
-              completeProducts ? products.length : undefined,
+              knownProducts ? products.length : undefined,
             ),
           },
         ]}
       />
       <OfflineNotice />
       {tab === "receipts" ? (
-        <ReceiptsView history={history} pending={pending} searching={!!term} />
+        <ReceiptsView
+          history={history}
+          pending={pending}
+          searching={!showPinned}
+        />
       ) : (
         <ProductsView
           allProducts={allProducts}
@@ -176,12 +183,9 @@ function ReceiptsView({
       {searching && history.status !== "Exhausted" && (
         <Notice>Henter hele resultatet …</Notice>
       )}
-      {/* Without the local copy, the last month shown may still miss receipts that are not fetched yet. */}
-      {!searching &&
-        history.status === "CanLoadMore" &&
-        history.total === undefined && (
-          <Notice>Viser innlastede kvitteringer.</Notice>
-        )}
+      {!searching && !loading && history.partialMonths && (
+        <Notice>Viser innlastede kvitteringer.</Notice>
+      )}
       {!searching && <PendingReceipts {...pending} />}
       {loading ? <Loading /> : <ReceiptMonths receipts={history.results} />}
       {empty && searching && (
@@ -342,9 +346,7 @@ function ReceiptMonths({
   const months = new Map<CalendarMonth | "unknown", typeof sorted>();
 
   for (const receipt of sorted) {
-    const key = receipt.purchaseDate
-      ? CalendarDate.month(receipt.purchaseDate)
-      : "unknown";
+    const key = receiptMonth(receipt);
 
     months.set(key, [...(months.get(key) ?? []), receipt]);
   }

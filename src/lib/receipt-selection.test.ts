@@ -1,10 +1,13 @@
 import { expect, it } from "vitest";
 import {
   createReceiptSelector,
+  historyPage,
+  isPinned,
   listedInHistory,
-  selectReceiptHistory,
 } from "./receipt-selection";
 import { receiptFixture, testId } from "./testing/receipts";
+import { date } from "./testing/calendar";
+import { receiptListItem } from "./domain/receipt-summary";
 
 it("reuses equivalent scopes and updates selections when their values or receipts change", () => {
   const select = createReceiptSelector();
@@ -29,33 +32,80 @@ it("reuses equivalent scopes and updates selections when their values or receipt
 });
 
 it("lists each receipt once: pinned receipts stay out of the months unless a search hides the pinned sections", () => {
-  const receipt = (
-    id: string,
-    status: "processing" | "needs_review" | "failed" | "reviewed",
-    excluded = false,
-  ) => receiptFixture({ _id: testId<"receipts">(id), status, excluded });
+  const statuses = [
+    "uploading",
+    "uploaded",
+    "processing",
+    "needs_review",
+    "failed",
+    "reviewed",
+  ] as const;
 
-  const receipts = [
-    receipt("reading", "processing"),
-    receipt("excluded", "processing", true),
-    receipt("review", "needs_review"),
-    receipt("failed", "failed"),
-    receipt("reviewed", "reviewed"),
-  ];
+  const receipts = statuses.flatMap((status) =>
+    [false, true].map((excluded) =>
+      receiptFixture({
+        _id: testId<"receipts">(`${status}-${excluded}`),
+        status,
+        excluded,
+      }),
+    ),
+  );
 
-  const listed = (search: string) =>
-    selectReceiptHistory(receipts, search).map((item) => item._id);
+  for (const receipt of receipts)
+    expect(listedInHistory(receipt, "")).toBe(!isPinned(receipt));
 
-  expect(listed("")).toEqual([testId("excluded"), testId("reviewed")]);
-  expect(listed("  ")).toEqual([testId("excluded"), testId("reviewed")]);
+  // Any search term hides the pinned sections; matching the text is selectReceiptHistory's job.
+  const anySearch = "x";
+
   expect(
-    receipts.flatMap((item) =>
-      listedInHistory(item, "kiwi") ? [item._id] : [],
+    receipts.flatMap((receipt) =>
+      listedInHistory(receipt, anySearch) ? [receipt._id] : [],
     ),
   ).toEqual([
-    testId("excluded"),
-    testId("review"),
-    testId("failed"),
-    testId("reviewed"),
+    testId("uploading-true"),
+    testId("uploaded-true"),
+    testId("processing-true"),
+    testId("needs_review-false"),
+    testId("needs_review-true"),
+    testId("failed-false"),
+    testId("failed-true"),
+    testId("reviewed-false"),
+    testId("reviewed-true"),
   ]);
+  expect(
+    receipts.flatMap((receipt) => (isPinned(receipt) ? [receipt._id] : [])),
+  ).toEqual([
+    testId("uploading-false"),
+    testId("uploaded-false"),
+    testId("processing-false"),
+    testId("needs_review-false"),
+    testId("failed-false"),
+  ]);
+});
+
+it("pages history by whole months, keeping the undated tail together", () => {
+  const item = (id: string, day: string | null) => ({
+    ...receiptListItem(receiptFixture({ _id: testId<"receipts">(id) })),
+    purchaseDate: day === null ? null : date(day),
+  });
+
+  const history = [
+    item("september", "2026-09-02"),
+    item("august-late", "2026-08-20"),
+    item("august-early", "2026-08-01"),
+    item("undated-first", null),
+    item("undated-second", null),
+  ];
+
+  const page = (limit: number) =>
+    historyPage(history, limit).map((receipt) => receipt._id);
+
+  expect(page(1)).toEqual([testId("september")]);
+  expect(page(2)).toEqual([
+    testId("september"),
+    testId("august-late"),
+    testId("august-early"),
+  ]);
+  expect(page(4)).toHaveLength(5);
+  expect(page(10)).toHaveLength(5);
 });
