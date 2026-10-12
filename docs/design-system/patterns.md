@@ -79,7 +79,7 @@ Kvitteringer searches from the native search bar and switches between receipts a
 
 ### Household settings
 
-Settings is a modal grouped native form ([settings](../../src/app/settings.tsx)), one section per area.
+Settings is a modal grouped native form ([settings](../../src/app/settings.tsx)), one section per area. Eksport opens a sheet ([export settings](../../src/features/export-settings.tsx)) with the periods as `Row`s in a `List`, the chosen one checked, and a footer with the receipt and line count over "Del CSV-fil", which opens the share sheet with the file.
 
 ## Screen catalogue
 

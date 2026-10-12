@@ -9,7 +9,8 @@ export function shareTextFile(name: string, contents: string) {
   link.href = url;
   link.download = name;
   link.click();
-  URL.revokeObjectURL(url);
+  // Revoking in the same task can cancel the download in some browsers.
+  setTimeout(() => URL.revokeObjectURL(url), 0);
 
   return Promise.resolve();
 }

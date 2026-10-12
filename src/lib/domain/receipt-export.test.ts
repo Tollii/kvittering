@@ -65,7 +65,7 @@ it("writes one row per counted line with unknown values left empty", () => {
   ]);
 });
 
-it("exports read receipts that count as spending, oldest first and undated before dated", () => {
+it("exports the receipts Forbruk counts, oldest first and undated before dated", () => {
   const product = [line("a", { name: "Vare", amountOre: Ore.of(100) })];
 
   const receipts = [
@@ -89,20 +89,26 @@ it("exports read receipts that count as spending, oldest first and undated befor
     }),
     receiptFixture({
       _id: "rereading",
+      _creationTime: 1,
       status: "processing",
-      data: data({ lines: product }),
+      data: data({ purchaseDate: date("2026-10-01"), lines: product }),
     }),
     receiptFixture({ _id: "failed", status: "failed" }),
   ];
 
   const result = receiptExport(receipts);
 
-  expect(result.receipts).toBe(3);
+  expect(result.receipts).toBe(4);
   expect(
     rows(exportCsv(result))
       .slice(1, -1)
-      .map((row) => row.split(";").at(-1)),
-  ).toEqual(["undated", "early", "late"]);
+      .map((row) => row.split(";").slice(-2).reverse().join(";")),
+  ).toEqual([
+    "undated;Kontrollert",
+    "rereading;Leses på nytt",
+    "early;Kontrollert",
+    "late;Kontrollert",
+  ]);
 });
 
 it("keeps names with separators, quotes and formula characters as plain text", () => {
@@ -121,4 +127,47 @@ it("keeps names with separators, quotes and formula characters as plain text", (
     `2026-10-03;"Bakeriet ""Brød; og sånn""";'=HYPERLINK(1);Vare;Ukjent vare;Uavklart;;;-2,50;NOK;Kontrollert;r1`,
     `2026-10-03;"Bakeriet ""Brød; og sånn""";"'-50 % rabatt\npå alt";Vare;Ukjent vare;Uavklart;;;1,00;NOK;Kontrollert;r1`,
   ]);
+});
+
+it("gives each line its own amount, so a receipt's rows add up to the paid total", () => {
+  const receipt = receiptFixture({
+    data: data({
+      totalOre: Ore.of(10_150),
+      lines: [
+        line("beer", { name: "Øl", amountOre: Ore.of(9000) }),
+        line("deposit", {
+          kind: "deposit",
+          name: "Pant",
+          amountOre: Ore.of(300),
+        }),
+        line("return", {
+          kind: "deposit_return",
+          name: "Pantretur",
+          amountOre: Ore.of(-200),
+        }),
+        line("member", {
+          kind: "receipt_discount",
+          name: "Medlemsrabatt",
+          amountOre: Ore.of(-450),
+        }),
+        line("fee", {
+          kind: "adjustment",
+          name: "Pose",
+          amountOre: Ore.of(1500),
+        }),
+        line("sum", {
+          kind: "summary",
+          name: "Totalt",
+          amountOre: Ore.of(10_150),
+        }),
+      ],
+    }),
+  });
+
+  const amounts = rows(exportCsv(receiptExport([receipt])))
+    .slice(1, -1)
+    .map((row) => Number(row.split(";")[8]?.replace(",", ".")));
+
+  expect(amounts).toEqual([90, 3, -2, -4.5, 15]);
+  expect(amounts.reduce((sum, amount) => sum + amount, 0)).toBe(101.5);
 });

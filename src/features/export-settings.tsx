@@ -15,65 +15,68 @@ import { exportCsv, receiptExport } from "@/lib/domain/receipt-export";
 import { plural } from "@/lib/domain/receipt-review";
 import { failureMessage } from "@/lib/failure-message";
 import { shareTextFile } from "@/lib/share-file";
-import { useHousehold } from "./household-context";
+import { OfflineNotice } from "./offline-notice";
 import { useCompleteReceipts } from "./receipt-queries";
 
-const periodOrder = [
-  "month",
-  "previous-month",
-  "year",
-  "previous-year",
-  "all",
-] as const;
-
-type PeriodId = (typeof periodOrder)[number];
-
 type ExportPeriod = Readonly<{
+  id: string;
   title: string;
   detail: string;
   scope: FunctionArgs<typeof api.receipts.readPage>["scope"];
   file: string;
 }>;
 
-function exportPeriods(today: CalendarDate): Record<PeriodId, ExportPeriod> {
+function exportPeriods(
+  today: CalendarDate,
+): readonly [ExportPeriod, ...ExportPeriod[]] {
   const month = CalendarDate.month(today);
-  const previous = CalendarMonth.before(month);
   const year = CalendarDate.year(today);
 
-  const monthPeriod = (title: string, value: CalendarMonth) => ({
+  const monthPeriod = (
+    id: string,
+    title: string,
+    value: CalendarMonth,
+  ): ExportPeriod => ({
+    id,
     title,
     detail: CalendarMonth.title(value),
     scope: {
-      kind: "period" as const,
+      kind: "period",
       start: CalendarMonth.first(value),
       end: CalendarMonth.last(value),
     },
     file: `Kvitto ${CalendarMonth.title(value)}.csv`,
   });
 
-  const yearPeriod = (title: string, value: number) => ({
+  const yearPeriod = (
+    id: string,
+    title: string,
+    value: number,
+  ): ExportPeriod => ({
+    id,
     title,
     detail: String(value),
     scope: {
-      kind: "period" as const,
+      kind: "period",
       start: CalendarDate.of(value, 1, 1),
       end: CalendarDate.of(value, 12, 31),
     },
     file: `Kvitto ${value}.csv`,
   });
 
-  return {
-    month: monthPeriod("Denne måneden", month),
-    "previous-month": monthPeriod("Forrige måned", previous),
-    year: yearPeriod("I år", year),
-    "previous-year": yearPeriod("I fjor", year - 1),
-    all: {
+  return [
+    monthPeriod("month", "Denne måneden", month),
+    monthPeriod("previous-month", "Forrige måned", CalendarMonth.before(month)),
+    yearPeriod("year", "I år", year),
+    yearPeriod("previous-year", "I fjor", year - 1),
+    {
+      id: "all",
       title: "Alle kjøp",
       detail: "Også kvitteringer uten dato",
       scope: { kind: "allProducts" },
       file: "Kvitto alle kjøp.csv",
     },
-  };
+  ];
 }
 
 /** A settings row that opens the spreadsheet export. */
@@ -97,13 +100,13 @@ function ExportSheet({
   visible,
   onClose,
 }: Readonly<{ visible: boolean; onClose: () => void }>) {
-  const { online } = useHousehold();
   const periods = exportPeriods(CalendarDate.today());
-  const [selected, setSelected] = useState<PeriodId>("month");
+  const [selected, setSelected] = useState(periods[0].id);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
 
-  const period = periods[selected];
+  const period =
+    periods.find((candidate) => candidate.id === selected) ?? periods[0];
 
   // Reports need every receipt in their scope; so does a file someone will sum.
   const { receipts, completeReceipts } = useCompleteReceipts(
@@ -111,8 +114,11 @@ function ExportSheet({
     visible,
   );
 
-  const prepared = useMemo(() => receiptExport(receipts), [receipts]);
-  const result = completeReceipts ? prepared : null;
+  // The sheet stays mounted while closed, so it builds rows only while open.
+  const result = useMemo(
+    () => (visible && completeReceipts ? receiptExport(receipts) : null),
+    [visible, completeReceipts, receipts],
+  );
 
   async function share() {
     if (!result) return;
@@ -132,15 +138,16 @@ function ExportSheet({
     ? result.receipts
       ? `${plural(result.receipts, "kvittering", "kvitteringer")} · ${plural(result.rows.length, "linje", "linjer")}`
       : "Ingen kvitteringer i perioden"
-    : online
-      ? "Henter kvitteringer …"
-      : "Koble til nettet for å hente kvitteringene.";
+    : "Henter kvitteringer …";
 
   return (
     <Sheet
       title="Eksporter til regneark"
       visible={visible}
-      onClose={onClose}
+      onClose={() => {
+        setError("");
+        onClose();
+      }}
       footer={
         <>
           {!!error && <Notice tone="error">{error}</Notice>}
@@ -157,19 +164,23 @@ function ExportSheet({
         </>
       }
     >
+      <OfflineNotice />
       <Copy>
-        Én rad per linje på kvitteringene, med dato, butikk, vare, kategori og
-        beløp. Utelatte kvitteringer er ikke med.
+        Én rad per linje på kvitteringene, med dato, butikk, vare, kategori,
+        beløp og valuta. Utelatte kvitteringer er ikke med.
       </Copy>
       <SectionTitle title="Periode" />
       <List>
-        {periodOrder.map((id) => (
+        {periods.map((candidate) => (
           <Row
-            key={id}
-            title={periods[id].title}
-            detail={periods[id].detail}
-            selected={id === selected}
-            onPress={() => setSelected(id)}
+            key={candidate.id}
+            title={candidate.title}
+            detail={candidate.detail}
+            selected={candidate.id === period.id}
+            onPress={() => {
+              setSelected(candidate.id);
+              setError("");
+            }}
           />
         ))}
       </List>

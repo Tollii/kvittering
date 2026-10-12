@@ -2,12 +2,9 @@ import { CalendarDate } from "./calendar";
 import { categoryOf } from "./categories";
 import type { Receipt } from "./insights";
 import { Ore } from "./ore";
+import { includedReceipt, overviewPurchasePolicy } from "./purchase-projection";
 import { isTotalsLine, lineLabels, type ReceiptLine } from "./receipt";
-import {
-  extractedReceipt,
-  hasReceiptBeenRead,
-  type ExtractedReceipt,
-} from "./receipt-state";
+import { isReceiptProcessing, type ExtractedReceipt } from "./receipt-state";
 
 const header = [
   "Dato",
@@ -31,7 +28,10 @@ const text = (value: string | null | undefined): Cell => ({
   kind: "text",
 });
 
-const number = (value: string): Cell => ({ text: value, kind: "number" });
+const numeric = (value: string): Cell => ({ text: value, kind: "number" });
+
+/** The purchases Forbruk counts, in every currency, since each row names its own. */
+const exportPolicy = { ...overviewPurchasePolicy, currency: "all" } as const;
 
 export type ReceiptExport = Readonly<{
   receipts: number;
@@ -39,19 +39,16 @@ export type ReceiptExport = Readonly<{
 }>;
 
 /**
- * One row per printed line of every read receipt that counts as spending,
- * oldest first. Totals and VAT lines restate the receipt and are left out, so
+ * One row per printed line of every receipt that Forbruk counts, oldest first. Totals and VAT lines restate the receipt and are left out, so
  * the amounts of a receipt's rows add up to what its lines say was paid.
  * Unknown values stay empty rather than becoming zero.
  */
 export function receiptExport(receipts: readonly Receipt[]): ReceiptExport {
   const included = receipts
     .flatMap((row) => {
-      const receipt = extractedReceipt(row);
+      const receipt = includedReceipt(row, exportPolicy);
 
-      return receipt && !receipt.excluded && hasReceiptBeenRead(receipt.status)
-        ? [receipt]
-        : [];
+      return receipt ? [receipt] : [];
     })
     .sort(
       (left, right) =>
@@ -80,16 +77,25 @@ function lineRow(receipt: ExtractedReceipt, line: ReceiptLine): Cell[] {
     text(lineLabels[line.kind]),
     text(category?.name),
     text(category?.groupName),
-    number(line.quantity === null ? "" : decimal(line.quantity)),
+    numeric(decimal(line.quantity)),
     text(line.unit),
-    number(Ore.formatInput(line.amountOre)),
+    numeric(Ore.formatInput(line.amountOre)),
     text(data.currency),
-    text(receipt.status === "reviewed" ? "Kontrollert" : "Til kontroll"),
+    text(receiptStatus(receipt)),
     text(receipt._id),
   ];
 }
 
-const decimal = (value: number) => String(value).replace(".", ",");
+/** A receipt with data that is processing is being read again. */
+function receiptStatus({ status }: ExtractedReceipt) {
+  if (status === "reviewed") return "Kontrollert";
+
+  return isReceiptProcessing(status) ? "Leses på nytt" : "Til kontroll";
+}
+
+/** "0,5" for a quantity; empty when it is not known, as `Ore.formatInput` does for amounts. */
+const decimal = (value: number | null) =>
+  value === null ? "" : String(value).replace(".", ",");
 
 /**
  * Semicolons and decimal commas, as Norwegian Excel expects; a byte order mark
