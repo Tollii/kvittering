@@ -3,6 +3,7 @@ import {
   Children,
   isValidElement,
   useId,
+  useRef,
   useState,
   type ReactNode,
 } from "react";
@@ -20,6 +21,7 @@ import { type SymbolViewProps } from "expo-symbols";
 import { radius, useTheme } from "@/constants/theme";
 import { Chevron, Copy, Icon, faded, styles, useLargeText } from "./typography";
 import { Press } from "./motion";
+import { useFocusedField } from "./field-scroll";
 
 export function IconButton({
   name,
@@ -249,6 +251,8 @@ export function Field({
   const colors = useTheme();
   const [focused, setFocused] = useState(false);
   const accessoryId = useId();
+  const input = useRef<TextInput>(null);
+  const scroll = useFocusedField();
 
   return (
     <View style={{ gap: 6 }}>
@@ -261,12 +265,17 @@ export function Field({
         placeholderTextColor={colors.secondary}
         selectionColor={colors.primary}
         {...props}
+        ref={input}
         onFocus={(event) => {
           setFocused(true);
+
+          if (input.current) scroll?.focus(input.current);
           onFocus?.(event);
         }}
         onBlur={(event) => {
           setFocused(false);
+
+          if (input.current) scroll?.blur(input.current);
           onBlur?.(event);
         }}
         style={[

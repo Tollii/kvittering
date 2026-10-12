@@ -4,7 +4,10 @@ const fs = require("node:fs");
 
 const path = require("node:path");
 
-/** Copy a Swift source from native/ios into the generated iOS project. */
+/**
+ * Copy a Swift source from native/ios into the generated iOS project.
+ * fingerprint.config.js hashes the same directory; keep the two in step.
+ */
 const copyNativeSource = (modRequest, name, destination) => {
   fs.copyFileSync(
     path.join(modRequest.projectRoot, `native/ios/${name}`),

@@ -47,7 +47,7 @@ States: `disabled` fades the button; `busy` shows a spinner in place of the icon
 
 ## Inputs
 
-**`Field`** is a labelled text input. The label sits above in secondary text; the border turns `primary` on focus; `hint` adds a caption below. On iOS it adds a keyboard toolbar with "Ferdig". Use the label as the accessibility label, and keep placeholders for examples, not instructions.
+**`Field`** is a labelled text input. The label sits above in secondary text; the border turns `primary` on focus; `hint` adds a caption below. On iOS it adds a keyboard toolbar with "Ferdig". Inside a `Screen` or `Sheet` that scrolls, the focused field scrolls above the keyboard and that toolbar. Use the label as the accessibility label, and keep placeholders for examples, not instructions.
 
 **`MoneyField`** ([money field](../../src/components/money-field.tsx)) is a `Field` for kroner. It keeps the typed text, parses it with a comma decimal, and reports a Norwegian error message instead of changing the amount when the text is invalid.
 
@@ -91,7 +91,7 @@ States: `disabled` fades the button; `busy` shows a spinner in place of the icon
 
 - `title` and `subtitle` draw the cobalt hero header with the arch mark; `settings` adds `SettingsButton`.
 - `summary` takes a `SummaryBand`, which sits under the header edge to edge.
-- `footer` pins an action bar to the bottom, above the home indicator, on `surface` with a hairline top border. At large text it scrolls in after the content instead, so it never covers most of the screen. While the keyboard is up, a scrolling screen leaves its footer behind the keyboard and scrolls the focused field above the keyboard and its "Ferdig" bar; `Sheet` does the same.
+- `footer` pins an action bar to the bottom, above the home indicator, on `surface` with a hairline top border. At large text it scrolls in after the content instead, so it never covers most of the screen.
 
 Pass `insetTop={false}` when a native stack header already covers the top inset.
 

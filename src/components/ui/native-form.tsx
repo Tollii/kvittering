@@ -2,7 +2,6 @@ import type { ReactNode } from "react";
 import { ScrollView, View } from "react-native";
 import { Copy } from "./typography";
 import { Panel } from "./surfaces";
-import { keyboardScrolling } from "./layout";
 
 export type NativeFormProps = Readonly<{ children: ReactNode }>;
 
@@ -10,7 +9,11 @@ export type FormSectionProps = Readonly<{ title: string; children: ReactNode }>;
 
 export function NativeForm({ children }: NativeFormProps) {
   return (
-    <ScrollView {...keyboardScrolling} contentContainerStyle={{ gap: 16 }}>
+    <ScrollView
+      keyboardDismissMode="interactive"
+      keyboardShouldPersistTaps="handled"
+      contentContainerStyle={{ gap: 16 }}
+    >
       {children}
     </ScrollView>
   );

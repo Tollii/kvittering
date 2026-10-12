@@ -1,10 +1,10 @@
 /**
- * Links the installed app or the system may still open after an update.
- * Build 18 and earlier opened `(tabs)/inbox` from the Live Activity and the
- * "Åpne innboks" shortcut; Innboks and Historikk are now the Kvitteringer tab.
+ * Build 18 and earlier opened `kvitto:///(tabs)/inbox` from the Live Activity
+ * and the "Åpne innboks" shortcut. Innboks is now the pinned section of the
+ * Kvitteringer tab. The match also accepts the path without the `(tabs)`
+ * group, a trailing slash or a query, which reach the same route.
  */
-const retiredTab =
-  /^\/(?:\(tabs\)\/)?(inbox|history)(?:\/index)?\/?(?:[?#].*)?$/;
+const retiredInbox = /^\/(?:\(tabs\)\/)?inbox\/?(?:[?#].*)?$/;
 
 /** The route a system link should open, or the link itself when it is current. */
 export function systemPathRoute(path: string): string {
@@ -12,9 +12,6 @@ export function systemPathRoute(path: string): string {
   if (path.includes("dataUrl=")) return "/";
 
   const route = path.replace(/^[a-z][a-z\d+.-]*:\/\/[^/]*/i, "");
-  const tab = retiredTab.exec(route)?.[1];
 
-  if (tab === "inbox") return "/(tabs)/receipts?show=pending";
-
-  return tab === "history" ? "/(tabs)/receipts" : path;
+  return retiredInbox.test(route) ? "/(tabs)/receipts?show=pending" : path;
 }

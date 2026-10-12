@@ -17,14 +17,13 @@ struct OpenReceiptsIntent: AppIntent {
 /// It stays, hidden from the action list, and opens Kvitteringer instead.
 struct OpenInboxIntent: AppIntent {
   static let title: LocalizedStringResource = "Åpne innboks"
-  static let description = IntentDescription("Åpner kvitteringene i Kvitto, med dem som trenger kontroll øverst.")
+  static let description = OpenReceiptsIntent.description
   static let openAppWhenRun = true
   static let isDiscoverable = false
 
   @MainActor
   func perform() async throws -> some IntentResult {
-    await UIApplication.shared.open(URL(string: "kvitto:///(tabs)/receipts?show=pending")!)
-    return .result()
+    try await OpenReceiptsIntent().perform()
   }
 }
 

@@ -65,6 +65,7 @@ export const areas: Area[] = [
       "modules/",
       "native/",
       "metro.config.js",
+      "fingerprint.config.js",
       "package.json",
       "package-lock.json",
     ),
