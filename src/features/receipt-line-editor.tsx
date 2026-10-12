@@ -34,6 +34,7 @@ import {
 } from "@/lib/domain/categories";
 import {
   lineKinds,
+  lineLabels,
   isTotalsLine,
   type ReceiptLine,
 } from "@/lib/domain/receipt";
@@ -48,17 +49,6 @@ import { CatalogProductSheet } from "./catalog-product-sheet";
 import { useTheme } from "@/constants/theme";
 import { priceSignalLabel, type PriceSignal } from "@/lib/domain/price-signals";
 import { tapFeedback } from "@/lib/haptics";
-
-export const lineLabels: Record<ReceiptLine["kind"], string> = {
-  product: "Vare",
-  item_discount: "Varerabatt",
-  receipt_discount: "Kvitteringsrabatt",
-  deposit: "Pant",
-  deposit_return: "Pantretur",
-  adjustment: "Justering",
-  summary: "Oppsummering (telles ikke)",
-  vat: "MVA (telles ikke)",
-};
 
 type Props = {
   line: ReceiptLine;

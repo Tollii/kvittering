@@ -25,6 +25,7 @@ import {
 import { useHousehold } from "@/features/household-context";
 import { OfflineNotice } from "@/features/offline-notice";
 import { BudgetSettings } from "@/features/budget-settings";
+import { ExportSettings } from "@/features/export-settings";
 import { OdaSettings } from "@/features/oda-settings";
 import { NotificationSettings } from "@/features/notifications";
 import { radius, useTheme } from "@/constants/theme";
@@ -207,6 +208,9 @@ export default function Settings() {
         </FormSection>
         <FormSection title="Budsjett">
           <BudgetSettings />
+        </FormSection>
+        <FormSection title="Eksport">
+          <ExportSettings />
         </FormSection>
         <FormSection title="Varsler">
           <NotificationSettings />
