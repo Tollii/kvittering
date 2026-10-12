@@ -43,16 +43,24 @@ export function manualPurchaseReceipt(purchase: ManualPurchase): ReceiptCheck {
     return { kind: "invalid", message: "Betalt beløp må være over null." };
 
   const typed = purchase.lines.length
-    ? purchase.lines
-    : [{ name: unspecifiedPurchaseName, amountOre: purchase.totalOre }];
+    ? purchase.lines.map((line) => ({ ...line, placeholder: false }))
+    : [
+        {
+          name: unspecifiedPurchaseName,
+          amountOre: purchase.totalOre,
+          placeholder: true,
+        },
+      ];
 
   const lines: ReceiptLine[] = typed.map((line, index) => ({
     ...emptyLine(`manual-${index + 1}`),
     name: line.name.trim(),
     receiptName: line.name.trim(),
     amountOre: line.amountOre,
-    // A person typed the name, not the category, so memory may still settle it.
-    manual: false,
+    // A person typed the name, not the category, so memory may settle it. The
+    // placeholder names no product, so memory and corrections must not learn
+    // from it or carry a category from one such purchase to the next.
+    manual: line.placeholder,
     categoryId: unclearCategoryId,
   }));
 
@@ -68,7 +76,7 @@ export function manualPurchaseReceipt(purchase: ManualPurchase): ReceiptCheck {
     originalText: [
       `${store}, lagt inn uten kvittering`,
       ...lines.map(
-        (line) => `${line.name}  ${Ore.formatInput(line.amountOre ?? null)}`,
+        (line) => `${line.name}  ${Ore.formatInput(line.amountOre)}`,
       ),
       `Betalt ${Ore.formatInput(purchase.totalOre)}`,
     ].join("\n"),

@@ -3,7 +3,10 @@ import { clientMutation as mutation } from "./clientFunctions";
 import { requireMember } from "./access";
 import { userError } from "./userErrors";
 import { consumeReceiptQuota } from "./rateLimits";
-import { beginUploadedReceipt } from "./receiptUploadCompletion";
+import {
+  receiptByClientId,
+  startImportedReceipt,
+} from "./receiptUploadCompletion";
 import {
   manualPurchaseReceipt,
   manualPurchaseValidator,
@@ -30,12 +33,11 @@ export const add = mutation({
 
     if (!/^[\w-]{16,80}$/.test(args.clientId)) throw userError("Ugyldig kjøp.");
 
-    const existing = await ctx.db
-      .query("receipts")
-      .withIndex("by_householdId_and_clientId", (q) =>
-        q.eq("householdId", member.householdId).eq("clientId", args.clientId),
-      )
-      .unique();
+    const existing = await receiptByClientId(
+      ctx,
+      member.householdId,
+      args.clientId,
+    );
 
     if (existing) return existing._id;
 
@@ -44,30 +46,11 @@ export const add = mutation({
     if (checked.kind === "invalid") throw userError(checked.message);
     await consumeReceiptQuota(ctx, member, { imagesWait: false });
 
-    const id = await ctx.db.insert("receipts", {
-      householdId: member.householdId,
-      uploadedBy: member.identity,
-      uploaderName: member.name,
+    return startImportedReceipt(ctx, member, {
       clientId: args.clientId,
-      imageCount: 0,
-      status: "uploading",
-      revision: 0,
-      generation: 0,
-      data: null,
-      provider: "pending",
-      duplicateResolved: false,
-      excluded: false,
-    });
-
-    await ctx.db.insert("receiptImports", {
-      householdId: member.householdId,
       provider: "manual",
       orderNumber: args.clientId,
-      receiptId: id,
       data: checked.receipt,
     });
-    await beginUploadedReceipt(ctx, id, 0);
-
-    return id;
   },
 });

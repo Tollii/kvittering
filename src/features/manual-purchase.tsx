@@ -1,6 +1,5 @@
 import { useRef, useState } from "react";
-import { Platform, View } from "react-native";
-import DateTimePicker from "@react-native-community/datetimepicker";
+import { View } from "react-native";
 import { randomUUID } from "expo-crypto";
 import { useConvex } from "convex/react";
 import { api } from "../../convex/_generated/api";
@@ -10,7 +9,6 @@ import {
   Field,
   IconButton,
   Notice,
-  Row,
   Sheet,
   useLargeText,
 } from "@/components/ui";
@@ -28,6 +26,7 @@ import { failureMessage } from "@/lib/failure-message";
 import { releaseMutation } from "@/lib/releases/requests";
 import { useFeatureFlag } from "./featureFlags";
 import { useHousehold } from "./household-context";
+import { PurchaseDateRow } from "./purchase-date-row";
 
 type DraftLine = {
   key: string;
@@ -69,7 +68,9 @@ export function ManualPurchaseSheet({
   const { household, online } = useHousehold();
   const available = useFeatureFlag("receiptProcessing");
   const [store, setStore] = useState("");
-  const [purchaseDate, setPurchaseDate] = useState(CalendarDate.today());
+  // Null until chosen: the sheet stays mounted, so today is read when it is used.
+  const [chosenDate, setChosenDate] = useState<CalendarDate | null>(null);
+  const purchaseDate = chosenDate ?? CalendarDate.today();
   const [totalOre, setTotalOre] = useState<Ore | null>(null);
   const [totalError, setTotalError] = useState<string | null>(null);
   const [lines, setLines] = useState<DraftLine[]>([]);
@@ -80,11 +81,6 @@ export function ManualPurchaseSheet({
   // Remounts the amount fields after a reset, since they keep their own text.
   const [generation, setGeneration] = useState(0);
 
-  // When the date picker opened, which is also its latest selectable date.
-  const [datePickerOpenedAt, setDatePickerOpenedAt] = useState<Date | null>(
-    null,
-  );
-
   const purchase: ManualPurchase | null =
     totalOre === null
       ? null
@@ -92,11 +88,13 @@ export function ManualPurchaseSheet({
 
   const checked = purchase && manualPurchaseReceipt(purchase);
 
-  const amountInvalid =
-    totalError !== null || lines.some((line) => line.amountError !== null);
+  const problem =
+    totalError ??
+    lines.find((line) => line.amountError !== null)?.amountError ??
+    (checked?.kind === "invalid" ? checked.message : null);
 
   const ready =
-    checked?.kind === "valid" && !amountInvalid && online && available && !busy;
+    checked?.kind === "valid" && !problem && online && available && !busy;
 
   // The same rules as a photographed receipt decide whether it needs a look.
   const review =
@@ -118,12 +116,11 @@ export function ManualPurchaseSheet({
 
   const reset = () => {
     setStore("");
-    setPurchaseDate(CalendarDate.today());
+    setChosenDate(null);
     setTotalOre(null);
     setTotalError(null);
     setLines([]);
     setError("");
-    setDatePickerOpenedAt(null);
     setGeneration((value) => value + 1);
     clientId.current = randomUUID();
   };
@@ -154,12 +151,6 @@ export function ManualPurchaseSheet({
     }
   };
 
-  const close = () => {
-    if (busy) return;
-    setDatePickerOpenedAt(null);
-    onClose();
-  };
-
   const status = !online
     ? "Du er uten nett. Kjøpet kan legges inn når du er på nett igjen."
     : !available
@@ -171,12 +162,13 @@ export function ManualPurchaseSheet({
       title="Legg inn kjøp"
       visible={visible}
       scrollable={false}
-      dismissible={!busy}
-      onClose={close}
+      onClose={onClose}
       footer={
         <>
           {!!status && <Notice>{status}</Notice>}
-          {!!error && <Notice tone="error">{error}</Notice>}
+          {!!(problem ?? error) && (
+            <Notice tone="error">{problem ?? error}</Notice>
+          )}
           {review.length > 0 && (
             <Copy role="caption" muted>
               {`Kjøpet blir lagt til kontroll: ${review.join(", ").toLocaleLowerCase("nb-NO")}.`}
@@ -208,28 +200,11 @@ export function ManualPurchaseSheet({
             onChange={setTotalOre}
             onError={setTotalError}
           />
-          <Row
-            title="Kjøpsdato"
-            value={CalendarDate.format(purchaseDate)}
-            icon="calendar"
-            onPress={() =>
-              setDatePickerOpenedAt(datePickerOpenedAt ? null : new Date())
-            }
+          <PurchaseDateRow
+            value={purchaseDate}
+            shown={visible}
+            onChange={setChosenDate}
           />
-          {datePickerOpenedAt && (
-            <DateTimePicker
-              value={CalendarDate.toNoon(purchaseDate)}
-              mode="date"
-              display={Platform.OS === "ios" ? "inline" : "default"}
-              locale="nb-NO"
-              maximumDate={datePickerOpenedAt}
-              onDismiss={() => setDatePickerOpenedAt(null)}
-              onValueChange={(_event, date) => {
-                if (Platform.OS !== "ios") setDatePickerOpenedAt(null);
-                setPurchaseDate(CalendarDate.fromLocal(date));
-              }}
-            />
-          )}
         </FormSection>
         <FormSection title="Varer (valgfritt)">
           {lines.map((line, index) => (

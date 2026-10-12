@@ -14,7 +14,7 @@ import { clientMutation as mutation } from "./clientFunctions";
 import { requireMember } from "./access";
 import { userError } from "./userErrors";
 import { featureEnabled } from "./featureFlags";
-import { beginUploadedReceipt } from "./receiptUploadCompletion";
+import { startImportedReceipt } from "./receiptUploadCompletion";
 import { receiptDataValidator } from "../src/lib/domain/receipt";
 import { catalogProductValidator } from "../src/lib/catalog/model";
 import { odaCatalogProduct } from "../src/lib/catalog/oda";
@@ -477,29 +477,12 @@ export const importOrders = internalMutation({
 
       for (const product of products) await saveStoreProduct(ctx, product);
 
-      const id: Id<"receipts"> = await ctx.db.insert("receipts", {
-        householdId: member.householdId,
-        uploadedBy: member.identity,
-        uploaderName: member.name,
+      await startImportedReceipt(ctx, member, {
         clientId: `oda-${orderNumber}`,
-        imageCount: 0,
-        status: "uploading",
-        revision: 0,
-        generation: 0,
-        data: null,
-        provider: "pending",
-        duplicateResolved: false,
-        excluded: false,
-      });
-
-      await ctx.db.insert("receiptImports", {
-        householdId: member.householdId,
         provider: "oda",
         orderNumber,
-        receiptId: id,
         data,
       });
-      await beginUploadedReceipt(ctx, id, 0);
       imported += 1;
     }
 

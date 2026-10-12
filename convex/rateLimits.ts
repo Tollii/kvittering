@@ -76,7 +76,7 @@ export async function consumeReceiptQuota(
   member: Pick<Doc<"members">, "identity" | "householdId">,
   { retryMetadata = false, imagesWait = true } = {},
 ) {
-  // A purchase typed in has no images; the form keeps what was typed.
+  // Callers without queued images leave out the sentence about the queue.
   const waiting = imagesWait ? " Bildene blir liggende i køen." : "";
 
   for (const key of [

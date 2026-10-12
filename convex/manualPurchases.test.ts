@@ -5,7 +5,11 @@ import { convexTest } from "convex-test";
 import { afterEach, expect, it, vi } from "vitest";
 import { api } from "./_generated/api";
 import schema from "./schema";
-import { sharedHousehold } from "../src/lib/testing/households";
+import type { Id } from "./_generated/dataModel";
+import {
+  separateHouseholds,
+  sharedHousehold,
+} from "../src/lib/testing/households";
 import { date } from "../src/lib/testing/calendar";
 import { Ore } from "../src/lib/domain/ore";
 
@@ -145,4 +149,97 @@ it("refuses a purchase without a store, a paid amount, or the caller's household
     outsider.mutation(api.manualPurchases.add, request),
   ).rejects.toThrow("Velg en husstand");
   expect(await t.run((ctx) => ctx.db.query("receipts").collect())).toEqual([]);
+});
+
+it("flags a second purchase with the same store, date and amount as a possible duplicate", async () => {
+  const { t, first, second, householdId } = await setup();
+
+  const add = (user: typeof first, clientId: string) =>
+    user.mutation(api.manualPurchases.add, {
+      clientId,
+      householdId,
+      purchase: { ...purchase, lines: [] },
+    });
+
+  const original = await add(first, "manual-purchase-0005");
+  await t.finishAllScheduledFunctions(vi.runAllTimers);
+  const copy = await add(second, "manual-purchase-0006");
+  await t.finishAllScheduledFunctions(vi.runAllTimers);
+
+  expect(await t.run((ctx) => ctx.db.get("receipts", copy))).toMatchObject({
+    status: "needs_review",
+    duplicateOf: original,
+  });
+});
+
+it("does not carry a category from one unspecified purchase to the next", async () => {
+  const { t, first, householdId } = await setup();
+
+  const ids: Id<"receipts">[] = [];
+
+  for (const clientId of ["manual-purchase-0007", "manual-purchase-0008"]) {
+    ids.push(
+      await first.mutation(api.manualPurchases.add, {
+        clientId,
+        householdId,
+        purchase: {
+          ...purchase,
+          lines: [],
+          totalOre: Ore.of(10000 + ids.length),
+        },
+      }),
+    );
+    await t.finishAllScheduledFunctions(vi.runAllTimers);
+  }
+
+  const receipt = (await t.run((ctx) => ctx.db.get("receipts", ids[0]!)))!;
+  const data = receipt.data!;
+
+  await first.mutation(api.receipts.save, {
+    id: receipt._id,
+    revision: receipt.revision,
+    data: {
+      ...data,
+      lines: data.lines.map((line) => ({
+        ...line,
+        name: "Jordbær",
+        categoryId: "produce.fruit",
+      })),
+    },
+    reviewed: true,
+    rememberLineIds: [data.lines[0]!.id],
+    duplicateResolved: false,
+    excluded: false,
+  });
+  await t.finishAllScheduledFunctions(vi.runAllTimers);
+
+  for (const correction of (await first.query(api.corrections.list, {}))
+    .entries)
+    expect(
+      (await first.query(api.corrections.preview, { id: correction._id }))
+        .targets,
+    ).toEqual([]);
+  expect(await t.run((ctx) => ctx.db.get("receipts", ids[1]!))).toMatchObject({
+    data: { lines: [{ name: "Uspesifisert kjøp" }] },
+  });
+});
+
+it("refuses a purchase for a household the caller has left", async () => {
+  vi.useFakeTimers();
+  const t = convexTest(schema, modules);
+  registerRateLimiter(t);
+  register(t);
+
+  const { first, other } = await separateHouseholds(t);
+
+  const otherHousehold = (await other.query(api.households.current, {}))!
+    .household._id;
+
+  await expect(
+    first.mutation(api.manualPurchases.add, {
+      clientId: "manual-purchase-0009",
+      householdId: otherHousehold,
+      purchase: { ...purchase, lines: [] },
+    }),
+  ).rejects.toThrow("Husstanden er endret");
 });

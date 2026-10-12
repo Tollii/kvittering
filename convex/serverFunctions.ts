@@ -29,14 +29,20 @@ triggers.register("receipts", async (ctx, change) => {
     .withIndex("by_receiptId", (q) => q.eq("receiptId", change.id))
     .unique();
 
-  if (imported?.provider === "manual")
-    await ctx.db.delete("receiptImports", imported._id);
-  // The order number stays, so the next sync does not bring the receipt back.
-  else if (imported)
-    await ctx.db.patch("receiptImports", imported._id, {
-      receiptId: undefined,
-      data: undefined,
-    });
+  if (!imported) return;
+
+  switch (imported.provider) {
+    case "oda":
+      // The order number stays, so the next sync does not bring the receipt back.
+      await ctx.db.patch("receiptImports", imported._id, {
+        receiptId: undefined,
+        data: undefined,
+      });
+      break;
+    case "manual":
+      await ctx.db.delete("receiptImports", imported._id);
+      break;
+  }
 });
 
 export const mutation = customMutation(rawMutation, customCtx(triggers.wrapDB));

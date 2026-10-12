@@ -1,4 +1,8 @@
-import { beginUploadedReceipt } from "./receiptUploadCompletion";
+import {
+  beginUploadedReceipt,
+  newReceipt,
+  receiptByClientId,
+} from "./receiptUploadCompletion";
 import { receiptPeriodPage } from "./receiptPeriod";
 import { CalendarDate } from "../src/lib/domain/calendar";
 import { userError } from "./userErrors";
@@ -130,12 +134,11 @@ export const reserve = mutation({
     )
       throw userError("Ugyldig opplasting.");
 
-    const existing = await ctx.db
-      .query("receipts")
-      .withIndex("by_householdId_and_clientId", (q) =>
-        q.eq("householdId", member.householdId).eq("clientId", args.clientId),
-      )
-      .unique();
+    const existing = await receiptByClientId(
+      ctx,
+      member.householdId,
+      args.clientId,
+    );
 
     if (existing) {
       if (args.backgroundUpload && existing.status === "uploading")
@@ -148,22 +151,13 @@ export const reserve = mutation({
 
     if (args.imageCount > maxReceiptImages)
       throw new ConvexError(receiptImageLimitMessage);
-    await consumeReceiptQuota(ctx, member, args);
+    await consumeReceiptQuota(ctx, member, {
+      retryMetadata: args.retryMetadata,
+    });
 
     return ctx.db.insert("receipts", {
-      householdId: member.householdId,
-      uploadedBy: member.identity,
-      uploaderName: member.name,
-      clientId: args.clientId,
-      imageCount: args.imageCount,
+      ...newReceipt(member, args.clientId, args.imageCount),
       backgroundUpload: args.backgroundUpload,
-      status: "uploading",
-      revision: 0,
-      generation: 0,
-      data: null,
-      provider: "pending",
-      duplicateResolved: false,
-      excluded: false,
     });
   },
 });
