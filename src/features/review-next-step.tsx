@@ -191,13 +191,6 @@ function reviewStep(task: ReviewTask, context: StepContext): Step {
         icon: "textformat",
         onPress: toLines,
       };
-    case "line-issues":
-      return {
-        label,
-        hint: "Se over varene som lesingen var usikker på.",
-        icon: "exclamationmark.circle",
-        onPress: toLines,
-      };
   }
 }
 

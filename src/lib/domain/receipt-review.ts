@@ -145,7 +145,10 @@ export function applyClassifications(
   }
 }
 
-/** Categories, product matching, and package information do not block receipt approval. */
+/**
+ * Categories, product matching, package information and the reader's notes on
+ * a line do not block receipt approval. Those notes stay on the line.
+ */
 export function canAcceptReceipt(
   data: ReceiptData,
   unresolvedDuplicate: boolean,
@@ -222,12 +225,16 @@ export type ReviewTask =
   | { kind: "no-lines" }
   | { kind: "amounts"; count: number }
   | { kind: "names"; count: number }
-  | { kind: "line-issues"; count: number }
   | { kind: "receipt-issues"; issues: string[] };
 
 /**
  * Everything standing between the receipt and approval, grouped the way a
  * person would fix it: receipt facts first, then the affected product lines.
+ *
+ * A reader's note on one line is not an exception. Its money is settled by
+ * the paid total: an unknown amount or a sum that misses the total stops the
+ * receipt on its own. What is left is the line's identity, which only affects
+ * its category, and the note stays on the line for a person to check.
  */
 export function assessReceipt(
   data: ParsedReceipt,
@@ -290,12 +297,6 @@ export function assessReceipt(
 
   if (names) tasks.push({ kind: "names", count: names });
 
-  const other = counted((line) =>
-    line.issues.some((issue) => !isCategoryUncertain(issue)),
-  );
-
-  if (other) tasks.push({ kind: "line-issues", count: other });
-
   return { acceptable: tasks.length === 0, tasks };
 }
 
@@ -336,8 +337,6 @@ export function reviewTaskLabel(task: ReviewTask): string {
       return `${task.count} beløp mangler`;
     case "names":
       return `${task.count} navn mangler`;
-    case "line-issues":
-      return plural(task.count, "vare å sjekke", "varer å sjekke");
   }
 }
 

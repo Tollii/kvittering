@@ -24,7 +24,7 @@ it("accepts balanced receipts without optional package details or product links"
   expect(canAcceptReceipt(data, true)).toBe(false);
 });
 
-it("requires review for amounts, identity, overlap and missing receipt information", () => {
+it("requires review for amounts, names and missing receipt information", () => {
   for (const modify of [
     (data: ReturnType<typeof batteryFixture>) => {
       data.totalOre = Ore.add(data.totalOre!, Ore.of(1));
@@ -42,9 +42,6 @@ it("requires review for amounts, identity, overlap and missing receipt informati
       present(data.lines[0]).amountOre = null;
     },
     (data: ReturnType<typeof batteryFixture>) => {
-      present(data.lines[0]).issues = ["Mulig overlapp."];
-    },
-    (data: ReturnType<typeof batteryFixture>) => {
       data.issues = ["Kvitteringen er ufullstendig."];
     },
   ]) {
@@ -52,6 +49,21 @@ it("requires review for amounts, identity, overlap and missing receipt informati
     modify(data);
     expect(canAcceptReceipt(data, false)).toBe(false);
   }
+});
+
+it("approves line notes once the lines match the paid total, and keeps them on the line", () => {
+  const data = batteryFixture();
+  present(data.lines[0]).issues = ["Mulig overlapp."];
+  expect(reviewTasks(data, false)).toEqual([]);
+  expect(quickApproveData(data, false)?.lines[0]?.issues).toEqual([
+    "Mulig overlapp.",
+  ]);
+
+  // A line read twice makes the lines miss the paid total, which still stops the receipt.
+  data.lines.push({ ...present(data.lines[0]), id: "twice" });
+  expect(reviewTasks(data, false).map((task) => task.kind)).toEqual([
+    "difference",
+  ]);
 });
 
 it("keeps a missing amount visible after a general warning is acknowledged", () => {
@@ -240,7 +252,6 @@ it("confirms suggested categories in bulk without touching unclear or other issu
   expect(present(data.lines[0]).issues).toEqual(["Kategorien er usikker."]);
   expect(reviewTasks(confirmed, false).map((task) => task.kind)).toEqual([
     "difference",
-    "line-issues",
   ]);
 });
 
@@ -293,22 +304,16 @@ it("walks a weekly shop from reading to approval", () => {
 
 it("uses stable codes and preserves reader text independently of category confirmation", async () => {
   const { categoryUncertainIssue } = await import("./receipt-issues");
-  const { parseReceipt } = await import("./receipt");
-  const { assessReceipt } = await import("./receipt-review");
   const data = batteryFixture();
   present(data.lines[0]).issues = [
     categoryUncertainIssue,
     "Reader wording changed",
   ];
   const before = structuredClone(data);
-  const parsed = parseReceipt(data);
-  expect(parsed.kind).toBe("parsed");
-
-  if (parsed.kind !== "parsed") throw new Error("Fixture must parse");
-  expect(assessReceipt(parsed.receipt, false)).toMatchObject({
-    acceptable: false,
-    tasks: [{ kind: "line-issues" }],
-  });
+  expect(lineReviewIssues(present(data.lines[0]))).toEqual([
+    { code: "category_uncertain" },
+    { code: "reader_issue", message: "Reader wording changed" },
+  ]);
   expect(
     confirmLineCategory(present(data.lines[0]), "drinks.soft-drinks").issues,
   ).toEqual(["Reader wording changed"]);

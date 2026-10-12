@@ -90,7 +90,7 @@ describe("reading uncertainty", () => {
     expect(canAcceptReceipt(data, false)).toBe(true);
   });
 
-  it("requires review for unreadable identity and ambiguous amounts even when the sum matches", () => {
+  it("keeps notes on unreadable identity and ambiguous amounts without review when the sum matches", () => {
     const extracted = fixture();
     present(extracted.lines[0]).issues = [
       { severity: "minor", message: "Utydelig mellomrom." },
@@ -103,7 +103,7 @@ describe("reading uncertainty", () => {
       "Beløpet kan være 25,90 eller 26,90.",
     ]);
     expect(reconcile(data).difference).toBe(0);
-    expect(canAcceptReceipt(data, false)).toBe(false);
+    expect(canAcceptReceipt(data, false)).toBe(true);
   });
 });
 
