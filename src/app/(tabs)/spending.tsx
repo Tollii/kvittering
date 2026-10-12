@@ -24,7 +24,6 @@ import { View } from "react-native";
 import {
   Amount,
   Button,
-  Chevron,
   Copy,
   IconButton,
   Sheet,
@@ -37,10 +36,13 @@ import {
   SectionTitle,
   Segments,
   SummaryBand,
-  Press,
 } from "@/components/ui";
 import { MonumentArtwork } from "@/components/monument-artwork";
-import { SpendingBars, SpendingDetails } from "@/components/spending-details";
+import {
+  AllCategoriesLink,
+  SpendingBars,
+  SpendingDetails,
+} from "@/components/spending-details";
 import { useHousehold } from "@/features/household-context";
 import { OfflineNotice } from "@/features/offline-notice";
 import {
@@ -58,6 +60,7 @@ import { monthPriceSignals } from "@/lib/domain/price-signals";
 import { catalogInsights } from "@/lib/catalog/insights";
 import { router, useLocalSearchParams } from "expo-router";
 import { StoreSpendingSheet } from "@/features/spending-reports/stores";
+import { trendLength } from "@/lib/domain/spending-trend";
 
 export default function SpendingRoute() {
   const params = useLocalSearchParams();
@@ -183,6 +186,15 @@ function Spending({ initialMonth }: Readonly<{ initialMonth: CalendarMonth }>) {
     report === "prices",
   );
 
+  const trend = useCompleteReceipts(
+    {
+      kind: "period",
+      start: CalendarMonth.first(CalendarMonth.shift(month, 1 - trendLength)),
+      end: CalendarMonth.last(month),
+    },
+    report === "trend",
+  );
+
   const surprises = history.completeReceipts
     ? monthPriceSignals(history.receipts, month)
     : [];
@@ -259,6 +271,18 @@ function Spending({ initialMonth }: Readonly<{ initialMonth: CalendarMonth }>) {
     month,
     historyComplete: history.completeReceipts,
     surprises,
+    trend: {
+      receipts: trend.receipts,
+      loading: trend.loadingReceipts,
+      complete: trend.completeReceipts,
+    },
+    onMonth: (value, category) => {
+      setReport(null);
+      setMonth(value);
+      setBreakdown("category");
+      setShowAllGroups(false);
+      setGroup(category);
+    },
     onSelect: showDetails,
     onAccounting: select,
     onClose: () => setReport(null),
@@ -352,29 +376,10 @@ function Spending({ initialMonth }: Readonly<{ initialMonth: CalendarMonth }>) {
               ]}
             />
             {!!group && (
-              <Press
-                feedback="highlight"
-                accessibilityRole="button"
+              <AllCategoriesLink
+                group={categoryOf(rows[0]?.id).groupName}
                 onPress={() => setGroup(null)}
-                style={{
-                  flexDirection: "row",
-                  alignItems: "center",
-                  gap: 6,
-                  minHeight: 44,
-                }}
-              >
-                <Chevron direction="left" color={colors.primary} />
-                <Copy
-                  role="detail"
-                  weight="600"
-                  style={{ color: colors.primary }}
-                >
-                  Alle kategorier
-                </Copy>
-                <Copy role="detail" muted>
-                  · {categoryOf(rows[0]?.id).groupName}
-                </Copy>
-              </Press>
+              />
             )}
             <SpendingBars
               rows={showAllGroups ? rows : rows.slice(0, 5)}
