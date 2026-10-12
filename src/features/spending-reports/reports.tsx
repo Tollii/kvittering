@@ -49,7 +49,6 @@ type ReportProps = {
   historyComplete: boolean;
   coverageComplete: boolean;
   surprises: ReturnType<typeof monthPriceSignals>;
-  trend: Readonly<{ receipts: Receipt[]; loading: boolean; complete: boolean }>;
   onMonth: (month: CalendarMonth, group: string | null) => void;
   onSelect: (value: SpendingGroup, dimension?: SpendingDimension) => void;
   onAccounting: (key: string) => void;
@@ -65,7 +64,6 @@ export function useSpendingReports({
   historyComplete,
   coverageComplete,
   surprises,
-  trend,
   onMonth,
   onSelect,
   onAccounting,
@@ -98,9 +96,7 @@ export function useSpendingReports({
     trend: {
       title: `Siste ${trendLength} måneder`,
       icon: "chart.line.uptrend.xyaxis",
-      render: () => (
-        <SpendingTrend {...trend} month={month} onMonth={onMonth} />
-      ),
+      render: () => <SpendingTrend month={month} onMonth={onMonth} />,
     },
     catalog: {
       title: "Produkter og merker",

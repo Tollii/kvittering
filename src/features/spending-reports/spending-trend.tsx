@@ -20,42 +20,49 @@ import { radius, useTheme } from "@/constants/theme";
 import {
   spendingTrend,
   trendLength,
+  trendPeriod,
   trendSeries,
 } from "@/lib/domain/spending-trend";
-import type { Receipt } from "@/lib/domain/insights";
+import { useCompleteReceipts } from "@/features/receipt-queries";
 
 type Series = ReturnType<typeof trendSeries>;
 
 /** The twelve months up to the month Forbruk shows, for all purchases or one category group. */
 export function SpendingTrend({
-  receipts,
   month,
-  loading,
-  complete,
   onMonth,
 }: Readonly<{
-  receipts: Receipt[];
   month: CalendarMonth;
-  loading: boolean;
-  complete: boolean;
   /** Opens a month in Forbruk, inside the category group when one is chosen. */
   onMonth: (month: CalendarMonth, group: string | null) => void;
 }>) {
-  const [group, setGroup] = useState<string | null>(null);
+  const [chosen, setGroup] = useState<string | null>(null);
   const [showAll, setShowAll] = useState(false);
+
+  const {
+    receipts,
+    loadingReceipts: loading,
+    completeReceipts: complete,
+  } = useCompleteReceipts({ kind: "period", ...trendPeriod(month) });
 
   const trend = useMemo(
     () => spendingTrend(receipts, month),
     [receipts, month],
   );
 
+  // A sync can remove the chosen group's last purchase while the sheet is open.
+  const group = trend.groups.some((value) => value.id === chosen)
+    ? chosen
+    : null;
+
   const series = trendSeries(trend, group);
-  const groupName = trend.groups.find((value) => value.id === group)?.name;
 
   if (loading) return <Loading />;
 
   if (!series.months.some((value) => value.recorded))
-    return (
+    return !complete ? (
+      <Notice>Kvitteringene er ikke hentet ennå.</Notice>
+    ) : (
       <Empty
         title="Ingen kjøp i perioden"
         message={`Forbruket de siste ${trendLength} månedene vises her når dere har kvitteringer fra dem.`}
@@ -68,8 +75,8 @@ export function SpendingTrend({
   return (
     <>
       {!complete && <Notice>Henter kvitteringer …</Notice>}
-      {!!groupName && (
-        <AllCategoriesLink group={groupName} onPress={() => setGroup(null)} />
+      {!!group && (
+        <AllCategoriesLink group={group} onPress={() => setGroup(null)} />
       )}
       <Average series={series} />
       <TrendChart series={series} month={month} />
@@ -116,6 +123,8 @@ export function SpendingTrend({
 }
 
 function monthDetail(month: Series["months"][number]) {
+  if (month.otherCurrency) return "Bare kvitteringer i annen valuta";
+
   if (!month.recorded) return "Ingen kvitteringer";
 
   return month.partial ? "Hittil i måneden" : undefined;
@@ -177,7 +186,6 @@ function TrendChart({
                 height: value.recorded
                   ? `${(Math.max(0, value.amountOre) / maximum) * 100}%`
                   : 2,
-                minHeight: 2,
                 borderRadius: radius.chip,
                 borderCurve: "continuous",
                 backgroundColor: !value.recorded

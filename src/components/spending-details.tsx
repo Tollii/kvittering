@@ -14,6 +14,7 @@ import {
 } from "./ui";
 import { openReceipt, receiptStatusLabel } from "./receipt-card";
 import { contributionKey, type SpendingGroup } from "@/lib/domain/insights";
+import { categoryGroupName } from "@/lib/domain/categories";
 
 /** Leaves one category group for all of them, naming the group it leaves. */
 export function AllCategoriesLink({
@@ -39,7 +40,7 @@ export function AllCategoriesLink({
         Alle kategorier
       </Copy>
       <Copy role="detail" muted>
-        · {group}
+        · {categoryGroupName(group)}
       </Copy>
     </Press>
   );

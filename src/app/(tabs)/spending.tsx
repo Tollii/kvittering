@@ -52,7 +52,7 @@ import {
   type SpendingGroup,
 } from "@/lib/domain/insights";
 import { isDiscountLine } from "@/lib/domain/receipt";
-import { categoryGroups, categoryOf } from "@/lib/domain/categories";
+import { categoryOf } from "@/lib/domain/categories";
 import { receiptNeeds } from "@/components/receipt-card";
 import { useTheme } from "@/constants/theme";
 import { budgetPace, paceLabel } from "@/lib/domain/budget";
@@ -60,7 +60,6 @@ import { monthPriceSignals } from "@/lib/domain/price-signals";
 import { catalogInsights } from "@/lib/catalog/insights";
 import { router, useLocalSearchParams } from "expo-router";
 import { StoreSpendingSheet } from "@/features/spending-reports/stores";
-import { trendLength } from "@/lib/domain/spending-trend";
 
 export default function SpendingRoute() {
   const params = useLocalSearchParams();
@@ -186,15 +185,6 @@ function Spending({ initialMonth }: Readonly<{ initialMonth: CalendarMonth }>) {
     report === "prices",
   );
 
-  const trend = useCompleteReceipts(
-    {
-      kind: "period",
-      start: CalendarMonth.first(CalendarMonth.shift(month, 1 - trendLength)),
-      end: CalendarMonth.last(month),
-    },
-    report === "trend",
-  );
-
   const surprises = history.completeReceipts
     ? monthPriceSignals(history.receipts, month)
     : [];
@@ -271,17 +261,13 @@ function Spending({ initialMonth }: Readonly<{ initialMonth: CalendarMonth }>) {
     month,
     historyComplete: history.completeReceipts,
     surprises,
-    trend: {
-      receipts: trend.receipts,
-      loading: trend.loadingReceipts,
-      complete: trend.completeReceipts,
-    },
     onMonth: (value, category) => {
       setReport(null);
       setMonth(value);
-      setBreakdown("category");
       setShowAllGroups(false);
       setGroup(category);
+
+      if (category) setBreakdown("category");
     },
     onSelect: showDetails,
     onAccounting: select,
@@ -376,10 +362,7 @@ function Spending({ initialMonth }: Readonly<{ initialMonth: CalendarMonth }>) {
               ]}
             />
             {!!group && (
-              <AllCategoriesLink
-                group={groupNames.get(group) ?? ""}
-                onPress={() => setGroup(null)}
-              />
+              <AllCategoriesLink group={group} onPress={() => setGroup(null)} />
             )}
             <SpendingBars
               rows={showAllGroups ? rows : rows.slice(0, 5)}
@@ -454,9 +437,6 @@ function Spending({ initialMonth }: Readonly<{ initialMonth: CalendarMonth }>) {
 }
 
 type Breakdown = "category" | "store" | "type";
-
-// The trend can open a month in a group that month has no purchases in.
-const groupNames = new Map<string, string>(categoryGroups);
 
 /** The store breakdown opens the full store list from its heading; the others have no action. */
 function storesAction(breakdown: Breakdown, onAction: () => void) {
