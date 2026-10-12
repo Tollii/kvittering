@@ -13,7 +13,13 @@ import { components, internal } from "./_generated/api";
 import appConfig from "../app.json";
 import type { DataModel } from "./_generated/dataModel";
 import authConfig from "./auth.config";
-import { env, query } from "./_generated/server";
+import {
+  env,
+  query,
+  type ActionCtx,
+  type MutationCtx,
+  type QueryCtx,
+} from "./_generated/server";
 
 /** The component types adapter pages as `any`; only the count is needed. */
 const linkedAccounts = z.object({ page: z.array(z.unknown()) });
@@ -51,6 +57,31 @@ export const authComponent = createClient<DataModel>(components.betterAuth, {
 
 export const { onCreate } = authComponent.triggersApi();
 
+const appleAccount = z.object({ accountId: z.string() }).nullable();
+
+/** The Apple ID linked to a Better Auth user, or null. */
+export async function appleAccountOf(
+  ctx:
+    | Pick<QueryCtx, "runQuery">
+    | Pick<MutationCtx, "runQuery">
+    | Pick<ActionCtx, "runQuery">,
+  userId: string,
+) {
+  // The component types adapter results as `any`.
+  const account: unknown = await ctx.runQuery(
+    components.betterAuth.adapter.findOne,
+    {
+      model: "account",
+      where: [
+        { field: "userId", value: userId },
+        { field: "providerId", value: "apple" },
+      ],
+    },
+  );
+
+  return appleAccount.parse(account)?.accountId ?? null;
+}
+
 export const appleConnected = query({
   args: {},
   returns: v.union(v.boolean(), v.null()),
@@ -60,19 +91,7 @@ export const appleConnected = query({
     // The subscription can update before the client finishes signing out.
     if (!user) return null;
 
-    // The component types adapter results as `any`; only presence is needed.
-    const account: unknown = await ctx.runQuery(
-      components.betterAuth.adapter.findOne,
-      {
-        model: "account",
-        where: [
-          { field: "userId", value: user._id },
-          { field: "providerId", value: "apple" },
-        ],
-      },
-    );
-
-    return account !== null;
+    return (await appleAccountOf(ctx, user._id)) !== null;
   },
 });
 

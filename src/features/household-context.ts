@@ -14,6 +14,8 @@ export type SessionData = {
   queue: LocalReceipt[];
   synchronize: () => Promise<void>;
   regroup: (id: string, selected: number[]) => void;
+  /** Remove every queued receipt of this account and household from the device. */
+  discardQueue: () => void;
   retryFailedUploads: () => Promise<void>;
 };
 

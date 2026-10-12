@@ -18,7 +18,7 @@ Status: DECIDED 10 October 2026. The owner chose to merge Innboks into Historikk
 
 ## Public App Store account lifecycle
 
-Status: IN-APP DELETION BUILT 12 October 2026. Konto in settings deletes the account, revokes a linked Apple ID through the authorization-code exchange, and removes the household when the last member leaves; [architecture](../docs/architecture.md#external-boundaries) explains the rules. Revocation needs `APPLE_TEAM_ID`, `APPLE_SIGN_IN_KEY_ID`, and `APPLE_SIGN_IN_PRIVATE_KEY` on each deployment; without them an Apple-linked account cannot be deleted. TestFlight configuration also needs a separate public production environment before public distribution.
+Status: IN-APP DELETION BUILT 12 October 2026. Konto in settings deletes the account, revokes a linked Apple ID through the authorization-code exchange, and removes the household when the last member leaves; [architecture](../docs/architecture.md#external-boundaries) explains the rules. Revocation needs `APNS_TEAM_ID`, `APPLE_SIGN_IN_KEY_ID`, and `APPLE_SIGN_IN_PRIVATE_KEY` on each deployment; without them an Apple-linked account cannot be deleted. TestFlight configuration also needs a separate public production environment before public distribution.
 
 ## Application risk review release checks
 

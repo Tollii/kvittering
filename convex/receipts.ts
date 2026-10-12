@@ -22,7 +22,11 @@ import {
   withProductReference,
   type ProductSelection,
 } from "../src/lib/domain/product-reference";
-import { commitReceiptChange, receiptCommitValidator } from "./receiptChanges";
+import {
+  commitReceiptChange,
+  deleteReceipt,
+  receiptCommitValidator,
+} from "./receiptChanges";
 import { requireCompatibleClient } from "./releasePolicy";
 import { clientValidator } from "../src/lib/releases/policy";
 import { clientMutation as mutation } from "./clientFunctions";
@@ -642,18 +646,8 @@ export const remove = mutation({
         "Kvitteringen er endret. Hent siste versjon før du sletter.",
         "RECEIPT_CHANGED",
       );
-    await ctx.db.delete("receipts", id);
-    await ctx.scheduler.runAfter(
-      0,
-      internal.retention.deletedReceiptWorkflows,
-      { receiptId: id },
-    );
+    await deleteReceipt(ctx, receipt);
     await notifyReceiptActivities(ctx, receipt.householdId);
-    await ctx.runMutation(internal.receipts.cleanupDeleted, { id });
-    await ctx.scheduler.runAfter(0, internal.retention.deletedReceiptBatches, {
-      householdId: receipt.householdId,
-      receiptId: id,
-    });
 
     return null;
   },

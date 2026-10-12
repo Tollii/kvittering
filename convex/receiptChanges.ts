@@ -189,3 +189,19 @@ export async function commitReceiptChange(
 
   return { receiptId: previous._id, revision: decision.revision };
 }
+
+/** Delete a receipt with its images, history, workflows, and correction batches. */
+export async function deleteReceipt(
+  ctx: MutationCtx,
+  receipt: Doc<"receipts">,
+) {
+  await ctx.db.delete("receipts", receipt._id);
+  await ctx.scheduler.runAfter(0, internal.retention.deletedReceiptWorkflows, {
+    receiptId: receipt._id,
+  });
+  await ctx.runMutation(internal.receipts.cleanupDeleted, { id: receipt._id });
+  await ctx.scheduler.runAfter(0, internal.retention.deletedReceiptBatches, {
+    householdId: receipt.householdId,
+    receiptId: receipt._id,
+  });
+}

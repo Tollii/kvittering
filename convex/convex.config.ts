@@ -23,7 +23,6 @@ const app = defineApp({
     APNS_KEY_ID: v.string().optional(),
     APNS_TEAM_ID: v.string().optional(),
     APNS_PRIVATE_KEY: v.string().optional(),
-    APPLE_TEAM_ID: v.string().optional(),
     APPLE_SIGN_IN_KEY_ID: v.string().optional(),
     APPLE_SIGN_IN_PRIVATE_KEY: v.string().optional(),
     EXPO_ACCESS_TOKEN: v.string().optional(),

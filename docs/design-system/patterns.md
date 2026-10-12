@@ -81,7 +81,7 @@ Kvitteringer searches from the native search bar and switches between receipts a
 
 Settings is a modal grouped native form ([settings](../../src/app/settings.tsx)), one section per area.
 
-Konto ends with "Slett kontoen", a `danger` button under "Logg ut". Its alert says what goes and what stays: alone, the household and every receipt; with a partner, only the account, while the receipts stay with them. An account linked to Apple is confirmed with Apple after the alert, before anything is deleted.
+Konto ends with "Slett kontoen", a `danger` button under "Logg ut". Its alert says what goes and what stays: alone, the household and every receipt; with a partner, only the account, while the receipts stay with them. An account linked to Apple is confirmed with Apple after the alert, before anything is deleted. The same button sits under "Logg ut" on Kom i gang, for an account without a household.
 
 ## Screen catalogue
 

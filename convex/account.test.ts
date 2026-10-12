@@ -8,7 +8,11 @@ import appConfig from "../app.json";
 import { api, components } from "./_generated/api";
 import type { Id } from "./_generated/dataModel";
 import schema from "./schema";
-import { sharedHousehold, testUser } from "../src/lib/testing/households";
+import {
+  invitation,
+  sharedHousehold,
+  testUser,
+} from "../src/lib/testing/households";
 
 const modules = import.meta.glob("./**/*.ts");
 
@@ -155,7 +159,7 @@ function appleServer(subject: string) {
 }
 
 function configureAppleKey() {
-  vi.stubEnv("APPLE_TEAM_ID", "team-id");
+  vi.stubEnv("APNS_TEAM_ID", "team-id");
   vi.stubEnv("APPLE_SIGN_IN_KEY_ID", "key-id");
   vi.stubEnv("APPLE_SIGN_IN_PRIVATE_KEY", applePrivateKey);
 }
@@ -248,6 +252,18 @@ it("keeps a shared household with the partner and removes the last member's hous
     "account-receipt-0001",
   );
 
+  // An upload the leaving member never finished, which nobody could complete or delete.
+  const unfinished = await receiptWithImage(
+    t,
+    second,
+    householdId,
+    "account-receipt-0003",
+  );
+
+  await t.run((ctx) =>
+    ctx.db.patch("receipts", kept.receiptId, { status: "reviewed" }),
+  );
+
   const firstMember = await first.query(api.households.current, {});
 
   await t.run(async (ctx) => {
@@ -279,6 +295,15 @@ it("keeps a shared household with the partner and removes the last member's hous
   await expect(
     first.query(api.receipts.detail, { id: kept.receiptId }),
   ).resolves.not.toBeNull();
+  await t.run(async (ctx) => {
+    expect(await ctx.db.get("receipts", unfinished.receiptId)).toBeNull();
+    expect(await ctx.storage.get(unfinished.storageId)).toBeNull();
+  });
+
+  // The person who left knows the old code, so it no longer admits anyone.
+  await expect(
+    testUser(t, "returning").mutation(api.households.join, { invitation }),
+  ).rejects.toThrow("ugyldig");
 
   await first.action(api.account.remove, {});
   await settle(t);
