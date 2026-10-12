@@ -15,9 +15,10 @@ import {
   TextInput,
   View,
   type TextInputProps,
+  type TextProps,
 } from "react-native";
 import { type SymbolViewProps } from "expo-symbols";
-import { radius, useTheme } from "@/constants/theme";
+import { radius, typeScale, useTheme } from "@/constants/theme";
 import { Chevron, Copy, Icon, faded, styles, useLargeText } from "./typography";
 import { Press } from "./motion";
 
@@ -238,6 +239,14 @@ export function Chip({
   );
 }
 
+// React Native forwards `dynamicTypeRamp` to the native input on iOS, but its
+// types declare it only on `Text`.
+declare module "react-native" {
+  interface TextInputProps {
+    dynamicTypeRamp?: TextProps["dynamicTypeRamp"];
+  }
+}
+
 export function Field({
   label,
   style,
@@ -260,6 +269,8 @@ export function Field({
         accessibilityLabel={label}
         placeholderTextColor={colors.secondary}
         selectionColor={colors.primary}
+        // The system's 17-point input size, growing as body text does.
+        dynamicTypeRamp={typeScale.body.ramp}
         {...props}
         onFocus={(event) => {
           setFocused(true);

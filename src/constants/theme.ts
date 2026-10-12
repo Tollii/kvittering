@@ -1,4 +1,4 @@
-import { useColorScheme } from "react-native";
+import { useColorScheme, type TextProps } from "react-native";
 
 /** The camera stays dark in both colour schemes so the viewfinder reads as a photo. */
 const camera = {
@@ -127,18 +127,27 @@ export const motion = {
 
 export type FontWeight = "400" | "500" | "600" | "700";
 
+export type TypeStyle = {
+  size: number;
+  lineHeight: number;
+  tracking: number;
+  weight: FontWeight;
+  ramp: NonNullable<TextProps["dynamicTypeRamp"]>;
+  maxScale?: number;
+};
+
 /**
  * The type scale: every text the app draws is one of these roles. `Copy`
  * draws the text roles and `Amount` the two amounts. Large text tightens its
  * tracking and small text loosens it. Weight carries meaning, so a caller may
  * override it; the other values belong to the role.
  *
- * Every role grows with the person's text size and stops where the matching
- * iOS text style stops at the largest accessibility size (AX5): reading text
- * at about the system's Body, 53 points, and titles and amounts a little
- * above it, up to about 60. React Native would otherwise grow every role 3.6
- * times, past the system's own sizes. `counter` is the number in a small
- * badge over a photo, capped lower so the badge stays small.
+ * Each role grows with the person's text size along the curve of one iOS text
+ * style, its `ramp`: titles and amounts grow less than body text and captions
+ * grow more, and every role stops where its style stops at the largest size.
+ * The two amounts follow Large Title, so a detail amount stays smaller than
+ * the hero amount at every size. `counter` is the number in a small badge over
+ * a photo, and `maxScale` caps it so the badge stays small.
  */
 export const typeScale = {
   heroAmount: {
@@ -146,75 +155,67 @@ export const typeScale = {
     lineHeight: 40,
     tracking: -0.7,
     weight: "600",
-    maxScale: 1.7,
+    ramp: "largeTitle",
   },
   amount: {
     size: 32,
     lineHeight: 36,
     tracking: -0.7,
     weight: "700",
-    maxScale: 1.8,
+    ramp: "largeTitle",
   },
   screenTitle: {
     size: 24,
     lineHeight: 29,
     tracking: -0.4,
     weight: "600",
-    maxScale: 2.4,
+    ramp: "title2",
   },
   sheetTitle: {
     size: 20,
     lineHeight: 26,
     tracking: -0.15,
     weight: "700",
-    maxScale: 2.8,
+    ramp: "title3",
   },
   sectionTitle: {
     size: 19,
     lineHeight: 25,
     tracking: -0.15,
     weight: "700",
-    maxScale: 2.9,
+    ramp: "title3",
   },
   cardTitle: {
     size: 17,
     lineHeight: 22,
     tracking: -0.15,
     weight: "600",
-    maxScale: 3.1,
+    ramp: "headline",
   },
-  body: { size: 16, lineHeight: 21, tracking: 0, weight: "400", maxScale: 3.2 },
+  body: { size: 16, lineHeight: 21, tracking: 0, weight: "400", ramp: "body" },
   detail: {
     size: 13,
     lineHeight: 17,
     tracking: 0.05,
     weight: "400",
-    maxScale: 3.4,
+    ramp: "footnote",
   },
   caption: {
     size: 12,
     lineHeight: 16,
     tracking: 0.15,
     weight: "400",
-    maxScale: 3.3,
+    ramp: "caption1",
   },
   counter: {
     size: 12,
     lineHeight: 16,
     tracking: 0.15,
     weight: "700",
+    ramp: "caption1",
     maxScale: 1.5,
   },
-} as const satisfies Record<
-  string,
-  {
-    size: number;
-    lineHeight: number;
-    tracking: number;
-    weight: FontWeight;
-    maxScale: number;
-  }
->;
+} as const satisfies Record<string, TypeStyle>;
 
 /**
  * The font scale above which layouts change shape instead of squeezing:
