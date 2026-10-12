@@ -390,13 +390,15 @@ export default defineSchema({
     clientId: v.string(),
   }).index("by_redirectUri", ["redirectUri"]),
   /**
-   * A store order imported as a receipt. A retry reads the order again. When
-   * the receipt is deleted, the order number stays so syncs do not import it
-   * again, until someone in the household signs in to the store again.
+   * Receipt evidence that is not an image: a store order imported as a
+   * receipt, or a purchase a person typed in, keyed by its client ID. A retry
+   * reads the evidence again. When an imported order's receipt is deleted, the
+   * order number stays so syncs do not import it again, until someone in the
+   * household signs in to the store again.
    */
   receiptImports: defineTable({
     householdId: v.id("households"),
-    provider: v.literal("oda"),
+    provider: v.union(v.literal("oda"), v.literal("manual")),
     orderNumber: v.string(),
     receiptId: v.id("receipts").optional(),
     data: receiptDataValidator.optional(),

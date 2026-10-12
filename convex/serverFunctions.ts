@@ -20,7 +20,7 @@ triggers.register("receipts", async (ctx, change) => {
   );
 });
 
-// A deleted receipt takes its imported order data with it.
+// A deleted receipt takes its imported evidence with it.
 triggers.register("receipts", async (ctx, change) => {
   if (change.operation !== "delete") return;
 
@@ -29,8 +29,10 @@ triggers.register("receipts", async (ctx, change) => {
     .withIndex("by_receiptId", (q) => q.eq("receiptId", change.id))
     .unique();
 
+  if (imported?.provider === "manual")
+    await ctx.db.delete("receiptImports", imported._id);
   // The order number stays, so the next sync does not bring the receipt back.
-  if (imported)
+  else if (imported)
     await ctx.db.patch("receiptImports", imported._id, {
       receiptId: undefined,
       data: undefined,

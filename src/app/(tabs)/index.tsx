@@ -1,4 +1,5 @@
 import { CaptureReview } from "@/features/capture-review";
+import { ManualPurchaseSheet } from "@/features/manual-purchase";
 import { recordEvent } from "@/lib/observability";
 import {
   useCallback,
@@ -66,6 +67,66 @@ function uploadStatusTitle(
   return saved === 1 ? "Lastet opp" : `${saved} kvitteringer lastet opp`;
 }
 
+type SaveNote = { uploading: boolean; failed: boolean; title: string };
+
+/** The note after saving: photos to follow through upload, or a purchase typed in. */
+function saveNote(
+  saved: number,
+  entered: boolean,
+  queue: readonly { error?: unknown }[],
+  online: boolean,
+): SaveNote | null {
+  if (saved > 0) {
+    const uploading = queue.some((entry) => !entry.error);
+    const failed = queue.some((entry) => !!entry.error);
+
+    return {
+      uploading,
+      failed,
+      title: uploadStatusTitle(saved, uploading, failed, online),
+    };
+  }
+
+  return entered
+    ? { uploading: false, failed: false, title: "Kjøpet er lagt inn" }
+    : null;
+}
+
+function SaveNotePanel({
+  note,
+  onClose,
+}: Readonly<{ note: SaveNote; onClose: () => void }>) {
+  const colors = useTheme();
+
+  return (
+    <Panel style={{ gap: 4 }}>
+      <View style={{ flexDirection: "row", alignItems: "center", gap: 10 }}>
+        {note.uploading ? (
+          <ActivityIndicator color={colors.primary} />
+        ) : (
+          <Icon
+            name={
+              note.failed ? "arrow.clockwise.circle" : "checkmark.circle.fill"
+            }
+            size={22}
+            color={note.failed ? colors.warning : colors.success}
+          />
+        )}
+        <Copy weight="700" style={{ flex: 1 }}>
+          {note.title}
+        </Copy>
+        <IconButton
+          name="xmark"
+          label="Lukk"
+          size={14}
+          color={colors.secondary}
+          onPress={onClose}
+        />
+      </View>
+    </Panel>
+  );
+}
+
 export default function Capture() {
   const colors = useTheme();
   const largeText = useLargeText();
@@ -95,6 +156,8 @@ export default function Capture() {
   const busyRef = useRef(false);
   const [error, setError] = useState("");
   const [saved, setSaved] = useState(0);
+  const [entering, setEntering] = useState(false);
+  const [entered, setEntered] = useState(false);
   const arrival = useArrival();
   const departure = useDeparture();
   useEffect(() => {
@@ -118,6 +181,7 @@ export default function Capture() {
       setOperation("working");
       setError("");
       setSaved(0);
+      setEntered(false);
 
       try {
         await action();
@@ -272,18 +336,25 @@ export default function Capture() {
       void synchronize();
     });
 
-  const live = permission?.granted && focused && foreground && !review;
+  const live =
+    permission?.granted && focused && foreground && !review && !entering;
+
   const shutterDisabled = busy || !ready || !live;
 
-  const uploading = queue.some((entry) => !entry.error);
-  const failed = queue.some((entry) => !!entry.error);
+  const note = saveNote(saved, entered, queue, online);
+  const settled = !!note && !note.uploading && !note.failed;
+
   // Let the success note fade away on its own once the upload has landed.
   useEffect(() => {
-    if (!saved || uploading || failed) return undefined;
-    const timeout = setTimeout(() => setSaved(0), 8000);
+    if (!settled) return undefined;
+
+    const timeout = setTimeout(() => {
+      setSaved(0);
+      setEntered(false);
+    }, 8000);
 
     return () => clearTimeout(timeout);
-  }, [saved, uploading, failed]);
+  }, [settled, saved, entered]);
 
   const overlay = (children: ReactNode, style?: ViewStyle) => (
     <View
@@ -348,6 +419,23 @@ export default function Capture() {
           <View style={{ flex: 1 }} />
           <Press
             accessibilityRole="button"
+            accessibilityLabel="Legg inn kjøp uten kvittering"
+            disabled={busy}
+            accessibilityState={{ disabled: busy, busy }}
+            onPress={() => setEntering(true)}
+            style={{
+              width: 44,
+              height: 44,
+              borderRadius: 22,
+              backgroundColor: colors.cameraOverlay,
+              alignItems: "center",
+              justifyContent: "center",
+            }}
+          >
+            <Icon name="square.and.pencil" size={17} color={colors.onCamera} />
+          </Press>
+          <Press
+            accessibilityRole="button"
             accessibilityLabel="Importer PDF eller bilde fra Filer"
             disabled={busy}
             accessibilityState={{ disabled: busy, busy }}
@@ -368,37 +456,15 @@ export default function Capture() {
         {/* At large text the label takes its own line under the buttons. */}
         {largeText && label}
         <OfflineNotice />
-        {saved > 0 && (
+        {note && (
           <Animated.View entering={arrival} exiting={departure}>
-            <Panel style={{ gap: 4 }}>
-              <View
-                style={{ flexDirection: "row", alignItems: "center", gap: 10 }}
-              >
-                {uploading ? (
-                  <ActivityIndicator color={colors.primary} />
-                ) : (
-                  <Icon
-                    name={
-                      failed
-                        ? "arrow.clockwise.circle"
-                        : "checkmark.circle.fill"
-                    }
-                    size={22}
-                    color={failed ? colors.warning : colors.success}
-                  />
-                )}
-                <Copy weight="700" style={{ flex: 1 }}>
-                  {uploadStatusTitle(saved, uploading, failed, online)}
-                </Copy>
-                <IconButton
-                  name="xmark"
-                  label="Lukk"
-                  size={14}
-                  color={colors.secondary}
-                  onPress={() => setSaved(0)}
-                />
-              </View>
-            </Panel>
+            <SaveNotePanel
+              note={note}
+              onClose={() => {
+                setSaved(0);
+                setEntered(false);
+              }}
+            />
           </Animated.View>
         )}
         {!!error && !review && <Notice tone="error">{error}</Notice>}
@@ -581,6 +647,15 @@ export default function Capture() {
           )}
         </View>
       </SafeAreaView>
+      <ManualPurchaseSheet
+        visible={entering}
+        onClose={() => setEntering(false)}
+        onSaved={() => {
+          setEntering(false);
+          setSaved(0);
+          setEntered(true);
+        }}
+      />
       <CaptureReview
         photos={photos}
         combined={combined}

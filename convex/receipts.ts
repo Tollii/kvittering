@@ -148,7 +148,7 @@ export const reserve = mutation({
 
     if (args.imageCount > maxReceiptImages)
       throw new ConvexError(receiptImageLimitMessage);
-    await consumeReceiptQuota(ctx, member, args.retryMetadata);
+    await consumeReceiptQuota(ctx, member, args);
 
     return ctx.db.insert("receipts", {
       householdId: member.householdId,

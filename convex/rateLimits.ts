@@ -74,8 +74,11 @@ export async function consumeMcpQuota(
 export async function consumeReceiptQuota(
   ctx: MutationCtx,
   member: Pick<Doc<"members">, "identity" | "householdId">,
-  retryMetadata = false,
+  { retryMetadata = false, imagesWait = true } = {},
 ) {
+  // A purchase typed in has no images; the form keeps what was typed.
+  const waiting = imagesWait ? " Bildene blir liggende i køen." : "";
+
   for (const key of [
     `user:${member.identity}`,
     `household:${member.householdId}`,
@@ -86,8 +89,8 @@ export async function consumeReceiptQuota(
       if (!result.ok) {
         const message =
           name === "receiptDaily"
-            ? "Dagens grense for kvitteringer er nådd. Prøv igjen i morgen. Bildene blir liggende i køen."
-            : "For mange kvitteringer på kort tid. Vent ett minutt og prøv igjen. Bildene blir liggende i køen.";
+            ? `Dagens grense for kvitteringer er nådd. Prøv igjen i morgen.${waiting}`
+            : `For mange kvitteringer på kort tid. Vent ett minutt og prøv igjen.${waiting}`;
 
         throw new ConvexError(
           retryMetadata
