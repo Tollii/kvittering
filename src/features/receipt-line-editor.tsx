@@ -268,7 +268,7 @@ export function ReceiptLineEditor({
         </View>
       )}
       {/* The line header expands the editor, so accepting is the one button. */}
-      {!showEditor && review && readerIssues.length > 0 && (
+      {!showEditor && readerIssues.length > 0 && (
         <View style={{ flexDirection: "row" }}>
           <Button
             title="Dette stemmer"

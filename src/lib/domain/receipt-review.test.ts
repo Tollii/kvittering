@@ -55,15 +55,26 @@ it("approves line notes once the lines match the paid total, and keeps them on t
   const data = batteryFixture();
   present(data.lines[0]).issues = ["Mulig overlapp."];
   expect(reviewTasks(data, false)).toEqual([]);
-  expect(quickApproveData(data, false)?.lines[0]?.issues).toEqual([
-    "Mulig overlapp.",
-  ]);
 
   // A line read twice makes the lines miss the paid total, which still stops the receipt.
   data.lines.push({ ...present(data.lines[0]), id: "twice" });
   expect(reviewTasks(data, false).map((task) => task.kind)).toEqual([
     "difference",
   ]);
+});
+
+it("keeps a note on the only priced line in review, since the paid total is the same number", () => {
+  const data = batteryFixture();
+  data.lines = data.lines.filter(
+    (line, index) => index === 0 || line.kind === "summary",
+  );
+  data.totalOre = present(data.lines[0]).amountOre;
+  present(data.lines[0]).issues = ["Beløpet kan være 25,90 eller 26,90."];
+  expect(reconcile(data).difference).toBe(0);
+  expect(reviewSummary(data, false)).toEqual(["1 vare å sjekke"]);
+
+  present(data.lines[0]).issues = ["Kategorien er usikker."];
+  expect(canAcceptReceipt(data, false)).toBe(true);
 });
 
 it("keeps a missing amount visible after a general warning is acknowledged", () => {

@@ -191,6 +191,13 @@ function reviewStep(task: ReviewTask, context: StepContext): Step {
         icon: "textformat",
         onPress: toLines,
       };
+    case "line-note":
+      return {
+        label,
+        hint: "Betalt beløp er samme tall som varen, så se over merknaden.",
+        icon: "exclamationmark.circle",
+        onPress: toLines,
+      };
   }
 }
 

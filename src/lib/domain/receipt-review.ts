@@ -145,10 +145,7 @@ export function applyClassifications(
   }
 }
 
-/**
- * Categories, product matching, package information and the reader's notes on
- * a line do not block receipt approval. Those notes stay on the line.
- */
+/** Categories, product matching, and package information do not block receipt approval. */
 export function canAcceptReceipt(
   data: ReceiptData,
   unresolvedDuplicate: boolean,
@@ -225,6 +222,7 @@ export type ReviewTask =
   | { kind: "no-lines" }
   | { kind: "amounts"; count: number }
   | { kind: "names"; count: number }
+  | { kind: "line-note" }
   | { kind: "receipt-issues"; issues: string[] };
 
 /**
@@ -233,8 +231,9 @@ export type ReviewTask =
  *
  * A reader's note on one line is not an exception. Its money is settled by
  * the paid total: an unknown amount or a sum that misses the total stops the
- * receipt on its own. What is left is the line's identity, which only affects
- * its category, and the note stays on the line for a person to check.
+ * receipt on its own. The note stays on the line for a person to check. With
+ * one priced line the paid total is the same printed number, so it settles
+ * nothing and the note still stops the receipt.
  */
 export function assessReceipt(
   data: ParsedReceipt,
@@ -297,6 +296,16 @@ export function assessReceipt(
 
   if (names) tasks.push({ kind: "names", count: names });
 
+  const priced = data.lines.filter(
+    (line) => !isTotalsLine(line.kind) && line.amountOre !== null,
+  );
+
+  if (
+    priced.length === 1 &&
+    priced[0]?.issues.some((issue) => !isCategoryUncertain(issue))
+  )
+    tasks.push({ kind: "line-note" });
+
   return { acceptable: tasks.length === 0, tasks };
 }
 
@@ -337,6 +346,8 @@ export function reviewTaskLabel(task: ReviewTask): string {
       return `${task.count} beløp mangler`;
     case "names":
       return `${task.count} navn mangler`;
+    case "line-note":
+      return "1 vare å sjekke";
   }
 }
 

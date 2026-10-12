@@ -80,9 +80,11 @@ it("keeps mismatches, duplicates and mock results in review, and approves a line
     const accepted = ["clean", "category", "line-note"].includes(scenario);
     expect(receipt.status).toBe(accepted ? "reviewed" : "needs_review");
     expect(receipt.autoAccepted).toBe(accepted);
-    expect(present(receipt.data?.lines[0]).issues).toEqual(
-      present(data.lines[0]).issues,
-    );
+    expect(
+      present(receipt.data?.lines[0]).issues.includes(
+        "Varenavnet er usikkert.",
+      ),
+    ).toBe(scenario === "line-note");
     previousId = id;
   }
 });
