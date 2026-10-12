@@ -91,7 +91,7 @@ States: `disabled` fades the button; `busy` shows a spinner in place of the icon
 
 - `title` and `subtitle` draw the cobalt hero header with the arch mark; `settings` adds `SettingsButton`.
 - `summary` takes a `SummaryBand`, which sits under the header edge to edge.
-- `footer` pins an action bar to the bottom, above the home indicator, on `surface` with a hairline top border. At large text it scrolls in after the content instead, so it never covers most of the screen.
+- `footer` pins an action bar to the bottom, above the home indicator, on `surface` with a hairline top border. At large text it scrolls in after the content instead, so it never covers most of the screen. While the keyboard is up, a scrolling screen leaves its footer behind the keyboard and scrolls the focused field above the keyboard and its "Ferdig" bar; `Sheet` does the same.
 
 Pass `insetTop={false}` when a native stack header already covers the top inset.
 

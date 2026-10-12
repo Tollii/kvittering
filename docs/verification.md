@@ -58,7 +58,9 @@ then read the job summary and the `e2e-ios` artifact with its screenshots.
 
 The fingerprint also hashes `package.json` scripts and the `patches/` directory,
 so a JavaScript-only fix delivered as a patch or a new script still needs a
-TestFlight build. Prefer `overrides`, a direct dependency, or a Metro and Jest
+TestFlight build. [`fingerprint.config.js`](../fingerprint.config.js) adds the
+Swift sources in `native/ios`, which config plugins copy into the iOS project
+and the default fingerprint would miss. Prefer `overrides`, a direct dependency, or a Metro and Jest
 shim for dependency fixes.
 
 The `Change areas` job summary lists the review checklist for each area the

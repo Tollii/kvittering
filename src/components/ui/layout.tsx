@@ -85,6 +85,18 @@ export function SummaryBand({
   );
 }
 
+/**
+ * A scroll view with text fields makes room for the keyboard itself and
+ * scrolls the focused field above it and its "Ferdig" bar. Shrinking the view
+ * around it instead leaves a field near the bottom hidden, so a scrolling
+ * screen or sheet lets its footer stay behind the keyboard.
+ */
+export const keyboardScrolling = {
+  automaticallyAdjustKeyboardInsets: true,
+  keyboardShouldPersistTaps: "handled",
+  keyboardDismissMode: "interactive",
+} as const;
+
 export function Screen({
   children,
   title,
@@ -187,13 +199,13 @@ export function Screen({
       {statusBarStyle && <StatusBar style={statusBarStyle} />}
       <KeyboardAvoidingView
         behavior={Platform.OS === "ios" ? "padding" : undefined}
+        enabled={!scrollable}
         style={{ flex: 1, backgroundColor: colors.background }}
       >
         {scrollable ? (
           <ScrollView
             style={{ flex: 1 }}
-            keyboardShouldPersistTaps="handled"
-            keyboardDismissMode="interactive"
+            {...keyboardScrolling}
             contentInsetAdjustmentBehavior="automatic"
             contentContainerStyle={{ flexGrow: 1 }}
           >
@@ -294,11 +306,11 @@ export function Sheet({
         <KeyboardAvoidingView
           style={{ flex: 1 }}
           behavior={Platform.OS === "ios" ? "padding" : undefined}
+          enabled={!scrollable}
         >
           {scrollable ? (
             <ScrollView
-              keyboardShouldPersistTaps="handled"
-              keyboardDismissMode="interactive"
+              {...keyboardScrolling}
               contentContainerStyle={{
                 padding: 16,
                 paddingTop: 4,

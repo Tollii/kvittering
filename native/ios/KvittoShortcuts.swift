@@ -13,6 +13,21 @@ struct OpenReceiptsIntent: AppIntent {
   }
 }
 
+/// Shortcuts made with build 18 and earlier run this action by its type name.
+/// It stays, hidden from the action list, and opens Kvitteringer instead.
+struct OpenInboxIntent: AppIntent {
+  static let title: LocalizedStringResource = "Åpne innboks"
+  static let description = IntentDescription("Åpner kvitteringene i Kvitto, med dem som trenger kontroll øverst.")
+  static let openAppWhenRun = true
+  static let isDiscoverable = false
+
+  @MainActor
+  func perform() async throws -> some IntentResult {
+    await UIApplication.shared.open(URL(string: "kvitto:///(tabs)/receipts?show=pending")!)
+    return .result()
+  }
+}
+
 enum PurchaseMonth: String, AppEnum {
   case january, february, march, april, may, june, july, august, september, october, november, december
 
