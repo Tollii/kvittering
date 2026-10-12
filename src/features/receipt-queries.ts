@@ -8,6 +8,7 @@ import { useQueryLifecycle } from "./query-lifecycle-context";
 import { recordEvent } from "@/lib/observability";
 import {
   createReceiptSelector,
+  historyPage,
   listedInHistory,
   selectReceiptHistory,
 } from "../lib/receipt-selection";
@@ -88,12 +89,20 @@ export function useReceiptHistory(search: string, enabled: boolean) {
     [cache.receipts, search],
   );
 
-  if (!cache.available)
+  if (!cache.available) {
+    const results = page.results.filter((receipt) =>
+      listedInHistory(receipt, search),
+    );
+
     return {
       ...page,
-      results: page.results.filter(listedInHistory),
+      results,
+      /** Every receipt the history lists, once all of it is known. */
+      total: page.status === "Exhausted" ? results.length : undefined,
     };
-  const results = search.trim() ? selected : selected.slice(0, limit);
+  }
+
+  const results = search.trim() ? selected : historyPage(selected, limit);
 
   return {
     results,
@@ -102,8 +111,11 @@ export function useReceiptHistory(search: string, enabled: boolean) {
       : results.length < selected.length
         ? ("CanLoadMore" as const)
         : ("Exhausted" as const),
-    loadMore: (count: number) => setLimit((value) => value + count),
+    // A page can run past the limit to finish a month, so more starts after what is shown.
+    loadMore: (count: number) =>
+      setLimit((value) => Math.max(value, results.length) + count),
     isLoading: !cache.complete,
+    total: cache.complete ? selected.length : undefined,
   };
 }
 

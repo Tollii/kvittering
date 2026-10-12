@@ -1,6 +1,7 @@
 import { expect, it } from "vitest";
 import {
   createReceiptSelector,
+  listedInHistory,
   selectReceiptHistory,
 } from "./receipt-selection";
 import { receiptFixture, testId } from "./testing/receipts";
@@ -27,21 +28,34 @@ it("reuses equivalent scopes and updates selections when their values or receipt
   ).toEqual([]);
 });
 
-it("keeps receipts that are still being read out of the months until they are read, unless excluded", () => {
+it("lists each receipt once: pinned receipts stay out of the months unless a search hides the pinned sections", () => {
   const receipt = (
     id: string,
-    status: "processing" | "needs_review",
+    status: "processing" | "needs_review" | "failed" | "reviewed",
     excluded = false,
   ) => receiptFixture({ _id: testId<"receipts">(id), status, excluded });
 
-  const listed = selectReceiptHistory(
-    [
-      receipt("reading", "processing"),
-      receipt("excluded", "processing", true),
-      receipt("review", "needs_review"),
-    ],
-    "",
-  ).map((item) => item._id);
+  const receipts = [
+    receipt("reading", "processing"),
+    receipt("excluded", "processing", true),
+    receipt("review", "needs_review"),
+    receipt("failed", "failed"),
+    receipt("reviewed", "reviewed"),
+  ];
 
-  expect(listed).toEqual([testId("excluded"), testId("review")]);
+  const listed = (search: string) =>
+    selectReceiptHistory(receipts, search).map((item) => item._id);
+
+  expect(listed("")).toEqual([testId("excluded"), testId("reviewed")]);
+  expect(listed("  ")).toEqual([testId("excluded"), testId("reviewed")]);
+  expect(
+    receipts.flatMap((item) =>
+      listedInHistory(item, "kiwi") ? [item._id] : [],
+    ),
+  ).toEqual([
+    testId("excluded"),
+    testId("review"),
+    testId("failed"),
+    testId("reviewed"),
+  ]);
 });

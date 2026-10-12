@@ -4,7 +4,11 @@ import type { api } from "../../convex/_generated/api";
 import type { Receipt } from "./domain/insights";
 import { productIdentityKey } from "./domain/product-reference";
 import { isReceiptProcessing } from "./domain/receipt-state";
-import { receiptListItem, receiptSearchText } from "./domain/receipt-summary";
+import {
+  receiptListItem,
+  receiptSearchText,
+  type ReceiptListItem,
+} from "./domain/receipt-summary";
 
 export function selectReceipts(
   receipts: Receipt[],
@@ -50,13 +54,20 @@ export function selectReceipts(
 }
 
 /**
- * Receipts still on their way in are listed under "Under behandling" until they
- * are read. An excluded receipt is never there, so it stays in its month.
+ * Without a search, receipts that wait for a person or are still on their way in
+ * are listed only in the pinned sections above the months, so each receipt shows
+ * once. A search hides those sections, so it lists every read receipt that
+ * matches. An excluded receipt is never pinned, so it stays in its month.
  */
 export function listedInHistory(
   receipt: Readonly<{ status: Receipt["status"]; excluded: boolean }>,
+  search: string,
 ) {
-  return !isReceiptProcessing(receipt.status) || receipt.excluded;
+  if (receipt.excluded) return true;
+
+  return search.trim()
+    ? !isReceiptProcessing(receipt.status)
+    : receipt.status === "reviewed";
 }
 
 export function selectReceiptHistory(receipts: Receipt[], search: string) {
@@ -64,7 +75,8 @@ export function selectReceiptHistory(receipts: Receipt[], search: string) {
 
   return receipts
     .flatMap((receipt) =>
-      listedInHistory(receipt) && receiptSearchText(receipt).includes(term)
+      listedInHistory(receipt, search) &&
+      receiptSearchText(receipt).includes(term)
         ? [receiptListItem(receipt)]
         : [],
     )
@@ -78,6 +90,27 @@ export function selectReceiptHistory(receipts: Receipt[], search: string) {
               ? -1
               : 0) || right._creationTime - left._creationTime,
     );
+}
+
+/**
+ * The first `limit` receipts of a history sorted by month, extended to the end
+ * of the last month it reaches, so every month shown carries its full count
+ * and spending.
+ */
+export function historyPage(receipts: ReceiptListItem[], limit: number) {
+  const month = (receipt: ReceiptListItem | undefined) =>
+    receipt?.purchaseDate ? CalendarDate.month(receipt.purchaseDate) : null;
+
+  let end = Math.min(limit, receipts.length);
+
+  while (
+    end > 0 &&
+    end < receipts.length &&
+    month(receipts[end]) === month(receipts[end - 1])
+  )
+    end++;
+
+  return receipts.slice(0, end);
 }
 
 /** Keep a selection stable when callers construct an equivalent scope on each render. */

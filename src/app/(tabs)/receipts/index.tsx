@@ -85,6 +85,13 @@ export default function Receipts() {
       .includes(search.trim().toLocaleLowerCase("nb-NO")),
   );
 
+  // Without a search the view also lists the pinned receipts. A count shows only once every receipt is known.
+  const receiptCount =
+    history.total === undefined || (!term && pending.loading)
+      ? undefined
+      : history.total +
+        (term ? 0 : pending.attention.length + pending.working.length);
+
   return (
     <Screen
       title={Platform.OS === "ios" ? undefined : "Kvitteringer"}
@@ -122,9 +129,15 @@ export default function Receipts() {
         options={[
           {
             value: "receipts",
-            label: `Kvitteringer (${history.results.length})`,
+            label: counted("Kvitteringer", receiptCount),
           },
-          { value: "products", label: `Varer (${products.length})` },
+          {
+            value: "products",
+            label: counted(
+              "Varer",
+              completeProducts ? products.length : undefined,
+            ),
+          },
         ]}
       />
       <OfflineNotice />
@@ -141,7 +154,11 @@ export default function Receipts() {
   );
 }
 
-/** What waits for a person on top, then every read receipt by month. A search shows only the matches. */
+function counted(label: string, count: number | undefined) {
+  return count === undefined ? label : `${label} (${count})`;
+}
+
+/** What waits for a person on top, then every other receipt by month, so each shows once. A search shows only the matches. */
 function ReceiptsView({
   history,
   pending,
@@ -156,13 +173,15 @@ function ReceiptsView({
 
   return (
     <>
-      {history.status !== "Exhausted" && (
-        <Notice>
-          {searching
-            ? "Henter hele resultatet …"
-            : "Viser innlastede kvitteringer."}
-        </Notice>
+      {searching && history.status !== "Exhausted" && (
+        <Notice>Henter hele resultatet …</Notice>
       )}
+      {/* Without the local copy, the last month shown may still miss receipts that are not fetched yet. */}
+      {!searching &&
+        history.status === "CanLoadMore" &&
+        history.total === undefined && (
+          <Notice>Viser innlastede kvitteringer.</Notice>
+        )}
       {!searching && <PendingReceipts {...pending} />}
       {loading ? <Loading /> : <ReceiptMonths receipts={history.results} />}
       {empty && searching && (
