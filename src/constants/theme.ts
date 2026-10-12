@@ -142,12 +142,14 @@ export type TypeStyle = {
  * tracking and small text loosens it. Weight carries meaning, so a caller may
  * override it; the other values belong to the role.
  *
- * Each role grows with the person's text size along the curve of one iOS text
+ * Each role grows with the person's text size by the ratio of one iOS text
  * style, its `ramp`: titles and amounts grow less than body text and captions
- * grow more, and every role stops where its style stops at the largest size.
- * The two amounts follow Large Title, so a detail amount stays smaller than
- * the hero amount at every size. `counter` is the number in a small badge over
- * a photo, and `maxScale` caps it so the badge stays small.
+ * grow more. A role larger than its style ends larger than the style does, so
+ * `maxScale` holds the screen title and the hero amount at their AX5 sizes,
+ * where longer titles would break mid-word. The two amounts follow Large
+ * Title, so a detail amount stays smaller than the hero amount at every size.
+ * `counter` is the number in a small badge over a photo, capped so the badge
+ * stays small.
  */
 export const typeScale = {
   heroAmount: {
@@ -156,6 +158,7 @@ export const typeScale = {
     tracking: -0.7,
     weight: "600",
     ramp: "largeTitle",
+    maxScale: 1.7,
   },
   amount: {
     size: 32,
@@ -170,6 +173,7 @@ export const typeScale = {
     tracking: -0.4,
     weight: "600",
     ramp: "title2",
+    maxScale: 2.4,
   },
   sheetTitle: {
     size: 20,
