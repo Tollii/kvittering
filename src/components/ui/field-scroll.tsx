@@ -78,14 +78,16 @@ export function FieldScrollView({
   };
 
   useEffect(() => {
-    const shown = Keyboard.addListener("keyboardDidShow", (event) =>
+    // Fires when the keyboard shows, hides, or changes height, such as
+    // switching from the number pad to letters while the field keeps focus.
+    const changed = Keyboard.addListener("keyboardDidChangeFrame", (event) =>
       reveal(event.endCoordinates.screenY),
     );
 
     const hidden = Keyboard.addListener("keyboardDidHide", () => setCovered(0));
 
     return () => {
-      shown.remove();
+      changed.remove();
       hidden.remove();
     };
   });
