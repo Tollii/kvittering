@@ -1,35 +1,20 @@
 "use node";
 
-import { Buffer } from "node:buffer";
 import { connect } from "node:http2";
-import { createPrivateKey, sign } from "node:crypto";
 import { v } from "convex/values";
 import { internalAction, env } from "./_generated/server";
 import { internal } from "./_generated/api";
+import { appleJwt } from "./appleJwt";
 
 function authorization() {
   if (!env.APNS_KEY_ID || !env.APNS_TEAM_ID || !env.APNS_PRIVATE_KEY)
     return null;
 
-  const header = Buffer.from(
-    JSON.stringify({ alg: "ES256", kid: env.APNS_KEY_ID }),
-  ).toString("base64url");
-
-  const claims = Buffer.from(
-    JSON.stringify({
-      iss: env.APNS_TEAM_ID,
-      iat: Math.floor(Date.now() / 1000),
-    }),
-  ).toString("base64url");
-
-  const message = `${header}.${claims}`;
-
-  const signature = sign("sha256", Buffer.from(message), {
-    key: createPrivateKey(env.APNS_PRIVATE_KEY.replaceAll("\\n", "\n")),
-    dsaEncoding: "ieee-p1363",
-  }).toString("base64url");
-
-  return `${message}.${signature}`;
+  return appleJwt({
+    keyId: env.APNS_KEY_ID,
+    privateKey: env.APNS_PRIVATE_KEY,
+    claims: { iss: env.APNS_TEAM_ID, iat: Math.floor(Date.now() / 1000) },
+  });
 }
 
 function send(
@@ -106,7 +91,7 @@ export const deliver = internalAction({
     let status = 0;
 
     try {
-      const jwt = authorization();
+      const jwt = await authorization();
 
       if (!jwt || !activity.token || !activity.environment) {
         if (args.expired || activity.expiresAt <= Date.now())

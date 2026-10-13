@@ -54,6 +54,28 @@ export async function releaseMutation<
   }
 }
 
+/** An action with the installed release, for work that calls another service first. */
+export async function releaseAction<
+  A extends FunctionReference<"action", "public">,
+>(
+  convex: ConvexReactClient,
+  action: A,
+  args: FunctionArgs<A>,
+): Promise<FunctionReturnType<A>> {
+  const operation = getFunctionName(action);
+  const started = Date.now();
+
+  try {
+    // oxlint-disable-next-line typescript/no-unsafe-return -- typescript-go resolves FunctionReturnType<A> to any here; TypeScript resolves the declared type.
+    return await convex.action(action, { ...args, client: installedRelease });
+  } catch (error) {
+    throw releaseError(error, operation, {
+      operation,
+      durationMs: Date.now() - started,
+    });
+  }
+}
+
 export function useReleaseMutation<
   M extends FunctionReference<"mutation", "public">,
 >(mutation: M) {

@@ -54,6 +54,29 @@ export async function requestAppleIdentity() {
   }
 }
 
+/** A fresh authorization code, which the backend exchanges to revoke Kvitto's Apple access. */
+export async function requestAppleAuthorization() {
+  try {
+    const credential = await AppleAuthentication.signInAsync({
+      requestedScopes: [],
+    });
+
+    if (!credential.authorizationCode)
+      throw new Error("Apple returnerte ingen bekreftelse. Prøv igjen.");
+
+    return credential.authorizationCode;
+  } catch (error) {
+    const parsed = nativeError.safeParse(error);
+
+    if (parsed.success && parsed.data.code === "ERR_REQUEST_CANCELED")
+      return null;
+
+    throw new Error("Kunne ikke bekrefte med Apple. Prøv igjen.", {
+      cause: error,
+    });
+  }
+}
+
 /** Rejections the person can act on; any other code is a failure worth reporting. */
 export function isAppleRejection(code?: string) {
   return code === "OAUTH_LINK_ERROR" || code === "LINKING_FAILED";

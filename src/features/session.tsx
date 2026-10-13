@@ -318,6 +318,16 @@ function HouseholdProvider({
             });
           regroupQueuedReceipt(owner, household.id, id, selected);
         },
+        discardQueue: () => {
+          if (drainQueue.isRunning())
+            throw new UserError({
+              code: "REJECTED",
+              message: "Vent til opplastingsforsøket er ferdig.",
+            });
+
+          for (const entry of receiptStorage.list(owner, household.id))
+            receiptStorage.remove(entry);
+        },
       }}
     >
       <ReceiptCacheProvider

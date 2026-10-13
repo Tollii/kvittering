@@ -31,7 +31,7 @@ If a step fails or targets an unexpected deployment, stop dependent work and ins
 
 Read bundle IDs, Apple team, app groups, and extensions from `app.json`, `eas.json`, and the plugins. For changed capabilities, verify Apple Developer enablement and provisioning for the main app and affected extensions. Regenerated Expo native files are not the source of these settings.
 
-Native Apple identity-token sign-in does not require browser OAuth credentials. Verify registration, repeat login, cancellation, Hide My Email, explicit linking, and retained household/queue access on a signed iPhone when that path changes. Public release also needs the unresolved account-deletion and Apple-revocation work in [open work](../../../plans/README.md).
+Native Apple identity-token sign-in does not require browser OAuth credentials. Verify registration, repeat login, cancellation, Hide My Email, explicit linking, and retained household/queue access on a signed iPhone when that path changes. Account deletion revokes the Apple ID with a Sign in with Apple key, so a deployment that offers Apple sign-in needs `APNS_TEAM_ID`, `APPLE_SIGN_IN_KEY_ID`, and `APPLE_SIGN_IN_PRIVATE_KEY`; verify deletion of an Apple-linked account on a signed iPhone when that path changes.
 
 For remote Live Activity updates, check the credentials read by [liveActivityPush.ts](../../../convex/liveActivityPush.ts). Use an APNs signing key for the app, not an App Store Connect key or Expo notification token. Foreground updates without these credentials do not prove suspended-app delivery. Verify APNs delivery and background transfers on a signed physical iPhone; simulator results cannot establish either.
 

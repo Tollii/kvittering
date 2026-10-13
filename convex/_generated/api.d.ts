@@ -9,8 +9,11 @@
  */
 
 import type * as access from "../access.js";
+import type * as account from "../account.js";
 import type * as aiModels from "../aiModels.js";
 import type * as aliases from "../aliases.js";
+import type * as appleJwt from "../appleJwt.js";
+import type * as appleSignIn from "../appleSignIn.js";
 import type * as auth from "../auth.js";
 import type * as catalog from "../catalog.js";
 import type * as catalogClassifier from "../catalogClassifier.js";
@@ -126,8 +129,11 @@ import type {
 
 declare const fullApi: ApiFromModules<{
   access: typeof access;
+  account: typeof account;
   aiModels: typeof aiModels;
   aliases: typeof aliases;
+  appleJwt: typeof appleJwt;
+  appleSignIn: typeof appleSignIn;
   auth: typeof auth;
   catalog: typeof catalog;
   catalogClassifier: typeof catalogClassifier;
