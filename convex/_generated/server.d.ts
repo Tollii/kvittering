@@ -35,6 +35,8 @@ type Env = {
   readonly APNS_KEY_ID: string | undefined;
   readonly APNS_PRIVATE_KEY: string | undefined;
   readonly APNS_TEAM_ID: string | undefined;
+  readonly APPLE_SIGN_IN_KEY_ID: string | undefined;
+  readonly APPLE_SIGN_IN_PRIVATE_KEY: string | undefined;
   readonly BETTER_AUTH_SECRET: string | undefined;
   readonly EXPO_ACCESS_TOKEN: string | undefined;
   readonly KASSALAPP_API_KEY: string | undefined;

@@ -230,21 +230,27 @@ export const sync = mutation({
   },
 });
 
+/** Stop importing at once; Oda forgets the sign-in in the background. */
+export async function forgetOdaConnection(ctx: MutationCtx, identity: string) {
+  const connection = await connectionOf(ctx, identity);
+
+  if (!connection) return;
+
+  await ctx.db.delete("odaConnections", connection._id);
+  await ctx.scheduler.runAfter(0, internal.oda.revoke, {
+    clientId: connection.clientId,
+    token: connection.refreshToken ?? connection.accessToken,
+  });
+}
+
 /** Forget the Oda account. Receipts already imported stay. */
 export const disconnect = mutation({
   args: {},
   returns: v.null(),
   handler: async (ctx) => {
     const member = await requireMember(ctx);
-    const connection = await connectionOf(ctx, member.identity);
 
-    if (connection) {
-      await ctx.db.delete("odaConnections", connection._id);
-      await ctx.scheduler.runAfter(0, internal.oda.revoke, {
-        clientId: connection.clientId,
-        token: connection.refreshToken ?? connection.accessToken,
-      });
-    }
+    await forgetOdaConnection(ctx, member.identity);
 
     return null;
   },

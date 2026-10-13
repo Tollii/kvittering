@@ -43,6 +43,7 @@ import {
   usePendingReceipts,
 } from "@/features/pending-receipts";
 import type { ReceiptListItem } from "@/lib/domain/receipt-summary";
+import { receiptMonth } from "@/lib/receipt-selection";
 
 export default function Receipts() {
   const [search, setSearch] = useState("");
@@ -72,10 +73,11 @@ export default function Receipts() {
   const history = useReceiptHistory(term, tab === "receipts");
   const pending = usePendingReceipts(tab === "receipts");
 
-  const { receipts, completeReceipts: completeProducts } = useCompleteReceipts(
-    { kind: "allProducts" },
-    tab === "products",
-  );
+  const {
+    receipts,
+    completeReceipts: completeProducts,
+    knownReceipts: knownProducts,
+  } = useCompleteReceipts({ kind: "allProducts" }, tab === "products");
 
   const allProducts = productHistory(receipts);
 
@@ -84,6 +86,14 @@ export default function Receipts() {
       .toLocaleLowerCase("nb-NO")
       .includes(search.trim().toLocaleLowerCase("nb-NO")),
   );
+
+  // A search hides the pinned sections. A count shows only once every receipt is known.
+  const showPinned = !term;
+
+  const receiptCount =
+    history.total === undefined || (showPinned && pending.loading)
+      ? undefined
+      : history.total + (showPinned ? pending.count : 0);
 
   return (
     <Screen
@@ -122,14 +132,24 @@ export default function Receipts() {
         options={[
           {
             value: "receipts",
-            label: `Kvitteringer (${history.results.length})`,
+            label: counted("Kvitteringer", receiptCount),
           },
-          { value: "products", label: `Varer (${products.length})` },
+          {
+            value: "products",
+            label: counted(
+              "Varer",
+              knownProducts ? products.length : undefined,
+            ),
+          },
         ]}
       />
       <OfflineNotice />
       {tab === "receipts" ? (
-        <ReceiptsView history={history} pending={pending} searching={!!term} />
+        <ReceiptsView
+          history={history}
+          pending={pending}
+          searching={!showPinned}
+        />
       ) : (
         <ProductsView
           allProducts={allProducts}
@@ -141,7 +161,11 @@ export default function Receipts() {
   );
 }
 
-/** What waits for a person on top, then every read receipt by month. A search shows only the matches. */
+function counted(label: string, count: number | undefined) {
+  return count === undefined ? label : `${label} (${count})`;
+}
+
+/** What waits for a person on top, then every other receipt by month, so each shows once. A search shows only the matches. */
 function ReceiptsView({
   history,
   pending,
@@ -156,12 +180,11 @@ function ReceiptsView({
 
   return (
     <>
-      {history.status !== "Exhausted" && (
-        <Notice>
-          {searching
-            ? "Henter hele resultatet …"
-            : "Viser innlastede kvitteringer."}
-        </Notice>
+      {searching && history.status !== "Exhausted" && (
+        <Notice>Henter hele resultatet …</Notice>
+      )}
+      {!searching && !loading && history.partialMonths && (
+        <Notice>Viser innlastede kvitteringer.</Notice>
       )}
       {!searching && <PendingReceipts {...pending} />}
       {loading ? <Loading /> : <ReceiptMonths receipts={history.results} />}
@@ -323,9 +346,7 @@ function ReceiptMonths({
   const months = new Map<CalendarMonth | "unknown", typeof sorted>();
 
   for (const receipt of sorted) {
-    const key = receipt.purchaseDate
-      ? CalendarDate.month(receipt.purchaseDate)
-      : "unknown";
+    const key = receiptMonth(receipt);
 
     months.set(key, [...(months.get(key) ?? []), receipt]);
   }

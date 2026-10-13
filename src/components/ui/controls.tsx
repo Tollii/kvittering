@@ -247,7 +247,7 @@ export function Field({
   onFocus,
   onBlur,
   ...props
-}: TextInputProps & { label: string; hint?: string }) {
+}: Omit<TextInputProps, "dynamicTypeRamp"> & { label: string; hint?: string }) {
   const colors = useTheme();
   const [focused, setFocused] = useState(false);
   const accessoryId = useId();
@@ -266,6 +266,8 @@ export function Field({
         selectionColor={colors.primary}
         {...props}
         ref={input}
+        // The system's 17-point input size, growing along the Body ramp.
+        dynamicTypeRamp="body"
         onFocus={(event) => {
           setFocused(true);
 

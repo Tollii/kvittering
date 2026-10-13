@@ -1,4 +1,5 @@
 import { needsAttention } from "@/lib/domain/receipt-state";
+import { isPinned } from "@/lib/receipt-selection";
 import { ReceiptActivityButton } from "@/features/receipt-activity";
 import { useCompleteReceipts } from "@/features/receipt-queries";
 import { UploadQueueCard } from "@/features/upload-queue-card";
@@ -21,10 +22,7 @@ export function usePendingReceipts(enabled: boolean) {
   const reserved = new Set(queue.map((entry) => entry.receiptId));
 
   const open = receipts.filter(
-    (receipt) =>
-      receipt.status !== "reviewed" &&
-      !receipt.excluded &&
-      !reserved.has(receipt._id),
+    (receipt) => isPinned(receipt) && !reserved.has(receipt._id),
   );
 
   const attention = open.filter((receipt) => needsAttention(receipt.status));

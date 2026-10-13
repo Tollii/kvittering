@@ -22,6 +22,7 @@ import {
 } from "@/lib/apple-authentication";
 
 import { useFeatureFlag } from "./featureFlags";
+import { DeleteAccountButton } from "./delete-account";
 import { failureMessage } from "@/lib/failure-message";
 import { UserError } from "@/lib/user-errors";
 import { reportError } from "@/lib/observability";
@@ -359,6 +360,7 @@ export function HouseholdSetup() {
             .catch(() => setError("Kunne ikke logge ut. Prøv igjen."));
         }}
       />
+      <DeleteAccountButton household={null} disabled={busy} />
     </Screen>
   );
 }

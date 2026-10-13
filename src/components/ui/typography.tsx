@@ -18,6 +18,7 @@ import {
   useTheme,
   type FontWeight,
   type TypeRole,
+  type TypeStyle,
 } from "@/constants/theme";
 
 /**
@@ -43,7 +44,11 @@ export const ShrinkToFit = createContext(true);
  */
 type TypeProps = Omit<
   TextProps,
-  "role" | "style" | "maxFontSizeMultiplier" | "allowFontScaling"
+  | "role"
+  | "style"
+  | "maxFontSizeMultiplier"
+  | "allowFontScaling"
+  | "dynamicTypeRamp"
 > & {
   role: TypeRole;
   /** Overrides the role's weight; weight carries meaning, size does not. */
@@ -57,13 +62,14 @@ type TypeProps = Omit<
 /** Draws one role of the type scale; `Copy` and `Amount` are its two faces. */
 function Type({ role, weight, muted = false, style, ...props }: TypeProps) {
   const colors = useTheme();
-  const scale = typeScale[role];
+  const scale: TypeStyle = typeScale[role];
 
   return (
     <Text
       // iOS pushes a lone last word onto the line before it, as UILabel does.
       lineBreakStrategyIOS="standard"
-      // Each role stops growing where its iOS text style does.
+      // Each role grows along its iOS text style's curve and stops where it does.
+      dynamicTypeRamp={scale.ramp}
       maxFontSizeMultiplier={scale.maxScale}
       {...props}
       style={[
