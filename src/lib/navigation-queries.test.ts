@@ -1,6 +1,8 @@
 import { ReceiptCacheContext } from "../features/receipt-cache-context";
 import { QueryLifecycleContext } from "../features/query-lifecycle-context";
 import { receiptFixture } from "./testing/receipts";
+import { date } from "./testing/calendar";
+import { batteryFixture } from "./mock-receipts";
 import type { ReceiptCacheSnapshot } from "./receipt-cache";
 import { z } from "zod";
 import { createElement, StrictMode, act } from "react";
@@ -255,10 +257,16 @@ it("loads optional report scopes only on demand and stops at sign-out", async ()
   expect(subscriptions.size).toBe(0);
 });
 
-it("retains local history pagination across tabs and keeps searches separate", async () => {
+it("pages local history by whole months, retains pagination across tabs and keeps searches separate", async () => {
   cache = {
     receipts: Array.from({ length: 40 }, (_, index) =>
-      receiptFixture({ _id: String(index) }),
+      receiptFixture({
+        _id: String(index),
+        data: {
+          ...batteryFixture(),
+          purchaseDate: date(index < 35 ? "2026-09-01" : "2026-08-01"),
+        },
+      }),
     ),
     sequence: 40,
     complete: true,
@@ -278,8 +286,10 @@ it("retains local history pagination across tabs and keeps searches separate", a
   }
 
   await show(History);
-  expect(result!.results).toHaveLength(30);
-  await act(async () => result!.loadMore(30));
+  expect(result!.results).toHaveLength(35);
+  expect(result!.status).toBe("CanLoadMore");
+  expect(result!.total).toBe(40);
+  await act(async () => result!.loadMore(1));
   enabled = false;
   await show(History);
   enabled = true;

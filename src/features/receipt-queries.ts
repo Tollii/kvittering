@@ -8,6 +8,7 @@ import { useQueryLifecycle } from "./query-lifecycle-context";
 import { recordEvent } from "@/lib/observability";
 import {
   createReceiptSelector,
+  historyPage,
   listedInHistory,
   selectReceiptHistory,
 } from "../lib/receipt-selection";
@@ -43,15 +44,18 @@ export function useCompleteReceipts(
   const [select] = useState(createReceiptSelector);
   const selected = select(cache.receipts, scope);
 
+  // `knownReceipts` holds every receipt, though the cache may be a change behind the server.
   return cache.available
     ? {
         receipts: selected,
         completeReceipts: cache.synchronized,
+        knownReceipts: cache.complete,
         loadingReceipts: !cache.complete,
       }
     : {
         receipts: page.results,
         completeReceipts: active && status === "Exhausted",
+        knownReceipts: active && status === "Exhausted",
         loadingReceipts: active && status !== "Exhausted",
       };
 }
@@ -88,12 +92,21 @@ export function useReceiptHistory(search: string, enabled: boolean) {
     [cache.receipts, search],
   );
 
-  if (!cache.available)
+  if (!cache.available) {
+    const results = page.results.filter((receipt) =>
+      listedInHistory(receipt, search),
+    );
+
     return {
       ...page,
-      results: page.results.filter(listedInHistory),
+      results,
+      total: page.status === "Exhausted" ? results.length : undefined,
+      // Server pages end at a row count, so the last month shown may be partial.
+      partialMonths: page.status !== "Exhausted",
     };
-  const results = search.trim() ? selected : selected.slice(0, limit);
+  }
+
+  const results = search.trim() ? selected : historyPage(selected, limit);
 
   return {
     results,
@@ -102,8 +115,12 @@ export function useReceiptHistory(search: string, enabled: boolean) {
       : results.length < selected.length
         ? ("CanLoadMore" as const)
         : ("Exhausted" as const),
-    loadMore: (count: number) => setLimit((value) => value + count),
+    // A page can run past the limit to finish a month, so more starts after what is shown.
+    loadMore: (count: number) =>
+      setLimit((value) => Math.max(value, results.length) + count),
     isLoading: !cache.complete,
+    total: cache.complete ? selected.length : undefined,
+    partialMonths: false,
   };
 }
 

@@ -1,10 +1,14 @@
-import { CalendarDate } from "./domain/calendar";
+import { CalendarDate, type CalendarMonth } from "./domain/calendar";
 import type { FunctionArgs } from "convex/server";
 import type { api } from "../../convex/_generated/api";
 import type { Receipt } from "./domain/insights";
 import { productIdentityKey } from "./domain/product-reference";
 import { isReceiptProcessing } from "./domain/receipt-state";
-import { receiptListItem, receiptSearchText } from "./domain/receipt-summary";
+import {
+  receiptListItem,
+  receiptSearchText,
+  type ReceiptListItem,
+} from "./domain/receipt-summary";
 
 export function selectReceipts(
   receipts: Receipt[],
@@ -49,14 +53,25 @@ export function selectReceipts(
     .sort((left, right) => right._creationTime - left._creationTime);
 }
 
+type ListedState = Readonly<{ status: Receipt["status"]; excluded: boolean }>;
+
 /**
- * Receipts still on their way in are listed under "Under behandling" until they
- * are read. An excluded receipt is never there, so it stays in its month.
+ * Receipts that wait for a person or are still on their way in are pinned above
+ * the months in Kvitteringer. An excluded receipt is never pinned.
  */
-export function listedInHistory(
-  receipt: Readonly<{ status: Receipt["status"]; excluded: boolean }>,
-) {
-  return !isReceiptProcessing(receipt.status) || receipt.excluded;
+export function isPinned(receipt: ListedState) {
+  return !receipt.excluded && receipt.status !== "reviewed";
+}
+
+/**
+ * Without a search, a pinned receipt stays out of the months, so each receipt
+ * shows once. A search hides the pinned sections, so it lists every read
+ * receipt that matches.
+ */
+export function listedInHistory(receipt: ListedState, search: string) {
+  return search.trim()
+    ? receipt.excluded || !isReceiptProcessing(receipt.status)
+    : !isPinned(receipt);
 }
 
 export function selectReceiptHistory(receipts: Receipt[], search: string) {
@@ -64,7 +79,8 @@ export function selectReceiptHistory(receipts: Receipt[], search: string) {
 
   return receipts
     .flatMap((receipt) =>
-      listedInHistory(receipt) && receiptSearchText(receipt).includes(term)
+      listedInHistory(receipt, search) &&
+      receiptSearchText(receipt).includes(term)
         ? [receiptListItem(receipt)]
         : [],
     )
@@ -78,6 +94,33 @@ export function selectReceiptHistory(receipts: Receipt[], search: string) {
               ? -1
               : 0) || right._creationTime - left._creationTime,
     );
+}
+
+/** The month a receipt is listed under in Kvitteringer. */
+export function receiptMonth(
+  receipt: Readonly<{ purchaseDate: ReceiptListItem["purchaseDate"] }>,
+): CalendarMonth | "unknown" {
+  return receipt.purchaseDate
+    ? CalendarDate.month(receipt.purchaseDate)
+    : "unknown";
+}
+
+/**
+ * The first `limit` receipts of a history sorted by month, extended to the end
+ * of the last month it reaches, so every month shown carries its full count
+ * and spending.
+ */
+export function historyPage(receipts: ReceiptListItem[], limit: number) {
+  const last = receipts[Math.min(limit, receipts.length) - 1];
+
+  if (!last) return [];
+
+  const end = receipts.findIndex(
+    (receipt, index) =>
+      index >= limit && receiptMonth(receipt) !== receiptMonth(last),
+  );
+
+  return end === -1 ? receipts : receipts.slice(0, end);
 }
 
 /** Keep a selection stable when callers construct an equivalent scope on each render. */
