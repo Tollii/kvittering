@@ -55,20 +55,33 @@ export function FieldScrollView({
   const scroll = useRef<ScrollView>(null);
   const focused = useRef<TextInput | null>(null);
   const offset = useRef(0);
+  // Each reveal, blur and hidden keyboard starts a new generation, so a
+  // measurement that returns late cannot apply an older keyboard frame.
+  const generation = useRef(0);
   const [covered, setCovered] = useState(0);
 
-  // The keyboard's top edge in the window, or null while it is hidden.
+  // keyboardTop is the keyboard's top edge in the window.
   const reveal = (keyboardTop: number) => {
     const input = focused.current;
     const frame = scroll.current?.getNativeScrollRef();
 
+    generation.current += 1;
+    const current = generation.current;
+
+    const stale = () =>
+      generation.current !== current || focused.current !== input;
+
     if (!input || !frame) return;
 
     frame.measureInWindow((_left, frameTop, _width, frameHeight) => {
+      if (stale()) return;
+
       const visibleBottom = Math.min(frameTop + frameHeight, keyboardTop);
       setCovered(Math.max(0, frameTop + frameHeight - keyboardTop));
 
       input.measureInWindow((_x, top, _w, height) => {
+        if (stale()) return;
+
         const overflow = top + height + keyboardMargin - visibleBottom;
 
         if (overflow > 0)
@@ -84,7 +97,10 @@ export function FieldScrollView({
       reveal(event.endCoordinates.screenY),
     );
 
-    const hidden = Keyboard.addListener("keyboardDidHide", () => setCovered(0));
+    const hidden = Keyboard.addListener("keyboardDidHide", () => {
+      generation.current += 1;
+      setCovered(0);
+    });
 
     return () => {
       changed.remove();
@@ -101,7 +117,10 @@ export function FieldScrollView({
       if (Keyboard.isVisible() && keyboard) reveal(keyboard.screenY);
     },
     blur: (input) => {
-      if (focused.current === input) focused.current = null;
+      if (focused.current !== input) return;
+
+      focused.current = null;
+      generation.current += 1;
     },
   };
 
