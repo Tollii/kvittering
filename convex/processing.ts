@@ -56,7 +56,7 @@ export const processReceipt = workflow
       if (!storageIds) return null;
       stage = "extraction";
 
-      // A receipt without images was imported from a store's own order data.
+      // A receipt without images has its evidence in receiptImports.
       const imported =
         storageIds.length === 0
           ? await step.runQuery(internal.processing.importedEvidence, {
@@ -214,23 +214,33 @@ type FinishArgs = ObjectType<typeof finishArgs>;
 
 type ProductDecision = Infer<typeof productDecision>;
 
-/** Tell if another receipt records the same purchase as the extracted data. */
+/** A purchase typed in has no images and no receipt number or time to compare. */
+const isTyped = (receipt: Doc<"receipts">, data: ReceiptData) =>
+  receipt.imageCount === 0 && !data.receiptNumber && !data.purchaseTime;
+
+/**
+ * Tell if another receipt records the same purchase as the extracted data.
+ * When either is a purchase typed in, store, date and total suffice, and a
+ * person decides.
+ */
 function isDuplicateReceipt(
   other: Doc<"receipts">,
-  receiptId: Id<"receipts">,
+  receipt: Doc<"receipts">,
   data: ReceiptData,
 ) {
-  const sameIdentifier =
+  const indistinct =
     (data.receiptNumber && other.data?.receiptNumber === data.receiptNumber) ||
-    (data.purchaseTime && other.data?.purchaseTime === data.purchaseTime);
+    (data.purchaseTime && other.data?.purchaseTime === data.purchaseTime) ||
+    isTyped(receipt, data) ||
+    (other.data && isTyped(other, other.data));
 
   return (
-    other._id !== receiptId &&
+    other._id !== receipt._id &&
     other.data?.store &&
     normalizeAlias(other.data.store) === normalizeAlias(data.store ?? "") &&
     other.data.purchaseDate === data.purchaseDate &&
     other.data.totalOre === data.totalOre &&
-    sameIdentifier
+    indistinct
   );
 }
 
@@ -275,7 +285,7 @@ async function findDuplicate(
     });
 
   const duplicateOf = page.page.find((other) =>
-    isDuplicateReceipt(other, receipt._id, args.data),
+    isDuplicateReceipt(other, receipt, args.data),
   )?._id;
 
   if (!duplicateOf && !page.isDone) {

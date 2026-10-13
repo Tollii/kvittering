@@ -1,12 +1,11 @@
-import { CalendarDate } from "@/lib/domain/calendar";
 import { FormSection, NativeForm } from "@/components/ui/native-form";
 import { useState } from "react";
-import { Alert, Platform, View } from "react-native";
-import DateTimePicker from "@react-native-community/datetimepicker";
+import { Alert, View } from "react-native";
 import { Button, Field, Notice, Row, Sheet } from "@/components/ui";
 import { MoneyField } from "@/components/money-field";
 import type { ReceiptData } from "@/lib/domain/receipt";
 import { CatalogStorePicker } from "./catalog-store-picker";
+import { PurchaseDateRow } from "./purchase-date-row";
 import type { Id } from "../../convex/_generated/dataModel";
 import type { PhysicalStore } from "@/lib/catalog/model";
 
@@ -30,17 +29,9 @@ export function ReceiptFields({
   const [totalError, setTotalError] = useState<string | null>(null);
   const [storePicker, setStorePicker] = useState(false);
 
-  // When the date picker opened, which is also its latest selectable date.
-  const [datePickerOpenedAt, setDatePickerOpenedAt] = useState<Date | null>(
-    null,
-  );
-
   const close = () => {
     if (totalError) Alert.alert("Kontroller beløpet", totalError);
-    else {
-      setDatePickerOpenedAt(null);
-      onClose();
-    }
+    else onClose();
   };
 
   const missingStore = !data.store?.trim();
@@ -102,34 +93,11 @@ export function ReceiptFields({
               onMoneyError(error);
             }}
           />
-          <Row
-            title="Kjøpsdato"
-            value={CalendarDate.format(data.purchaseDate)}
-            icon="calendar"
-            onPress={() =>
-              setDatePickerOpenedAt(datePickerOpenedAt ? null : new Date())
-            }
+          <PurchaseDateRow
+            value={data.purchaseDate}
+            shown={visible}
+            onChange={(purchaseDate) => onChange({ ...data, purchaseDate })}
           />
-          {datePickerOpenedAt && (
-            <DateTimePicker
-              value={CalendarDate.toNoon(
-                data.purchaseDate ?? CalendarDate.today(),
-              )}
-              mode="date"
-              display={Platform.OS === "ios" ? "inline" : "default"}
-              locale="nb-NO"
-              maximumDate={datePickerOpenedAt}
-              onDismiss={() => setDatePickerOpenedAt(null)}
-              onValueChange={(_event, date) => {
-                if (Platform.OS !== "ios") setDatePickerOpenedAt(null);
-
-                onChange({
-                  ...data,
-                  purchaseDate: CalendarDate.fromLocal(date),
-                });
-              }}
-            />
-          )}
         </FormSection>
         <FormSection title="Flere detaljer">
           <View style={{ gap: 10 }}>

@@ -1,4 +1,6 @@
 import { CaptureReview } from "@/features/capture-review";
+import { ManualPurchaseSheet } from "@/features/manual-purchase";
+import { SaveNotePanel, saveNote, type LastSave } from "@/features/save-note";
 import { recordEvent } from "@/lib/observability";
 import {
   useCallback,
@@ -8,7 +10,6 @@ import {
   type ReactNode,
 } from "react";
 import {
-  ActivityIndicator,
   AppState,
   Image,
   Linking,
@@ -22,11 +23,11 @@ import { CameraView, useCameraPermissions } from "expo-camera";
 import * as ImagePicker from "expo-image-picker";
 import * as DocumentPicker from "expo-document-picker";
 import { useIsFocused } from "expo-router";
+import type { SymbolViewProps } from "expo-symbols";
 import {
   Button,
   Copy,
   Icon,
-  IconButton,
   Notice,
   Panel,
   faded,
@@ -52,18 +53,39 @@ import { radius, useTheme } from "@/constants/theme";
 import { failureMessage } from "@/lib/failure-message";
 import { UserError } from "@/lib/user-errors";
 
-/** The title of the note that follows the saved receipts through upload. */
-function uploadStatusTitle(
-  saved: number,
-  uploading: boolean,
-  failed: boolean,
-  online: boolean,
-) {
-  if (uploading) return online ? "Laster opp …" : "Venter på nett";
+/** A round control on the camera view. */
+function CameraDisc({
+  icon,
+  label,
+  disabled,
+  onPress,
+}: Readonly<{
+  icon: SymbolViewProps["name"];
+  label: string;
+  disabled: boolean;
+  onPress: () => void;
+}>) {
+  const colors = useTheme();
 
-  if (failed) return "Prøver igjen";
-
-  return saved === 1 ? "Lastet opp" : `${saved} kvitteringer lastet opp`;
+  return (
+    <Press
+      accessibilityRole="button"
+      accessibilityLabel={label}
+      disabled={disabled}
+      accessibilityState={{ disabled, busy: disabled }}
+      onPress={onPress}
+      style={{
+        width: 44,
+        height: 44,
+        borderRadius: 22,
+        backgroundColor: colors.cameraOverlay,
+        alignItems: "center",
+        justifyContent: "center",
+      }}
+    >
+      <Icon name={icon} size={17} color={colors.onCamera} />
+    </Press>
+  );
 }
 
 export default function Capture() {
@@ -94,7 +116,8 @@ export default function Capture() {
   }, []);
   const busyRef = useRef(false);
   const [error, setError] = useState("");
-  const [saved, setSaved] = useState(0);
+  const [lastSave, setLastSave] = useState<LastSave>(null);
+  const [entering, setEntering] = useState(false);
   const arrival = useArrival();
   const departure = useDeparture();
   useEffect(() => {
@@ -117,7 +140,7 @@ export default function Capture() {
       busyRef.current = true;
       setOperation("working");
       setError("");
-      setSaved(0);
+      setLastSave(null);
 
       try {
         await action();
@@ -268,22 +291,26 @@ export default function Capture() {
       setPhotos([]);
       setCombined(false);
       setReview(false);
-      setSaved(count);
+      setLastSave({ kind: "photos", count });
       void synchronize();
     });
 
-  const live = permission?.granted && focused && foreground && !review;
+  const live =
+    permission?.granted && focused && foreground && !review && !entering;
+
   const shutterDisabled = busy || !ready || !live;
 
-  const uploading = queue.some((entry) => !entry.error);
-  const failed = queue.some((entry) => !!entry.error);
+  const note = saveNote(lastSave, queue, online);
+  const settled = !!note && !note.uploading && !note.failed;
+
   // Let the success note fade away on its own once the upload has landed.
   useEffect(() => {
-    if (!saved || uploading || failed) return undefined;
-    const timeout = setTimeout(() => setSaved(0), 8000);
+    if (!settled) return undefined;
+
+    const timeout = setTimeout(() => setLastSave(null), 8000);
 
     return () => clearTimeout(timeout);
-  }, [saved, uploading, failed]);
+  }, [settled, lastSave]);
 
   const overlay = (children: ReactNode, style?: ViewStyle) => (
     <View
@@ -346,59 +373,26 @@ export default function Capture() {
         <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
           {!largeText && label}
           <View style={{ flex: 1 }} />
-          <Press
-            accessibilityRole="button"
-            accessibilityLabel="Importer PDF eller bilde fra Filer"
+          <CameraDisc
+            icon="square.and.pencil"
+            label="Legg inn kjøp uten kvittering"
             disabled={busy}
-            accessibilityState={{ disabled: busy, busy }}
+            onPress={() => setEntering(true)}
+          />
+          <CameraDisc
+            icon="doc.badge.plus"
+            label="Importer PDF eller bilde fra Filer"
+            disabled={busy}
             onPress={() => void chooseFiles()}
-            style={{
-              width: 44,
-              height: 44,
-              borderRadius: 22,
-              backgroundColor: colors.cameraOverlay,
-              alignItems: "center",
-              justifyContent: "center",
-            }}
-          >
-            <Icon name="doc.badge.plus" size={17} color={colors.onCamera} />
-          </Press>
+          />
           <SettingsButton surface="camera" />
         </View>
         {/* At large text the label takes its own line under the buttons. */}
         {largeText && label}
         <OfflineNotice />
-        {saved > 0 && (
+        {note && (
           <Animated.View entering={arrival} exiting={departure}>
-            <Panel style={{ gap: 4 }}>
-              <View
-                style={{ flexDirection: "row", alignItems: "center", gap: 10 }}
-              >
-                {uploading ? (
-                  <ActivityIndicator color={colors.primary} />
-                ) : (
-                  <Icon
-                    name={
-                      failed
-                        ? "arrow.clockwise.circle"
-                        : "checkmark.circle.fill"
-                    }
-                    size={22}
-                    color={failed ? colors.warning : colors.success}
-                  />
-                )}
-                <Copy weight="700" style={{ flex: 1 }}>
-                  {uploadStatusTitle(saved, uploading, failed, online)}
-                </Copy>
-                <IconButton
-                  name="xmark"
-                  label="Lukk"
-                  size={14}
-                  color={colors.secondary}
-                  onPress={() => setSaved(0)}
-                />
-              </View>
-            </Panel>
+            <SaveNotePanel note={note} onClose={() => setLastSave(null)} />
           </Animated.View>
         )}
         {!!error && !review && <Notice tone="error">{error}</Notice>}
@@ -581,6 +575,19 @@ export default function Capture() {
           )}
         </View>
       </SafeAreaView>
+      <ManualPurchaseSheet
+        visible={entering}
+        onClose={() => setEntering(false)}
+        onSaved={() => {
+          setEntering(false);
+          // An upload still on its way keeps its note.
+          setLastSave((current) =>
+            current?.kind === "photos" && !settled
+              ? current
+              : { kind: "purchase" },
+          );
+        }}
+      />
       <CaptureReview
         photos={photos}
         combined={combined}
