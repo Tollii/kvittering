@@ -67,6 +67,10 @@ Use blocking only when the item is so poorly read that its general identity cann
 A legible but unfamiliar product name is not an issue. Specialty, dairy-free, lactose-free, plant-based, vegan or gluten-free variants and store abbreviations (MELKEFRI, MLKFRI, LAKTOSEFRI, LF, HAVRE, SOYA, VEGANSK, GLUTENFRI) are readable names: use the printed text as the name instead of reporting that the product cannot be identified. Reserve blocking identity issues for text that cannot be read.
 Keep the best supported product name and originalText. Do not invent missing details or amounts.`;
 
+/**
+ * Keeps the reader's serious notes. On the receipt they stop review; on a line
+ * they stay as a note, because the paid total settles the line's money.
+ */
 function blockingIssues(issues: z.infer<typeof extractionIssue>[]): string[] {
   return issues.flatMap((issue) =>
     issue.severity === "blocking" ? [issue.message] : [],

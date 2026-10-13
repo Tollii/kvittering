@@ -191,10 +191,10 @@ function reviewStep(task: ReviewTask, context: StepContext): Step {
         icon: "textformat",
         onPress: toLines,
       };
-    case "line-issues":
+    case "line-note":
       return {
         label,
-        hint: "Se over varene som lesingen var usikker på.",
+        hint: "Betalt beløp er samme tall som varen, så se over merknaden.",
         icon: "exclamationmark.circle",
         onPress: toLines,
       };

@@ -141,7 +141,7 @@ it("schedules only the uploader once, and skips delivery after review, unsubscri
     ctx.db.patch("receipts", id, { status: "processing", generation: 1 }),
   );
   const data = batteryFixture();
-  present(data.lines[0]).issues = ["Varenavnet er usikkert."];
+  data.issues = ["Datoen er utydelig."];
   const args = { id, generation: 1, data, original: data, provider: "fixture" };
   await t.mutation(internal.processing.finish, args);
   expect(
@@ -172,7 +172,7 @@ it("schedules only the uploader once, and skips delivery after review, unsubscri
   expect(
     await t.run((ctx) => ctx.db.system.query("_scheduled_functions").take(10)),
   ).toHaveLength(1);
-  present(data.lines[0]).issues = [];
+  data.issues = [];
   await uploader.mutation(api.receipts.save, {
     id,
     revision: 0,

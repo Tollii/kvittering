@@ -19,7 +19,7 @@ import { quickApproveData } from "../src/lib/domain/receipt-review";
 
 const modules = import.meta.glob("./**/*.ts");
 
-it("keeps unresolved extraction issues, mismatches, duplicates and mock results in review", async () => {
+it("keeps mismatches, duplicates and mock results in review, and approves a line note with its note kept", async () => {
   const t = convexTest(schema, modules);
   registerRateLimiter(t);
 
@@ -36,7 +36,7 @@ it("keeps unresolved extraction issues, mismatches, duplicates and mock results 
   let previousId: Id<"receipts"> | undefined;
 
   for (const scenario of [
-    "issue",
+    "line-note",
     "category",
     "mismatch",
     "duplicate",
@@ -58,7 +58,7 @@ it("keeps unresolved extraction issues, mismatches, duplicates and mock results 
     );
     const data = batteryFixture();
 
-    if (scenario === "issue")
+    if (scenario === "line-note")
       present(data.lines[0]).issues.push("Varenavnet er usikkert.");
 
     if (scenario === "category") {
@@ -77,31 +77,14 @@ it("keeps unresolved extraction issues, mismatches, duplicates and mock results 
       provider: scenario === "mock" ? "mock" : "test",
     });
     const receipt = (await user.query(api.receipts.detail, { id }))!.receipt;
-    expect(receipt.status).toBe(
-      ["clean", "category"].includes(scenario) ? "reviewed" : "needs_review",
-    );
-    expect(receipt.autoAccepted).toBe(["clean", "category"].includes(scenario));
-
-    if (scenario === "issue") {
-      present(data.lines[0]).issues = [];
-      await user.mutation(api.receipts.save, {
-        id,
-        revision: 0,
-        data,
-        reviewed: false,
-        rememberLineIds: [],
-        duplicateResolved: false,
-        excluded: false,
-      });
-    }
-
+    const accepted = ["clean", "category", "line-note"].includes(scenario);
+    expect(receipt.status).toBe(accepted ? "reviewed" : "needs_review");
+    expect(receipt.autoAccepted).toBe(accepted);
     expect(
-      (await user.query(api.receipts.detail, { id }))!.receipt.status,
-    ).toBe(
-      ["issue", "clean", "category"].includes(scenario)
-        ? "reviewed"
-        : "needs_review",
-    );
+      present(receipt.data?.lines[0]).issues.includes(
+        "Varenavnet er usikkert.",
+      ),
+    ).toBe(scenario === "line-note");
     previousId = id;
   }
 });
