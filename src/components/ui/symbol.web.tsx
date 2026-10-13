@@ -72,6 +72,7 @@ const material = new Map<string, AndroidSymbol>([
   ["scalemass", "scale"],
   ["square.and.arrow.up", "ios_share"],
   ["storefront", "storefront"],
+  ["tablecells", "table_chart"],
   ["tag", "sell"],
   ["textformat", "text_fields"],
   ["trash", "delete"],

@@ -47,31 +47,41 @@ export function currentAnalysis(receipt: Receipt) {
     : undefined;
 }
 
+/** The receipt with its read data when the policy counts it as a purchase, otherwise null. */
+export function includedReceipt(
+  row: Receipt,
+  policy: PurchasePolicy,
+): ExtractedReceipt | null {
+  const receipt = extractedReceipt(row);
+
+  if (!receipt) return null;
+  const { data } = receipt;
+
+  return receipt.excluded ||
+    (policy.currency === "NOK" && data.currency !== "NOK") ||
+    (policy.provisional === "exclude" && receipt.status !== "reviewed") ||
+    (policy.duplicates === "exclude" &&
+      receipt.duplicateOf &&
+      !receipt.duplicateResolved) ||
+    (!data.purchaseDate && policy.undated === "exclude") ||
+    (policy.period &&
+      (!data.purchaseDate ||
+        data.purchaseDate < policy.period.start ||
+        data.purchaseDate > policy.period.end))
+    ? null
+    : receipt;
+}
+
 /** One preparation pass owns inclusion, accounting, and current analysis evidence. */
 export function preparePurchases(
   receipts: readonly Receipt[],
   policy: PurchasePolicy,
 ) {
   return receipts.flatMap((row) => {
-    const receipt = extractedReceipt(row);
+    const receipt = includedReceipt(row, policy);
 
     if (!receipt) return [];
     const { data } = receipt;
-
-    if (
-      receipt.excluded ||
-      (policy.currency === "NOK" && data.currency !== "NOK") ||
-      (policy.provisional === "exclude" && receipt.status !== "reviewed") ||
-      (policy.duplicates === "exclude" &&
-        receipt.duplicateOf &&
-        !receipt.duplicateResolved) ||
-      (!data.purchaseDate && policy.undated === "exclude") ||
-      (policy.period &&
-        (!data.purchaseDate ||
-          data.purchaseDate < policy.period.start ||
-          data.purchaseDate > policy.period.end))
-    )
-      return [];
     const analysis = currentAnalysis(receipt);
 
     const byLine = new Map(

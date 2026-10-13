@@ -38,6 +38,18 @@ export function isTotalsLine(kind: LineKind): boolean {
   return kind === "summary" || kind === "vat";
 }
 
+/** What a person calls each line kind, in the line editor and in exports. */
+export const lineLabels: Record<LineKind, string> = {
+  product: "Vare",
+  item_discount: "Varerabatt",
+  receipt_discount: "Kvitteringsrabatt",
+  deposit: "Pant",
+  deposit_return: "Pantretur",
+  adjustment: "Justering",
+  summary: "Oppsummering (telles ikke)",
+  vat: "MVA (telles ikke)",
+};
+
 export function isDiscountLine(kind: LineKind): boolean {
   return kind === "item_discount" || kind === "receipt_discount";
 }

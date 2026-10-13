@@ -80,7 +80,7 @@ Kvitteringer searches from the native search bar and switches between receipts a
 
 ### Household settings
 
-Settings is a modal grouped native form ([settings](../../src/app/settings.tsx)), one section per area.
+Settings is a modal grouped native form ([settings](../../src/app/settings.tsx)), one section per area. Eksport opens a sheet ([export settings](../../src/features/export-settings.tsx)) with the periods as `Row`s in a `List`, the chosen one checked, and a footer with the receipt and line count over "Del CSV-fil", which opens the share sheet with the file.
 
 Konto ends with "Slett kontoen", a `danger` button under "Logg ut". Its alert says what goes and what stays: alone, the household and every receipt; with a partner, only the account, while the receipts stay with them. An account linked to Apple is confirmed with Apple after the alert, before anything is deleted. The same button sits under "Logg ut" on Kom i gang, for an account without a household.
 
