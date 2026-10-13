@@ -2,9 +2,49 @@ import { CalendarDate } from "@/lib/domain/calendar";
 import { Ore } from "@/lib/domain/ore";
 import { View } from "react-native";
 import { useTheme } from "@/constants/theme";
-import { Amount, Copy, List, Row, Sheet, Press, useLargeText } from "./ui";
+import {
+  Amount,
+  Chevron,
+  Copy,
+  List,
+  Row,
+  Sheet,
+  Press,
+  useLargeText,
+} from "./ui";
 import { openReceipt, receiptStatusLabel } from "./receipt-card";
 import { contributionKey, type SpendingGroup } from "@/lib/domain/insights";
+import { categoryGroupName } from "@/lib/domain/categories";
+
+/** Leaves one category group for all of them, naming the group it leaves. */
+export function AllCategoriesLink({
+  group,
+  onPress,
+}: Readonly<{ group: string; onPress: () => void }>) {
+  const colors = useTheme();
+
+  return (
+    <Press
+      feedback="highlight"
+      accessibilityRole="button"
+      onPress={onPress}
+      style={{
+        flexDirection: "row",
+        alignItems: "center",
+        gap: 6,
+        minHeight: 44,
+      }}
+    >
+      <Chevron direction="left" color={colors.primary} />
+      <Copy role="detail" weight="600" style={{ color: colors.primary }}>
+        Alle kategorier
+      </Copy>
+      <Copy role="detail" muted>
+        · {categoryGroupName(group)}
+      </Copy>
+    </Press>
+  );
+}
 
 export function SpendingBars<
   Group extends Pick<SpendingGroup, "id" | "name" | "amountOre">,

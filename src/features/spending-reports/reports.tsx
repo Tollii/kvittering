@@ -10,6 +10,8 @@ import {
   familySummary,
 } from "@/features/spending-reports/family-purchases";
 import { SpendingCalendar } from "@/features/spending-reports/spending-calendar";
+import { SpendingTrend } from "@/features/spending-reports/spending-trend";
+import { trendLength } from "@/lib/domain/spending-trend";
 import { openReceipt } from "@/components/receipt-card";
 import { isCategoryUncertain } from "@/lib/domain/receipt-issues";
 import {
@@ -27,6 +29,7 @@ import type { catalogInsights } from "@/lib/catalog/insights";
 import type { SpendingDimension } from "@/lib/spending-selection";
 
 export const reportIds = [
+  "trend",
   "catalog",
   "prices",
   "families",
@@ -46,6 +49,7 @@ type ReportProps = {
   historyComplete: boolean;
   coverageComplete: boolean;
   surprises: ReturnType<typeof monthPriceSignals>;
+  onMonth: (month: CalendarMonth, group: string | null) => void;
   onSelect: (value: SpendingGroup, dimension?: SpendingDimension) => void;
   onAccounting: (key: string) => void;
   onClose: () => void;
@@ -60,6 +64,7 @@ export function useSpendingReports({
   historyComplete,
   coverageComplete,
   surprises,
+  onMonth,
   onSelect,
   onAccounting,
   onClose,
@@ -88,6 +93,11 @@ export function useSpendingReports({
       render: () => ReactNode;
     }
   > = {
+    trend: {
+      title: `Siste ${trendLength} måneder`,
+      icon: "chart.line.uptrend.xyaxis",
+      render: () => <SpendingTrend month={month} onMonth={onMonth} />,
+    },
     catalog: {
       title: "Produkter og merker",
       icon: "barcode",

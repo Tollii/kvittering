@@ -24,7 +24,6 @@ import { View } from "react-native";
 import {
   Amount,
   Button,
-  Chevron,
   Copy,
   IconButton,
   Sheet,
@@ -37,10 +36,13 @@ import {
   SectionTitle,
   Segments,
   SummaryBand,
-  Press,
 } from "@/components/ui";
 import { MonumentArtwork } from "@/components/monument-artwork";
-import { SpendingBars, SpendingDetails } from "@/components/spending-details";
+import {
+  AllCategoriesLink,
+  SpendingBars,
+  SpendingDetails,
+} from "@/components/spending-details";
 import { useHousehold } from "@/features/household-context";
 import { OfflineNotice } from "@/features/offline-notice";
 import {
@@ -259,6 +261,14 @@ function Spending({ initialMonth }: Readonly<{ initialMonth: CalendarMonth }>) {
     month,
     historyComplete: history.completeReceipts,
     surprises,
+    onMonth: (value, category) => {
+      setReport(null);
+      setMonth(value);
+      setShowAllGroups(false);
+      setGroup(category);
+
+      if (category) setBreakdown("category");
+    },
     onSelect: showDetails,
     onAccounting: select,
     onClose: () => setReport(null),
@@ -352,29 +362,7 @@ function Spending({ initialMonth }: Readonly<{ initialMonth: CalendarMonth }>) {
               ]}
             />
             {!!group && (
-              <Press
-                feedback="highlight"
-                accessibilityRole="button"
-                onPress={() => setGroup(null)}
-                style={{
-                  flexDirection: "row",
-                  alignItems: "center",
-                  gap: 6,
-                  minHeight: 44,
-                }}
-              >
-                <Chevron direction="left" color={colors.primary} />
-                <Copy
-                  role="detail"
-                  weight="600"
-                  style={{ color: colors.primary }}
-                >
-                  Alle kategorier
-                </Copy>
-                <Copy role="detail" muted>
-                  · {categoryOf(rows[0]?.id).groupName}
-                </Copy>
-              </Press>
+              <AllCategoriesLink group={group} onPress={() => setGroup(null)} />
             )}
             <SpendingBars
               rows={showAllGroups ? rows : rows.slice(0, 5)}
@@ -395,7 +383,7 @@ function Spending({ initialMonth }: Readonly<{ initialMonth: CalendarMonth }>) {
               />
             )}
             {!rows.length && (
-              <Empty title="Ingen kjøp denne måneden" icon="cart" />
+              <Empty title={emptyBreakdownTitle(group)} icon="cart" />
             )}
           </View>
           <View style={{ gap: 4 }}>
@@ -476,6 +464,13 @@ function breakdownRows(
       categoryOf(category.id).group === group ||
       (group === "fallback" && category.id === "unallocated"),
   );
+}
+
+/** A chosen group can be empty in a month the trend opened. */
+function emptyBreakdownTitle(group: string | null) {
+  return group
+    ? "Ingen kjøp i kategorien denne måneden"
+    : "Ingen kjøp denne måneden";
 }
 
 /** The detail dimension of a row in the selected breakdown. */

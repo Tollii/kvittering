@@ -44,7 +44,7 @@ A failed upload is a warning, not a danger: the images are safe in the queue and
 
 ### Charts
 
-`chart` is a four-step cobalt ramp, strongest first; `onChart` is the readable label colour on each step. Spending bars colour the top rows with the first steps and every later row with the last; a negative amount, such as a deposit return, uses `warning`. The shopping calendar uses the ramp as a heat scale on a `muted` empty day. Keep series distinguishable by label and position, not by hue alone, because the ramp is one hue.
+`chart` is a four-step cobalt ramp, strongest first; `onChart` is the readable label colour on each step. Spending bars colour the top rows with the first steps and every later row with the last; a negative amount, such as a deposit return, uses `warning`. The shopping calendar uses the ramp as a heat scale on a `muted` empty day. The twelve-month trend draws the month Forbruk shows in the first step and the other months in the third; a month without receipts is a `muted` stub, so it reads as unknown rather than zero. Keep series distinguishable by label and position, not by hue alone, because the ramp is one hue.
 
 ### Fixed-context colours
 
@@ -92,7 +92,7 @@ There are no spacing tokens. Spacing follows a 4-point rhythm, and the shared co
 | ---------------- | ------------------------------------- | ------------------------------------------------------------------------------------------ |
 | `radius.card`    | [theme](../../src/constants/theme.ts) | `Panel`, `List`, `Empty`, swipe action, the store map, the arch tile on sign-in.           |
 | `radius.control` | theme                                 | `Button`, `Field`, `Notice`, segmented track, the Sign in with Apple button.               |
-| `radius.chip`    | theme                                 | `Chip`.                                                                                    |
+| `radius.chip`    | theme                                 | `Chip`, the month columns of the twelve-month trend.                                       |
 | `radius.inner`   | theme                                 | Images inside a card, including the capture-review pages.                                  |
 | `radius.tile`    | theme                                 | `IconTile`, inset boxes, calendar days, category-group tiles, the camera's overlay labels. |
 
