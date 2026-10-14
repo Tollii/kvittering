@@ -2,7 +2,6 @@ import { useState, type ReactNode } from "react";
 import {
   KeyboardAvoidingView,
   Platform,
-  ScrollView,
   StyleSheet,
   View,
   type StyleProp,
@@ -18,6 +17,7 @@ import { ArchMark } from "../monument-artwork";
 import { useTheme } from "@/constants/theme";
 import { Copy, Icon, styles, useLargeText } from "./typography";
 import { Press } from "./motion";
+import { FieldScrollBoundary, FieldScrollView } from "./field-scroll";
 import { IconButton } from "./controls";
 import { SheetPresentation } from "./sheet-presentation";
 
@@ -190,7 +190,7 @@ export function Screen({
         style={{ flex: 1, backgroundColor: colors.background }}
       >
         {scrollable ? (
-          <ScrollView
+          <FieldScrollView
             style={{ flex: 1 }}
             keyboardShouldPersistTaps="handled"
             keyboardDismissMode="interactive"
@@ -198,7 +198,7 @@ export function Screen({
             contentContainerStyle={{ flexGrow: 1 }}
           >
             {content}
-          </ScrollView>
+          </FieldScrollView>
         ) : (
           content
         )}
@@ -259,76 +259,78 @@ export function Sheet({
       onDismissed={() => setHeld(null)}
       dismissible={dismissible}
     >
-      <SafeAreaView
-        pointerEvents={closing ? "none" : "auto"}
-        style={{ flex: 1, backgroundColor: colors.background }}
-      >
-        <View
-          style={[
-            styles.row,
-            { paddingHorizontal: 16, paddingTop: 12, paddingBottom: 8 },
-          ]}
+      <FieldScrollBoundary>
+        <SafeAreaView
+          pointerEvents={closing ? "none" : "auto"}
+          style={{ flex: 1, backgroundColor: colors.background }}
         >
-          <Copy
-            accessibilityRole="header"
-            role="sheetTitle"
-            style={{ flex: 1 }}
+          <View
+            style={[
+              styles.row,
+              { paddingHorizontal: 16, paddingTop: 12, paddingBottom: 8 },
+            ]}
           >
-            {title}
-          </Copy>
-          <IconButton
-            name="xmark"
-            label="Lukk"
-            size={15}
-            filled
-            disabled={!dismissible}
-            color={colors.text}
-            onPress={onClose}
-          />
-        </View>
-        {!!header && !inlineHeader && (
-          <View style={{ paddingHorizontal: 16, paddingBottom: 10, gap: 10 }}>
-            {header}
+            <Copy
+              accessibilityRole="header"
+              role="sheetTitle"
+              style={{ flex: 1 }}
+            >
+              {title}
+            </Copy>
+            <IconButton
+              name="xmark"
+              label="Lukk"
+              size={15}
+              filled
+              disabled={!dismissible}
+              color={colors.text}
+              onPress={onClose}
+            />
           </View>
-        )}
-        <KeyboardAvoidingView
-          style={{ flex: 1 }}
-          behavior={Platform.OS === "ios" ? "padding" : undefined}
-        >
-          {scrollable ? (
-            <ScrollView
-              keyboardShouldPersistTaps="handled"
-              keyboardDismissMode="interactive"
-              contentContainerStyle={{
-                padding: 16,
-                paddingTop: 4,
-                gap: 16,
-                paddingBottom: 24,
-              }}
-            >
-              {inlineHeader && <View style={{ gap: 10 }}>{header}</View>}
-              {children}
-              {inlineFooter && <View style={{ gap: 8 }}>{footer}</View>}
-            </ScrollView>
-          ) : (
-            children
-          )}
-          {!!footer && !inlineFooter && (
-            <View
-              style={{
-                paddingHorizontal: 16,
-                paddingVertical: 10,
-                gap: 8,
-                backgroundColor: colors.surface,
-                borderTopWidth: StyleSheet.hairlineWidth,
-                borderColor: colors.line,
-              }}
-            >
-              {footer}
+          {!!header && !inlineHeader && (
+            <View style={{ paddingHorizontal: 16, paddingBottom: 10, gap: 10 }}>
+              {header}
             </View>
           )}
-        </KeyboardAvoidingView>
-      </SafeAreaView>
+          <KeyboardAvoidingView
+            style={{ flex: 1 }}
+            behavior={Platform.OS === "ios" ? "padding" : undefined}
+          >
+            {scrollable ? (
+              <FieldScrollView
+                keyboardShouldPersistTaps="handled"
+                keyboardDismissMode="interactive"
+                contentContainerStyle={{
+                  padding: 16,
+                  paddingTop: 4,
+                  gap: 16,
+                  paddingBottom: 24,
+                }}
+              >
+                {inlineHeader && <View style={{ gap: 10 }}>{header}</View>}
+                {children}
+                {inlineFooter && <View style={{ gap: 8 }}>{footer}</View>}
+              </FieldScrollView>
+            ) : (
+              children
+            )}
+            {!!footer && !inlineFooter && (
+              <View
+                style={{
+                  paddingHorizontal: 16,
+                  paddingVertical: 10,
+                  gap: 8,
+                  backgroundColor: colors.surface,
+                  borderTopWidth: StyleSheet.hairlineWidth,
+                  borderColor: colors.line,
+                }}
+              >
+                {footer}
+              </View>
+            )}
+          </KeyboardAvoidingView>
+        </SafeAreaView>
+      </FieldScrollBoundary>
     </SheetPresentation>
   );
 }

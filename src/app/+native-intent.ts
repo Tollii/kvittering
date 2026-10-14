@@ -1,12 +1,11 @@
-/**
- * The share extension opens the app with `kvitto://dataUrl=…`. That is not a
- * route; expo-share-intent reads the payload itself, so land on the camera tab.
- */
+import { systemPathRoute } from "@/lib/system-paths";
+
+/** Rewrites system links that are not current routes before Expo Router reads them. */
 export function redirectSystemPath({
   path,
 }: {
   path: string;
   initial: boolean;
 }) {
-  return path.includes("dataUrl=") ? "/" : path;
+  return systemPathRoute(path);
 }

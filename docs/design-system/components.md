@@ -47,7 +47,7 @@ States: `disabled` fades the button; `busy` shows a spinner in place of the icon
 
 ## Inputs
 
-**`Field`** is a labelled text input. The label sits above in secondary text; the border turns `primary` on focus; `hint` adds a caption below. On iOS it adds a keyboard toolbar with "Ferdig". Use the label as the accessibility label, and keep placeholders for examples, not instructions.
+**`Field`** is a labelled text input. The label sits above in secondary text; the border turns `primary` on focus; `hint` adds a caption below. On iOS it adds a keyboard toolbar with "Ferdig". Inside a `Screen` or `Sheet` that scrolls, the focused field scrolls above the keyboard and that toolbar. Use the label as the accessibility label, and keep placeholders for examples, not instructions.
 
 **`MoneyField`** ([money field](../../src/components/money-field.tsx)) is a `Field` for kroner. It keeps the typed text, parses it with a comma decimal, and reports a Norwegian error message instead of changing the amount when the text is invalid.
 

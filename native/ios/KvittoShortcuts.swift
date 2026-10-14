@@ -13,6 +13,20 @@ struct OpenReceiptsIntent: AppIntent {
   }
 }
 
+/// Shortcuts made with build 18 and earlier run this action by its type name.
+/// It stays, hidden from the action list, and opens Kvitteringer instead.
+struct OpenInboxIntent: AppIntent {
+  static let title: LocalizedStringResource = "Åpne innboks"
+  static let description = OpenReceiptsIntent.description
+  static let openAppWhenRun = true
+  static let isDiscoverable = false
+
+  @MainActor
+  func perform() async throws -> some IntentResult {
+    try await OpenReceiptsIntent().perform()
+  }
+}
+
 enum PurchaseMonth: String, AppEnum {
   case january, february, march, april, may, june, july, august, september, october, november, december
 

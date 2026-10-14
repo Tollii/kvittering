@@ -1,11 +1,13 @@
 {
   "$schema": "https://unpkg.com/knip@6/schema.json",
   // Expo loads config plugins by path from app.json; Oxlint and ESLint load rules by path.
+  // Expo's fingerprint reads fingerprint.config.js by name.
   // Stryker runs the mutation test config from a command string; npm scripts
   // and CI run the tools/*.mts commands with Node. Metro substitutes the
   // src/web modules in web bundles, and threads run visual flows directly.
   "entry": [
     "plugins/*.js",
+    "fingerprint.config.js",
     "tools/lint-rules/*.cjs",
     "tools/*.mts",
     "tools/e2e/seed.mts",

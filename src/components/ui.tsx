@@ -9,4 +9,6 @@ export * from "./ui/surfaces";
 
 export * from "./ui/layout";
 
+export { FieldScrollView } from "./ui/field-scroll";
+
 export * from "./ui/selection";

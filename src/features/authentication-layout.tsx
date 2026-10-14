@@ -1,8 +1,8 @@
 import type { ReactNode } from "react";
-import { KeyboardAvoidingView, Platform, ScrollView, View } from "react-native";
+import { KeyboardAvoidingView, Platform, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { StatusBar } from "expo-status-bar";
-import { Chevron, Copy, faded, Press } from "@/components/ui";
+import { Chevron, Copy, faded, FieldScrollView, Press } from "@/components/ui";
 import { ArchMark } from "@/components/monument-artwork";
 import { radius, useTheme } from "@/constants/theme";
 
@@ -28,7 +28,7 @@ export function AuthenticationLayout({
       style={{ flex: 1, backgroundColor: colors.background }}
     >
       <StatusBar style="auto" />
-      <ScrollView
+      <FieldScrollView
         contentInsetAdjustmentBehavior="never"
         keyboardShouldPersistTaps="handled"
         keyboardDismissMode="interactive"
@@ -91,7 +91,7 @@ export function AuthenticationLayout({
           </View>
           {children}
         </View>
-      </ScrollView>
+      </FieldScrollView>
     </KeyboardAvoidingView>
   );
 }
