@@ -26,7 +26,13 @@ export function ReceiptContextMenu({
   return (
     <View onLayout={(event) => setWidth(event.nativeEvent.layout.width)}>
       {/* A new width or text size remounts the host, so it measures again. */}
-      <Host key={`${width}:${fontScale}`} matchContents={{ vertical: true }}>
+      {/* A host that keeps the safe area insets its row where it passes under
+          the header, tab bar or search keyboard, drawing it over its neighbour. */}
+      <Host
+        key={`${width}:${fontScale}`}
+        matchContents={{ vertical: true }}
+        ignoreSafeArea="all"
+      >
         <ContextMenu>
           <ContextMenu.Trigger>
             <RNHostView matchContents>
