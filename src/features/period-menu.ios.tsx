@@ -27,6 +27,7 @@ export function PeriodMenu({ value, latest, onChange }: PeriodMenuProps) {
       matchContents={{ vertical: true }}
       style={{ flex: 1, minHeight: 44 }}
       seedColor={colors.onHero}
+      ignoreSafeArea="all"
     >
       <Menu
         label={CalendarMonth.title(value)}
