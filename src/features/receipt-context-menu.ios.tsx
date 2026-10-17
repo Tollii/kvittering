@@ -25,9 +25,9 @@ export function ReceiptContextMenu({
 
   return (
     <View onLayout={(event) => setWidth(event.nativeEvent.layout.width)}>
-      {/* A new width or text size remounts the host, so it measures again.
-          A host that keeps the safe area moves its row by the overlap with the
-          header or tab bar, drawing it over its neighbour at the scroll edges. */}
+      {/* A new width or text size remounts the host, so it measures again. */}
+      {/* A host that keeps the safe area insets its row where it passes under
+          the header, tab bar or search keyboard, drawing it over its neighbour. */}
       <Host
         key={`${width}:${fontScale}`}
         matchContents={{ vertical: true }}
