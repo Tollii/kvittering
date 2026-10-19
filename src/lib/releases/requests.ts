@@ -44,7 +44,6 @@ export async function releaseMutation<
         durationMs: Date.now() - started,
       });
 
-    // oxlint-disable-next-line typescript/no-unsafe-return -- typescript-go resolves FunctionReturnType<M> to any here; TypeScript resolves the declared type.
     return result;
   } catch (error) {
     throw releaseError(error, operation, {
@@ -66,7 +65,6 @@ export async function releaseAction<
   const started = Date.now();
 
   try {
-    // oxlint-disable-next-line typescript/no-unsafe-return -- typescript-go resolves FunctionReturnType<A> to any here; TypeScript resolves the declared type.
     return await convex.action(action, { ...args, client: installedRelease });
   } catch (error) {
     throw releaseError(error, operation, {
