@@ -104,7 +104,9 @@ function decisionQuestion(
       criteria: sent(choiceCriteria, question.criteria),
     };
 
-  throw new Error(`Score question ${name} has no product judgment yet.`);
+  throw new Error(
+    `${question.type} question ${name} has no product judgment yet.`,
+  );
 }
 
 const confidenceSchema = z.record(z.string(), z.number());
