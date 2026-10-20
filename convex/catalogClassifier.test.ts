@@ -27,7 +27,11 @@ const item = (index: number) => ({
 });
 
 const client = () =>
-  new TypeSafeClient({ apiKey: "test-key", retry: { maxRetries: 0 } });
+  new TypeSafeClient({
+    apiKey: "test-key",
+    retry: { maxRetries: 0 },
+    compression: false,
+  });
 
 afterEach(() => vi.unstubAllGlobals());
 
