@@ -1,6 +1,8 @@
 import type {
+  ChoiceCriteria,
   ChoiceResponse,
   EntryType,
+  NoulQuestion,
   NoulResponse,
   Questions,
   SystemOneRequest,
@@ -40,8 +42,35 @@ export type JudgmentClient = {
 
 export type JudgmentAnswer = NoulResponse | ChoiceResponse;
 
+/**
+ * Product judgments send text and JSON, and a decision reads the JSON a
+ * request sends: absent fields drop out. The AI SDK's decisions take no
+ * TypeSafe assets, and no judgment sends one.
+ */
+const sent = <T>(
+  schema: z.ZodType<T>,
+  entry: EntryType | ChoiceCriteria | NoulQuestion["criteria"],
+) => schema.parse(JSON.parse(JSON.stringify(entry)));
+
+const decisionInput = z.union([
+  z.string(),
+  z.array(z.json()),
+  z.record(z.string(), z.json()),
+]);
+
 /** The AI SDK has no null input; an absent text is empty. */
-const input = (entry: EntryType | undefined) => entry ?? "";
+const input = (entry: EntryType | undefined) =>
+  sent(decisionInput, entry ?? "");
+
+/** A null description leaves its outcome undescribed. */
+const description = decisionInput.nullable();
+
+const booleanCriteria = z.object({
+  true: description.optional(),
+  false: description.optional(),
+});
+
+const choiceCriteria = z.record(z.string(), description);
 
 /**
  * The AI SDK reads any list state as parts and rejects other lists, so a JSON
@@ -63,17 +92,21 @@ function decisionQuestion(
     return {
       type: "boolean",
       instructions: input(question.instructions),
-      ...(question.criteria && { criteria: question.criteria }),
+      ...(question.criteria && {
+        criteria: sent(booleanCriteria, question.criteria),
+      }),
     };
 
   if (question.type === "choice")
     return {
       type: "choice",
       instructions: input(question.instructions),
-      criteria: question.criteria,
+      criteria: sent(choiceCriteria, question.criteria),
     };
 
-  throw new Error(`Score question ${name} has no product judgment yet.`);
+  throw new Error(
+    `${question.type} question ${name} has no product judgment yet.`,
+  );
 }
 
 const confidenceSchema = z.record(z.string(), z.number());
