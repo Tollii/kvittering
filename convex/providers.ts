@@ -2,6 +2,7 @@
 
 import { generateText, NoObjectGeneratedError, Output } from "ai";
 import { languageModel, productJudgments } from "./aiModels";
+import { modelUsage } from "./modelTelemetry";
 import { v } from "convex/values";
 import { internalAction } from "./_generated/server";
 import {
@@ -84,6 +85,7 @@ export const extract = internalAction({
       // Extra reasoning takes longer; an action may still run ten minutes.
       abortSignal: AbortSignal.timeout(args.reasoning ? 300000 : 120000),
       providerOptions: { openai: { store: false } },
+      telemetry: { integrations: modelUsage },
       instructions: `${extractionInstructions}\n\n${overlapInstructions}\n\n${uncertaintyInstructions}`,
       messages: [
         {
@@ -119,7 +121,9 @@ export const extract = internalAction({
       imageCount: images.length,
       lineCount: data.lines.length,
       inputTokens: response.usage.inputTokens,
+      cachedInputTokens: response.usage.inputTokenDetails.cacheReadTokens,
       outputTokens: response.usage.outputTokens,
+      reasoningTokens: response.usage.outputTokenDetails.reasoningTokens,
     });
 
     return { data, provider: model, durationMs: Date.now() - started };
