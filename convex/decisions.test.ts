@@ -94,6 +94,7 @@ it("splits on state so the state with any one question fits Jev's per-question c
   const batches = contextBatches(items, request);
 
   expect(batches.length).toBeGreaterThan(1);
+  expect(batches.every((batch) => batch.length > 1)).toBe(true);
   expect(batches.flat()).toEqual(items);
   expect(
     batches.every(

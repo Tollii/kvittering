@@ -126,3 +126,63 @@ it("classifies a receipt beyond one request's context with each answer kept on i
     vi.unstubAllGlobals();
   }
 });
+
+it("falls back to unclear only for the products whose request failed", async () => {
+  vi.stubEnv("TYPESAFE_API_KEY", "test-key");
+  vi.stubEnv("RECEIPT_PROVIDER", "");
+  const t = convexTest(schema, modules);
+  registerRateLimiter(t);
+  const failedNames = new Set<string>();
+
+  // The request that carries the first product fails; every other one answers.
+  vi.stubGlobal(
+    "fetch",
+    vi.fn(async (_url: string, init?: RequestInit) => {
+      const request = readModelRequest(init);
+
+      const names = z
+        .array(z.object({ name: z.string() }))
+        .parse(request.state?.products)
+        .map((product) => product.name);
+
+      if (names.includes("JUICE 0")) {
+        names.forEach((name) => failedNames.add(name));
+
+        return new Response(null, { status: 400 });
+      }
+
+      return Response.json({
+        model: "jev-latest",
+        answers: Object.fromEntries(
+          Object.keys(request.questions).map((key) => [
+            key,
+            choiceAnswer(request.questions[key], "drinks.juice", 0.9),
+          ]),
+        ),
+        usage: { input_tokens: 10, output_tokens: 1 },
+      });
+    }),
+  );
+
+  const products = Array.from({ length: 60 }, (_, index) => ({
+    id: `line_${index}`,
+    evidence: { name: `JUICE ${index}` },
+  }));
+
+  try {
+    const result = await t.action(internal.providers.classify, { products });
+
+    expect(failedNames.size).toBeGreaterThan(0);
+    expect(failedNames.size).toBeLessThan(products.length);
+    expect(result.provider).toMatch(/classification unavailable/);
+    expect(result.classifications).toEqual(
+      products.map((product) =>
+        failedNames.has(product.evidence.name)
+          ? { id: product.id, categoryId: "fallback.unclear", confidence: 0 }
+          : { id: product.id, categoryId: "drinks.juice", confidence: 0.9 },
+      ),
+    );
+  } finally {
+    vi.unstubAllGlobals();
+  }
+});

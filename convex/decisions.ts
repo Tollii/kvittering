@@ -51,15 +51,16 @@ export type JudgmentAnswer = NoulResponse | ChoiceResponse;
  */
 const requestTokens = 56000;
 
-const questionTokens = 28000;
+const stateWithQuestionTokens = 28000;
 
 const estimatedTokens = (entry: EntryType | Questions[string]) =>
   Math.ceil(JSON.stringify(entry).length / 3);
 
 /**
  * Splits items into as few judgment requests as fit Jev's context, in order.
- * `request` builds the request for a batch of items; each item is sized on its
- * own, so its state and questions must not depend on the rest of the batch.
+ * `request` builds the request for a batch of items; each item is sized as if
+ * sent alone, so its state and questions must not grow with the rest of the
+ * batch.
  */
 export function contextBatches<T>(
   items: readonly T[],
@@ -81,7 +82,8 @@ export function contextBatches<T>(
     if (
       batch.length &&
       (state + itemState + questions + itemQuestions > requestTokens ||
-        state + itemState + Math.max(largest, itemLargest) > questionTokens)
+        state + itemState + Math.max(largest, itemLargest) >
+          stateWithQuestionTokens)
     ) {
       batches.push(batch);
       batch = [];

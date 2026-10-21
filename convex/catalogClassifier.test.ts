@@ -204,12 +204,12 @@ it("does not treat an unanswered competing group as a negative answer", async ()
 });
 
 it("splits a receipt beyond one request's context and keeps every line decision", async () => {
-  const batches: number[] = [];
+  const bodyLengths: number[] = [];
   vi.stubGlobal(
     "fetch",
     vi.fn<typeof fetch>(async (_url, init) => {
       const body = readModelRequest(init);
-      batches.push(z.string().parse(init?.body).length);
+      bodyLengths.push(z.string().parse(init?.body).length);
 
       const answers = Object.fromEntries(
         Object.keys(body.questions).map((key) => [
@@ -233,9 +233,8 @@ it("splits a receipt beyond one request's context and keeps every line decision"
     client(),
   );
 
-  // Jev reads 64k tokens per request; JSON runs above three characters a token.
-  expect(batches.length).toBeGreaterThan(1);
-  expect(batches.every((length) => length / 3 <= 64000)).toBe(true);
+  expect(bodyLengths.length).toBeGreaterThan(1);
+  expect(bodyLengths.every((length) => length / 3 <= 64000)).toBe(true);
   expect(results.map((result) => result.lineId)).toEqual(
     Array.from({ length: 60 }, (_, index) => `pizza_${index}`),
   );

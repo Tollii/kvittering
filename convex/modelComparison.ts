@@ -204,7 +204,10 @@ const linkingCases = [
   },
 ];
 
-/** Categories in batches that fit the context, as the receipt classifier sends them. */
+/**
+ * Categories in batches that fit the context, as the receipt classifier sends
+ * them, one after another so models compare without rate limits in the way.
+ */
 async function categorize(
   client: JudgmentClient,
   products: ClassificationEvidence[],
@@ -216,17 +219,17 @@ async function categorize(
     ),
   });
 
-  const found = await Promise.all(
-    contextBatches(products, request).map(async (batch) => {
-      const response = await client.systemOne(request(batch));
+  const found: Outcome[] = [];
 
-      return batch.map((_, index) =>
-        choiceOutcome(response.answers[`item_${index}`]),
-      );
-    }),
-  );
+  for (const batch of contextBatches(products, request)) {
+    const response = await client.systemOne(request(batch));
 
-  return found.flat();
+    batch.forEach((_, index) =>
+      found.push(choiceOutcome(response.answers[`item_${index}`])),
+    );
+  }
+
+  return found;
 }
 
 const modelsArg = v.array(v.string());

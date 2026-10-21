@@ -171,7 +171,7 @@ export const classify = internalAction({
       ...(args.receiptId && {
         source: { kind: "receipt" as const, id: args.receiptId },
       }),
-      timeoutMs: 10000,
+      timeoutMs: 20000,
     });
 
     if (!client) throw new Error("Kategoriseringen er ikke tilgjengelig.");
@@ -207,15 +207,15 @@ export const classify = internalAction({
       ? model
       : `${model}: classification unavailable`;
 
-    const results = batches.flatMap(({ batch, response }) =>
-      batch.map((product, index) => {
-        if (!response)
-          return {
-            id: product.id,
-            categoryId: "fallback.unclear",
-            confidence: 0,
-          };
+    const results = batches.flatMap(({ batch, response }) => {
+      if (!response)
+        return batch.map((product) => ({
+          id: product.id,
+          categoryId: "fallback.unclear",
+          confidence: 0,
+        }));
 
+      return batch.map((product, index) => {
         const answer = response.answers[`item_${index}`];
 
         if (!answer || !categories.some((c) => c.id === answer.choice))
@@ -226,8 +226,8 @@ export const classify = internalAction({
           categoryId: answer.choice,
           confidence: answer.confidence,
         };
-      }),
-    );
+      });
+    });
 
     console.info("receipt.classification_completed", {
       receiptId: args.receiptId,

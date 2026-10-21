@@ -400,7 +400,8 @@ export const analyze = internalAction({
       ),
     });
 
-    const results = await Promise.all(
+    // Settle every batch first, so a workflow retry never overlaps requests still in flight.
+    const settled = await Promise.allSettled(
       contextBatches(items, request).map(async (batch) => {
         const response = await client.systemOne(request(batch));
 
@@ -410,6 +411,10 @@ export const analyze = internalAction({
       }),
     );
 
-    return results.flat();
+    return settled.flatMap((result) => {
+      if (result.status === "rejected") throw result.reason;
+
+      return result.value;
+    });
   },
 });

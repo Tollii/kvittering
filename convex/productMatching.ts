@@ -48,7 +48,7 @@ export const match = internalAction({
       receiptProductModel().kind === "model"
         ? productJudgments(ctx, {
             source: { kind: "receipt", id: args.id },
-            timeoutMs: 10000,
+            timeoutMs: 20000,
           })
         : null;
 
@@ -56,17 +56,27 @@ export const match = internalAction({
 
     if (!retailer) return decisions;
 
-    const prepared = await Promise.all(
-      lines.map(async (line, position) => ({
+    const prepare = async (line: (typeof lines)[number], position: number) => ({
+      line,
+      position,
+      ...(await ctx.runQuery(internal.products.prepare, {
+        id: args.id,
+        retailer,
         line,
-        position,
-        ...(await ctx.runQuery(internal.products.prepare, {
-          id: args.id,
-          retailer,
-          line,
-        })),
       })),
-    );
+    });
+
+    const prepared: Awaited<ReturnType<typeof prepare>>[] = [];
+
+    // A dozen lookups at a time leave query capacity for the app.
+    for (let offset = 0; offset < lines.length; offset += 12)
+      prepared.push(
+        ...(await Promise.all(
+          lines
+            .slice(offset, offset + 12)
+            .map((line, index) => prepare(line, offset + index)),
+        )),
+      );
 
     const unresolved = prepared.filter((item) => {
       if (!item.saved) return true;
