@@ -22,9 +22,9 @@ The review is sized to the change, and the reviewers get everything they need in
 ## 2. Choose the tier
 
 - **Light, one reviewer:** the diff changes only Markdown files (documentation, skills, plans), or only dependency versions (`package.json` version ranges and `package-lock.json`, as in a Dependabot PR). Executable files under `.agents/` or `.claude/`, such as hooks, scripts and settings, are not Markdown.
-- **Full, two reviewers:** everything else, including tests, tooling, configuration and `.github/`.
+- **Full, two reviewers:** everything else, including tests, tooling, configuration and anything under `.github/`, Markdown or not.
 
-When in doubt, use the full tier. Neither tier is optional.
+Check the tier with `git diff --name-only <base-sha> <sha>` rather than by eye: for the light tier, every path is a `.md` file outside `.github/`, or the only paths are `package.json` and `package-lock.json` and the `package.json` diff changes only versions. When in doubt, use the full tier. Neither tier is optional.
 
 ## 3. Write the briefs
 
@@ -47,7 +47,7 @@ The shared part:
 
 The roles:
 
-- **Adversarial** (both tiers): correctness, security, household authorization, installed-client and persisted-data compatibility, failure paths and test value. Paste `docs/architecture.md` and `docs/principles.md`; in the light tier, paste only the documents the changed text refers to. Ask the reviewer to compare the old code at `<base-sha>` with the new code for each removed guard, authorization check, or compatibility path. In the light tier, also ask it to check every claim the changed text makes about the code, commands and other documents, and, for dependency changes, the call sites that a new version could break and the constraints in [security-triage](../security-triage/SKILL.md). Ask for at most 900 words, or 500 in the light tier.
+- **Adversarial** (both tiers): correctness, security, household authorization, installed-client and persisted-data compatibility, failure paths and test value. Paste `docs/architecture.md` and `docs/principles.md`; in the light tier, paste only the documents the changed text refers to. Ask the reviewer to compare the old code at `<base-sha>` with the new code for each removed guard, authorization check, or compatibility path. In the light tier, also ask it to check every claim the changed text makes about the code, commands and other documents, and, for dependency changes, the call sites that a new version could break and the constraints in [security-triage](../security-triage/SKILL.md), including its native fingerprint comparison, whoever opened the PR. Ask for at most 900 words, or 500 in the light tier.
 - **Maintainability** (full tier): paste [thermo-nuclear-code-quality-review](../thermo-nuclear-code-quality-review/SKILL.md) and ask the reviewer to apply that gate to the diff exactly as it describes. Ask for at most 900 words.
 
 ## 4. Run the reviewers in read-only copies
@@ -86,9 +86,9 @@ A push after the reviewed `<sha>` needs a review of its own commits only, before
 - Fix commits get one adversarial reviewer. Its brief has the shared rules, the findings the commits address, the rejected findings with their reasons (so it does not raise them again without new evidence), and the diff of those commits. Ask whether each fix closes its finding without a new defect, in at most 400 words.
 - When a fix restructured the change rather than patching it, as a maintainability finding often asks, review the new head at its full tier instead.
 - Other new work gets its own tier from step 2, on its own commits.
-- Merging the base branch without conflicts, formatting, or regenerating `package-lock.json` or `convex/contract.json` without other changes needs no review. Review a conflict resolution with `git show --remerge-diff <merge-sha>`.
+- Merging the base branch without conflicts, formatting, or regenerating `convex/contract.json` without other changes needs no review. Neither does regenerating `package-lock.json` when the lockfile command in step 3 prints no version change; when it prints one, the commit gets the dependency light tier. Review a conflict resolution with `git show --remerge-diff <merge-sha>`.
 
-When a merge from the base branch sits between the reviewed `<sha>` and the head, diff only the commits that are not merges: `git log --no-merges --format=%H <sha>..HEAD`, then `git show` each one. After two rounds of re-review, report what is still disputed instead of starting a third.
+When a merge from the base branch sits between the reviewed `<sha>` and the head, diff only the commits that are not merges: `git log --first-parent --no-merges --format=%H <sha>..HEAD`, then `git show` each one. After two rounds of re-review, report what is still disputed instead of starting a third, and leave auto-merge off until the owner decides.
 
 ## 7. Report
 
