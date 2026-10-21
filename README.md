@@ -74,6 +74,8 @@ they do not deploy the backend.
 
 Configure provider credentials in the selected Convex deployment. Required names and model defaults are read by [providers](convex/providers.ts), [authentication](convex/auth.ts), and the affected integration. Keep them out of `EXPO_PUBLIC_*` variables. Use separate provider accounts/projects and keys for development and staging where possible; separate keys in one account can still share billing or quota.
 
+Backend metrics, such as each model call's token use, go to an OpenTelemetry collector only when the deployment sets the standard `OTEL_EXPORTER_OTLP_*` variables; [metrics](convex/metrics.ts) describes the export.
+
 For push, configure Apple credentials and use a signed physical iPhone. For Apple sign-in, widgets, or ActivityKit setup, follow the native capability checks in [release operations](.agents/skills/release-operations/SKILL.md#native-capabilities). Expo Go cannot verify these integrations.
 
 ## Source references
@@ -83,6 +85,7 @@ For push, configure Apple credentials and use a signed physical iPhone. For Appl
 | Build identities, capabilities, and native assets | [app.json](app.json), [plugins](plugins/), [native module](modules/receipt-intelligence/)                                        |
 | Release commands and credentials                  | [package.json](package.json), [TestFlight workflow](.github/workflows/testflight.yml), [OTA workflow](.github/workflows/ota.yml) |
 | Diagnostics and redaction                         | [Sentry initialization](src/lib/sentry.ts), [event handling](src/lib/sentry-event.ts)                                            |
+| Backend metrics                                   | [OTLP export](convex/metrics.ts), [model token use](convex/modelTelemetry.ts)                                                    |
 | Formatting, lint, and coverage                    | [oxfmt](.oxfmtrc.jsonc), [Oxlint](oxlint.config.mts), [type-dependent rules](eslint.config.js), [Vitest](vitest.config.mts)      |
 
 Do not copy constants, enabled rules, event catalogs, or feature inventories into documentation. Explain a constraint or procedure only when the code does not make it clear.

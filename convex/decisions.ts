@@ -21,6 +21,7 @@ import {
   type ProviderMetadata,
 } from "ai";
 import { z } from "zod";
+import { modelUsage } from "./modelTelemetry";
 
 /**
  * Product judgments ask TypeSafe-shaped questions and read TypeSafe-shaped
@@ -202,6 +203,7 @@ export function judgmentClient(
         ),
         maxRetries: 0,
         abortSignal: AbortSignal.timeout(options.timeoutMs),
+        telemetry: { integrations: modelUsage },
       });
 
       const confidence = confidences(result.providerMetadata);
