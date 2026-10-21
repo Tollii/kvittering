@@ -44,6 +44,65 @@ export type JudgmentClient = {
 export type JudgmentAnswer = NoulResponse | ChoiceResponse;
 
 /**
+ * Jev sets no limit on the number of questions, only on context: 64k tokens
+ * for the state and every question together, and 32k for the state with any
+ * one question (https://docs.typesafe.ai/models#context-length). JSON runs
+ * above three characters per token, so this estimate errs large, and the
+ * budgets leave room for Jev's own framing.
+ */
+const requestTokens = 56000;
+
+const stateWithQuestionTokens = 28000;
+
+const estimatedTokens = (entry: EntryType | Questions[string]) =>
+  Math.ceil(JSON.stringify(entry).length / 3);
+
+/**
+ * Splits items into as few judgment requests as fit Jev's context, in order.
+ * `request` builds the request for a batch of items; each item is sized as if
+ * sent alone, so its state and questions must not grow with the rest of the
+ * batch.
+ */
+export function contextBatches<T>(
+  items: readonly T[],
+  request: (batch: T[]) => JudgmentRequest,
+): T[][] {
+  const batches: T[][] = [];
+  let batch: T[] = [];
+  let state = 0;
+  let questions = 0;
+  let largest = 0;
+
+  for (const item of items) {
+    const single = request([item]);
+    const sizes = Object.values(single.questions).map(estimatedTokens);
+    const itemState = estimatedTokens(single.state);
+    const itemQuestions = sizes.reduce((sum, size) => sum + size, 0);
+    const itemLargest = Math.max(0, ...sizes);
+
+    if (
+      batch.length &&
+      (state + itemState + questions + itemQuestions > requestTokens ||
+        state + itemState + Math.max(largest, itemLargest) >
+          stateWithQuestionTokens)
+    ) {
+      batches.push(batch);
+      batch = [];
+      state = questions = largest = 0;
+    }
+
+    batch.push(item);
+    state += itemState;
+    questions += itemQuestions;
+    largest = Math.max(largest, itemLargest);
+  }
+
+  if (batch.length) batches.push(batch);
+
+  return batches;
+}
+
+/**
  * Product judgments send text and JSON, and a decision reads the JSON a
  * request sends: absent fields drop out. The AI SDK's decisions take no
  * TypeSafe assets, and no judgment sends one.

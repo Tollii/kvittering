@@ -13,7 +13,7 @@ metadata:
 
 Accept a PR number, URL, or the current branch (`--pr auto`). Confirm the repository, head branch, head commit, and requested outcome. Reuse any merge authorization already given by the user.
 
-- By default, finish when CI passes for the current head, published review findings are addressed, all review conversations are resolved, and GitHub reports the PR as mergeable.
+- By default, finish when CI passes for the current head, [adversarial-code-review](../adversarial-code-review/SKILL.md) covers every commit up to it, published review findings are addressed, all review conversations are resolved, and GitHub reports the PR as mergeable.
 - If the user requests a merge, merge when these conditions hold and confirm that GitHub reports the PR as merged.
 - If the user explicitly requests continued monitoring while the PR remains open, continue until it is merged, closed, or the user stops the task.
 - Stop and report a blocker when permissions, persistent infrastructure failures, or a required product decision prevent further progress.

@@ -3,6 +3,7 @@
 import { generateText, NoObjectGeneratedError, Output } from "ai";
 import { languageModel, productJudgments } from "./aiModels";
 import { modelUsage } from "./modelTelemetry";
+import { contextBatches } from "./decisions";
 import { v } from "convex/values";
 import { internalAction } from "./_generated/server";
 import {
@@ -181,38 +182,27 @@ export const classify = internalAction({
       ...(args.receiptId && {
         source: { kind: "receipt" as const, id: args.receiptId },
       }),
-      timeoutMs: 10000,
+      timeoutMs: 20000,
     });
 
     if (!client) throw new Error("Kategoriseringen er ikke tilgjengelig.");
 
-    const results: { id: string; categoryId: string; confidence: number }[] =
-      [];
-
     const { model } = productModel;
-    let provider = model;
-    let batchCount = 0;
 
-    for (let offset = 0; offset < args.products.length; offset += 12) {
-      const batch = args.products.slice(offset, offset + 12);
-
-      const questions = Object.fromEntries(
-        batch.map((_, index) => [
+    const request = (products: typeof args.products) => ({
+      state: { products: products.map((p) => classificationEvidence(p)) },
+      questions: Object.fromEntries(
+        products.map((_, index) => [
           `item_${index}`,
           classificationQuestion(index),
         ]),
-      );
+      ),
+    });
 
-      batchCount++;
-
-      const response = await client
-        .systemOne({
-          state: {
-            products: batch.map((p) => classificationEvidence(p)),
-          },
-          questions,
-        })
-        .catch(() => {
+    const batches = await Promise.all(
+      contextBatches(args.products, request).map(async (batch) => ({
+        batch,
+        response: await client.systemOne(request(batch)).catch(() => {
           console.warn("receipt.classification_unavailable", {
             receiptId: args.receiptId,
             generation: args.generation,
@@ -220,32 +210,35 @@ export const classify = internalAction({
           });
 
           return null;
-        });
+        }),
+      })),
+    );
 
-      if (!response) {
-        provider = `${model}: classification unavailable`;
-        results.push(
-          ...args.products.slice(offset).map((product) => ({
-            id: product.id,
-            categoryId: "fallback.unclear",
-            confidence: 0,
-          })),
-        );
-        break;
-      }
+    const provider = batches.every(({ response }) => response)
+      ? model
+      : `${model}: classification unavailable`;
 
-      batch.forEach((product, index) => {
+    const results = batches.flatMap(({ batch, response }) => {
+      if (!response)
+        return batch.map((product) => ({
+          id: product.id,
+          categoryId: "fallback.unclear",
+          confidence: 0,
+        }));
+
+      return batch.map((product, index) => {
         const answer = response.answers[`item_${index}`];
 
         if (!answer || !categories.some((c) => c.id === answer.choice))
           throw new Error("Kategoriseringen ga et ugyldig svar.");
-        results.push({
+
+        return {
           id: product.id,
           categoryId: answer.choice,
           confidence: answer.confidence,
-        });
+        };
       });
-    }
+    });
 
     console.info("receipt.classification_completed", {
       receiptId: args.receiptId,
@@ -253,7 +246,7 @@ export const classify = internalAction({
       model,
       durationMs: Date.now() - started,
       itemCount: results.length,
-      batchCount,
+      batchCount: batches.length,
       provider,
     });
 

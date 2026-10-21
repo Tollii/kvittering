@@ -1,7 +1,7 @@
 import { choice, noul } from "@typesafe-ai/sdk";
 import type { Experimental_DecisionModel } from "ai";
 import { expect, it } from "vitest";
-import { judgmentClient } from "./decisions";
+import { contextBatches, judgmentClient } from "./decisions";
 
 type DecisionModelV4 = Extract<
   Experimental_DecisionModel,
@@ -75,4 +75,41 @@ it("sends judgment state and criteria to the decision model as JSON", async () =
     organic: { type: "noul", noul: 0.2 },
     fresh: { type: "noul", noul: 0.7 },
   });
+});
+
+it("splits on state so the state with any one question fits Jev's per-question context", () => {
+  // About 6,700 tokens of state per item; 32k tokens hold four with a question.
+  const items = Array.from({ length: 10 }, (_, index) => ({
+    index,
+    note: "x".repeat(20000),
+  }));
+
+  const request = (batch: typeof items) => ({
+    state: { items: batch },
+    questions: Object.fromEntries(
+      batch.map((_, index) => [`item_${index}`, noul("Is it fresh?")]),
+    ),
+  });
+
+  const batches = contextBatches(items, request);
+
+  expect(batches.length).toBeGreaterThan(1);
+  expect(batches.every((batch) => batch.length > 1)).toBe(true);
+  expect(batches.flat()).toEqual(items);
+  expect(
+    batches.every(
+      (batch) => JSON.stringify(request(batch).state).length / 3 < 32000,
+    ),
+  ).toBe(true);
+});
+
+it("still asks about an item too large for any request, on its own", () => {
+  const items = ["small", "x".repeat(300000), "small"];
+
+  expect(
+    contextBatches(items, (batch) => ({
+      state: batch,
+      questions: { fresh: noul("Is it fresh?") },
+    })),
+  ).toEqual([["small"], ["x".repeat(300000)], ["small"]]);
 });

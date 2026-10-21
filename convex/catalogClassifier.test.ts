@@ -4,6 +4,7 @@ import {
   type ModelRequest,
 } from "../src/lib/testing/model-requests";
 import { afterEach, expect, it, vi } from "vitest";
+import { z } from "zod";
 import { TypeSafeClient } from "@typesafe-ai/sdk";
 import { classifyCatalogProducts } from "./catalogClassifier";
 import { emptyLine } from "../src/lib/domain/receipt";
@@ -202,13 +203,13 @@ it("does not treat an unanswered competing group as a negative answer", async ()
   expect(result.equivalentKeys).toBeUndefined();
 });
 
-it("bounds catalog question batches while retaining every line decision", async () => {
-  const batches: number[] = [];
+it("splits a receipt beyond one request's context and keeps every line decision", async () => {
+  const bodyLengths: number[] = [];
   vi.stubGlobal(
     "fetch",
     vi.fn<typeof fetch>(async (_url, init) => {
       const body = readModelRequest(init);
-      batches.push(Object.keys(body.questions).length);
+      bodyLengths.push(z.string().parse(init?.body).length);
 
       const answers = Object.fromEntries(
         Object.keys(body.questions).map((key) => [
@@ -228,14 +229,14 @@ it("bounds catalog question batches while retaining every line decision", async 
   );
 
   const results = await classifyCatalogProducts(
-    Array.from({ length: 25 }, (_, index) => item(index)),
+    Array.from({ length: 60 }, (_, index) => item(index)),
     client(),
   );
 
-  expect(batches.length).toBeGreaterThan(0);
-  expect(batches.every((count) => count > 0 && count <= 24)).toBe(true);
+  expect(bodyLengths.length).toBeGreaterThan(1);
+  expect(bodyLengths.every((length) => length / 3 <= 64000)).toBe(true);
   expect(results.map((result) => result.lineId)).toEqual(
-    Array.from({ length: 25 }, (_, index) => `pizza_${index}`),
+    Array.from({ length: 60 }, (_, index) => `pizza_${index}`),
   );
   expect(
     results.every((result) => result.categoryId === "convenience.frozen-pizza"),

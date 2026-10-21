@@ -4,6 +4,7 @@ import { v, type Infer } from "convex/values";
 import { choice } from "@typesafe-ai/sdk";
 import { internalAction } from "./_generated/server";
 import { productJudgments } from "./aiModels";
+import { contextBatches } from "./decisions";
 import { receiptProductModel } from "./providerConfig";
 import { internal } from "./_generated/api";
 import { receiptDataValidator } from "../src/lib/domain/receipt";
@@ -47,64 +48,73 @@ export const match = internalAction({
       receiptProductModel().kind === "model"
         ? productJudgments(ctx, {
             source: { kind: "receipt", id: args.id },
-            timeoutMs: 10000,
+            timeoutMs: 20000,
           })
         : null;
 
-    const deadline = Date.now() + 45000;
-    let model = client;
     const retailer = args.data.store;
 
     if (!retailer) return decisions;
 
-    for (let offset = 0; offset < lines.length; offset += 12) {
-      const batch = lines.slice(offset, offset + 12);
+    const prepare = async (line: (typeof lines)[number], position: number) => ({
+      line,
+      position,
+      ...(await ctx.runQuery(internal.products.prepare, {
+        id: args.id,
+        retailer,
+        line,
+      })),
+    });
 
-      const prepared = await Promise.all(
-        batch.map(async (line, index) => ({
-          line,
-          position: offset + index,
-          ...(await ctx.runQuery(internal.products.prepare, {
-            id: args.id,
-            retailer,
-            line,
-          })),
-        })),
+    const prepared: Awaited<ReturnType<typeof prepare>>[] = [];
+
+    // A dozen lookups at a time leave query capacity for the app.
+    for (let offset = 0; offset < lines.length; offset += 12)
+      prepared.push(
+        ...(await Promise.all(
+          lines
+            .slice(offset, offset + 12)
+            .map((line, index) => prepare(line, offset + index)),
+        )),
       );
 
-      const unresolved = prepared.filter((item) => {
-        if (!item.saved) return true;
-        decisions[item.position] = {
-          lineId: item.line.id,
-          kind: item.productId ? "match" : "uncertain",
-          productId: item.productId,
-        };
+    const unresolved = prepared.filter((item) => {
+      if (!item.saved) return true;
+      decisions[item.position] = {
+        lineId: item.line.id,
+        kind: item.productId ? "match" : "uncertain",
+        productId: item.productId,
+      };
 
-        return false;
-      });
+      return false;
+    });
 
-      if (!unresolved.length || !model || Date.now() >= deadline) continue;
+    if (!unresolved.length || !client) return decisions;
 
-      try {
-        const questions = Object.fromEntries(
-          unresolved.map((item, index) => [
-            `item_${index}`,
-            linkingQuestion(index, item.candidates.length),
-          ]),
-        );
+    const request = (items: typeof unresolved) => ({
+      state: {
+        items: items.map((item) => ({
+          receiptDescription: productEvidence(item.line),
+          candidates: item.candidates.map(productEvidence),
+        })),
+      },
+      questions: Object.fromEntries(
+        items.map((item, index) => [
+          `item_${index}`,
+          linkingQuestion(index, item.candidates.length),
+        ]),
+      ),
+    });
 
-        const response = await model.systemOne({
-          state: {
-            items: unresolved.map((item) => ({
-              receiptDescription: productEvidence(item.line),
-              candidates: item.candidates.map(productEvidence),
-            })),
-          },
-          questions,
-        });
+    await Promise.all(
+      contextBatches(unresolved, request).map(async (batch) => {
+        // Handled: saved mappings stay available when the provider fails.
+        const response = await client
+          .systemOne(request(batch))
+          .catch(() => null);
 
-        unresolved.forEach((item, index) => {
-          const answer = response.answers[`item_${index}`];
+        batch.forEach((item, index) => {
+          const answer = response?.answers[`item_${index}`];
 
           if (!answer || answer.confidence < 0.85) return;
 
@@ -125,11 +135,8 @@ export const match = internalAction({
               productId: null,
             };
         });
-      } catch {
-        // Handled: keep exact mappings available, but stop model calls after a provider failure.
-        model = null;
-      }
-    }
+      }),
+    );
 
     return decisions;
   },
