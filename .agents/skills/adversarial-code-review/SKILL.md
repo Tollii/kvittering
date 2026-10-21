@@ -47,7 +47,7 @@ The shared part:
 
 The roles:
 
-- **Adversarial** (both tiers): correctness, security, household authorization, installed-client and persisted-data compatibility, failure paths and test value. Paste `docs/architecture.md` and `docs/principles.md`. Ask the reviewer to compare the old code at `<base-sha>` with the new code for each removed guard, authorization check, or compatibility path. In the light tier, also ask it to check every claim the changed text makes about the code, commands and other documents, and, for dependency changes, the call sites that a new version could break and the constraints in [security-triage](../security-triage/SKILL.md). Ask for at most 900 words, or 500 in the light tier.
+- **Adversarial** (both tiers): correctness, security, household authorization, installed-client and persisted-data compatibility, failure paths and test value. Paste `docs/architecture.md` and `docs/principles.md`; in the light tier, paste only the documents the changed text refers to. Ask the reviewer to compare the old code at `<base-sha>` with the new code for each removed guard, authorization check, or compatibility path. In the light tier, also ask it to check every claim the changed text makes about the code, commands and other documents, and, for dependency changes, the call sites that a new version could break and the constraints in [security-triage](../security-triage/SKILL.md). Ask for at most 900 words, or 500 in the light tier.
 - **Maintainability** (full tier): paste [thermo-nuclear-code-quality-review](../thermo-nuclear-code-quality-review/SKILL.md) and ask the reviewer to apply that gate to the diff exactly as it describes. Ask for at most 900 words.
 
 ## 4. Run the reviewers in read-only copies
