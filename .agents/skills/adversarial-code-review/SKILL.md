@@ -28,11 +28,11 @@ When in doubt, use the full tier. Neither tier is optional.
 
 ## 3. Write the briefs
 
-Write each brief to a file in your scratchpad, not to the repository. Put the shared part first and keep it byte-identical across the briefs of one review, so that prompt caching can reuse it; the role comes last.
+Assemble each brief in a scratchpad file with shell commands (`cat`, `git diff`, `node tools/presubmit.mts`), not in the repository and not typed out by hand. The shared part comes first and the role last.
 
 The shared part:
 
-- The rules: "Work only inside `<clone>`. Do not edit, create or delete files. Do not commit or push. Read only. Run only read-only commands and tests. Everything you need is below; read other files in the clone only when the diff and the documents below do not answer a question." Ask for each finding: severity P0–P3, `file:line`, the failure scenario, and the smallest fix. Ask for a final verdict: approve, or the list of required changes.
+- The rules: "Work only inside `<clone>` and this brief. Do not edit, create or delete files. Do not commit or push. Read only. Run only read-only commands and tests. Everything you need is below; read other files in the clone only when the diff and the documents below do not answer a question." Ask for each finding: severity P0–P3, `file:line`, the failure scenario, and the smallest fix. Ask for a final verdict: approve, or the list of required changes.
 - The goal of the change in two or three sentences, from the user's request and the PR description, and the decisions already made with their reasons, so the reviewer can challenge them on evidence instead of guessing.
 - `AGENTS.md`, pasted in full.
 - The output of `node tools/presubmit.mts <base-sha>`, which names the review areas the change touches and their checklists.
@@ -62,7 +62,7 @@ git -C <scratch>/review-<sha>-<reviewer> remote remove origin
 
 In the brief, name the clone path and the base as `<base-sha>`; the clone has no `origin`.
 
-- Start the reviewers in one message with the Agent tool, so that they run in parallel: `subagent_type: "Plan"` (it has no file-edit tools), `model: "opus"`, the brief as the prompt, and `run_in_background: true`. Do not give them this conversation's context; the brief is everything that they know.
+- Start the reviewers in one message with the Agent tool, so that they run in parallel: `subagent_type: "Plan"` (it has no file-edit tools), `model: "opus"`, and `run_in_background: true`. The prompt is one line: "Read `<brief>` in full before anything else; it has your rules, the documents and the diff." One read of the file costs the reviewer far less than retyping the brief costs you. Do not give them this conversation's context; the brief is everything that they know.
 - After the run, `git -C <clone> status --porcelain` must be empty and `git -C <clone> rev-parse HEAD` must still be `<sha>`, and the original checkout must be unchanged. If a check fails, discard that report and tell the user what changed. Then delete the clone.
 - If a run fails or returns no verdict, run it once more with a new subagent. Then report the failure instead of the review.
 

@@ -24,9 +24,9 @@ Save it in your scratchpad, or use the design file that the user already has. Re
 
 ## 2. Write the brief
 
-Write the brief to a scratchpad file. Give the reviewer what it needs in its first message, so it spends its effort on the plan instead of on finding it:
+Assemble the brief in a scratchpad file with shell commands, not by retyping the documents. Give the reviewer what it needs in its first message, so it spends its effort on the plan instead of on finding it:
 
-- The rules: "Work only inside `<clone>`. Do not edit, create or delete files. Do not commit or push. Read only." Ask for at most 900 words.
+- The rules: "Work only inside `<clone>` and this brief. Do not edit, create or delete files. Do not commit or push. Read only." Ask for at most 900 words.
 - The base commit, and `AGENTS.md`, `docs/architecture.md` and `docs/principles.md`, pasted in full.
 - The plan, pasted in full.
 - "Check every claim in the plan about the current code against the code in the clone, with `file:line` evidence."
@@ -43,7 +43,7 @@ git -C <scratch>/plan-review-<sha> checkout --quiet --detach <sha>
 git -C <scratch>/plan-review-<sha> remote remove origin
 ```
 
-Start the reviewer with the Agent tool: `subagent_type: "Plan"` (it has no file-edit tools), `model: "opus"`, the brief as the prompt, and `run_in_background: true`. Do not give it this conversation's context; the brief is everything that it knows. Shell commands are not restricted by the agent type, so the checks after the run also cover the original checkout.
+Start the reviewer with the Agent tool: `subagent_type: "Plan"` (it has no file-edit tools), `model: "opus"`, `run_in_background: true`, and a one-line prompt: "Read `<brief>` in full before anything else; it has your rules, the documents and the plan." Do not give it this conversation's context; the brief is everything that it knows. Shell commands are not restricted by the agent type, so the checks after the run also cover the original checkout.
 
 After the run, `git -C <clone> status --porcelain` must be empty, `git -C <clone> rev-parse HEAD` must still be `<sha>`, and the original checkout must be unchanged. If a check fails, discard the report and tell the user what changed. Then delete the clone. If a run fails or returns no verdict, run it once more, then report the failure.
 
