@@ -1,4 +1,9 @@
-import { metrics } from "@opentelemetry/api";
+import {
+  DiagConsoleLogger,
+  DiagLogLevel,
+  diag,
+  metrics,
+} from "@opentelemetry/api";
 import {
   AggregationTemporalityPreference,
   OTLPMetricExporter,
@@ -49,27 +54,53 @@ function exporting() {
           ...(!env.OTEL_EXPORTER_OTLP_TIMEOUT &&
             !env.OTEL_EXPORTER_OTLP_METRICS_TIMEOUT && { timeoutMillis: 5000 }),
         }),
-        exportIntervalMillis: 60000,
       }),
     ],
   });
-  metrics.setGlobalMeterProvider(provider);
+  // The reader reports a failed export only through OpenTelemetry's own
+  // diagnostics, which are silent until they have a logger.
+  diag.setLogger(new DiagConsoleLogger(), DiagLogLevel.WARN);
 
   return provider;
 }
 
-/** The backend's meter; a no-op until a collector is configured. */
+/**
+ * The backend's meter. Without a collector it comes from the global provider,
+ * which does nothing unless a test installs one.
+ */
 export function meter() {
-  exporting();
-
-  return metrics.getMeter("kvitto-backend");
+  return (exporting() ?? metrics).getMeter("kvitto-backend");
 }
 
-/** Sends what was recorded. A collector failure never fails the caller. */
+const flushWaitMs = 1000;
+
+const slowCollectorPauseMs = 60000;
+
+let waitAgainAt = 0;
+
+/**
+ * Sends what was recorded. Receipt work waits at most a second for it; after
+ * a slow export it stops waiting for a minute and lets exports finish in the
+ * background. A failed export is logged, never thrown.
+ */
 export async function flushMetrics() {
-  await exporting()
+  // The diagnostics logger reports failures; a background flush must not reject.
+  const flushing = exporting()
     ?.forceFlush()
-    .catch((error: Error) => {
-      console.warn("metrics.export_failed", { message: error.message });
-    });
+    .catch(() => undefined);
+
+  if (!flushing || Date.now() < waitAgainAt) return;
+
+  let timer: ReturnType<typeof setTimeout> | undefined;
+
+  const finished = await Promise.race([
+    flushing.then(() => true),
+    new Promise<false>((resolve) => {
+      timer = setTimeout(() => resolve(false), flushWaitMs);
+    }),
+  ]);
+
+  clearTimeout(timer);
+
+  if (!finished) waitAgainAt = Date.now() + slowCollectorPauseMs;
 }

@@ -12,6 +12,8 @@ import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { internal } from "./_generated/api";
 import { judgmentClient } from "./decisions";
 import schema from "./schema";
+import type { z } from "zod";
+import type { extractionSchema } from "../src/lib/domain/receipt-extraction";
 
 const modules = import.meta.glob("./**/*.ts");
 
@@ -86,7 +88,7 @@ const extraction = {
       issues: [],
     },
   ],
-};
+} satisfies z.input<typeof extractionSchema>;
 
 it("reports the reader's cached and reasoning tokens in its log and metrics", async () => {
   vi.stubEnv("RECEIPT_PROVIDER", "openai");
@@ -138,6 +140,17 @@ it("reports the reader's cached and reasoning tokens in its log and metrics", as
   await t.action(internal.providers.extract, { storageIds: [storageId] });
 
   expect(info).toHaveBeenCalledWith(
+    "model.call_completed",
+    expect.objectContaining({
+      operation: "chat",
+      model: "gpt-6-luna",
+      inputTokens: 1200,
+      cachedInputTokens: 1024,
+      outputTokens: 900,
+      reasoningTokens: 600,
+    }),
+  );
+  expect(info).toHaveBeenCalledWith(
     "receipt.extraction_completed",
     expect.objectContaining({
       inputTokens: 1200,
@@ -150,7 +163,8 @@ it("reports the reader's cached and reasoning tokens in its log and metrics", as
   const call = {
     "gen_ai.operation.name": "chat",
     "gen_ai.provider.name": "openai",
-    "gen_ai.request.model": "gpt-6-luna",
+    "gen_ai.response.model": "gpt-6-luna",
+    "kvitto.function": "evaluation.read.default",
   };
 
   expect(await recorded("gen_ai.client.token.usage")).toEqual(
@@ -169,7 +183,7 @@ it("reports the reader's cached and reasoning tokens in its log and metrics", as
 });
 
 it("reports a decision's token use without inventing cached or reasoning tokens", async () => {
-  vi.spyOn(console, "info").mockImplementation(() => {});
+  const info = vi.spyOn(console, "info").mockImplementation(() => {});
   vi.stubGlobal(
     "fetch",
     vi.fn(
@@ -197,10 +211,22 @@ it("reports a decision's token use without inventing cached or reasoning tokens"
     },
   });
 
+  expect(info).toHaveBeenCalledWith(
+    "model.call_completed",
+    expect.objectContaining({
+      operation: "decide",
+      model: "jev-latest",
+      inputTokens: 100,
+      cachedInputTokens: undefined,
+      outputTokens: 20,
+      reasoningTokens: undefined,
+    }),
+  );
+
   const call = {
     "gen_ai.operation.name": "decide",
     "gen_ai.provider.name": "typesafe",
-    "gen_ai.request.model": "jev-latest",
+    "gen_ai.response.model": "jev-latest",
   };
 
   expect(await recorded("gen_ai.client.token.usage")).toEqual(

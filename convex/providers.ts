@@ -85,7 +85,13 @@ export const extract = internalAction({
       // Extra reasoning takes longer; an action may still run ten minutes.
       abortSignal: AbortSignal.timeout(args.reasoning ? 300000 : 120000),
       providerOptions: { openai: { store: false } },
-      telemetry: { integrations: modelUsage },
+      telemetry: {
+        integrations: modelUsage,
+        // Evaluations read without a receipt and may ask for more reasoning.
+        functionId: args.receiptId
+          ? "receipt.read"
+          : `evaluation.read.${args.reasoning ?? "default"}`,
+      },
       instructions: `${extractionInstructions}\n\n${overlapInstructions}\n\n${uncertaintyInstructions}`,
       messages: [
         {
@@ -113,6 +119,7 @@ export const extract = internalAction({
     });
 
     const data = prepareExtraction(response.output, images.length);
+    // Repeats the model call's token counts so they can be tied to a receipt.
     console.info("receipt.extraction_completed", {
       receiptId: args.receiptId,
       generation: args.generation,

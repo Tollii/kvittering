@@ -5,6 +5,11 @@ export default defineConfig({
   oxc: { jsx: { runtime: "automatic" } },
   test: {
     environment: "edge-runtime",
+    // Tests must not send metrics to a collector named by the shell.
+    env: {
+      OTEL_EXPORTER_OTLP_ENDPOINT: "",
+      OTEL_EXPORTER_OTLP_METRICS_ENDPOINT: "",
+    },
     include: [
       "convex/**/*.test.ts",
       "src/lib/**/*.test.ts",

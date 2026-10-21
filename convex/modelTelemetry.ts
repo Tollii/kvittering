@@ -1,5 +1,5 @@
-import type { Attributes, Histogram, Meter } from "@opentelemetry/api";
-import type { Experimental_DecisionModelCallEndEvent, Telemetry } from "ai";
+import type { Attributes, Histogram } from "@opentelemetry/api";
+import type { Telemetry } from "ai";
 import { flushMetrics, meter } from "./metrics";
 
 /**
@@ -7,13 +7,18 @@ import { flushMetrics, meter } from "./metrics";
  * production shows what reasoning and prompt caching cost before anyone tunes
  * them. Names follow the OpenTelemetry GenAI conventions; cached input and
  * reasoning output are parts of input and output, so they get their own
- * instruments instead of token types that a sum would count twice.
+ * instruments instead of token types that a sum would count twice. The AI SDK
+ * reports a call only once it succeeds, so tokens spent on a failed or
+ * refused call are missing.
  */
 
 type ModelCall = {
   operation: "chat" | "decide";
+  /** Which work made the call, when the caller names it. */
+  functionId: string | undefined;
   /** The AI SDK names providers by API, such as `openai.responses`. */
   provider: string;
+  /** The model the provider says answered, which may be a dated snapshot. */
   model: string;
   inputTokens: number | undefined;
   cachedInputTokens: number | undefined;
@@ -32,28 +37,18 @@ const durationBuckets = [
   40.96, 81.92, 163.84, 327.68,
 ];
 
-type Instruments = {
-  tokens: Histogram;
-  cachedInputTokens: Histogram;
-  reasoningTokens: Histogram;
-  duration: Histogram;
-};
-
-const instruments = new WeakMap<Meter, Instruments>();
-
-function instrumentsOf(meter: Meter) {
-  const existing = instruments.get(meter);
-
-  if (existing) return existing;
+// The SDK returns the same instruments when they are created again.
+function instruments() {
+  const backend = meter();
 
   const tokens = (name: string, description: string) =>
-    meter.createHistogram(name, {
+    backend.createHistogram(name, {
       description,
       unit: "{token}",
       advice: { explicitBucketBoundaries: tokenBuckets },
     });
 
-  const created = {
+  return {
     tokens: tokens("gen_ai.client.token.usage", "Tokens used per model call."),
     cachedInputTokens: tokens(
       "kvitto.gen_ai.client.cached_input_tokens",
@@ -63,32 +58,24 @@ function instrumentsOf(meter: Meter) {
       "kvitto.gen_ai.client.reasoning_tokens",
       "Output tokens spent reasoning, part of output.",
     ),
-    duration: meter.createHistogram("gen_ai.client.operation.duration", {
+    duration: backend.createHistogram("gen_ai.client.operation.duration", {
       description: "Time a model call took.",
       unit: "s",
       advice: { explicitBucketBoundaries: durationBuckets },
     }),
   };
-
-  instruments.set(meter, created);
-
-  return created;
 }
 
 async function record(call: ModelCall) {
-  const { durationMs, ...usage } = call;
+  console.info("model.call_completed", call);
 
-  console.info("model.call_completed", {
-    ...usage,
-    ...(durationMs !== undefined && { durationMs }),
-  });
-
-  const recorded = instrumentsOf(meter());
+  const recorded = instruments();
 
   const attributes: Attributes = {
     "gen_ai.operation.name": call.operation,
     "gen_ai.provider.name": call.provider.split(".")[0],
-    "gen_ai.request.model": call.model,
+    "gen_ai.response.model": call.model,
+    ...(call.functionId && { "kvitto.function": call.functionId }),
   };
 
   const measure = (
@@ -108,31 +95,18 @@ async function record(call: ModelCall) {
   measure(recorded.reasoningTokens, call.reasoningTokens);
   measure(
     recorded.duration,
-    durationMs === undefined ? undefined : durationMs / 1000,
+    call.durationMs === undefined ? undefined : call.durationMs / 1000,
   );
 
   await flushMetrics();
 }
 
-// Decision models report only input and output tokens.
-async function recordDecision(event: Experimental_DecisionModelCallEndEvent) {
-  await record({
-    operation: "decide",
-    provider: event.provider,
-    model: event.modelId,
-    inputTokens: event.usage?.inputTokens,
-    cachedInputTokens: undefined,
-    outputTokens: event.usage?.outputTokens,
-    reasoningTokens: undefined,
-    durationMs: undefined,
-  });
-}
-
 /** Pass as `telemetry: { integrations: modelUsage }` on each model call. */
 export const modelUsage: Telemetry = {
-  async onLanguageModelCallEnd(event) {
-    await record({
+  onLanguageModelCallEnd: (event) =>
+    record({
       operation: "chat",
+      functionId: event.functionId,
       provider: event.provider,
       model: event.modelId,
       inputTokens: event.usage.inputTokens,
@@ -140,7 +114,18 @@ export const modelUsage: Telemetry = {
       outputTokens: event.usage.outputTokens,
       reasoningTokens: event.usage.outputTokenDetails.reasoningTokens,
       durationMs: event.performance.responseTimeMs,
-    });
-  },
-  experimental_onDecisionModelCallEnd: recordDecision,
+    }),
+  // Decision models report only input and output tokens.
+  ["experimental_onDecisionModelCallEnd"]: (event) =>
+    record({
+      operation: "decide",
+      functionId: event.functionId,
+      provider: event.provider,
+      model: event.response?.modelId ?? event.modelId,
+      inputTokens: event.usage?.inputTokens,
+      cachedInputTokens: undefined,
+      outputTokens: event.usage?.outputTokens,
+      reasoningTokens: undefined,
+      durationMs: undefined,
+    }),
 };
