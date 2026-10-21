@@ -39,6 +39,7 @@ Put media in the description without committing it to the PR branch or using ext
   ```
 
   To edit, `PATCH` `https://api.github.com/repos/Tollii/kvittering/pulls/<number>` with only the fields that change.
+
 - **Elsewhere:** use `gh` 2.99.0 or newer with `--attach`, for example `gh pr edit <number> --body-file <description.md> --attach './receipt-details.png#Items in the selected category'`. References to attached local files in the body are replaced with uploaded asset URLs; other attachments are appended. A partial upload can update the PR despite a nonzero exit; inspect the result before retrying. See [GitHub CLI attachment documentation](https://docs.github.com/en/github-cli/github-cli/attaching-files-with-github-cli).
 
 Afterward, read back the body and check that each media URL loads. Reviewers cannot open local paths, so cite only published URLs as evidence.
@@ -48,5 +49,7 @@ For changes that have no useful visual result, give concise execution evidence i
 End the description with the actual model and harness used for the change, for example `Created with <model> in <harness>.` Do not invent a model identifier if it is unavailable.
 
 Use a structured tool argument for the description, or write it to a temporary file and pass it as the body. Open a real PR, not a draft, so review bots run. In Codex, attach the created or updated PR to the task with the artifact tool when available.
+
+Every PR gets an [adversarial-code-review](../adversarial-code-review/SKILL.md) before it merges, sized to its diff. Run it after filing, while CI runs, and fix its valid findings before enabling auto-merge. Later pushes get a review of their own commits only.
 
 After filing, use [babysit-pr](../babysit-pr/SKILL.md) to follow CI and published review feedback through completion. Honor an explicit request to file only or a different stopping point. Carry the PR URL and any existing merge authorization into monitoring. Merge only if the user requested it; otherwise finish when the PR is ready.
