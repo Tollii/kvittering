@@ -5,6 +5,7 @@ import { internalAction, type ActionCtx } from "./_generated/server";
 import { internal } from "./_generated/api";
 import { decisionModel } from "./aiModels";
 import {
+  contextBatches,
   judgmentClient,
   type JudgmentAnswer,
   type JudgmentClient,
@@ -203,32 +204,29 @@ const linkingCases = [
   },
 ];
 
-/** Categories in batches of 12, as the receipt classifier sends them. */
+/** Categories in batches that fit the context, as the receipt classifier sends them. */
 async function categorize(
   client: JudgmentClient,
   products: ClassificationEvidence[],
 ): Promise<Outcome[]> {
-  const found: Outcome[] = [];
+  const request = (batch: ClassificationEvidence[]) => ({
+    state: { products: batch },
+    questions: Object.fromEntries(
+      batch.map((_, index) => [`item_${index}`, classificationQuestion(index)]),
+    ),
+  });
 
-  for (let offset = 0; offset < products.length; offset += 12) {
-    const batch = products.slice(offset, offset + 12);
+  const found = await Promise.all(
+    contextBatches(products, request).map(async (batch) => {
+      const response = await client.systemOne(request(batch));
 
-    const response = await client.systemOne({
-      state: { products: batch },
-      questions: Object.fromEntries(
-        batch.map((_, index) => [
-          `item_${index}`,
-          classificationQuestion(index),
-        ]),
-      ),
-    });
+      return batch.map((_, index) =>
+        choiceOutcome(response.answers[`item_${index}`]),
+      );
+    }),
+  );
 
-    batch.forEach((_, index) =>
-      found.push(choiceOutcome(response.answers[`item_${index}`])),
-    );
-  }
-
-  return found;
+  return found.flat();
 }
 
 const modelsArg = v.array(v.string());

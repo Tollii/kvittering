@@ -11,7 +11,7 @@ import { v } from "convex/values";
 import { choice } from "@typesafe-ai/sdk";
 import { internalAction, type ActionCtx } from "./_generated/server";
 import { productJudgments } from "./aiModels";
-import type { JudgmentClient } from "./decisions";
+import { contextBatches, type JudgmentClient } from "./decisions";
 import type { Id } from "./_generated/dataModel";
 import { internal } from "./_generated/api";
 import {
@@ -364,15 +364,26 @@ export const analyze = internalAction({
       }
     }
 
-    const results: ProductAnalysisResult[] = [];
+    const items = prepared.map((item) => ({
+      ...item,
+      candidates: purchaseCandidates(item.line),
+    }));
 
-    for (let offset = 0; offset < prepared.length; offset += 12) {
-      const batch = prepared.slice(offset, offset + 12).map((item) => ({
-        ...item,
-        candidates: purchaseCandidates(item.line),
-      }));
-
-      const questions = Object.fromEntries(
+    const request = (batch: typeof items) => ({
+      state: {
+        items: batch.map(({ line, profile, candidates }) => ({
+          receiptText: line.originalText,
+          name: line.name,
+          quantity: line.quantity,
+          unit: line.unit,
+          amountOre: line.amountOre,
+          unitPriceOre: line.unitPriceOre,
+          catalogProduct: line.catalogProduct ?? null,
+          package: profile,
+          candidates,
+        })),
+      },
+      questions: Object.fromEntries(
         batch.map((item, index) => [
           `quantity_${index}`,
           choice(
@@ -386,32 +397,19 @@ export const analyze = internalAction({
             ]),
           ),
         ]),
-      );
+      ),
+    });
 
-      const response = await client.systemOne({
-        state: {
-          items: batch.map(({ line, profile, candidates }) => ({
-            receiptText: line.originalText,
-            name: line.name,
-            quantity: line.quantity,
-            unit: line.unit,
-            amountOre: line.amountOre,
-            unitPriceOre: line.unitPriceOre,
-            catalogProduct: line.catalogProduct ?? null,
-            package: profile,
-            candidates,
-          })),
-        },
-        questions,
-      });
+    const results = await Promise.all(
+      contextBatches(items, request).map(async (batch) => {
+        const response = await client.systemOne(request(batch));
 
-      batch.forEach((item, index) => {
-        results.push(
+        return batch.map((item, index) =>
           purchaseAnalysisResult(item, response.answers[`quantity_${index}`]),
         );
-      });
-    }
+      }),
+    );
 
-    return results;
+    return results.flat();
   },
 });
