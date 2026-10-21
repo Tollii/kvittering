@@ -5,7 +5,7 @@ import { noul, type Questions } from "@typesafe-ai/sdk";
 import { internalAction } from "./_generated/server";
 import { productJudgments } from "./aiModels";
 import { internal } from "./_generated/api";
-import type { JudgmentClient } from "./decisions";
+import { contextBatches, type JudgmentClient } from "./decisions";
 import { matchingInput } from "./catalogMatching";
 import {
   catalogDecision,
@@ -41,45 +41,94 @@ export function catalogMatchQuestion(item: number, candidate: number) {
   );
 }
 
+type CatalogItem = {
+  line: ReceiptLine;
+  candidates: CatalogProduct[];
+  product: CatalogProduct | null;
+};
+
+type PreparedCatalogItem = ReturnType<typeof prepareCatalogItem>;
+
+function prepareCatalogItem(item: CatalogItem) {
+  const candidates = rankCatalogProducts(
+    printedName(item.line),
+    groupCatalogProducts(item.candidates),
+  )
+    .slice(0, 8)
+    .map(({ product }) => product);
+
+  return {
+    ...item,
+    originals: item.candidates,
+    candidates,
+    match: item.product ?? automaticCatalogProduct(item.line, candidates),
+  };
+}
+
 /** All questions are independent and use the complete, already collected candidate evidence. */
 export async function classifyCatalogProducts(
-  items: Parameters<typeof classifyCatalogBatch>[0],
+  items: CatalogItem[],
   client: JudgmentClient | null,
 ): Promise<CatalogDecision[]> {
-  const results: CatalogDecision[] = [];
+  const prepared = items.map(prepareCatalogItem);
 
-  for (let offset = 0; offset < items.length; offset += 12)
-    results.push(
-      ...(await classifyCatalogBatch(items.slice(offset, offset + 12), client)),
-    );
+  return (
+    await Promise.all(
+      contextBatches(prepared, catalogRequest).map((batch) =>
+        classifyCatalogBatch(batch, client),
+      ),
+    )
+  ).flat();
+}
 
-  return results;
+function catalogRequest(prepared: PreparedCatalogItem[]) {
+  const questions: Questions = {};
+
+  prepared.forEach((item, index) => {
+    if (!item.candidates.length) return;
+
+    if (!item.line.manual && !item.line.productKey)
+      questions[`category_${index}`] = classificationQuestion(index);
+
+    if (!item.match)
+      item.candidates.forEach((_, candidate) => {
+        questions[`product_${index}_${candidate}`] = catalogMatchQuestion(
+          index,
+          candidate,
+        );
+      });
+  });
+
+  return {
+    state: {
+      products: prepared.map((item) => ({
+        ...productEvidence(item.line),
+        receiptText: printedName(item.line),
+        originalText: item.line.originalText,
+        catalogCandidates: item.candidates.map((product) => ({
+          name: product.name,
+          brand: product.brand ?? null,
+          packageSize: product.weight ?? null,
+          packageUnit: product.weightUnit ?? null,
+          categories: product.categories,
+          alternativeNames: item.originals
+            .filter((original) =>
+              product.equivalence?.candidateKeys.includes(original.key),
+            )
+            .map((original) => original.name),
+        })),
+        catalogInstructions:
+          "Use only candidates relevant to the receipt name as category evidence. The category may be certain even when size or variant is not. An unrelated search result is not evidence.",
+      })),
+    },
+    questions,
+  };
 }
 
 async function classifyCatalogBatch(
-  items: {
-    line: ReceiptLine;
-    candidates: CatalogProduct[];
-    product: CatalogProduct | null;
-  }[],
+  prepared: PreparedCatalogItem[],
   client: JudgmentClient | null,
 ): Promise<CatalogDecision[]> {
-  const prepared = items.map((item) => {
-    const candidates = rankCatalogProducts(
-      printedName(item.line),
-      groupCatalogProducts(item.candidates),
-    )
-      .slice(0, 8)
-      .map(({ product }) => product);
-
-    return {
-      ...item,
-      originals: item.candidates,
-      candidates,
-      match: item.product ?? automaticCatalogProduct(item.line, candidates),
-    };
-  });
-
   // Each prepared line carries the decision it produces.
   const entries = prepared.map((item) => {
     const result: CatalogDecision = {
@@ -131,49 +180,12 @@ async function classifyCatalogBatch(
     }));
 
   if (!client) return decisions();
-  const questions: Questions = {};
-  prepared.forEach((item, index) => {
-    if (!item.candidates.length) return;
+  const request = catalogRequest(prepared);
 
-    if (!item.line.manual && !item.line.productKey)
-      questions[`category_${index}`] = classificationQuestion(index);
-
-    if (!item.match)
-      item.candidates.forEach((_, candidate) => {
-        questions[`product_${index}_${candidate}`] = catalogMatchQuestion(
-          index,
-          candidate,
-        );
-      });
-  });
-
-  if (!Object.keys(questions).length) return decisions();
+  if (!Object.keys(request.questions).length) return decisions();
 
   try {
-    const response = await client.systemOne({
-      state: {
-        products: prepared.map((item) => ({
-          ...productEvidence(item.line),
-          receiptText: printedName(item.line),
-          originalText: item.line.originalText,
-          catalogCandidates: item.candidates.map((product) => ({
-            name: product.name,
-            brand: product.brand ?? null,
-            packageSize: product.weight ?? null,
-            packageUnit: product.weightUnit ?? null,
-            categories: product.categories,
-            alternativeNames: item.originals
-              .filter((original) =>
-                product.equivalence?.candidateKeys.includes(original.key),
-              )
-              .map((original) => original.name),
-          })),
-          catalogInstructions:
-            "Use only candidates relevant to the receipt name as category evidence. The category may be certain even when size or variant is not. An unrelated search result is not evidence.",
-        })),
-      },
-      questions,
-    });
+    const response = await client.systemOne(request);
 
     entries.forEach(({ item, result }, index) => {
       const category = response.answers[`category_${index}`];

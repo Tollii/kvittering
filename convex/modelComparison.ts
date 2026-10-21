@@ -5,6 +5,7 @@ import { internalAction, type ActionCtx } from "./_generated/server";
 import { internal } from "./_generated/api";
 import { decisionModel } from "./aiModels";
 import {
+  contextBatches,
   judgmentClient,
   type JudgmentAnswer,
   type JudgmentClient,
@@ -203,25 +204,25 @@ const linkingCases = [
   },
 ];
 
-/** Categories in batches of 12, as the receipt classifier sends them. */
+/**
+ * Categories in batches that fit the context, as the receipt classifier sends
+ * them, one after another so models compare without rate limits in the way.
+ */
 async function categorize(
   client: JudgmentClient,
   products: ClassificationEvidence[],
 ): Promise<Outcome[]> {
+  const request = (batch: ClassificationEvidence[]) => ({
+    state: { products: batch },
+    questions: Object.fromEntries(
+      batch.map((_, index) => [`item_${index}`, classificationQuestion(index)]),
+    ),
+  });
+
   const found: Outcome[] = [];
 
-  for (let offset = 0; offset < products.length; offset += 12) {
-    const batch = products.slice(offset, offset + 12);
-
-    const response = await client.systemOne({
-      state: { products: batch },
-      questions: Object.fromEntries(
-        batch.map((_, index) => [
-          `item_${index}`,
-          classificationQuestion(index),
-        ]),
-      ),
-    });
+  for (const batch of contextBatches(products, request)) {
+    const response = await client.systemOne(request(batch));
 
     batch.forEach((_, index) =>
       found.push(choiceOutcome(response.answers[`item_${index}`])),
