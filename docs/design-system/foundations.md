@@ -8,16 +8,16 @@ The palette is cobalt ink on warm paper. Light and dark share token names, so a 
 
 ### Surfaces
 
-| Token           | Role                                                                                                                     |
-| --------------- | ------------------------------------------------------------------------------------------------------------------------ |
-| `background`    | Screen and sheet backdrop, including sign-in.                                                                            |
-| `surface`       | Cards (`Panel`, `List`), text fields, footer action bars, and the sections of a `NativeForm`.                            |
-| `surfaceRaised` | A quieter card (`Panel tone="plain"`) and inset boxes such as the invitation code.                                       |
-| `muted`         | Fill for secondary buttons, chips, segmented-control track, progress tracks.                                             |
-| `line`          | Dividers between rows, field borders, footer top border.                                                                 |
-| `hero`          | Cobalt header and `SummaryBand`. It stays dark in both schemes, so text on it uses `onHero`, never `text`.               |
-| `heroControl`   | Translucent disc behind a control on the hero, such as the settings button or the receipt's edit button.                 |
-| `heroTrack`     | Track of a bar drawn on the hero (budget pace). `heroMarker` is the "today" tick; `heroWarning` is the over-budget fill. |
+| Token           | Role                                                                                                                                                                                    |
+| --------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `background`    | Screen and sheet backdrop, including sign-in.                                                                                                                                           |
+| `surface`       | Cards (`Panel`, `List`), text fields, footer action bars, and the sections of a `NativeForm`.                                                                                           |
+| `surfaceRaised` | A quieter card (`Panel tone="plain"`) and inset boxes such as the invitation code.                                                                                                      |
+| `muted`         | Fill for secondary buttons, chips, segmented-control track, progress tracks.                                                                                                            |
+| `line`          | Dividers between rows, field borders, footer top border.                                                                                                                                |
+| `hero`          | Cobalt header and `SummaryBand`. It stays dark in both schemes, so text on it uses `onHero`, never `text`.                                                                              |
+| `heroControl`   | Translucent disc behind a control on the hero, such as the settings button or the receipt's edit button.                                                                                |
+| `heroTrack`     | Track of a bar drawn on the hero (budget pace). `heroMarker` is the "today" tick; `heroWarning` is a warning fill on the hero, such as over budget or a receipt that needs another try. |
 
 ### Content
 
@@ -55,7 +55,7 @@ Some backdrops do not follow the colour scheme, so their tokens do not either:
 
 ### Widgets
 
-`expo-widgets` turns each widget function into a string, so code in [widgets](../../src/widgets) cannot read the theme and keeps literal colours. Match a new literal to the value of the token whose role it plays, in the scheme its backdrop implies: the purchase widget draws the light `background` and `primary`. The receipt Live Activity's lock screen banner is a `hero` band, so it draws `onHero`, `onHeroMuted`, `heroTrack`, and `heroWarning`. Its Dynamic Island content sits on the always-black island and draws the dark scheme's `text`, `secondary`, `primary`, and `warning`, with `heroTrack` for the empty part of the progress bar; the expanded island repeats the banner's `hero` disc and `onHero` arch so the brand mark reads the same in both places. The bar shows receipts that need another try in the warning colour, so a failure stays visible. A widget change ships with the next native build, not an OTA update.
+`expo-widgets` turns each widget function into a string, so code in [widgets](../../src/widgets) cannot read the theme and keeps literal colours. Match a new literal to the value of the token whose role it plays, in the scheme its backdrop implies: the purchase widget draws the light `background` and `primary`. The receipt Live Activity's lock screen banner is a light `hero` band, so it draws the hero tokens; its Dynamic Island content sits on the always-black island, so it draws the dark scheme's tokens, except that its progress track is `heroTrack` and its expanded view repeats the banner's `hero` disc so the arch reads the same in both places. A widget's layout is JavaScript that the app hands to the extension when it loads, so a layout change ships in an OTA update and takes effect once the updated app has loaded the widget; a component or modifier that the installed build's `@expo/ui` lacks needs a native build.
 
 ## Typography
 

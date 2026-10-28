@@ -132,6 +132,7 @@ export default createLiveActivity(
     /** One segment per receipt, read ones first, so a failure stays visible. */
     const segments = (palette: Palette) => (
       <HStack
+        // Tighter gaps keep up to 30 segments (`liveActivityReceiptLimit`) legible.
         spacing={props.total > 12 ? 2 : 4}
         modifiers={[accessibilityHidden(true)]}
       >
@@ -215,7 +216,10 @@ export default createLiveActivity(
           <HStack
             alignment="firstTextBaseline"
             spacing={6}
-            modifiers={[accessibilityElement("combine")]}
+            modifiers={[
+              accessibilityElement("combine"),
+              accessibilityLabel(summary),
+            ]}
           >
             <Text
               modifiers={[
@@ -279,32 +283,37 @@ export default createLiveActivity(
           {glyph(16, banner.ink)}
         </ZStack>
       ),
+      // The widget runtime applies a Text's modifiers twice, so padding sits on a
+      // ZStack. The top paddings of leading, trailing, and center line up the title
+      // and count with the 40-point disc, so they change together.
       expandedTrailing: (
-        <Text
-          modifiers={[
-            font({ textStyle: "title2", weight: "bold" }),
-            foregroundStyle(island.ink),
-            contentTransition("numericText"),
-            lineLimit(1),
-            minimumScaleFactor(0.7),
-            accessibilityLabel(summary),
-            padding({ trailing: 4, top: 10 }),
-          ]}
-        >
-          {count}
-        </Text>
+        <ZStack modifiers={[padding({ trailing: 4, top: 10 })]}>
+          <Text
+            modifiers={[
+              font({ textStyle: "title2", weight: "bold" }),
+              foregroundStyle(island.ink),
+              contentTransition("numericText"),
+              lineLimit(1),
+              minimumScaleFactor(0.7),
+              accessibilityLabel(summary),
+            ]}
+          >
+            {count}
+          </Text>
+        </ZStack>
       ),
       expandedCenter: (
-        <Text
-          modifiers={[
-            font({ textStyle: "subheadline", weight: "semibold" }),
-            foregroundStyle(island.ink),
-            lineLimit(1),
-            padding({ top: 12 }),
-          ]}
-        >
-          {title}
-        </Text>
+        <ZStack modifiers={[padding({ top: 12 })]}>
+          <Text
+            modifiers={[
+              font({ textStyle: "subheadline", weight: "semibold" }),
+              foregroundStyle(island.ink),
+              lineLimit(1),
+            ]}
+          >
+            {title}
+          </Text>
+        </ZStack>
       ),
       expandedBottom: (
         <VStack
