@@ -93,15 +93,15 @@ export const deliver = internalAction({
     try {
       const jwt = await authorization();
 
-      if (!jwt && activity.token)
-        // Without these, the Live Activity only changes while the app is open.
-        console.warn("receipt.activity_push_unconfigured", {
-          keyId: !!env.APNS_KEY_ID,
-          teamId: !!env.APNS_TEAM_ID,
-          privateKey: !!env.APNS_PRIVATE_KEY,
-        });
-
       if (!jwt || !activity.token || !activity.environment) {
+        // Without APNs credentials, the Live Activity only changes while the app is open.
+        if (!jwt && activity.token && !args.expired)
+          console.warn("receipt.activity_push_unconfigured", {
+            keyId: !!env.APNS_KEY_ID,
+            teamId: !!env.APNS_TEAM_ID,
+            privateKey: !!env.APNS_PRIVATE_KEY,
+          });
+
         if (args.expired || activity.expiresAt <= Date.now())
           await ctx.runMutation(internal.liveActivities.remove, {
             id: activity._id,
