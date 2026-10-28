@@ -16,6 +16,7 @@ import {
   activityBackgroundTint,
   clipped,
   contentTransition,
+  dynamicTypeSize,
   font,
   foregroundStyle,
   frame,
@@ -34,43 +35,51 @@ export default createLiveActivity(
   (props: ReceiptActivityProgress, environment) => {
     "widget";
 
-    // The lock screen banner sits on the light `hero` cobalt, so it draws `onHero`,
-    // `onHeroMuted`, `heroTrack`, and `heroWarning`. The Dynamic Island is always
-    // black, so it draws the dark scheme's `primary`, `text`, `secondary`, and `warning`.
+    // Literal tokens; see docs/design-system/foundations.md#widgets.
+    const hero = "#263CC7"; // hero
+
     const banner = {
-      ink: "#FFFFFF",
-      muted: "#E3E7FF",
-      track: "#FFFFFF33",
-      warning: "#FFE3A1",
+      ink: "#FFFFFF", // onHero
+      muted: "#E3E7FF", // onHeroMuted
+      fill: "#FFFFFF", // onHero
+      track: "#FFFFFF33", // heroTrack
+      warning: "#FFE3A1", // heroWarning
     };
 
     const island = {
-      ink: "#F6F3EA",
-      muted: "#B3BAD2",
-      accent: "#A5B7FF",
-      track: "#FFFFFF26",
-      warning: "#E5CE6A",
+      ink: "#F6F3EA", // dark text
+      muted: "#B3BAD2", // dark secondary
+      fill: "#A5B7FF", // dark primary
+      track: "#FFFFFF33", // heroTrack
+      warning: "#E5CE6A", // dark warning
     };
 
-    const settled = props.completed + props.failed === props.total;
+    type Palette = typeof banner;
 
-    const title = environment.isStale
-      ? "Åpne Kvitto for siste status"
-      : props.ended
-        ? settled
-          ? "Kvitteringene er lest"
-          : "Behandlingen er avsluttet"
-        : "Leser kvitteringer …";
+    const phase = environment.isStale
+      ? "stale"
+      : !props.ended
+        ? "reading"
+        : props.total > 0 && props.completed === props.total
+          ? "done"
+          : "stopped";
+
+    const title = {
+      stale: "Åpne Kvitto for siste status",
+      reading: "Leser kvitteringer …",
+      done: "Kvitteringene er lest",
+      stopped: "Behandlingen er avsluttet",
+    }[phase];
 
     const count = `${props.completed} av ${props.total}`;
-    const failure = `${props.failed} trenger et nytt forsøk`;
     const summary = `${count} klare`;
-    const finished = props.ended && settled && props.failed === 0;
 
-    /** The arch from the app icon: two capsules with their lower halves clipped off. */
+    /**
+     * The arch of the app icon (assets/artwork/app-icon.svg, and `ArchMark`) on its
+     * 24 × 28 grid: two stroked capsules whose bottom caps are clipped off.
+     */
     const arch = (width: number, color: string) => {
-      const height = width * 1.165;
-      const inner = width * 0.417;
+      const unit = width / 24;
 
       const half = (size: number, rise: number, line: number) => (
         <Rectangle
@@ -92,22 +101,36 @@ export default createLiveActivity(
       return (
         <ZStack
           alignment="bottom"
-          modifiers={[frame({ width, height }), accessibilityHidden(true)]}
+          modifiers={[
+            frame({ width, height: 28 * unit }),
+            accessibilityHidden(true),
+          ]}
         >
-          {half(width, height, width * 0.125)}
-          <ZStack modifiers={[padding({ bottom: width * 0.169 })]}>
-            {half(inner, width * 0.704, width * 0.083)}
+          {half(24 * unit, 28 * unit, 3 * unit)}
+          <ZStack modifiers={[padding({ bottom: 4 * unit })]}>
+            {half(10 * unit, 17 * unit, 2 * unit)}
           </ZStack>
         </ZStack>
       );
     };
 
-    /** One segment per receipt, settled ones first, so a failure stays visible. */
-    const segments = (colors: {
-      ink: string;
-      track: string;
-      warning: string;
-    }) => (
+    /** A checkmark once every receipt is read, otherwise the arch. */
+    const glyph = (width: number, color: string) =>
+      phase === "done" ? (
+        <Image
+          systemName="checkmark"
+          modifiers={[
+            foregroundStyle(color),
+            font({ size: width, weight: "bold" }),
+            accessibilityHidden(true),
+          ]}
+        />
+      ) : (
+        arch(width, color)
+      );
+
+    /** One segment per receipt, read ones first, so a failure stays visible. */
+    const segments = (palette: Palette) => (
       <HStack
         spacing={props.total > 12 ? 2 : 4}
         modifiers={[accessibilityHidden(true)]}
@@ -118,10 +141,10 @@ export default createLiveActivity(
             modifiers={[
               foregroundStyle(
                 index < props.completed
-                  ? colors.ink
+                  ? palette.fill
                   : index < props.completed + props.failed
-                    ? colors.warning
-                    : colors.track,
+                    ? palette.warning
+                    : palette.track,
               ),
               frame({ height: 6 }),
             ]}
@@ -130,24 +153,25 @@ export default createLiveActivity(
       </HStack>
     );
 
-    const retry = (text: string, warning: string) =>
+    const retry = (palette: Palette) =>
       props.failed > 0 && (
         <HStack spacing={6}>
           <Image
             systemName="arrow.clockwise.circle"
             modifiers={[
-              foregroundStyle(warning),
+              foregroundStyle(palette.warning),
               font({ textStyle: "footnote", weight: "semibold" }),
+              accessibilityHidden(true),
             ]}
           />
           <Text
             modifiers={[
-              foregroundStyle(text),
+              foregroundStyle(palette.muted),
               font({ textStyle: "footnote" }),
               lineLimit(1),
             ]}
           >
-            {failure}
+            {`${props.failed} trenger et nytt forsøk`}
           </Text>
         </HStack>
       );
@@ -157,22 +181,11 @@ export default createLiveActivity(
         value={props.total > 0 ? props.completed / props.total : 0}
         modifiers={[
           progressViewStyle("circular"),
-          tint(island.accent),
+          tint(island.fill),
           frame({ width: size, height: size }),
+          accessibilityLabel(summary),
         ]}
       />
-    );
-
-    const mark = finished ? (
-      <Image
-        systemName="checkmark.circle"
-        modifiers={[
-          foregroundStyle(banner.ink),
-          font({ textStyle: "subheadline", weight: "semibold" }),
-        ]}
-      />
-    ) : (
-      arch(14, banner.ink)
     );
 
     return {
@@ -182,12 +195,14 @@ export default createLiveActivity(
           spacing={10}
           modifiers={[
             padding({ vertical: 16, horizontal: 18 }),
-            activityBackgroundTint("#263CC7"),
+            activityBackgroundTint(hero),
             foregroundStyle(banner.ink),
+            // A lock screen Live Activity is cut off above 160 points.
+            dynamicTypeSize({ max: "xLarge" }),
           ]}
         >
           <HStack spacing={8}>
-            {mark}
+            {glyph(14, banner.ink)}
             <Text
               modifiers={[
                 font({ textStyle: "subheadline", weight: "semibold" }),
@@ -222,7 +237,7 @@ export default createLiveActivity(
             </Text>
           </HStack>
           {segments(banner)}
-          {retry(banner.muted, banner.warning)}
+          {retry(banner)}
         </VStack>
       ),
       bannerSmall: (
@@ -230,11 +245,11 @@ export default createLiveActivity(
           spacing={8}
           modifiers={[
             padding({ all: 12 }),
-            activityBackgroundTint("#263CC7"),
+            activityBackgroundTint(hero),
             foregroundStyle(banner.ink),
           ]}
         >
-          {arch(12, banner.ink)}
+          {glyph(12, banner.ink)}
           <Text
             modifiers={[
               font({ textStyle: "headline" }),
@@ -248,37 +263,20 @@ export default createLiveActivity(
       ),
       compactLeading: (
         <ZStack modifiers={[padding({ leading: 4 })]}>
-          {arch(13, island.accent)}
+          {glyph(13, island.fill)}
         </ZStack>
       ),
-      compactTrailing: (
-        <ZStack modifiers={[accessibilityLabel(summary)]}>{ring(20)}</ZStack>
-      ),
-      minimal: (
-        <ZStack modifiers={[accessibilityLabel(summary)]}>
-          {ring(22)}
-          {arch(8, island.accent)}
-        </ZStack>
-      ),
+      compactTrailing: ring(20),
+      minimal: ring(22),
       expandedLeading: (
         <ZStack modifiers={[padding({ leading: 4, top: 4 })]}>
           <Circle
             modifiers={[
-              foregroundStyle("#263CC7"),
+              foregroundStyle(hero),
               frame({ width: 40, height: 40 }),
             ]}
           />
-          {finished ? (
-            <Image
-              systemName="checkmark"
-              modifiers={[
-                foregroundStyle(banner.ink),
-                font({ textStyle: "body", weight: "semibold" }),
-              ]}
-            />
-          ) : (
-            arch(16, banner.ink)
-          )}
+          {glyph(16, banner.ink)}
         </ZStack>
       ),
       expandedTrailing: (
@@ -287,6 +285,8 @@ export default createLiveActivity(
             font({ textStyle: "title2", weight: "bold" }),
             foregroundStyle(island.ink),
             contentTransition("numericText"),
+            lineLimit(1),
+            minimumScaleFactor(0.7),
             accessibilityLabel(summary),
             padding({ trailing: 4, top: 10 }),
           ]}
@@ -312,12 +312,8 @@ export default createLiveActivity(
           spacing={10}
           modifiers={[padding({ horizontal: 4, top: 6, bottom: 4 })]}
         >
-          {segments({
-            ink: island.accent,
-            track: island.track,
-            warning: island.warning,
-          })}
-          {retry(island.muted, island.warning)}
+          {segments(island)}
+          {retry(island)}
         </VStack>
       ),
     };
