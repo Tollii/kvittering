@@ -9,6 +9,7 @@ import { userError } from "../../convex/userErrors";
 import {
   createQueueRunner,
   retryPolicy,
+  stepDeadlineMs,
   type LocalReceipt,
   type QueueStore,
   type UploadTransport,
@@ -233,8 +234,7 @@ it("schedules every background image before waiting and retains each successful 
   };
 
   const running = run("user", household, transport, () => true);
-  await Promise.resolve();
-  expect(scheduled).toEqual([0, 1]);
+  await vi.waitFor(() => expect(scheduled).toEqual([0, 1]));
   second.resolve();
   first.reject(new Error("Offline"));
   await running;
@@ -412,6 +412,48 @@ it("processes a capture added while another upload is in progress without anothe
   } finally {
     stop();
   }
+});
+
+it("fails a reservation that never answers, reports it, and uploads the next capture", async () => {
+  vi.useFakeTimers();
+  const { store, append, rows, retries, clock } = fixture();
+  append("next");
+  const reports: { operation: string; phase?: string }[] = [];
+
+  const run = createQueueRunner(
+    store,
+    undefined,
+    retries,
+    () => clock.now,
+    (_cause, operation, fields) => reports.push({ operation, ...fields }),
+  );
+
+  const completed: string[] = [];
+
+  const transport: UploadTransport = {
+    reserve: (entry) =>
+      entry.id === "capture"
+        ? new Promise<never>(() => {})
+        : Promise.resolve(receiptId),
+    upload: async () => {},
+    complete: async (_, entry) => {
+      completed.push(entry.id);
+    },
+  };
+
+  const drain = run("user", household, transport, () => true);
+  await vi.advanceTimersByTimeAsync(stepDeadlineMs.reserve);
+  await drain;
+
+  expect(run.isRunning()).toBe(false);
+  expect(completed).toEqual(["next"]);
+  expect(rows()).toHaveLength(1);
+  expect(present(rows()[0]).id).toBe("capture");
+  expect(present(rows()[0]).error).toBeTruthy();
+  expect(reports).toMatchObject([
+    { operation: "receipt.upload_stalled", phase: "reserve" },
+  ]);
+  expect(vi.getTimerCount()).toBe(0);
 });
 
 it("keeps the quota error and the later deadline on manual retry and household deferral", async () => {

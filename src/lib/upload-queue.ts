@@ -34,6 +34,46 @@ export interface UploadTransport {
 
 export const retryPolicy = { firstDelayMs: 15_000, maxAttempts: 6 };
 
+/** How long each step may wait for an answer while the app is open. */
+export const stepDeadlineMs = {
+  reserve: 30_000,
+  upload: 120_000,
+  complete: 30_000,
+};
+
+type UploadStep = keyof typeof stepDeadlineMs;
+
+const deadlineTickMs = 5_000;
+
+/** A request that never answered. It holds no server result, so the capture retries. */
+export class UploadStalled extends Error {
+  override name = "UploadStalled";
+
+  constructor(readonly step: UploadStep) {
+    super("Opplastingen fikk ikke svar. Kvitto prøver igjen.");
+  }
+}
+
+/**
+ * Reject a step that has not settled within its deadline. iOS stops timers
+ * while the app is suspended, so counted ticks leave background time out.
+ */
+function withinDeadline<T>(step: UploadStep, request: Promise<T>) {
+  let timer: ReturnType<typeof setInterval> | undefined;
+
+  const stalled = new Promise<never>((_, reject) => {
+    let remaining = stepDeadlineMs[step];
+
+    timer = setInterval(() => {
+      remaining -= deadlineTickMs;
+
+      if (remaining <= 0) reject(new UploadStalled(step));
+    }, deadlineTickMs);
+  });
+
+  return Promise.race([request, stalled]).finally(() => clearInterval(timer));
+}
+
 /**
  * When a failed capture may be tried again automatically. A rejection the
  * person must act on waits for them; other failures back off and stop after
@@ -49,17 +89,57 @@ export function nextAttemptAt(
   return now + retryPolicy.firstDelayMs * 2 ** (failures - 1);
 }
 
+/** Why queued captures wait before the drain may start; null when they may upload. */
+export type UploadWait =
+  | "offline"
+  | "convex_auth"
+  | "household"
+  | "release"
+  | "paused";
+
+export function uploadWait(conditions: {
+  online: boolean;
+  authenticated: boolean;
+  householdLoaded: boolean;
+  releaseBlocked: boolean;
+  processingEnabled: boolean;
+}): UploadWait | null {
+  if (!conditions.online) return "offline";
+
+  if (!conditions.authenticated) return "convex_auth";
+
+  if (!conditions.householdLoaded) return "household";
+
+  if (conditions.releaseBlocked) return "release";
+
+  if (!conditions.processingEnabled) return "paused";
+
+  return null;
+}
+
+/** The person sees a notice for the other waits; these leave the queue at "Laster opp" without an error. */
+export const silentWaits: ReadonlySet<UploadWait> = new Set([
+  "convex_auth",
+  "household",
+]);
+
 type RetryState = { failures: number; nextAttemptAt: number | null };
 
 /**
  * Persist each completed step. Repeated requests use the same server reservation.
  * Quota deadlines survive restarts. Other failures stop after the per-process cap.
+ * A step that never answers fails at its deadline, so it cannot hold the queue.
  */
 export function createQueueRunner(
   store: QueueStore,
   record: (event: string, fields: DiagnosticFields) => void = () => {},
   retries: RetryStore,
   clock: () => number = Date.now,
+  report: (
+    cause: unknown,
+    operation: string,
+    fields: DiagnosticFields,
+  ) => void = () => {},
 ) {
   let running = false;
   const attempts = new Map<string, RetryState>();
@@ -180,7 +260,10 @@ export function createQueueRunner(
     entry.error = undefined;
 
     if (!entry.receiptId) {
-      entry.receiptId = await transport.reserve(entry);
+      entry.receiptId = await withinDeadline(
+        "reserve",
+        transport.reserve(entry),
+      );
       store.update(entry);
       record("receipt.reserved", {
         captureId: entry.id,
@@ -196,7 +279,10 @@ export function createQueueRunner(
 
       if (entry.uploaded[position]) return;
       const started = Date.now();
-      await transport.upload(receiptId, position, image);
+      await withinDeadline(
+        "upload",
+        transport.upload(receiptId, position, image),
+      );
       entry.uploaded[position] = true;
       store.update(entry);
       record("receipt.image_uploaded", {
@@ -215,7 +301,7 @@ export function createQueueRunner(
     if (failed) throw failed.reason;
 
     if (!active()) return false;
-    await transport.complete(entry.receiptId, entry);
+    await withinDeadline("complete", transport.complete(receiptId, entry));
     retries.remove(entry.id);
     store.remove(entry);
     attempts.delete(entry.id);
@@ -274,6 +360,18 @@ export function createQueueRunner(
     );
 
     attempts.set(entry.id, { failures, nextAttemptAt: next });
+
+    // A stall throws nowhere else, so this is its only report.
+    if (cause instanceof UploadStalled) {
+      const fields: DiagnosticFields = {
+        captureId: entry.id,
+        phase: cause.step,
+        attempts: failures,
+      };
+
+      if (entry.receiptId) fields.receiptId = entry.receiptId;
+      report(cause, "receipt.upload_stalled", fields);
+    }
 
     if (next === null)
       record("receipt.upload_paused", {
