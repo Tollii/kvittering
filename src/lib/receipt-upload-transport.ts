@@ -16,6 +16,8 @@ export function receiptUploadTransport(
   scope: string,
 ): UploadTransport {
   return {
+    // The background session hands a repeated upload the task still in flight.
+    joinsPendingUploads: !!ReceiptIntelligence?.uploadReceiptImage,
     reserve: (entry) =>
       releaseMutation(convex, api.receipts.reserve, {
         clientId: entry.id,

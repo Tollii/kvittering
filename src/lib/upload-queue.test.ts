@@ -462,6 +462,7 @@ it("keeps retrying a stalled image upload past the attempt cap until the transfe
   let uploads = 0;
 
   const transport: UploadTransport = {
+    joinsPendingUploads: true,
     reserve: async () => receiptId,
     upload: () => {
       uploads++;
@@ -490,6 +491,28 @@ it("keeps retrying a stalled image upload past the attempt cap until the transfe
   } finally {
     stop();
   }
+});
+
+it("records another image's real error instead of a stall beside it", async () => {
+  vi.useFakeTimers();
+  const { store, rows, retries } = fixture();
+  const run = createQueueRunner(store, retries);
+
+  const transport: UploadTransport = {
+    joinsPendingUploads: true,
+    reserve: async () => receiptId,
+    upload: (_id, position) =>
+      position === 0
+        ? new Promise<never>(() => {})
+        : Promise.reject(new Error("Bildet er for stort.")),
+    complete: async () => {},
+  };
+
+  const drain = run("user", household, transport, () => true);
+  await vi.advanceTimersByTimeAsync(stepDeadlineMs.upload);
+  await drain;
+
+  expect(present(rows()[0]).error).toBe("Bildet er for stort.");
 });
 
 it("keeps the quota error and the later deadline on manual retry and household deferral", async () => {

@@ -30,6 +30,8 @@ export interface UploadTransport {
   reserve(entry: LocalReceipt): Promise<Id<"receipts">>;
   upload(id: Id<"receipts">, position: number, uri: string): Promise<void>;
   complete(id: Id<"receipts">, entry: LocalReceipt): Promise<void>;
+  /** Whether a repeated upload joins the transfer already in flight instead of sending another. */
+  readonly joinsPendingUploads?: boolean;
 }
 
 export const retryPolicy = { firstDelayMs: 15_000, maxAttempts: 6 };
@@ -49,7 +51,11 @@ const deadlineTickMs = 5_000;
 class UploadStalled extends Error {
   override name = "UploadStalled";
 
-  constructor(readonly step: UploadStep) {
+  constructor(
+    readonly step: UploadStep,
+    /** A retry joins the request still in flight, so retrying costs nothing. */
+    readonly joinable = false,
+  ) {
     super("Opplastingen fikk ikke svar.");
   }
 }
@@ -66,7 +72,7 @@ type Report = (
  * counted ticks leave background time out.
  */
 function withinDeadline<T>(
-  step: UploadStep,
+  cause: UploadStalled,
   request: Promise<T>,
   report: Report,
   fields: DiagnosticFields,
@@ -74,15 +80,24 @@ function withinDeadline<T>(
   let timer: ReturnType<typeof setInterval> | undefined;
 
   const stalled = new Promise<never>((_, reject) => {
-    let remaining = stepDeadlineMs[step];
+    let remaining = stepDeadlineMs[cause.step];
 
     timer = setInterval(() => {
       remaining -= deadlineTickMs;
 
       if (remaining > 0) return;
-      const cause = new UploadStalled(step);
-      report(cause, "receipt.upload_stalled", { ...fields, phase: step });
+      clearInterval(timer);
+      // Settle first: a failing report must not bring back the hang.
       reject(cause);
+
+      try {
+        report(cause, "receipt.upload_stalled", {
+          ...fields,
+          phase: cause.step,
+        });
+      } catch {
+        /* The capture still retries; only the diagnostic is lost. */
+      }
     }, deadlineTickMs);
   });
 
@@ -96,36 +111,38 @@ function withDeadlines(
 ): UploadTransport {
   return {
     reserve: (entry) =>
-      withinDeadline("reserve", transport.reserve(entry), report, {
-        captureId: entry.id,
-      }),
+      withinDeadline(
+        new UploadStalled("reserve"),
+        transport.reserve(entry),
+        report,
+        {},
+      ),
     upload: (receiptId, position, uri) =>
       withinDeadline(
-        "upload",
+        new UploadStalled("upload", transport.joinsPendingUploads),
         transport.upload(receiptId, position, uri),
         report,
-        {
-          receiptId,
-          position,
-        },
+        { receiptId, position },
       ),
     complete: (receiptId, entry) =>
-      withinDeadline("complete", transport.complete(receiptId, entry), report, {
-        receiptId,
-        captureId: entry.id,
-      }),
+      withinDeadline(
+        new UploadStalled("complete"),
+        transport.complete(receiptId, entry),
+        report,
+        { receiptId },
+      ),
   };
 }
 
 /**
- * Failures that count toward the automatic attempt cap. A stalled image upload
- * does not: each retry joins the same iOS background task instead of sending
- * another request, and stopping would leave the capture waiting after it lands.
+ * Failures that count toward the automatic attempt cap. A stall whose retry
+ * joins the transfer in flight does not: retrying sends nothing new, and
+ * stopping would leave the capture waiting after the transfer lands.
  */
 function countedFailures(previous: number, cause: unknown) {
   const failures = previous + 1;
 
-  return cause instanceof UploadStalled && cause.step === "upload"
+  return cause instanceof UploadStalled && cause.joinable
     ? Math.min(failures, retryPolicy.maxAttempts - 1)
     : failures;
 }
@@ -314,9 +331,17 @@ export function createQueueRunner(
       entry.images.map((image, position) => uploadImage(image, position)),
     );
 
-    const failed = results.find((result) => result.status === "rejected");
+    const rejected: unknown[] = [];
 
-    if (failed) throw failed.reason;
+    for (const result of results)
+      if (result.status === "rejected") rejected.push(result.reason);
+
+    // A stall must not hide another image's real error, which the cap still applies to.
+    const failure =
+      rejected.find((cause) => !(cause instanceof UploadStalled)) ??
+      rejected[0];
+
+    if (rejected.length) throw failure;
 
     if (!active()) return false;
     await transport.complete(receiptId, entry);
@@ -408,7 +433,6 @@ export function createQueueRunner(
 
     if (running) return;
     running = true;
-    const guarded = withDeadlines(transport, report);
 
     try {
       for (const snapshot of store.list(owner, householdId)) {
@@ -423,6 +447,10 @@ export function createQueueRunner(
         if (!isDue(entry)) continue;
 
         const retry = attempts.get(entry.id);
+
+        const guarded = withDeadlines(transport, (cause, operation, fields) =>
+          report(cause, operation, { ...fields, captureId: entry.id }),
+        );
 
         try {
           if (!(await uploadEntry(entry, guarded, active))) return;
