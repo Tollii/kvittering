@@ -44,13 +44,8 @@ import {
   regroupQueuedReceipt,
 } from "@/lib/receipt-storage";
 import { visibleHousehold } from "@/lib/household";
-import {
-  createQueueRunner,
-  silentWaits,
-  uploadWait,
-  type LocalReceipt,
-  type UploadWait,
-} from "@/lib/upload-queue";
+import { createQueueRunner, type LocalReceipt } from "@/lib/upload-queue";
+import { silentWaits, uploadWait, type UploadWait } from "./upload-gate";
 import type { DiagnosticFields } from "@/lib/diagnostics";
 import { Loading, Notice, Screen } from "@/components/ui";
 import { CatalogQueryProvider } from "./catalog-query-provider";
@@ -83,21 +78,18 @@ function connectionDiagnostics(): DiagnosticFields {
   };
 }
 
-const drainQueue = createQueueRunner(
-  receiptStorage,
-  recordEvent,
-  uploadRetries,
-  Date.now,
-  (cause, operation, fields) =>
+const drainQueue = createQueueRunner(receiptStorage, uploadRetries, {
+  record: recordEvent,
+  report: (cause, operation, fields) =>
     reportError(cause, operation, { ...fields, ...connectionDiagnostics() }),
-);
+});
 
 /** How long queued uploads may wait silently before Sentry hears of it. */
 const silentWaitReportMs = 30_000;
 
 /** Report a wait that leaves queued captures at "Laster opp" with no error to show. */
-function useSilentWaitReport(wait: UploadWait | null) {
-  const silent = wait && silentWaits.has(wait) ? wait : null;
+function useSilentWaitReport(wait: UploadWait | null, watching: boolean) {
+  const silent = watching && wait && silentWaits.has(wait) ? wait : null;
 
   useEffect(() => {
     if (!silent) return undefined;
@@ -247,7 +239,7 @@ function HouseholdProvider({
   useEffect(() => {
     canUpload.current = wait === null;
   }, [wait]);
-  useSilentWaitReport(foreground && queue.length > 0 ? wait : null);
+  useSilentWaitReport(wait, foreground && queue.length > 0);
   useEffect(() => {
     active.current = true;
 
@@ -318,23 +310,11 @@ function HouseholdProvider({
   }, [householdId, synchronize]);
 
   useEffect(() => {
-    if (!foreground || !canUpload.current || !queue.length) return undefined;
-
-    if (!householdId) return undefined;
+    if (!foreground || wait !== null || !queue.length || !householdId)
+      return undefined;
 
     return drainQueue.schedule(owner, householdId, synchronize);
-  }, [
-    synchronize,
-    owner,
-    householdId,
-    online,
-    auth.isAuthenticated,
-    foreground,
-    queue,
-    blocked,
-    receiptProcessing,
-    details,
-  ]);
+  }, [synchronize, owner, householdId, foreground, queue, wait]);
 
   if (!online && !household)
     return (

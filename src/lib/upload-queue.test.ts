@@ -71,9 +71,9 @@ function fixture() {
     advance: (milliseconds: number) => {
       clock.now += milliseconds;
     },
-    run: createQueueRunner(store, undefined, retries, () => clock.now),
+    run: createQueueRunner(store, retries, { clock: () => clock.now }),
     restart: () =>
-      createQueueRunner(store, undefined, retries, () => clock.now),
+      createQueueRunner(store, retries, { clock: () => clock.now }),
   };
 }
 
@@ -308,12 +308,12 @@ it("does not contact the server before its quota deadline, including after runne
   await run("user", household, transport, () => true);
   advance(60_000);
   await run("user", household, transport, () => true);
-  await createQueueRunner(
-    store,
-    () => {},
-    retries,
-    () => 60_000,
-  )("user", household, transport, () => true);
+  await createQueueRunner(store, retries, { clock: () => 60_000 })(
+    "user",
+    household,
+    transport,
+    () => true,
+  );
   expect(calls).toBe(1);
   expect(present(rows()[0]).images).toEqual(["first.jpg", "second.jpg"]);
   advance(86_400_000);
@@ -420,13 +420,11 @@ it("fails a reservation that never answers, reports it, and uploads the next cap
   append("next");
   const reports: { operation: string; phase?: string }[] = [];
 
-  const run = createQueueRunner(
-    store,
-    undefined,
-    retries,
-    () => clock.now,
-    (_cause, operation, fields) => reports.push({ operation, ...fields }),
-  );
+  const run = createQueueRunner(store, retries, {
+    clock: () => clock.now,
+    report: (_cause, operation, fields) =>
+      reports.push({ operation, ...fields }),
+  });
 
   const completed: string[] = [];
 
@@ -454,6 +452,44 @@ it("fails a reservation that never answers, reports it, and uploads the next cap
     { operation: "receipt.upload_stalled", phase: "reserve" },
   ]);
   expect(vi.getTimerCount()).toBe(0);
+});
+
+it("keeps retrying a stalled image upload past the attempt cap until the transfer lands", async () => {
+  vi.useFakeTimers();
+  const { store, rows, retries } = fixture();
+  const run = createQueueRunner(store, retries);
+  const transfer = Promise.withResolvers<void>();
+  let uploads = 0;
+
+  const transport: UploadTransport = {
+    reserve: async () => receiptId,
+    upload: () => {
+      uploads++;
+
+      return transfer.promise;
+    },
+    complete: async () => {},
+  };
+
+  const stop = run.schedule("user", household, () =>
+    run("user", household, transport, () => true),
+  );
+
+  const longestBackoff =
+    retryPolicy.firstDelayMs * 2 ** (retryPolicy.maxAttempts - 1);
+
+  try {
+    await vi.advanceTimersByTimeAsync(
+      (stepDeadlineMs.upload + longestBackoff) * (retryPolicy.maxAttempts + 2),
+    );
+    // Two images per attempt, and more attempts than the cap allows other failures.
+    expect(uploads).toBeGreaterThan(2 * retryPolicy.maxAttempts);
+    transfer.resolve();
+    await vi.advanceTimersByTimeAsync(longestBackoff);
+    expect(rows()).toEqual([]);
+  } finally {
+    stop();
+  }
 });
 
 it("keeps the quota error and the later deadline on manual retry and household deferral", async () => {
@@ -525,7 +561,7 @@ it.each(["read", "write", "remove"] as const)(
       },
     };
 
-    const run = createQueueRunner(store, undefined, failing, () => 0);
+    const run = createQueueRunner(store, failing, { clock: () => 0 });
     await expect(
       run("user", household, transport, () => true),
     ).resolves.toBeUndefined();
