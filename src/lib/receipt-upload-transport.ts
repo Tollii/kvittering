@@ -9,6 +9,35 @@ import { convexSiteUrl, fetchAccessToken } from "./auth-client";
 import { imageFile } from "./receipt-storage";
 import type { UploadTransport } from "./upload-queue";
 
+const tokenDeadlineMs = 30_000;
+
+/**
+ * The sign-in token for one upload. It has its own deadline, so a hung token
+ * request fails as an ordinary error that counts toward the retry cap, and only
+ * a stalled background transfer is joined by a later retry.
+ */
+async function uploadToken(id: Id<"receipts">, position: number) {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+
+  const deadline = new Promise<never>((_, reject) => {
+    timer = setTimeout(
+      () =>
+        reject(
+          releaseError(
+            new Error("Innloggingen svarte ikke. Prøv igjen."),
+            "receipt.upload_token",
+            { receiptId: id, position },
+          ),
+        ),
+      tokenDeadlineMs,
+    );
+  });
+
+  return Promise.race([fetchAccessToken(), deadline]).finally(() =>
+    clearTimeout(timer),
+  );
+}
+
 export function receiptUploadTransport(
   convex: ConvexReactClient,
   householdId: Id<"households">,
@@ -27,7 +56,7 @@ export function receiptUploadTransport(
         backgroundUpload: !!ReceiptIntelligence?.uploadReceiptImage,
       }),
     upload: async (id, position, name) => {
-      const token = await fetchAccessToken();
+      const token = await uploadToken(id, position);
 
       if (!active())
         throw new Error("Opplastingen fortsetter når du åpner appen med nett.");

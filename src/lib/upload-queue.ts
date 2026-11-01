@@ -135,16 +135,12 @@ function withDeadlines(
 }
 
 /**
- * Failures that count toward the automatic attempt cap. A stall whose retry
+ * Whether a failure spends the automatic retry budget. A stall whose retry
  * joins the transfer in flight does not: retrying sends nothing new, and
  * stopping would leave the capture waiting after the transfer lands.
  */
-function countedFailures(previous: number, cause: unknown) {
-  const failures = previous + 1;
-
-  return cause instanceof UploadStalled && cause.joinable
-    ? Math.min(failures, retryPolicy.maxAttempts - 1)
-    : failures;
+function spendsRetry(cause: unknown) {
+  return !(cause instanceof UploadStalled && cause.joinable);
 }
 
 /**
@@ -394,10 +390,11 @@ export function createQueueRunner(
       cause instanceof Error ? cause.message : "Opplastingen mislyktes.";
     store.update(entry);
 
-    const failures = countedFailures(retry?.failures ?? 0, cause);
+    const failures = (retry?.failures ?? 0) + (spendsRetry(cause) ? 1 : 0);
 
+    // A free retry still backs off, from the first delay up.
     const next = nextAttemptAt(
-      failures,
+      Math.max(failures, 1),
       parseUserError(cause)?.code === "REJECTED",
       clock(),
     );

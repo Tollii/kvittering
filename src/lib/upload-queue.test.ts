@@ -493,6 +493,76 @@ it("keeps retrying a stalled image upload past the attempt cap until the transfe
   }
 });
 
+it("does not spend the retry budget on stalls that join the transfer in flight", async () => {
+  vi.useFakeTimers();
+  const { store, retries } = fixture();
+  const run = createQueueRunner(store, retries);
+  const stalledAttempts = retryPolicy.maxAttempts + 1;
+  let uploads = 0;
+
+  const transport: UploadTransport = {
+    joinsPendingUploads: true,
+    reserve: async () => receiptId,
+    upload: () => {
+      uploads++;
+
+      // Two images per attempt: stall past the cap, then fail for real.
+      return uploads <= 2 * stalledAttempts
+        ? new Promise<never>(() => {})
+        : Promise.reject(new Error("Offline"));
+    },
+    complete: async () => {},
+  };
+
+  const stop = run.schedule("user", household, () =>
+    run("user", household, transport, () => true),
+  );
+
+  try {
+    await vi.advanceTimersByTimeAsync(
+      (stepDeadlineMs.upload + retryPolicy.firstDelayMs) * stalledAttempts +
+        retryPolicy.firstDelayMs * 2 ** retryPolicy.maxAttempts,
+    );
+    // The first real failure is retried, as the cap allows.
+    expect(uploads).toBeGreaterThan(2 * (stalledAttempts + 1));
+  } finally {
+    stop();
+  }
+});
+
+it("stops retrying a stalled upload at the cap when a retry would send it again", async () => {
+  vi.useFakeTimers();
+  const { store, retries } = fixture();
+  const run = createQueueRunner(store, retries);
+  let uploads = 0;
+
+  const transport: UploadTransport = {
+    reserve: async () => receiptId,
+    upload: () => {
+      uploads++;
+
+      return new Promise<never>(() => {});
+    },
+    complete: async () => {},
+  };
+
+  const stop = run.schedule("user", household, () =>
+    run("user", household, transport, () => true),
+  );
+
+  try {
+    await vi.advanceTimersByTimeAsync(
+      (stepDeadlineMs.upload +
+        retryPolicy.firstDelayMs * 2 ** (retryPolicy.maxAttempts - 1)) *
+        (retryPolicy.maxAttempts + 2),
+    );
+    // Two images per attempt.
+    expect(uploads).toBe(2 * retryPolicy.maxAttempts);
+  } finally {
+    stop();
+  }
+});
+
 it("records another image's real error instead of a stall beside it", async () => {
   vi.useFakeTimers();
   const { store, rows, retries } = fixture();
