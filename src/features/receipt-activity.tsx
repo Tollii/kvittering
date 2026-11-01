@@ -3,6 +3,7 @@ import { useEffect, useState, useSyncExternalStore } from "react";
 import { useConvex, useQuery, type ConvexReactClient } from "convex/react";
 import { requireOptionalNativeModule } from "expo";
 import { getIosPushNotificationServiceEnvironmentAsync } from "expo-application";
+import * as Device from "expo-device";
 import Storage from "expo-sqlite/kv-store";
 import { z } from "zod";
 import { api } from "../../convex/_generated/api";
@@ -158,8 +159,11 @@ export function ReceiptActivityTracking() {
           return;
         }
 
+        // App Store and TestFlight installs carry no provisioning profile, so the
+        // lookup returns null there; those builds use production APNs.
         const environment =
-          await getIosPushNotificationServiceEnvironmentAsync();
+          (await getIosPushNotificationServiceEnvironmentAsync()) ??
+          (Device.isDevice ? "production" : null);
 
         if (stopped() || !environment) return;
 
