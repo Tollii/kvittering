@@ -30,9 +30,118 @@ export interface UploadTransport {
   reserve(entry: LocalReceipt): Promise<Id<"receipts">>;
   upload(id: Id<"receipts">, position: number, uri: string): Promise<void>;
   complete(id: Id<"receipts">, entry: LocalReceipt): Promise<void>;
+  /** Whether a repeated upload joins the transfer already in flight instead of sending another. */
+  readonly joinsPendingUploads?: boolean;
 }
 
 export const retryPolicy = { firstDelayMs: 15_000, maxAttempts: 6 };
+
+/** How long each step may wait for an answer while the app is open. */
+export const stepDeadlineMs = {
+  reserve: 30_000,
+  upload: 120_000,
+  complete: 30_000,
+};
+
+type UploadStep = keyof typeof stepDeadlineMs;
+
+const deadlineTickMs = 5_000;
+
+/** A request that never answered. It holds no server result, so the capture retries. */
+class UploadStalled extends Error {
+  override name = "UploadStalled";
+
+  constructor(
+    readonly step: UploadStep,
+    /** A retry joins the request still in flight, so retrying costs nothing. */
+    readonly joinable = false,
+  ) {
+    super("Opplastingen fikk ikke svar.");
+  }
+}
+
+type Report = (
+  cause: unknown,
+  operation: string,
+  fields: DiagnosticFields,
+) => void;
+
+/**
+ * Reject a step that has not settled within its deadline, and report the stall,
+ * which throws nowhere else. iOS stops timers while the app is suspended, so
+ * counted ticks leave background time out.
+ */
+function withinDeadline<T>(
+  cause: UploadStalled,
+  request: Promise<T>,
+  report: Report,
+  fields: DiagnosticFields,
+) {
+  let timer: ReturnType<typeof setInterval> | undefined;
+
+  const stalled = new Promise<never>((_, reject) => {
+    let remaining = stepDeadlineMs[cause.step];
+
+    timer = setInterval(() => {
+      remaining -= deadlineTickMs;
+
+      if (remaining > 0) return;
+      clearInterval(timer);
+      // Settle first: a failing report must not bring back the hang.
+      reject(cause);
+
+      try {
+        report(cause, "receipt.upload_stalled", {
+          ...fields,
+          phase: cause.step,
+        });
+      } catch {
+        /* The capture still retries; only the diagnostic is lost. */
+      }
+    }, deadlineTickMs);
+  });
+
+  return Promise.race([request, stalled]).finally(() => clearInterval(timer));
+}
+
+/** Give every transport step its deadline, so a request that never answers cannot hold the queue. */
+function withDeadlines(
+  transport: UploadTransport,
+  report: Report,
+): UploadTransport {
+  return {
+    reserve: (entry) =>
+      withinDeadline(
+        new UploadStalled("reserve"),
+        transport.reserve(entry),
+        report,
+        {},
+      ),
+    upload: (receiptId, position, uri) =>
+      withinDeadline(
+        new UploadStalled("upload", transport.joinsPendingUploads),
+        transport.upload(receiptId, position, uri),
+        report,
+        { receiptId, position },
+      ),
+    complete: (receiptId, entry) =>
+      withinDeadline(
+        new UploadStalled("complete"),
+        transport.complete(receiptId, entry),
+        report,
+        { receiptId },
+      ),
+  };
+}
+
+/**
+ * Whether a failure spends the automatic retry budget. A stall whose retry
+ * joins the transfer in flight does not: retrying sends nothing new, and
+ * stopping would leave the capture waiting after the transfer lands.
+ */
+function spendsRetry(cause: unknown) {
+  return !(cause instanceof UploadStalled && cause.joinable);
+}
 
 /**
  * When a failed capture may be tried again automatically. A rejection the
@@ -54,12 +163,20 @@ type RetryState = { failures: number; nextAttemptAt: number | null };
 /**
  * Persist each completed step. Repeated requests use the same server reservation.
  * Quota deadlines survive restarts. Other failures stop after the per-process cap.
+ * A step that never answers fails at its deadline, so it cannot hold the queue.
  */
 export function createQueueRunner(
   store: QueueStore,
-  record: (event: string, fields: DiagnosticFields) => void = () => {},
   retries: RetryStore,
-  clock: () => number = Date.now,
+  {
+    record = () => {},
+    report = () => {},
+    clock = Date.now,
+  }: {
+    record?: (event: string, fields: DiagnosticFields) => void;
+    report?: Report;
+    clock?: () => number;
+  } = {},
 ) {
   let running = false;
   const attempts = new Map<string, RetryState>();
@@ -210,12 +327,20 @@ export function createQueueRunner(
       entry.images.map((image, position) => uploadImage(image, position)),
     );
 
-    const failed = results.find((result) => result.status === "rejected");
+    const rejected: unknown[] = [];
 
-    if (failed) throw failed.reason;
+    for (const result of results)
+      if (result.status === "rejected") rejected.push(result.reason);
+
+    // A stall must not hide another image's real error, which the cap still applies to.
+    const failure =
+      rejected.find((cause) => !(cause instanceof UploadStalled)) ??
+      rejected[0];
+
+    if (rejected.length) throw failure;
 
     if (!active()) return false;
-    await transport.complete(entry.receiptId, entry);
+    await transport.complete(receiptId, entry);
     retries.remove(entry.id);
     store.remove(entry);
     attempts.delete(entry.id);
@@ -265,10 +390,11 @@ export function createQueueRunner(
       cause instanceof Error ? cause.message : "Opplastingen mislyktes.";
     store.update(entry);
 
-    const failures = (retry?.failures ?? 0) + 1;
+    const failures = (retry?.failures ?? 0) + (spendsRetry(cause) ? 1 : 0);
 
+    // A free retry still backs off, from the first delay up.
     const next = nextAttemptAt(
-      failures,
+      Math.max(failures, 1),
       parseUserError(cause)?.code === "REJECTED",
       clock(),
     );
@@ -319,8 +445,12 @@ export function createQueueRunner(
 
         const retry = attempts.get(entry.id);
 
+        const guarded = withDeadlines(transport, (cause, operation, fields) =>
+          report(cause, operation, { ...fields, captureId: entry.id }),
+        );
+
         try {
-          if (!(await uploadEntry(entry, transport, active))) return;
+          if (!(await uploadEntry(entry, guarded, active))) return;
         } catch (cause) {
           recordFailure(owner, householdId, entry, retry, cause);
         }

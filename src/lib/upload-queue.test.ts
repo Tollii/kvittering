@@ -9,6 +9,7 @@ import { userError } from "../../convex/userErrors";
 import {
   createQueueRunner,
   retryPolicy,
+  stepDeadlineMs,
   type LocalReceipt,
   type QueueStore,
   type UploadTransport,
@@ -70,9 +71,9 @@ function fixture() {
     advance: (milliseconds: number) => {
       clock.now += milliseconds;
     },
-    run: createQueueRunner(store, undefined, retries, () => clock.now),
+    run: createQueueRunner(store, retries, { clock: () => clock.now }),
     restart: () =>
-      createQueueRunner(store, undefined, retries, () => clock.now),
+      createQueueRunner(store, retries, { clock: () => clock.now }),
   };
 }
 
@@ -233,8 +234,7 @@ it("schedules every background image before waiting and retains each successful 
   };
 
   const running = run("user", household, transport, () => true);
-  await Promise.resolve();
-  expect(scheduled).toEqual([0, 1]);
+  await vi.waitFor(() => expect(scheduled).toEqual([0, 1]));
   second.resolve();
   first.reject(new Error("Offline"));
   await running;
@@ -308,12 +308,12 @@ it("does not contact the server before its quota deadline, including after runne
   await run("user", household, transport, () => true);
   advance(60_000);
   await run("user", household, transport, () => true);
-  await createQueueRunner(
-    store,
-    () => {},
-    retries,
-    () => 60_000,
-  )("user", household, transport, () => true);
+  await createQueueRunner(store, retries, { clock: () => 60_000 })(
+    "user",
+    household,
+    transport,
+    () => true,
+  );
   expect(calls).toBe(1);
   expect(present(rows()[0]).images).toEqual(["first.jpg", "second.jpg"]);
   advance(86_400_000);
@@ -414,6 +414,177 @@ it("processes a capture added while another upload is in progress without anothe
   }
 });
 
+it("fails a reservation that never answers, reports it, and uploads the next capture", async () => {
+  vi.useFakeTimers();
+  const { store, append, rows, retries, clock } = fixture();
+  append("next");
+  const reports: { operation: string; phase?: string }[] = [];
+
+  const run = createQueueRunner(store, retries, {
+    clock: () => clock.now,
+    report: (_cause, operation, fields) =>
+      reports.push({ operation, ...fields }),
+  });
+
+  const completed: string[] = [];
+
+  const transport: UploadTransport = {
+    reserve: (entry) =>
+      entry.id === "capture"
+        ? new Promise<never>(() => {})
+        : Promise.resolve(receiptId),
+    upload: async () => {},
+    complete: async (_, entry) => {
+      completed.push(entry.id);
+    },
+  };
+
+  const drain = run("user", household, transport, () => true);
+  await vi.advanceTimersByTimeAsync(stepDeadlineMs.reserve);
+  await drain;
+
+  expect(run.isRunning()).toBe(false);
+  expect(completed).toEqual(["next"]);
+  expect(rows()).toHaveLength(1);
+  expect(present(rows()[0]).id).toBe("capture");
+  expect(present(rows()[0]).error).toBeTruthy();
+  expect(reports).toMatchObject([
+    { operation: "receipt.upload_stalled", phase: "reserve" },
+  ]);
+  expect(vi.getTimerCount()).toBe(0);
+});
+
+it("keeps retrying a stalled image upload past the attempt cap until the transfer lands", async () => {
+  vi.useFakeTimers();
+  const { store, rows, retries } = fixture();
+  const run = createQueueRunner(store, retries);
+  const transfer = Promise.withResolvers<void>();
+  let uploads = 0;
+
+  const transport: UploadTransport = {
+    joinsPendingUploads: true,
+    reserve: async () => receiptId,
+    upload: () => {
+      uploads++;
+
+      return transfer.promise;
+    },
+    complete: async () => {},
+  };
+
+  const stop = run.schedule("user", household, () =>
+    run("user", household, transport, () => true),
+  );
+
+  const longestBackoff =
+    retryPolicy.firstDelayMs * 2 ** (retryPolicy.maxAttempts - 1);
+
+  try {
+    await vi.advanceTimersByTimeAsync(
+      (stepDeadlineMs.upload + longestBackoff) * (retryPolicy.maxAttempts + 2),
+    );
+    // Two images per attempt, and more attempts than the cap allows other failures.
+    expect(uploads).toBeGreaterThan(2 * retryPolicy.maxAttempts);
+    transfer.resolve();
+    await vi.advanceTimersByTimeAsync(longestBackoff);
+    expect(rows()).toEqual([]);
+  } finally {
+    stop();
+  }
+});
+
+it("does not spend the retry budget on stalls that join the transfer in flight", async () => {
+  vi.useFakeTimers();
+  const { store, retries } = fixture();
+  const run = createQueueRunner(store, retries);
+  const stalledAttempts = retryPolicy.maxAttempts + 1;
+  let uploads = 0;
+
+  const transport: UploadTransport = {
+    joinsPendingUploads: true,
+    reserve: async () => receiptId,
+    upload: () => {
+      uploads++;
+
+      // Two images per attempt: stall past the cap, then fail for real.
+      return uploads <= 2 * stalledAttempts
+        ? new Promise<never>(() => {})
+        : Promise.reject(new Error("Offline"));
+    },
+    complete: async () => {},
+  };
+
+  const stop = run.schedule("user", household, () =>
+    run("user", household, transport, () => true),
+  );
+
+  try {
+    await vi.advanceTimersByTimeAsync(
+      (stepDeadlineMs.upload + retryPolicy.firstDelayMs) * stalledAttempts +
+        retryPolicy.firstDelayMs * 2 ** retryPolicy.maxAttempts,
+    );
+    // The first real failure is retried, as the cap allows.
+    expect(uploads).toBeGreaterThan(2 * (stalledAttempts + 1));
+  } finally {
+    stop();
+  }
+});
+
+it("stops retrying a stalled upload at the cap when a retry would send it again", async () => {
+  vi.useFakeTimers();
+  const { store, retries } = fixture();
+  const run = createQueueRunner(store, retries);
+  let uploads = 0;
+
+  const transport: UploadTransport = {
+    reserve: async () => receiptId,
+    upload: () => {
+      uploads++;
+
+      return new Promise<never>(() => {});
+    },
+    complete: async () => {},
+  };
+
+  const stop = run.schedule("user", household, () =>
+    run("user", household, transport, () => true),
+  );
+
+  try {
+    await vi.advanceTimersByTimeAsync(
+      (stepDeadlineMs.upload +
+        retryPolicy.firstDelayMs * 2 ** (retryPolicy.maxAttempts - 1)) *
+        (retryPolicy.maxAttempts + 2),
+    );
+    // Two images per attempt.
+    expect(uploads).toBe(2 * retryPolicy.maxAttempts);
+  } finally {
+    stop();
+  }
+});
+
+it("records another image's real error instead of a stall beside it", async () => {
+  vi.useFakeTimers();
+  const { store, rows, retries } = fixture();
+  const run = createQueueRunner(store, retries);
+
+  const transport: UploadTransport = {
+    joinsPendingUploads: true,
+    reserve: async () => receiptId,
+    upload: (_id, position) =>
+      position === 0
+        ? new Promise<never>(() => {})
+        : Promise.reject(new Error("Bildet er for stort.")),
+    complete: async () => {},
+  };
+
+  const drain = run("user", household, transport, () => true);
+  await vi.advanceTimersByTimeAsync(stepDeadlineMs.upload);
+  await drain;
+
+  expect(present(rows()[0]).error).toBe("Bildet er for stort.");
+});
+
 it("keeps the quota error and the later deadline on manual retry and household deferral", async () => {
   const { run, retries, append, rows, clock } = fixture();
   append("later");
@@ -483,7 +654,7 @@ it.each(["read", "write", "remove"] as const)(
       },
     };
 
-    const run = createQueueRunner(store, undefined, failing, () => 0);
+    const run = createQueueRunner(store, failing, { clock: () => 0 });
     await expect(
       run("user", household, transport, () => true),
     ).resolves.toBeUndefined();

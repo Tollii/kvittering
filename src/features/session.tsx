@@ -45,6 +45,8 @@ import {
 } from "@/lib/receipt-storage";
 import { visibleHousehold } from "@/lib/household";
 import { createQueueRunner, type LocalReceipt } from "@/lib/upload-queue";
+import { silentWaits, uploadWait, type UploadWait } from "./upload-gate";
+import type { DiagnosticFields } from "@/lib/diagnostics";
 import { Loading, Notice, Screen } from "@/components/ui";
 import { CatalogQueryProvider } from "./catalog-query-provider";
 import { NavigationQueryProvider } from "./navigation-query-provider";
@@ -63,11 +65,48 @@ const convex = convexUrl
     }
   : null;
 
-const drainQueue = createQueueRunner(
-  receiptStorage,
-  recordEvent,
-  uploadRetries,
-);
+/** The Convex connection when an upload waits, which tells a dead socket from a slow server. */
+function connectionDiagnostics(): DiagnosticFields {
+  if (!convex) return {};
+  const state = convex.client.connectionState();
+
+  return {
+    websocketConnected: state.isWebSocketConnected,
+    connectionCount: state.connectionCount,
+    connectionRetries: state.connectionRetries,
+    inflightMutations: state.inflightMutations,
+  };
+}
+
+const drainQueue = createQueueRunner(receiptStorage, uploadRetries, {
+  record: recordEvent,
+  report: (cause, operation, fields) =>
+    reportError(cause, operation, { ...fields, ...connectionDiagnostics() }),
+});
+
+/** How long queued uploads may wait silently before Sentry hears of it. */
+const silentWaitReportMs = 30_000;
+
+/** Report a wait that leaves queued captures at "Laster opp" with no error to show. */
+function useSilentWaitReport(wait: UploadWait | null, watching: boolean) {
+  const silent = watching && wait && silentWaits.has(wait) ? wait : null;
+
+  useEffect(() => {
+    if (!silent) return undefined;
+
+    const timer = setTimeout(
+      () =>
+        reportError(
+          new Error("Queued receipt uploads are waiting to start."),
+          "receipt.queue_waiting",
+          { phase: silent, ...connectionDiagnostics() },
+        ),
+      silentWaitReportMs,
+    );
+
+    return () => clearTimeout(timer);
+  }, [silent]);
+}
 
 function useSessionAuth() {
   const session = authClient.useSession();
@@ -188,14 +227,19 @@ function HouseholdProvider({
   const [queueError, setQueueError] = useState("");
   const active = useRef(true);
   const canUpload = useRef(false);
+
+  const wait = uploadWait({
+    online,
+    authenticated: auth.isAuthenticated,
+    householdLoaded: !!details,
+    releaseBlocked: blocked,
+    processingEnabled: receiptProcessing,
+  });
+
   useEffect(() => {
-    canUpload.current =
-      online &&
-      auth.isAuthenticated &&
-      !!details &&
-      !blocked &&
-      receiptProcessing;
-  }, [online, auth.isAuthenticated, details, blocked, receiptProcessing]);
+    canUpload.current = wait === null;
+  }, [wait]);
+  useSilentWaitReport(wait, foreground && queue.length > 0);
   useEffect(() => {
     active.current = true;
 
@@ -266,23 +310,11 @@ function HouseholdProvider({
   }, [householdId, synchronize]);
 
   useEffect(() => {
-    if (!foreground || !canUpload.current || !queue.length) return undefined;
-
-    if (!householdId) return undefined;
+    if (!foreground || wait !== null || !queue.length || !householdId)
+      return undefined;
 
     return drainQueue.schedule(owner, householdId, synchronize);
-  }, [
-    synchronize,
-    owner,
-    householdId,
-    online,
-    auth.isAuthenticated,
-    foreground,
-    queue,
-    blocked,
-    receiptProcessing,
-    details,
-  ]);
+  }, [synchronize, owner, householdId, foreground, queue, wait]);
 
   if (!online && !household)
     return (

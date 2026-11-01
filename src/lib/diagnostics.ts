@@ -26,6 +26,10 @@ export type DiagnosticFields = {
   remoteRevision?: number;
   baselineRevision?: number;
   dirty?: boolean;
+  websocketConnected?: boolean;
+  connectionCount?: number;
+  connectionRetries?: number;
+  inflightMutations?: number;
 };
 
 const errorCodeSchema = z
