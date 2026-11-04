@@ -2,7 +2,18 @@ const path = require("node:path");
 
 const { getSentryExpoConfig } = require("@sentry/react-native/metro");
 
-const config = getSentryExpoConfig(__dirname);
+const { getPostHogExpoConfig } = require("posthog-react-native/metro");
+
+// Bundles carry both Sentry's debug id and PostHog's chunk id, so each service
+// can match a stack trace to its uploaded source map.
+const config = getSentryExpoConfig(__dirname, {
+  // Sentry passes its options on, including this function; PostHog would
+  // call it again instead of Expo's.
+  getDefaultConfig: (
+    projectRoot,
+    { getDefaultConfig: _sentryArgument, ...options },
+  ) => getPostHogExpoConfig(projectRoot, options),
+});
 
 config.resolver.blockList = [
   ...config.resolver.blockList,

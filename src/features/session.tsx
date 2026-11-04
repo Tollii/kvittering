@@ -10,6 +10,7 @@ import { removeAccountCatalogCache } from "@/lib/catalog-cache";
 import { removedAccount, useQueryLifecycle } from "./query-lifecycle";
 import { ReleaseDiagnostics } from "./release-diagnostics";
 import { recordEvent, reportError } from "@/lib/observability";
+import { analytics } from "@/lib/analytics";
 import { ReleasePolicyProvider, useReleasePolicy } from "./release-policy";
 import { receiptUploadTransport } from "@/lib/receipt-upload-transport";
 import {
@@ -164,7 +165,12 @@ function SessionGate({ children }: Readonly<{ children: ReactNode }>) {
     if (session.isPending) return;
     const removed = removedAccount(previousOwner.current, owner);
 
-    if (removed) removeAccountCatalogCache(removed);
+    if (removed) {
+      removeAccountCatalogCache(removed);
+      analytics?.reset();
+    }
+
+    if (owner && owner !== previousOwner.current) analytics?.identify(owner);
 
     if (!owner) {
       retainReceiptSystemScope(null);
@@ -265,6 +271,9 @@ function HouseholdProvider({
       householdId ? `${storageSuffix}:${owner}:${householdId}` : null,
     );
   }, [householdId, owner]);
+  useEffect(() => {
+    if (householdId) void analytics?.register({ household_id: householdId });
+  }, [householdId]);
 
   const showQueueReadError = useCallback(() => {
     if (active.current)

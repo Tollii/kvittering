@@ -3,6 +3,7 @@ import { useSegments } from "expo-router";
 import { getCurrentScope } from "@sentry/react-native";
 import { diagnosticScreen } from "@/lib/navigation-diagnostics";
 import { recordEvent } from "@/lib/observability";
+import { analytics } from "@/lib/analytics";
 import { useQueryLifecycle } from "./query-lifecycle-context";
 
 export function NavigationDiagnostics() {
@@ -14,6 +15,7 @@ export function NavigationDiagnostics() {
   useEffect(() => {
     getCurrentScope().setTag("screen", screen);
     recordEvent("navigation.opened", { screen });
+    void analytics?.screen(screen);
 
     return () => {
       getCurrentScope().setTag("screen", "unknown");

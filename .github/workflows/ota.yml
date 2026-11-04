@@ -48,3 +48,5 @@ jobs:
         run: eas update --channel testflight --environment preview --platform ios --message "$UPDATE_MESSAGE" --non-interactive
       - name: Upload update source maps to Sentry
         run: npm run sentry:sourcemaps
+      - name: Upload update source maps to PostHog
+        run: npm run posthog:sourcemaps

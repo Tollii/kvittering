@@ -2,6 +2,7 @@ import { z } from "zod";
 import * as Sentry from "@sentry/react-native";
 import { errorDetails, type DiagnosticFields } from "./diagnostics";
 import { diagnosticText } from "./sentry-event";
+import { analytics } from "./analytics";
 
 /** Record deliberate milestones; do not pass request arguments or response bodies. */
 export function recordEvent(
@@ -16,8 +17,13 @@ export function recordEvent(
     level,
   });
 
-  if (level === "warning") Sentry.logger.warn(event, fields);
-  else Sentry.logger.info(event, fields);
+  if (level === "warning") {
+    Sentry.logger.warn(event, fields);
+    analytics?.logger.warn(event, fields);
+  } else {
+    Sentry.logger.info(event, fields);
+    analytics?.logger.info(event, fields);
+  }
 }
 
 const errorMessageSchema = z.union([
@@ -94,6 +100,7 @@ export function reportError(
     operation,
     sentry_event_id: eventId,
   });
+  analytics?.captureException(diagnostic, { ...fields, ...details, ...tags });
 
   return eventId;
 }

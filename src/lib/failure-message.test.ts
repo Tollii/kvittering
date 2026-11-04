@@ -4,6 +4,9 @@ import { ConvexError } from "convex/values";
 import { userError } from "../../convex/userErrors";
 import { failureMessage } from "./failure-message";
 
+// oxlint-disable-next-line anti-slop/no-module-mocking -- Keep the native PostHog SDK out of tests; it sends nothing outside release builds.
+vi.mock("./analytics", () => ({ analytics: undefined }));
+
 // oxlint-disable-next-line anti-slop/no-module-mocking -- Replace the native SDK boundary; the message choice and reporting remain under test.
 vi.mock("@sentry/react-native", () => ({
   addBreadcrumb: vi.fn<typeof Sentry.addBreadcrumb>(),
