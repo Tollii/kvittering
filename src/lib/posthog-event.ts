@@ -11,13 +11,22 @@ type BeforeSend = Exclude<
   unknown[]
 >;
 
-/** Exception messages get the same filtering as Sentry's. */
+/**
+ * Exception messages get the same filtering as Sentry's. An exception list
+ * that cannot be read is dropped rather than sent unfiltered.
+ */
 export const redactExceptions: BeforeSend = (event) => {
+  const list = event.properties?.$exception_list;
+
+  if (list === undefined) return event;
+
+  // Read as it will be sent: JSON drops the undefined fields that unmapped
+  // stack frames carry, which z.json() would otherwise reject.
   const exceptions = exceptionsSchema.safeParse(
-    event.properties?.$exception_list,
+    JSON.parse(JSON.stringify(list)),
   ).data;
 
-  if (!exceptions) return event;
+  if (!exceptions) return null;
 
   return {
     ...event,

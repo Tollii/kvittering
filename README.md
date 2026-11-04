@@ -30,7 +30,7 @@ npm ci
 cp .env.example .env.local # Only if .env.local does not exist.
 ```
 
-Set the deployment and both public Convex URLs in `.env.local`. Keep provider keys and `BETTER_AUTH_SECRET` in the Convex deployment. Do not put secrets in `EXPO_PUBLIC_*` variables. The PostHog project token and host come from the EAS environment; builds without them send nothing to PostHog. EAS also holds the `POSTHOG_CLI_*` source map upload key, so only EAS Release builds and the update scripts upload source maps to PostHog.
+Set the deployment and both public Convex URLs in `.env.local`. Keep provider keys and `BETTER_AUTH_SECRET` in the Convex deployment. Do not put secrets in `EXPO_PUBLIC_*` variables. The PostHog project token and host come from the EAS environment; builds without them send nothing to PostHog. EAS also holds the `POSTHOG_CLI_*` source map upload key, so only EAS Release builds and the update scripts upload source maps to PostHog. The app turns off GeoIP, but only the PostHog project setting "Discard client IP data" keeps IP addresses out, and exception autocapture must stay on in the project for the app to send crashes.
 
 Run the backend from the repository root:
 

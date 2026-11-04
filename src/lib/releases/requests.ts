@@ -6,7 +6,8 @@ import type {
   FunctionArgs,
   FunctionReturnType,
 } from "convex/server";
-import { installedRelease, releaseError } from "./client";
+import { releaseError } from "./client";
+import { installedRelease } from "./installed";
 import { getFunctionName } from "convex/server";
 import { recordEvent } from "../observability";
 import type { DiagnosticFields } from "../diagnostics";

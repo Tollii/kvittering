@@ -1,12 +1,8 @@
 import PostHog from "posthog-react-native";
-import * as Updates from "expo-updates";
 import { redactExceptions } from "./posthog-event";
+import { installedRelease, telemetryEnabled } from "./releases/installed";
 
 const projectToken = process.env.EXPO_PUBLIC_POSTHOG_API_KEY;
-
-// Read here rather than from the release client, which reports through
-// observability and so would import this module back.
-const channel = Updates.channel ?? process.env.EXPO_PUBLIC_RELEASE_CHANNEL;
 
 /**
  * PostHog for product analytics, errors and logs. Events say what someone did,
@@ -15,9 +11,7 @@ const channel = Updates.channel ?? process.env.EXPO_PUBLIC_RELEASE_CHANNEL;
  * production builds with the project token send anything.
  */
 export const analytics =
-  projectToken &&
-  !__DEV__ &&
-  (channel === "testflight" || channel === "production")
+  projectToken && telemetryEnabled
     ? new PostHog(projectToken, {
         host:
           process.env.EXPO_PUBLIC_POSTHOG_HOST ?? "https://eu.i.posthog.com",
@@ -29,9 +23,13 @@ export const analytics =
         capturePushNotificationSubscriptions: false,
         capturePushNotificationOpened: false,
         errorTracking: {
+          // Hermes keeps one promise rejection tracker, and Sentry starts later and takes it, so rejections reach only Sentry until it is removed.
           autocapture: { uncaughtExceptions: true, unhandledRejections: true },
         },
-        logs: { serviceName: "kvitto-app", environment: channel },
+        logs: {
+          serviceName: "kvitto-app",
+          environment: installedRelease.channel,
+        },
         before_send: redactExceptions,
       })
     : undefined;

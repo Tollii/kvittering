@@ -14,7 +14,7 @@ const posthogXcode =
 const guardedUpload = (bundle) =>
   [
     'if [ "$CONFIGURATION" = "Release" ] && [ -n "$POSTHOG_CLI_API_KEY" ]; then',
-    `  ${posthogXcode} ${bundle}`,
+    `  "${posthogXcode}" ${bundle}`,
     "else",
     `  ${bundle}`,
     "fi",
@@ -36,15 +36,25 @@ module.exports = (config) =>
         "PBXShellScriptBuildPhase",
       );
 
+      if (!phase)
+        throw new Error(
+          `PostHog source maps: no "${bundlePhase}" build phase.`,
+        );
+
       const script = JSON.parse(phase.shellScript);
 
-      if (!script.includes("posthog-xcode.sh"))
-        phase.shellScript = JSON.stringify(
-          script.replace(
-            /^.*(packager|scripts)\/react-native-xcode\.sh.*$/m,
-            (line) => guardedUpload(line.trim()),
-          ),
+      if (script.includes("posthog-xcode.sh")) return results;
+
+      const bundleLine = /^.*(packager|scripts)\/react-native-xcode\.sh.*$/m;
+
+      if (!bundleLine.test(script))
+        throw new Error(
+          "PostHog source maps: the bundle phase no longer runs react-native-xcode.sh.",
         );
+
+      phase.shellScript = JSON.stringify(
+        script.replace(bundleLine, (line) => guardedUpload(line.trim())),
+      );
 
       return results;
     },

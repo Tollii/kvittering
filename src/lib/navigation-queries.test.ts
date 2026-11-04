@@ -21,7 +21,7 @@ import {
 import { useProductLinkingQueue } from "../features/product-linking-queue";
 import * as Sentry from "@sentry/react-native";
 
-// oxlint-disable-next-line anti-slop/no-module-mocking -- Keep the native PostHog SDK out of tests; it sends nothing outside release builds.
+// oxlint-disable-next-line anti-slop/no-module-mocking -- The query hooks report through observability, and its native PostHog SDK cannot load in the edge runtime.
 vi.mock("./analytics", () => ({ analytics: undefined }));
 
 // oxlint-disable-next-line anti-slop/no-module-mocking -- Replace the native telemetry transport while exercising the real query hooks.

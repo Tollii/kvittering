@@ -1,9 +1,9 @@
 import * as Sentry from "@sentry/react-native";
-import { installedRelease, setReleaseDiagnostics } from "./releases/client";
+import { setReleaseDiagnostics } from "./releases/client";
+import { installedRelease, telemetryEnabled } from "./releases/installed";
 import { diagnosticBreadcrumb, prepareErrorEvent } from "./sentry-event";
 
-export const sentryEnabled =
-  !__DEV__ && installedRelease.channel !== "development";
+export const sentryEnabled = telemetryEnabled;
 
 if (sentryEnabled) {
   Sentry.init({

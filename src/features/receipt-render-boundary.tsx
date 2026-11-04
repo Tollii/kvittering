@@ -4,6 +4,7 @@ import { Button, Notice, Screen } from "@/components/ui";
 import type { receiptDraftDiagnostics } from "@/lib/receipt-diagnostics";
 import { diagnosticText } from "@/lib/sentry-event";
 import { recordEvent } from "@/lib/observability";
+import { analytics } from "@/lib/analytics";
 
 /** Catch below Expo Router so React supplies the component stack before it is lost. */
 export function ReceiptRenderBoundary({
@@ -42,6 +43,10 @@ export function ReceiptRenderBoundary({
           componentStack: diagnosticText(componentStack),
         });
       }}
+      // Sentry's boundary reports only to Sentry; PostHog gets the same crash until Sentry is removed.
+      onError={(error) =>
+        analytics?.captureException(error, { operation: "receipt.render" })
+      }
       // oxlint-disable-next-line typescript/unbound-method -- Sentry passes a bound reset function.
       fallback={({ resetError }) => (
         <Screen title="Kunne ikke åpne kvitteringen" insetTop={false}>

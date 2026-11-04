@@ -1,9 +1,7 @@
 import { useEffect } from "react";
 import { useSegments } from "expo-router";
-import { getCurrentScope } from "@sentry/react-native";
 import { diagnosticScreen } from "@/lib/navigation-diagnostics";
-import { recordEvent } from "@/lib/observability";
-import { analytics } from "@/lib/analytics";
+import { recordEvent, recordScreen } from "@/lib/observability";
 import { useQueryLifecycle } from "./query-lifecycle-context";
 
 export function NavigationDiagnostics() {
@@ -12,15 +10,7 @@ export function NavigationDiagnostics() {
   useEffect(() => {
     recordEvent("application.state_changed", { active, online });
   }, [active, online]);
-  useEffect(() => {
-    getCurrentScope().setTag("screen", screen);
-    recordEvent("navigation.opened", { screen });
-    void analytics?.screen(screen);
-
-    return () => {
-      getCurrentScope().setTag("screen", "unknown");
-    };
-  }, [screen]);
+  useEffect(() => recordScreen(screen), [screen]);
 
   return null;
 }

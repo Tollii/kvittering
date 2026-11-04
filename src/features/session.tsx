@@ -9,8 +9,12 @@ import { FeatureFlagsProvider, useFeatureFlag } from "./featureFlags";
 import { removeAccountCatalogCache } from "@/lib/catalog-cache";
 import { removedAccount, useQueryLifecycle } from "./query-lifecycle";
 import { ReleaseDiagnostics } from "./release-diagnostics";
-import { recordEvent, reportError } from "@/lib/observability";
-import { analytics } from "@/lib/analytics";
+import {
+  identifyAccount,
+  recordEvent,
+  reportError,
+  tagHousehold,
+} from "@/lib/observability";
 import { ReleasePolicyProvider, useReleasePolicy } from "./release-policy";
 import { receiptUploadTransport } from "@/lib/receipt-upload-transport";
 import {
@@ -165,12 +169,7 @@ function SessionGate({ children }: Readonly<{ children: ReactNode }>) {
     if (session.isPending) return;
     const removed = removedAccount(previousOwner.current, owner);
 
-    if (removed) {
-      removeAccountCatalogCache(removed);
-      analytics?.reset();
-    }
-
-    if (owner && owner !== previousOwner.current) analytics?.identify(owner);
+    if (removed) removeAccountCatalogCache(removed);
 
     if (!owner) {
       retainReceiptSystemScope(null);
@@ -271,9 +270,11 @@ function HouseholdProvider({
       householdId ? `${storageSuffix}:${owner}:${householdId}` : null,
     );
   }, [householdId, owner]);
-  useEffect(() => {
-    if (householdId) void analytics?.register({ household_id: householdId });
-  }, [householdId]);
+  useEffect(() => identifyAccount(owner), [owner]);
+  useEffect(
+    () => (householdId ? tagHousehold(householdId) : undefined),
+    [householdId],
+  );
 
   const showQueueReadError = useCallback(() => {
     if (active.current)

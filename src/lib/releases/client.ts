@@ -4,34 +4,12 @@ import {
   deferredRequestSchema,
 } from "../request-retry";
 import { z } from "zod";
-import * as Application from "expo-application";
-import * as Updates from "expo-updates";
 import * as Sentry from "@sentry/react-native";
-import { Platform } from "react-native";
 import { recordEvent, reportError } from "../observability";
 import { parseUserError } from "../user-errors";
 import type { DiagnosticFields } from "../diagnostics";
-import {
-  apiVersion,
-  type ClientRelease,
-  type ReleasePolicy,
-  parsePolicy,
-} from "./policy";
-
-const channel = Updates.channel ?? process.env.EXPO_PUBLIC_RELEASE_CHANNEL;
-
-export const installedRelease: ClientRelease = {
-  version: Application.nativeApplicationVersion ?? "0.0.0",
-  build: Application.nativeBuildVersion ?? "0",
-  platform: Platform.OS === "android" ? "android" : "ios",
-  channel:
-    channel === "testflight" || channel === "production"
-      ? channel
-      : "development",
-  apiVersion,
-  updateId: Updates.updateId,
-  runtimeVersion: Updates.runtimeVersion,
-};
+import { type ReleasePolicy, parsePolicy } from "./policy";
+import { installedRelease } from "./installed";
 
 const listeners = new Set<(policy: ReleasePolicy) => void>();
 
