@@ -4,7 +4,7 @@ import { useConvex } from "convex/react";
 import { randomUUID } from "expo-crypto";
 import Storage from "expo-sqlite/kv-store";
 import { api } from "../../convex/_generated/api";
-import { installedRelease } from "@/lib/releases/client";
+import { installedRelease } from "@/lib/releases/installed";
 import { storageSuffix } from "@/lib/deployment-storage";
 import { useReleasePolicy } from "./release-policy";
 

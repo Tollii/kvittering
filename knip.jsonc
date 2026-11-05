@@ -21,10 +21,12 @@
   // expo-router's native tabs require this peer at runtime without an import.
   // Metro resolves the expo-sqlite name in web bundles (metro.config.js).
   // Stryker core bundles its command runner under this name.
+  // PostHog's Xcode script and the eas env:exec command string run posthog-cli.
   "ignoreDependencies": [
     "expo-glass-effect",
     "@stryker-mutator/command-runner",
     "expo-sqlite-web-worker-channel",
+    "@posthog/cli",
   ],
   // Visual checks encode recordings with the environment's ffmpeg.
   "ignoreBinaries": ["ffmpeg"],

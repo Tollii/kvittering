@@ -29,10 +29,10 @@ import {
   type VersionPolicy,
 } from "@/lib/releases/policy";
 import {
-  installedRelease,
   subscribeServerPolicy,
   setReleaseDiagnostics,
 } from "@/lib/releases/client";
+import { installedRelease } from "@/lib/releases/installed";
 import { releasePolicyCache } from "@/lib/releases/cache";
 
 const { cachePolicy, readCachedPolicy, dismissedUntil, dismissUpdate } =

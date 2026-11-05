@@ -2,6 +2,7 @@ import { z } from "zod";
 import * as Sentry from "@sentry/react-native";
 import { errorDetails, type DiagnosticFields } from "./diagnostics";
 import { diagnosticText } from "./sentry-event";
+import { analytics } from "./analytics";
 
 /** Record deliberate milestones; do not pass request arguments or response bodies. */
 export function recordEvent(
@@ -16,8 +17,39 @@ export function recordEvent(
     level,
   });
 
-  if (level === "warning") Sentry.logger.warn(event, fields);
-  else Sentry.logger.info(event, fields);
+  const method = level === "warning" ? "warn" : "info";
+
+  Sentry.logger[method](event, fields);
+  analytics?.logger[method](event, fields);
+}
+
+/** Report the visible screen by route name, without ids. Returns the cleanup for when it closes. */
+export function recordScreen(screen: string) {
+  Sentry.getCurrentScope().setTag("screen", screen);
+  recordEvent("navigation.opened", { screen });
+  void analytics?.screen(screen);
+
+  return () => {
+    Sentry.getCurrentScope().setTag("screen", "unknown");
+  };
+}
+
+/** Tie PostHog events to the internal account id. Returns the cleanup for sign-out or an account switch. */
+export function identifyAccount(owner: string) {
+  analytics?.identify(owner);
+
+  return () => {
+    analytics?.reset();
+  };
+}
+
+/** Tag later PostHog events with the household. Returns the cleanup for leaving it. */
+export function tagHousehold(householdId: string) {
+  void analytics?.register({ household_id: householdId });
+
+  return () => {
+    void analytics?.unregister("household_id");
+  };
 }
 
 const errorMessageSchema = z.union([
@@ -94,6 +126,7 @@ export function reportError(
     operation,
     sentry_event_id: eventId,
   });
+  analytics?.captureException(diagnostic, { ...fields, ...details, operation });
 
   return eventId;
 }

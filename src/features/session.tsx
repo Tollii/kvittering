@@ -9,7 +9,12 @@ import { FeatureFlagsProvider, useFeatureFlag } from "./featureFlags";
 import { removeAccountCatalogCache } from "@/lib/catalog-cache";
 import { removedAccount, useQueryLifecycle } from "./query-lifecycle";
 import { ReleaseDiagnostics } from "./release-diagnostics";
-import { recordEvent, reportError } from "@/lib/observability";
+import {
+  identifyAccount,
+  recordEvent,
+  reportError,
+  tagHousehold,
+} from "@/lib/observability";
 import { ReleasePolicyProvider, useReleasePolicy } from "./release-policy";
 import { receiptUploadTransport } from "@/lib/receipt-upload-transport";
 import {
@@ -265,6 +270,11 @@ function HouseholdProvider({
       householdId ? `${storageSuffix}:${owner}:${householdId}` : null,
     );
   }, [householdId, owner]);
+  useEffect(() => identifyAccount(owner), [owner]);
+  useEffect(
+    () => (householdId ? tagHousehold(householdId) : undefined),
+    [householdId],
+  );
 
   const showQueueReadError = useCallback(() => {
     if (active.current)

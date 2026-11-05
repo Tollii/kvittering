@@ -9,7 +9,7 @@ import { useQuery } from "convex/react";
 import Storage from "expo-sqlite/kv-store";
 import { z } from "zod";
 import { api } from "../../convex/_generated/api";
-import { installedRelease } from "@/lib/releases/client";
+import { installedRelease } from "@/lib/releases/installed";
 import { storageSuffix } from "@/lib/deployment-storage";
 import {
   defaultFeatureFlags,

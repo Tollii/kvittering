@@ -1,6 +1,8 @@
 import { NotificationRouting } from "@/features/notifications";
 import { NavigationDiagnostics } from "@/features/navigation-diagnostics";
 import { sentryEnabled } from "@/lib/sentry";
+import { analytics } from "@/lib/analytics";
+import { PostHogProvider } from "posthog-react-native";
 import { reportError } from "@/lib/observability";
 import { ReceiptMigrationError } from "@/lib/receipt-migrations";
 import { useEffect } from "react";
@@ -112,10 +114,19 @@ function RootLayout() {
 }
 
 function App() {
-  return (
+  const app = (
     <StorageReady>
       <RootLayout />
     </StorageReady>
+  );
+
+  // Screens are reported by route name in NavigationDiagnostics, without ids.
+  return analytics ? (
+    <PostHogProvider client={analytics} autocapture={false}>
+      {app}
+    </PostHogProvider>
+  ) : (
+    app
   );
 }
 

@@ -6,6 +6,9 @@ import { errorDetails } from "./diagnostics";
 import { defaultStackParser, exceptionFromError } from "@sentry/browser";
 import { prepareErrorEvent } from "./sentry-event";
 
+// oxlint-disable-next-line anti-slop/no-module-mocking -- reportError also sends to PostHog, whose native SDK cannot load in the edge runtime; these tests check Sentry.
+vi.mock("./analytics", () => ({ analytics: undefined }));
+
 // oxlint-disable-next-line anti-slop/no-module-mocking -- Capture calls to the native Sentry SDK instead of sending events.
 vi.mock("@sentry/react-native", () => ({
   addBreadcrumb: vi.fn<typeof Sentry.addBreadcrumb>(),

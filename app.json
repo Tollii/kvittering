@@ -83,6 +83,7 @@
         }
       ],
       "./plugins/with-app-shortcuts",
+      "./plugins/with-posthog-sourcemaps",
       [
         "expo-widgets",
         {

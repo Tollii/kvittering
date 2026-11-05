@@ -2,7 +2,7 @@ import { useState } from "react";
 import { View } from "react-native";
 import * as Updates from "expo-updates";
 import { Button, Copy, Notice } from "@/components/ui";
-import { installedRelease } from "@/lib/releases/client";
+import { installedRelease } from "@/lib/releases/installed";
 import { useReleasePolicy } from "./release-policy";
 import { recordEvent, reportError } from "@/lib/observability";
 
