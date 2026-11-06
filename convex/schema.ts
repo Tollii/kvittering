@@ -63,7 +63,7 @@ export default defineSchema({
     expiresAt: v.number().optional(),
   })
     .index("by_component_and_workflowId", ["component", "workflowId"])
-    .index("by_receiptId", ["receiptId"]),
+    .index("by_receiptId_and_component", ["receiptId", "component"]),
   receiptReadModel: defineTable({
     name: v.literal("receipts-v1"),
     cursor: v.union(v.string(), v.null()),

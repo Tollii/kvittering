@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { ActivityIndicator, Alert } from "react-native";
 import { Ore } from "@/lib/domain/ore";
 import {
@@ -12,6 +13,7 @@ import {
   Segments,
 } from "@/components/ui";
 import type { ReceiptData } from "@/lib/domain/receipt";
+import { productAnalysisRestartable } from "@/lib/domain/product-families";
 import type { Receipt } from "@/lib/domain/insights";
 import { useTheme } from "@/constants/theme";
 
@@ -138,6 +140,8 @@ export function ReceiptDetails({
   onRetryCatalog?: () => void;
   onRetryAnalysis?: () => void;
 }>) {
+  // Opening the receipt again rechecks whether a pending analysis is presumed lost.
+  const [openedAt] = useState(Date.now);
   const linkedCount = data.lines.filter((line) => line.catalogProduct).length;
 
   const productCount = data.lines.filter(
@@ -163,13 +167,14 @@ export function ReceiptDetails({
           onPress={onRetryCatalog}
         />
       )}
-      {receipt.productAnalysis?.state === "error" && (
-        <Row
-          title="Prøv mengdeberegning igjen"
-          icon="arrow.clockwise"
-          onPress={onRetryAnalysis}
-        />
-      )}
+      {receipt.productAnalysis &&
+        productAnalysisRestartable(receipt.productAnalysis, openedAt) && (
+          <Row
+            title="Prøv mengdeberegning igjen"
+            icon="arrow.clockwise"
+            onPress={onRetryAnalysis}
+          />
+        )}
     </Disclosure>
   );
 }
