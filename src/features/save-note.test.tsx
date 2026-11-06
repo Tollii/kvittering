@@ -25,14 +25,18 @@ it("says a deferred upload waits instead of failing, and keeps the note", () => 
   const deferred = capture({ kind: "deferred", message: "Vent ett minutt." });
 
   expect(saveNote(photos, [deferred], true)).toEqual({
-    state: "waiting",
+    phase: { kind: "deferred", message: "Vent ett minutt." },
     title: "Lastes opp senere",
   });
   expect(
-    saveNote(photos, [deferred, capture({ kind: "failed" })], true),
-  ).toMatchObject({ state: "retrying", title: "Prøver igjen" });
+    saveNote(photos, [deferred, capture({ kind: "failed" })], true)?.title,
+  ).toBe("Prøver igjen");
   expect(
-    saveNote(photos, [capture({ kind: "rejected", message: "Nei." })], true),
-  ).toMatchObject({ state: "stopped", title: "Kunne ikke laste opp" });
-  expect(saveNote(photos, [], true)).toMatchObject({ state: "done" });
+    saveNote(photos, [capture({ kind: "rejected", message: "Nei." })], true)
+      ?.title,
+  ).toBe("Kunne ikke laste opp");
+  expect(saveNote(photos, [], true)).toEqual({
+    phase: null,
+    title: "Lastet opp",
+  });
 });

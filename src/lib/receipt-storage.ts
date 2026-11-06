@@ -114,12 +114,18 @@ export const receiptStorage: QueueStore = {
   list(owner, householdId) {
     return getOrInsert(queueSnapshots, scopeKey(owner, householdId), () => {
       const entries = storage()
-        .getAllSync<{ data: string }>(
-          "SELECT data FROM receipt_queue WHERE owner = ? AND household = ? ORDER BY rowid",
+        .getAllSync<{ data: string; restricted: number | null }>(
+          "SELECT receipt_queue.data, receipt_retry.restricted FROM receipt_queue LEFT JOIN receipt_retry ON receipt_retry.id = receipt_queue.id WHERE receipt_queue.owner = ? AND receipt_queue.household = ? ORDER BY receipt_queue.rowid",
           owner,
           householdId,
         )
-        .map((row) => freezeReceipt(migrateReceipt(JSON.parse(row.data))));
+        .map((row) =>
+          freezeReceipt(
+            migrateReceipt(JSON.parse(row.data), {
+              restricted: row.restricted === 1,
+            }),
+          ),
+        );
 
       Object.freeze(entries);
 

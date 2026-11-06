@@ -7,6 +7,7 @@ import {
   saveLocalReceipts,
   parseCachedHousehold,
   regroupQueuedReceipt,
+  uploadRetries,
 } from "./receipt-storage";
 
 const control = vi.hoisted(() => ({
@@ -215,4 +216,38 @@ it("refuses to regroup reserved or unknown future queue payloads", () => {
       entry.id,
     )?.data,
   ).toBe(future);
+});
+
+it("reads a capture an older release deferred as waiting for the service's deadline", () => {
+  const household = testId<"households">("older-deferral-household");
+
+  const entry = {
+    schemaVersion: 1 as const,
+    id: "older-deferral",
+    owner: "older-deferral",
+    householdId: household,
+    createdAt: 1,
+    images: ["0.jpg"],
+    uploaded: [false],
+  };
+
+  // Open the store, which creates its tables, in another scope.
+  receiptStorage.list("someone-else", household);
+  // Written as the older release stores a deferral: the message as text.
+  openDatabaseSync("ignored").runSync(
+    "INSERT INTO receipt_queue (id, owner, household, data) VALUES (?, ?, ?, ?)",
+    entry.id,
+    entry.owner,
+    household,
+    JSON.stringify({ ...entry, error: "Vent ett minutt." }),
+  );
+  uploadRetries.write(entry.id, {
+    attempts: 1,
+    retryAt: 60_000,
+    restricted: true,
+  });
+
+  expect(receiptStorage.list(entry.owner, household)).toEqual([
+    { ...entry, failure: { kind: "deferred", message: "Vent ett minutt." } },
+  ]);
 });

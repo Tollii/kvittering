@@ -5,7 +5,11 @@ import {
 import { z } from "zod";
 import { v } from "convex/values";
 import { parse } from "convex-helpers/validators";
-import type { LocalReceipt, UploadFailure } from "./upload-queue";
+import {
+  uploadFailureSchema,
+  type LocalReceipt,
+  type UploadFailure,
+} from "./upload-queue";
 
 export class ReceiptMigrationError extends Error {}
 
@@ -22,13 +26,6 @@ const receiptValidator = v.object({
   error: v.string().optional(),
 });
 
-const failureSchema = z.discriminatedUnion("kind", [
-  z.object({ kind: z.literal("failed") }),
-  z.object({ kind: z.literal("deferred"), message: z.string().min(1) }),
-  z.object({ kind: z.literal("rejected"), message: z.string().min(1) }),
-  z.object({ kind: z.literal("image_limit") }),
-]);
-
 /**
  * The failure of a stored capture. A row written by an older release, or by
  * one rolled back to after this one, has only the text: of that, only the
@@ -39,14 +36,17 @@ const failureSchema = z.discriminatedUnion("kind", [
 function storedFailure(
   typed: UploadFailure | undefined,
   error: string | undefined,
+  restricted: boolean,
 ): UploadFailure | undefined {
-  if (typed && error !== undefined) return typed;
+  // Older releases treat empty text as no failure.
+  if (!error) return undefined;
 
-  if (error === undefined) return undefined;
+  if (typed) return typed;
 
-  return error.includes(receiptImageLimitMessage)
-    ? { kind: "image_limit" }
-    : { kind: "failed" };
+  if (error.includes(receiptImageLimitMessage)) return { kind: "image_limit" };
+
+  // The text of a capture that waits for the service's deadline is that deferral's message.
+  return restricted ? { kind: "deferred", message: error } : { kind: "failed" };
 }
 
 /** The text an older release shows and matches for each failure. */
@@ -73,9 +73,16 @@ export function serializeReceipt({ failure, ...entry }: LocalReceipt) {
   );
 }
 
-/** Retain reservation IDs, upload progress and relative image paths during upgrades. */
-// oxlint-disable-next-line anti-slop/no-unknown-parameters -- This boundary parser validates external input before returning a domain value.
-export function migrateReceipt(value: unknown): LocalReceipt {
+/**
+ * Retain reservation IDs, upload progress and relative image paths during
+ * upgrades. `restricted` says the capture waits for a deadline the service
+ * named, which an older release kept only as text.
+ */
+export function migrateReceipt(
+  // oxlint-disable-next-line anti-slop/no-unknown-parameters -- This boundary parser validates external input before returning a domain value.
+  value: unknown,
+  { restricted = false }: { restricted?: boolean } = {},
+): LocalReceipt {
   const input = z
     .looseObject({ schemaVersion: z.unknown().optional() })
     .safeParse(value);
@@ -97,7 +104,7 @@ export function migrateReceipt(value: unknown): LocalReceipt {
   });
 
   // A failure kind from a later release is not an error: its text still counts.
-  const typed = failureSchema.safeParse(input.data["failure"]).data;
+  const typed = uploadFailureSchema.safeParse(input.data["failure"]).data;
 
   if (
     !result.id ||
@@ -118,7 +125,7 @@ export function migrateReceipt(value: unknown): LocalReceipt {
     throw new ReceiptMigrationError(
       "Ugyldig lokal kvittering. Bildene er beholdt.",
     );
-  const stored = storedFailure(typed, error);
+  const stored = storedFailure(typed, error, restricted);
 
   return stored ? { ...result, failure: stored } : result;
 }

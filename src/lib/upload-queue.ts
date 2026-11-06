@@ -14,15 +14,18 @@ import {
 import { z } from "zod";
 
 /** Why the last upload attempt of a capture stopped. */
-export type UploadFailure =
+export const uploadFailureSchema = z.discriminatedUnion("kind", [
   /** Something went wrong on the way; the queue tries again. */
-  | { kind: "failed" }
+  z.object({ kind: z.literal("failed") }),
   /** The service asked the queue to wait; the message says until when. */
-  | { kind: "deferred"; message: string }
+  z.object({ kind: z.literal("deferred"), message: z.string().min(1) }),
   /** The service refused the capture as sent; the message says why. */
-  | { kind: "rejected"; message: string }
+  z.object({ kind: z.literal("rejected"), message: z.string().min(1) }),
   /** An older capture has more images than one receipt takes. */
-  | { kind: "image_limit" };
+  z.object({ kind: z.literal("image_limit") }),
+]);
+
+export type UploadFailure = z.infer<typeof uploadFailureSchema>;
 
 export type LocalReceipt = {
   schemaVersion: 1;
@@ -38,16 +41,38 @@ export type LocalReceipt = {
 
 /** Where a capture stands, for the interface. */
 export type UploadPhase =
-  | { kind: "uploading"; uploaded: number; total: number }
-  | { kind: "offline"; uploaded: number; total: number }
+  | { kind: "uploading" }
+  | { kind: "offline" }
   /** Waits for the time the service named, and then continues by itself. */
-  | { kind: "waiting"; message: string }
-  /** Failed; the queue tries again, or the person does. */
-  | { kind: "retrying" }
+  | { kind: "deferred"; message: string }
+  /** Failed; the queue tries again until its attempts run out, then waits for the person. */
+  | { kind: "failed" }
   /** Waits for the person; only a manual retry sends it again. */
   | { kind: "rejected"; message: string }
   /** Waits for the person to split the images into two receipts. */
   | { kind: "regroup" };
+
+/** How a phase reads: in progress, waiting by itself, or waiting for the person. */
+export type UploadTone = "active" | "waiting" | "attention";
+
+/** Each phase's tone and the one action the person can take. */
+const phaseTreatment = {
+  uploading: { tone: "active", action: null },
+  offline: { tone: "active", action: null },
+  deferred: { tone: "waiting", action: null },
+  failed: { tone: "attention", action: "retry" },
+  rejected: { tone: "attention", action: "retry" },
+  regroup: { tone: "attention", action: "regroup" },
+} as const satisfies Record<
+  UploadPhase["kind"],
+  { tone: UploadTone; action: "retry" | "regroup" | null }
+>;
+
+export const phaseTone = (phase: UploadPhase) =>
+  phaseTreatment[phase.kind].tone;
+
+export const phaseAction = (phase: UploadPhase) =>
+  phaseTreatment[phase.kind].action;
 
 /** Whether the person can split an unreserved older capture into two receipts. */
 export function canRegroup(entry: LocalReceipt) {
@@ -60,20 +85,13 @@ export function canRegroup(entry: LocalReceipt) {
 }
 
 export function uploadPhase(entry: LocalReceipt, online: boolean): UploadPhase {
-  const uploaded = entry.uploaded.filter(Boolean).length;
-  const total = entry.images.length;
-
   switch (entry.failure?.kind) {
     case undefined:
-      return online
-        ? { kind: "uploading", uploaded, total }
-        : { kind: "offline", uploaded, total };
+      return { kind: online ? "uploading" : "offline" };
     case "failed":
-      return { kind: "retrying" };
     case "deferred":
-      return { kind: "waiting", message: entry.failure.message };
     case "rejected":
-      return { kind: "rejected", message: entry.failure.message };
+      return entry.failure;
     case "image_limit":
       return canRegroup(entry)
         ? { kind: "regroup" }
@@ -81,15 +99,26 @@ export function uploadPhase(entry: LocalReceipt, online: boolean): UploadPhase {
   }
 }
 
+/** Whether a capture waits for the person, which the tab badge counts. */
+export const needsPerson = (entry: LocalReceipt) =>
+  phaseTone(uploadPhase(entry, true)) === "attention";
+
+/** Whether automatic retries stop until the person acts. */
+const waitsForPerson = (failure: UploadFailure) =>
+  failure.kind === "rejected" || failure.kind === "image_limit";
+
 // The backend sends the image limit as the message itself.
 const imageLimitSchema = z.object({
   data: z.literal(receiptImageLimitMessage),
 });
 
+const deferralMessage = (cause: RequestDeferred) =>
+  cause.message || "Opplastingen fortsetter senere.";
+
 /** Read the failure a capture keeps from what a step threw. */
-export function uploadFailure(cause: unknown): UploadFailure {
+function uploadFailure(cause: unknown): UploadFailure {
   if (cause instanceof RequestDeferred)
-    return { kind: "deferred", message: cause.message };
+    return { kind: "deferred", message: deferralMessage(cause) };
 
   if (
     imageLimitSchema.safeParse(cause).success ||
@@ -228,10 +257,10 @@ function withDeadlines(
  * a deferral: the service named when to come back, so the capture waits for
  * that time instead of stopping as if it had failed.
  */
-function spendsRetry(cause: unknown) {
-  return !(
-    (cause instanceof UploadStalled && cause.joinable) ||
-    cause instanceof RequestDeferred
+function spendsRetry(failure: UploadFailure, cause: unknown) {
+  return (
+    failure.kind !== "deferred" &&
+    !(cause instanceof UploadStalled && cause.joinable)
   );
 }
 
@@ -460,7 +489,10 @@ export function createQueueRunner(
 
       const deferred = {
         ...pending,
-        failure: pending.failure ?? uploadFailure(cause),
+        failure: pending.failure ?? {
+          kind: "deferred" as const,
+          message: deferralMessage(cause),
+        },
       };
 
       store.update(deferred);
@@ -481,15 +513,17 @@ export function createQueueRunner(
     retry: RetryState | undefined,
     cause: unknown,
   ) {
-    entry.failure = uploadFailure(cause);
+    const failure = uploadFailure(cause);
+    entry.failure = failure;
     store.update(entry);
 
-    const failures = (retry?.failures ?? 0) + (spendsRetry(cause) ? 1 : 0);
+    const failures =
+      (retry?.failures ?? 0) + (spendsRetry(failure, cause) ? 1 : 0);
 
     // A free retry still backs off, from the first delay up.
     const next = nextAttemptAt(
       Math.max(failures, 1),
-      entry.failure.kind === "rejected" || entry.failure.kind === "image_limit",
+      waitsForPerson(failure),
       clock(),
     );
 

@@ -2,27 +2,31 @@ import { ActivityIndicator, View } from "react-native";
 import Animated from "react-native-reanimated";
 import { Button, Copy, IconTile, Panel, easeOut } from "@/components/ui";
 import { motion, useTheme } from "@/constants/theme";
+import { maxReceiptImages } from "@/lib/domain/receipt-images";
 import {
+  phaseAction,
+  phaseTone,
   uploadPhase,
   type LocalReceipt,
   type UploadPhase,
 } from "@/lib/upload-queue";
 import { QueueRegroup } from "./queue-regroup";
+import { phaseSymbol, toneColor } from "./upload-phase-style";
 
 /** The one line under the title that says where the upload stands. */
-function phaseDetail(phase: UploadPhase) {
+function phaseDetail(phase: UploadPhase, uploaded: number, total: number) {
   switch (phase.kind) {
     case "uploading":
-      return `Laster opp · ${phase.uploaded} av ${phase.total}`;
+      return `Laster opp · ${uploaded} av ${total}`;
     case "offline":
       return "Venter på nett";
-    case "waiting":
+    case "deferred":
     case "rejected":
       return phase.message;
-    case "retrying":
+    case "failed":
       return "Venter på nytt forsøk";
     case "regroup":
-      return "Maks 5 bilder per kvittering. Bildene er beholdt.";
+      return `Maks ${maxReceiptImages} bilder per kvittering. Bildene er beholdt.`;
   }
 }
 
@@ -38,42 +42,28 @@ export function UploadQueueCard({
 }>) {
   const colors = useTheme();
   const phase = uploadPhase(entry, online);
+  const color = toneColor(phaseTone(phase), colors);
+  const symbol = phaseSymbol[phase.kind];
+  const action = phaseAction(phase);
   const uploaded = entry.uploaded.filter(Boolean).length;
-  const active = phase.kind === "uploading" || phase.kind === "offline";
-
-  // A failure is a warning: the images are safe and wait for the person.
-  const stopped =
-    phase.kind === "retrying" ||
-    phase.kind === "rejected" ||
-    phase.kind === "regroup";
+  const total = entry.images.length;
 
   return (
     <Panel style={{ gap: 8 }}>
       <View style={{ flexDirection: "row", alignItems: "center", gap: 12 }}>
-        {active ? (
-          <IconTile>
-            <ActivityIndicator color={colors.primary} />
-          </IconTile>
-        ) : phase.kind === "waiting" ? (
-          <IconTile icon="hourglass" color={colors.secondary} />
+        {symbol ? (
+          <IconTile icon={symbol} color={color} />
         ) : (
-          <IconTile
-            icon={
-              phase.kind === "retrying"
-                ? "arrow.clockwise.circle"
-                : "exclamationmark.circle"
-            }
-            color={colors.warning}
-          />
+          <IconTile>
+            <ActivityIndicator color={color} />
+          </IconTile>
         )}
         <View style={{ flex: 1, gap: 2 }}>
           <Copy weight="600">
-            {entry.images.length === 1
-              ? "Ny kvittering"
-              : `Ny kvittering · ${entry.images.length} bilder`}
+            {total === 1 ? "Ny kvittering" : `Ny kvittering · ${total} bilder`}
           </Copy>
           <Copy role="detail" muted>
-            {phaseDetail(phase)}
+            {phaseDetail(phase, uploaded, total)}
           </Copy>
         </View>
       </View>
@@ -89,20 +79,16 @@ export function UploadQueueCard({
         <Animated.View
           style={{
             height: 4,
-            width: `${Math.max(6, (uploaded / entry.images.length) * 100)}%`,
-            backgroundColor: stopped
-              ? colors.warning
-              : active
-                ? colors.primary
-                : colors.secondary,
+            width: `${Math.max(6, (uploaded / total) * 100)}%`,
+            backgroundColor: color,
             transitionProperty: "width",
             transitionDuration: motion.state,
             transitionTimingFunction: easeOut,
           }}
         />
       </View>
-      {phase.kind === "regroup" && <QueueRegroup entry={entry} />}
-      {(phase.kind === "retrying" || phase.kind === "rejected") && (
+      {action === "regroup" && <QueueRegroup entry={entry} />}
+      {action === "retry" && (
         <Button
           title="Prøv igjen"
           variant="tint"

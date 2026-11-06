@@ -7,14 +7,28 @@ import {
 } from "./receipt-migrations";
 import { receiptImageLimitMessage } from "./domain/receipt-images";
 import type { LocalReceipt, UploadFailure } from "./upload-queue";
-import { z } from "zod";
+import { v } from "convex/values";
+import { parse } from "convex-helpers/validators";
 import { sqliteDatabase } from "./testing/sqlite";
 
-/** The fields an older release reads from a stored capture. */
+/** The reader of the releases before typed failures, as they shipped. */
+const olderReader = v.object({
+  schemaVersion: v.literal(1),
+  id: v.string(),
+  owner: v.string(),
+  householdId: v.id("households"),
+  createdAt: v.number(),
+  images: v.array(v.string()),
+  uploaded: v.array(v.boolean()),
+  receiptId: v.id("receipts").optional(),
+  error: v.string().optional(),
+});
+
+/** What an older release rolled back to reads from a stored capture. */
 function storedForOlderRelease(entry: LocalReceipt) {
-  return z
-    .object({ schemaVersion: z.literal(1), error: z.string() })
-    .parse(JSON.parse(serializeReceipt(entry)));
+  const stored: unknown = JSON.parse(serializeReceipt(entry));
+
+  return parse(olderReader, stored);
 }
 
 const legacy = {
@@ -121,8 +135,9 @@ it("stores each failure so this release and an older one rolled back to both rea
       serializeReceipt({ ...capture, failure }),
     );
 
-    expect(storedForOlderRelease({ ...capture, failure }).schemaVersion).toBe(
-      1,
+    // The older reader accepts the row and drops the field it does not know.
+    expect(storedForOlderRelease({ ...capture, failure })).not.toHaveProperty(
+      "failure",
     );
     expect(migrateReceipt(stored)).toEqual({ ...capture, failure });
   }
@@ -156,6 +171,13 @@ it("reads the failure from the text older releases wrote", () => {
       failure: { kind: "rejected", message: "Husstanden er endret." },
     }).failure,
   ).toBeUndefined();
+  // A capture an older release deferred keeps waiting for the service's deadline.
+  expect(
+    migrateReceipt(
+      { ...uploading, error: "Vent ett minutt." },
+      { restricted: true },
+    ).failure,
+  ).toEqual({ kind: "deferred", message: "Vent ett minutt." });
   // A failure kind from a later release falls back to its text.
   expect(
     migrateReceipt({ ...legacy, failure: { kind: "later" } }).failure,

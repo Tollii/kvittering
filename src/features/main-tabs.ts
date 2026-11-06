@@ -4,6 +4,7 @@ import { useHousehold } from "@/features/household-context";
 import { useQuery } from "convex/react";
 import { type SFSymbol } from "expo-symbols";
 import { api } from "../../convex/_generated/api";
+import { needsPerson } from "@/lib/upload-queue";
 
 /**
  * The main tabs, in order. The iOS layout shows them as native tabs; the web
@@ -53,10 +54,7 @@ export function useReceiptsBadge() {
     : legacy;
 
   // Badge only what needs a person; processing receipts and deferred uploads resolve on their own.
-  const pending =
-    (attention?.count ?? 0) +
-    queue.filter((entry) => entry.failure && entry.failure.kind !== "deferred")
-      .length;
+  const pending = (attention?.count ?? 0) + queue.filter(needsPerson).length;
 
   if (pending === 0) return undefined;
 

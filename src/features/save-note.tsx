@@ -1,7 +1,13 @@
 import { ActivityIndicator, View } from "react-native";
 import { Copy, Icon, IconButton, Panel } from "@/components/ui";
 import { useTheme } from "@/constants/theme";
-import { uploadPhase, type LocalReceipt } from "@/lib/upload-queue";
+import {
+  phaseTone,
+  uploadPhase,
+  type LocalReceipt,
+  type UploadPhase,
+} from "@/lib/upload-queue";
+import { phaseSymbol, toneColor } from "./upload-phase-style";
 
 /** What Kamera last saved: photos that follow through upload, or a typed purchase. */
 export type LastSave =
@@ -9,45 +15,48 @@ export type LastSave =
   | { kind: "purchase" }
   | null;
 
-/**
- * Where the saved receipts stand. `waiting` continues by itself at the time the
- * service named; `stopped` waits for the person in Kvitteringer.
- */
-type SaveNoteState = "uploading" | "retrying" | "stopped" | "waiting" | "done";
+/** The upload phase the note speaks for, or null once nothing is left to upload. */
+type SaveNote = { phase: UploadPhase | null; title: string };
 
-type SaveNote = { state: SaveNoteState; title: string };
+/** Which phase the note names when captures stand in different ones: lower first. */
+const notePriority = {
+  uploading: 0,
+  offline: 0,
+  rejected: 1,
+  regroup: 1,
+  failed: 2,
+  deferred: 3,
+} satisfies Record<UploadPhase["kind"], number>;
 
-/** The state of the whole queue: the one that most needs saying comes first. */
-function queueState(queue: readonly LocalReceipt[], online: boolean) {
-  const phases = new Set(queue.map((entry) => uploadPhase(entry, online).kind));
+/** The phase of the whole queue: the one that most needs saying. */
+function queuePhase(queue: readonly LocalReceipt[], online: boolean) {
+  let first: UploadPhase | null = null;
 
-  if (phases.has("uploading") || phases.has("offline")) return "uploading";
+  for (const entry of queue) {
+    const phase = uploadPhase(entry, online);
 
-  if (phases.has("retrying")) return "retrying";
+    if (!first || notePriority[phase.kind] < notePriority[first.kind])
+      first = phase;
+  }
 
-  if (phases.has("rejected") || phases.has("regroup")) return "stopped";
-
-  if (phases.has("waiting")) return "waiting";
-
-  return "done";
+  return first;
 }
 
 /** The title of the note that follows the saved receipts through upload. */
-function uploadStatusTitle(
-  saved: number,
-  state: SaveNoteState,
-  online: boolean,
-) {
-  switch (state) {
+function uploadStatusTitle(saved: number, phase: UploadPhase | null) {
+  switch (phase?.kind) {
     case "uploading":
-      return online ? "Laster opp …" : "Venter på nett";
-    case "retrying":
+      return "Laster opp …";
+    case "offline":
+      return "Venter på nett";
+    case "failed":
       return "Prøver igjen";
-    case "stopped":
+    case "rejected":
+    case "regroup":
       return "Kunne ikke laste opp";
-    case "waiting":
+    case "deferred":
       return "Lastes opp senere";
-    case "done":
+    case undefined:
       return saved === 1 ? "Lastet opp" : `${saved} kvitteringer lastet opp`;
   }
 }
@@ -60,51 +69,38 @@ export function saveNote(
 ): SaveNote | null {
   switch (lastSave?.kind) {
     case "photos": {
-      const state = queueState(queue, online);
+      const phase = queuePhase(queue, online);
 
-      return {
-        state,
-        title: uploadStatusTitle(lastSave.count, state, online),
-      };
+      return { phase, title: uploadStatusTitle(lastSave.count, phase) };
     }
 
     case "purchase":
-      return { state: "done", title: "Kjøpet er lagt inn" };
+      return { phase: null, title: "Kjøpet er lagt inn" };
     case undefined:
       return null;
   }
 }
-
-const noteIcons = {
-  retrying: "arrow.clockwise.circle",
-  stopped: "exclamationmark.circle",
-  waiting: "hourglass",
-  done: "checkmark.circle.fill",
-} as const;
 
 export function SaveNotePanel({
   note,
   onClose,
 }: Readonly<{ note: SaveNote; onClose: () => void }>) {
   const colors = useTheme();
+  const symbol = note.phase ? phaseSymbol[note.phase.kind] : null;
 
   return (
     <Panel style={{ gap: 4 }}>
       <View style={{ flexDirection: "row", alignItems: "center", gap: 10 }}>
-        {note.state === "uploading" ? (
-          <ActivityIndicator color={colors.primary} />
-        ) : (
+        {!note.phase ? (
+          <Icon name="checkmark.circle.fill" size={22} color={colors.success} />
+        ) : symbol ? (
           <Icon
-            name={noteIcons[note.state]}
+            name={symbol}
             size={22}
-            color={
-              note.state === "done"
-                ? colors.success
-                : note.state === "waiting"
-                  ? colors.secondary
-                  : colors.warning
-            }
+            color={toneColor(phaseTone(note.phase), colors)}
           />
+        ) : (
+          <ActivityIndicator color={colors.primary} />
         )}
         <Copy weight="700" style={{ flex: 1 }}>
           {note.title}
