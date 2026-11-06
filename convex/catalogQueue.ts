@@ -22,6 +22,8 @@ import {
   type CatalogProduct,
 } from "../src/lib/catalog/model";
 import {
+  catalogRequestStaleMs,
+  catalogRetryAfterCapMs,
   normalizeRequest,
   requestKey,
   resultLifetime,
@@ -83,6 +85,14 @@ function isRequestInFlight(state: Doc<"catalogRequests">["state"]): boolean {
   return state === "pending" || state === "running";
 }
 
+/** An in-flight request that is not stale will still settle and notify its waiters. */
+function isRequestLive(request: Doc<"catalogRequests">, now: number): boolean {
+  return (
+    isRequestInFlight(request.state) &&
+    request.scheduledAt > now - catalogRequestStaleMs
+  );
+}
+
 export async function ensureRequest(
   ctx: MutationCtx,
   input: CatalogRequest,
@@ -98,10 +108,10 @@ export async function ensureRequest(
     .withIndex("by_key", (q) => q.eq("key", key))
     .unique();
 
-  if (
-    existing &&
-    (isRequestInFlight(existing.state) || existing.expiresAt > Date.now())
-  ) {
+  const now = Date.now();
+
+  // A stale in-flight row is queued again on the same id, so its waiters still hear the result.
+  if (existing && (isRequestLive(existing, now) || existing.expiresAt > now)) {
     console.info("catalog.request_reused", {
       requestId: existing._id,
       kind: request.kind,
@@ -139,6 +149,7 @@ export async function ensureRequest(
     requestId: id,
     kind: request.kind,
     refresh: !!existing,
+    stale: existing ? isRequestInFlight(existing.state) : false,
   });
 
   const saved = await ctx.db.get("catalogRequests", id);
@@ -339,8 +350,11 @@ async function failRequest(
 
   const delay =
     status === 429
-      ? Math.max(60000, retryAfterMs)
-      : Math.max(5000 * 2 ** request.attempts, retryAfterMs);
+      ? Math.max(60000, Math.min(retryAfterMs, catalogRetryAfterCapMs))
+      : Math.max(
+          5000 * 2 ** request.attempts,
+          Math.min(retryAfterMs, catalogRetryAfterCapMs),
+        );
 
   if (transient && request.attempts < 3) {
     await enqueue(ctx, id, now + delay);

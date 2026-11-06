@@ -37,7 +37,10 @@ import {
   lineEvidenceKey,
   exactPhysicalStore,
 } from "../src/lib/catalog/matching";
-import { normalizeSearch } from "../src/lib/catalog/policy";
+import {
+  catalogMatchingDeadlineMs,
+  normalizeSearch,
+} from "../src/lib/catalog/policy";
 import { matchingKey } from "../src/lib/domain/product-matching";
 import { isDecidedCategory } from "../src/lib/domain/categories";
 import {
@@ -586,47 +589,52 @@ async function settleFailedMatching(ctx: MutationCtx, id: Id<"receipts">) {
   await ctx.scheduler.runAfter(0, internal.productAnalysis.start, { id });
 }
 
-/**
- * Lookups retry for a few minutes at most, so a run this old is stalled, for
- * example waiting on a catalog result whose notification never arrived.
- */
-const matchingDeadlineMs = 30 * 60_000;
+/** The run's state, or null once retention has cleaned it up. */
+async function workflowRun(ctx: MutationCtx, workflowId: string) {
+  try {
+    const { workflow } = await ctx.runQuery(
+      components.workflow.workflow.getStatus,
+      { workflowId },
+    );
 
-/**
- * Why a pending receipt's matching can no longer finish by itself, or null
- * while its run may still finish.
- */
-async function stalledMatching(
-  ctx: MutationCtx,
-  receipt: Doc<"receipts">,
-  now: number,
-): Promise<"missing" | "ended" | "timed_out" | null> {
-  const workflowId = receipt.catalogWorkflowId;
-
-  if (!workflowId) return "missing";
-
-  // Runs are journaled when they start, and a journal goes only with its cleaned-up run.
-  const journal = await ctx.db
-    .query("workflowJournals")
-    .withIndex("by_component_and_workflowId", (q) =>
-      q.eq("component", "processing").eq("workflowId", workflowId),
+    return workflow;
+  } catch (cause) {
+    // The installed workflow API reports this once retention has cleaned the run up.
+    if (
+      cause instanceof Error &&
+      cause.message.includes(`Workflow not found: ${workflowId}`)
     )
-    .unique();
+      return null;
 
-  if (!journal) return "missing";
+    throw cause;
+  }
+}
 
-  const { workflow } = await ctx.runQuery(
-    components.workflow.workflow.getStatus,
-    { workflowId },
-  );
+/**
+ * Ends a pending receipt's matching when its run can no longer finish it: the
+ * run is gone, ended without `finish` or `failed`, or outlived its deadline,
+ * in which case it is cancelled first.
+ */
+async function endStalledMatching(ctx: MutationCtx, receipt: Doc<"receipts">) {
+  const workflowId = receipt.catalogWorkflowId;
+  const run = workflowId ? await workflowRun(ctx, workflowId) : null;
+  let reason: "no_run" | "cleaned_up" | "ended" | "timed_out";
 
-  // A run that ended without `finish` or `failed` leaves the receipt pending.
-  if (workflow.runResult) return "ended";
+  if (!workflowId) reason = "no_run";
+  else if (!run) reason = "cleaned_up";
+  else if (run.runResult) reason = "ended";
+  else if (Date.now() - run._creationTime < catalogMatchingDeadlineMs) return;
+  else {
+    await cancelWorkflow(ctx, components.workflow, workflowId);
+    reason = "timed_out";
+  }
 
-  if (now - workflow._creationTime < matchingDeadlineMs) return null;
-  await cancelWorkflow(ctx, components.workflow, workflowId);
-
-  return "timed_out";
+  console.error("catalog.matching_stalled", {
+    receiptId: receipt._id,
+    generation: receipt.generation,
+    reason,
+  });
+  await settleFailedMatching(ctx, receipt._id);
 }
 
 /** Settles pending matching that will never finish, so retry and analysis are not blocked. */
@@ -639,18 +647,16 @@ export const recoverStalled = internalMutation({
       .withIndex("by_catalogStatus", (q) => q.eq("catalogStatus", "pending"))
       .paginate({ cursor, numItems: 20 });
 
-    const now = Date.now();
-
     for (const receipt of page.page) {
-      const reason = await stalledMatching(ctx, receipt, now);
-
-      if (!reason) continue;
-      console.error("catalog.matching_stalled", {
-        receiptId: receipt._id,
-        generation: receipt.generation,
-        reason,
-      });
-      await settleFailedMatching(ctx, receipt._id);
+      try {
+        await endStalledMatching(ctx, receipt);
+      } catch (cause) {
+        // One unreadable run must not hold back the receipts after it.
+        console.error("catalog.matching_recovery_failed", {
+          receiptId: receipt._id,
+          error: cause instanceof Error ? cause.message : String(cause),
+        });
+      }
     }
 
     if (!page.isDone)

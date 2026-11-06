@@ -16,15 +16,29 @@ const modules = import.meta.glob("./**/*.ts");
 afterEach(() => {
   vi.useRealTimers();
   vi.unstubAllEnvs();
+  vi.unstubAllGlobals();
 });
+
+const hour = 60 * 60_000;
 
 /**
  * Starts real catalog matching for a receipt whose product lookup is already
- * in flight, held by a worker that will never report back.
+ * in flight, held by a worker that will never report back. The provider
+ * answers with no products whenever a lookup does reach it.
  */
-async function stalledMatching() {
+async function matchingStuckOnLookup() {
   vi.useFakeTimers();
   vi.stubEnv("KASSALAPP_API_KEY", "test-key");
+
+  const provider = vi.fn<typeof fetch>(
+    async () =>
+      new Response(JSON.stringify({ data: [] }), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      }),
+  );
+
+  vi.stubGlobal("fetch", provider);
   vi.stubEnv("TYPESAFE_API_KEY", "");
   const t = convexTest(schema, modules);
   registerWorkflow(t);
@@ -67,7 +81,7 @@ async function stalledMatching() {
         result: emptyCatalogResult(),
         expiresAt: 0,
         attempts: 1,
-        scheduledAt: 0,
+        scheduledAt: Date.now(),
       });
     }
   });
@@ -77,6 +91,7 @@ async function stalledMatching() {
 
   const receipt = await t.run((ctx) => ctx.db.get("receipts", id));
   expect(receipt?.catalogStatus).toBe("pending");
+  expect(provider).not.toHaveBeenCalled();
 
   const workflowId = receipt!.catalogWorkflowId!;
 
@@ -84,10 +99,17 @@ async function stalledMatching() {
     workflowId,
   });
 
-  return { t, first, id, workflowId, startedAt: workflow._creationTime };
+  return {
+    t,
+    first,
+    id,
+    workflowId,
+    provider,
+    startedAt: workflow._creationTime,
+  };
 }
 
-type Backend = Awaited<ReturnType<typeof stalledMatching>>["t"];
+type Backend = Awaited<ReturnType<typeof matchingStuckOnLookup>>["t"];
 
 async function workflowState(t: Backend, workflowId: string) {
   const { workflow } = await t.query(components.workflow.workflow.getStatus, {
@@ -108,10 +130,11 @@ async function analysisScheduled(t: Backend) {
   );
 }
 
-it("waits for a run within its deadline, then cancels it, unblocks retry and starts analysis", async () => {
-  const { t, first, id, workflowId, startedAt } = await stalledMatching();
+it("waits for a run within its deadline, then cancels it and lets a retry fetch the lost lookup", async () => {
+  const { t, first, id, workflowId, provider, startedAt } =
+    await matchingStuckOnLookup();
 
-  vi.setSystemTime(startedAt + 29 * 60_000);
+  vi.setSystemTime(startedAt + 2 * hour - 60_000);
   await t.mutation(internal.catalogMatching.recoverStalled, { cursor: null });
   expect(
     (await t.run((ctx) => ctx.db.get("receipts", id)))?.catalogStatus,
@@ -119,7 +142,7 @@ it("waits for a run within its deadline, then cancels it, unblocks retry and sta
   expect(await workflowState(t, workflowId)).toBe("running");
   expect(await analysisScheduled(t)).toBe(false);
 
-  vi.setSystemTime(startedAt + 31 * 60_000);
+  vi.setSystemTime(startedAt + 2 * hour + 60_000);
   await t.mutation(internal.catalogMatching.recoverStalled, { cursor: null });
   expect(
     (await t.run((ctx) => ctx.db.get("receipts", id)))?.catalogStatus,
@@ -127,11 +150,20 @@ it("waits for a run within its deadline, then cancels it, unblocks retry and sta
   expect(await workflowState(t, workflowId)).toBe("canceled");
   expect(await analysisScheduled(t)).toBe(true);
 
-  // The person's retry starts a new run instead of being ignored as pending.
+  // The person's retry queues the lost lookup again instead of waiting on it.
   await first.mutation(api.catalogMatching.enrich, { id });
+  await t.finishAllScheduledFunctions(vi.runAllTimers);
+
   const retried = await t.run((ctx) => ctx.db.get("receipts", id));
-  expect(retried?.catalogStatus).toBe("pending");
   expect(retried?.catalogWorkflowId).not.toBe(workflowId);
+  expect(retried?.catalogStatus).not.toBe("pending");
+  expect(await workflowState(t, retried!.catalogWorkflowId!)).toBe("success");
+  expect(provider).toHaveBeenCalled();
+  expect(
+    (await t.run((ctx) => ctx.db.query("catalogRequests").collect())).map(
+      (request) => request.state,
+    ),
+  ).not.toContain("running");
 });
 
 it.each([
@@ -140,25 +172,13 @@ it.each([
 ])(
   "settles a pending receipt at once when its run $name",
   async ({ cleanedUp }) => {
-    const { t, id, workflowId } = await stalledMatching();
+    const { t, id, workflowId } = await matchingStuckOnLookup();
 
     // An ending that bypasses `finish` and `failed`, such as an operator cancel.
     await t.mutation(components.workflow.workflow.cancel, { workflowId });
 
     if (cleanedUp)
-      await t.run(async (ctx) => {
-        await ctx.runMutation(components.workflow.workflow.cleanup, {
-          workflowId,
-        });
-
-        for (const journal of await ctx.db
-          .query("workflowJournals")
-          .withIndex("by_component_and_workflowId", (q) =>
-            q.eq("component", "processing").eq("workflowId", workflowId),
-          )
-          .collect())
-          await ctx.db.delete("workflowJournals", journal._id);
-      });
+      await t.mutation(components.workflow.workflow.cleanup, { workflowId });
 
     await t.mutation(internal.catalogMatching.recoverStalled, { cursor: null });
     expect(
