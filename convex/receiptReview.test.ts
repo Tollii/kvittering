@@ -108,9 +108,9 @@ it.each([
 
   const previous = {
     revision: 0,
-    status: "needs_review" as const,
+    status: kind === "extraction" ? "processing" : "needs_review",
     provider: "reader",
-  };
+  } as const;
 
   const data = validateReceipt(batteryFixture());
   const before = structuredClone(data);
@@ -245,14 +245,15 @@ it("persists category uncertainty in the representation understood by installed 
   present(data.lines[0]).issues = ["category_uncertain"];
   present(data.lines[0]).confidence = 0.3;
   present(data.lines[0]).manual = false;
-  await t.run((ctx) =>
-    commitReceiptChange(ctx, {
+  await t.run(async (ctx) => {
+    await ctx.db.patch("receipts", id, { status: "processing" });
+    await commitReceiptChange(ctx, {
       receiptId: id,
       expected: { revision: 0, generation: 0 },
       data,
       origin: { kind: "extraction", provider: "test", next: "none" },
-    }),
-  );
+    });
+  });
   const receipt = (await user.query(api.receipts.detail, { id }))!.receipt;
   expect(receipt.status).toBe("reviewed");
   expect(receipt.data!.lines[0]).toMatchObject({

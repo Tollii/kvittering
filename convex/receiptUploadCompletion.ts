@@ -3,6 +3,7 @@ import type { MutationCtx } from "./_generated/server";
 import type { Doc, Id } from "./_generated/dataModel";
 import type { WithoutSystemFields } from "convex/server";
 import type { ReceiptData } from "../src/lib/domain/receipt";
+import { receiptTransition } from "../src/lib/domain/receipt-state";
 
 type Uploader = Pick<Doc<"members">, "householdId" | "identity" | "name">;
 
@@ -47,7 +48,13 @@ export async function beginUploadedReceipt(
   id: Id<"receipts">,
   imageCount: number,
 ) {
-  await ctx.db.patch("receipts", id, { status: "uploaded", generation: 1 });
+  const receipt = await ctx.db.get("receipts", id);
+
+  const status =
+    receipt && receiptTransition(receipt.status, { kind: "upload_completed" });
+
+  if (!status) throw new Error("Kvitteringen venter ikke på bilder.");
+  await ctx.db.patch("receipts", id, { status, generation: 1 });
 
   await startReading(ctx, id, 1);
   console.info("receipt.upload_completed", {

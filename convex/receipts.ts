@@ -8,8 +8,10 @@ import { receiptPeriodPage } from "./receiptPeriod";
 import { CalendarDate } from "../src/lib/domain/calendar";
 import { userError } from "./userErrors";
 import {
+  acceptsReceiptEvent,
   attentionStatuses,
   isReceiptProcessing,
+  receiptTransition,
 } from "../src/lib/domain/receipt-state";
 import {
   maxReceiptImages,
@@ -173,7 +175,7 @@ export const completeUpload = mutation({
   handler: async (ctx, { id }) => {
     const { receipt } = await requireReceipt(ctx, id);
 
-    if (receipt.status !== "uploading") return null;
+    if (!acceptsReceiptEvent(receipt.status, "upload_completed")) return null;
 
     const images = await ctx.db
       .query("images")
@@ -195,12 +197,18 @@ export const retry = mutation({
   handler: async (ctx, { id }) => {
     const { receipt, member } = await requireReceipt(ctx, id);
 
-    if (isReceiptProcessing(receipt.status))
-      throw userError("Kvitteringen behandles allerede.");
+    const status = receiptTransition(receipt.status, { kind: "retried" });
+
+    if (!status)
+      throw userError(
+        isReceiptProcessing(receipt.status)
+          ? "Kvitteringen behandles allerede."
+          : "Kvitteringen er allerede lest.",
+      );
     await consumeReceiptQuota(ctx, member);
     const generation = receipt.generation + 1;
     await ctx.db.patch("receipts", id, {
-      status: "uploaded",
+      status,
       generation,
       error: undefined,
     });
@@ -430,7 +438,7 @@ export const save = mutation({
         "RECEIPT_CHANGED",
       );
 
-    if (isReceiptProcessing(receipt.status))
+    if (!acceptsReceiptEvent(receipt.status, "edited"))
       throw userError("Vent til behandlingen er ferdig.");
     args = { ...args, data: structuredClone(args.data) };
     const checked = checkReceipt(args.data);
@@ -542,7 +550,7 @@ export const attachImage = internalMutation({
     const { receipt } = await requireReceipt(ctx, args.id);
 
     if (
-      receipt.status !== "uploading" ||
+      !acceptsReceiptEvent(receipt.status, "upload_completed") ||
       !Number.isInteger(args.position) ||
       args.position < 0 ||
       args.position >= receipt.imageCount
