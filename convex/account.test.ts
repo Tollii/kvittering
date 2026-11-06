@@ -5,7 +5,7 @@ import { convexTest, type TestConvex } from "convex-test";
 import { afterEach, beforeAll, expect, it, vi } from "vitest";
 import { z } from "zod";
 import appConfig from "../app.json";
-import { api, components } from "./_generated/api";
+import { api, components, internal } from "./_generated/api";
 import type { Id } from "./_generated/dataModel";
 import schema from "./schema";
 import {
@@ -396,5 +396,32 @@ it("revokes the linked Apple ID before deleting, and deletes nothing when it can
   });
   await t.run(async (ctx) => {
     expect(await ctx.db.get("receipts", receiptId)).toBeNull();
+  });
+});
+
+// An earlier deploy queued purges with a position (`legacyStage`); a step now ahead of it must still run.
+it("runs every step of a household purge queued past one by an earlier deploy", async () => {
+  const t = setup();
+  const member = testUser(t, "earlier");
+
+  const householdId = await member.mutation(api.households.create, {
+    name: "Earlier",
+    invitation,
+  });
+
+  const { receiptId, storageId } = await receiptWithImage(
+    t,
+    member,
+    householdId,
+    "account-receipt-0004",
+  );
+
+  await t.mutation(internal.account.purgeHousehold, { householdId, stage: 1 });
+  await settle(t);
+
+  await t.run(async (ctx) => {
+    expect(await ctx.db.get("receipts", receiptId)).toBeNull();
+    expect(await ctx.storage.get(storageId)).toBeNull();
+    expect(await ctx.db.query("images").take(1)).toEqual([]);
   });
 });

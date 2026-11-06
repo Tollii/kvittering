@@ -132,7 +132,6 @@ export const deleteAccount = internalMutation({
         await ctx.db.delete("households", member.householdId);
         await ctx.scheduler.runAfter(0, internal.account.purgeHousehold, {
           householdId: member.householdId,
-          stage: 0,
         });
       }
     }
@@ -140,7 +139,6 @@ export const deleteAccount = internalMutation({
     await forgetOdaConnection(ctx, identity);
     await ctx.scheduler.runAfter(0, internal.account.purgeIdentity, {
       identity,
-      stage: 0,
     });
 
     await deleteAuthRecords(ctx, "session", userId);
@@ -166,20 +164,27 @@ async function removeRows<Table extends TableNames>(
   return rows.length;
 }
 
-/** Repeat a step while it removes records, then move to the next one. */
-async function runStage<Key>(
+/**
+ * Remove one batch with the first step that still finds records, and report
+ * whether one did. A purge keeps no position between runs, so a deploy that
+ * adds, removes, or reorders steps cannot make a running purge skip one. A
+ * finished step costs one empty read per run.
+ */
+async function removeBatch<Key>(
   ctx: MutationCtx,
   steps: Step<Key>[],
-  stage: number,
   key: Key,
-  next: (stage: number) => Promise<Id<"_scheduled_functions">>,
 ) {
-  const step = steps[stage];
+  for (const step of steps) if ((await step(ctx, key)) > 0) return true;
 
-  if (!step) return;
-
-  await next((await step(ctx, key)) > 0 ? stage : stage + 1);
+  return false;
 }
+
+/**
+ * Purges queued by an earlier deploy carry a step index in `stage`. It is
+ * ignored. Remove it, and the test that passes it, once no such job is queued.
+ */
+const legacyStage = v.optional(v.number());
 
 /** Devices go with their reminders, whose scheduled pushes are cancelled. */
 const removeDevices: Step<string> = async (ctx, identity) => {
@@ -238,15 +243,13 @@ const identitySteps: Step<string>[] = [
 
 /** Remove a deleted member's devices, tokens, and sign-ins in bounded batches. */
 export const purgeIdentity = internalMutation({
-  args: { identity: v.string(), stage: v.number() },
+  args: { identity: v.string(), stage: legacyStage },
   returns: v.null(),
-  handler: async (ctx, { identity, stage }) => {
-    await runStage(ctx, identitySteps, stage, identity, (next) =>
-      ctx.scheduler.runAfter(0, internal.account.purgeIdentity, {
+  handler: async (ctx, { identity }) => {
+    if (await removeBatch(ctx, identitySteps, identity))
+      await ctx.scheduler.runAfter(0, internal.account.purgeIdentity, {
         identity,
-        stage: next,
-      }),
-    );
+      });
 
     return null;
   },
@@ -358,15 +361,13 @@ const householdSteps: Step<Id<"households">>[] = [
 
 /** Remove a deleted household's receipts, images, and derived data in bounded batches. */
 export const purgeHousehold = internalMutation({
-  args: { householdId: v.id("households"), stage: v.number() },
+  args: { householdId: v.id("households"), stage: legacyStage },
   returns: v.null(),
-  handler: async (ctx, { householdId, stage }) => {
-    await runStage(ctx, householdSteps, stage, householdId, (next) =>
-      ctx.scheduler.runAfter(0, internal.account.purgeHousehold, {
+  handler: async (ctx, { householdId }) => {
+    if (await removeBatch(ctx, householdSteps, householdId))
+      await ctx.scheduler.runAfter(0, internal.account.purgeHousehold, {
         householdId,
-        stage: next,
-      }),
-    );
+      });
 
     return null;
   },
