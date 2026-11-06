@@ -5,9 +5,11 @@ import { convexTest, type TestConvex } from "convex-test";
 import { afterEach, beforeAll, expect, it, vi } from "vitest";
 import { z } from "zod";
 import appConfig from "../app.json";
-import { api, components } from "./_generated/api";
+import { api, components, internal } from "./_generated/api";
 import type { Id } from "./_generated/dataModel";
 import schema from "./schema";
+import { newReceipt } from "./receiptUploadCompletion";
+import { batchSize } from "./account";
 import {
   invitation,
   sharedHousehold,
@@ -252,7 +254,28 @@ it("keeps a shared household with the partner and removes the last member's hous
     "account-receipt-0001",
   );
 
-  // An upload the leaving member never finished, which nobody could complete or delete.
+  // More waiting uploads from the partner than one batch; they must all survive.
+  const firstMember = await first.query(api.households.current, {});
+
+  const partnerUploads = await t.run(async (ctx) => {
+    const ids: Id<"receipts">[] = [];
+
+    for (let index = 0; index <= batchSize; index++)
+      ids.push(
+        await ctx.db.insert(
+          "receipts",
+          newReceipt(
+            firstMember!.member,
+            `partner-upload-${index}`.padEnd(16, "0"),
+            1,
+          ),
+        ),
+      );
+
+    return ids;
+  });
+
+  // An upload the leaving member never finished, which nobody could complete.
   const unfinished = await receiptWithImage(
     t,
     second,
@@ -263,8 +286,6 @@ it("keeps a shared household with the partner and removes the last member's hous
   await t.run((ctx) =>
     ctx.db.patch("receipts", kept.receiptId, { status: "reviewed" }),
   );
-
-  const firstMember = await first.query(api.households.current, {});
 
   await t.run(async (ctx) => {
     const identity = firstMember?.member.identity ?? "";
@@ -298,6 +319,9 @@ it("keeps a shared household with the partner and removes the last member's hous
   await t.run(async (ctx) => {
     expect(await ctx.db.get("receipts", unfinished.receiptId)).toBeNull();
     expect(await ctx.storage.get(unfinished.storageId)).toBeNull();
+
+    for (const id of partnerUploads)
+      expect(await ctx.db.get("receipts", id)).not.toBeNull();
   });
 
   // The person who left knows the old code, so it no longer admits anyone.
@@ -396,5 +420,32 @@ it("revokes the linked Apple ID before deleting, and deletes nothing when it can
   });
   await t.run(async (ctx) => {
     expect(await ctx.db.get("receipts", receiptId)).toBeNull();
+  });
+});
+
+// An earlier deploy queued purges with a position (`legacyStage`); a step now ahead of it must still run.
+it("runs every step of a household purge queued past one by an earlier deploy", async () => {
+  const t = setup();
+  const member = testUser(t, "earlier");
+
+  const householdId = await member.mutation(api.households.create, {
+    name: "Earlier",
+    invitation,
+  });
+
+  const { receiptId, storageId } = await receiptWithImage(
+    t,
+    member,
+    householdId,
+    "account-receipt-0004",
+  );
+
+  await t.mutation(internal.account.purgeHousehold, { householdId, stage: 1 });
+  await settle(t);
+
+  await t.run(async (ctx) => {
+    expect(await ctx.db.get("receipts", receiptId)).toBeNull();
+    expect(await ctx.storage.get(storageId)).toBeNull();
+    expect(await ctx.db.query("images").take(1)).toEqual([]);
   });
 });

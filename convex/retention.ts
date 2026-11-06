@@ -51,6 +51,30 @@ export async function trackWorkflow(
 
 const thirtyDays = 30 * 24 * 60 * 60_000;
 
+/** Keep an ended run's journal for diagnostics while its receipt exists. */
+export async function recordWorkflowCompletion(
+  ctx: MutationCtx,
+  workflowId: WorkflowId,
+  context: { component: WorkflowComponent; receiptId: Id<"receipts"> },
+) {
+  const id = await trackWorkflow(
+    ctx,
+    workflowId,
+    context.component,
+    context.receiptId,
+  );
+
+  const receipt = await ctx.db.get("receipts", context.receiptId);
+  const delay = receipt ? thirtyDays : 0;
+  await ctx.db.patch("workflowJournals", id, {
+    expiresAt: Date.now() + delay,
+  });
+  await ctx.scheduler.runAfter(delay, internal.retention.workflowJournal, {
+    workflowId,
+    component: context.component,
+  });
+}
+
 /** All terminal results have the same diagnostic retention period. Null is the legacy context. */
 export const workflowCompleted = internalMutation({
   args: {
@@ -64,24 +88,7 @@ export const workflowCompleted = internalMutation({
   returns: v.null(),
   handler: async (ctx, { workflowId, context }) => {
     // The daily inventory registers legacy journals without one scan per callback.
-    if (!context) return null;
-
-    const id = await trackWorkflow(
-      ctx,
-      workflowId,
-      context.component,
-      context.receiptId,
-    );
-
-    const receipt = await ctx.db.get("receipts", context.receiptId);
-    const delay = receipt ? thirtyDays : 0;
-    await ctx.db.patch("workflowJournals", id, {
-      expiresAt: Date.now() + delay,
-    });
-    await ctx.scheduler.runAfter(delay, internal.retention.workflowJournal, {
-      workflowId,
-      component: context.component,
-    });
+    if (context) await recordWorkflowCompletion(ctx, workflowId, context);
 
     return null;
   },
@@ -198,6 +205,43 @@ export const inventoryWorkflows = internalMutation({
   },
 });
 
+/** Cancels a run that has not finished. Its terminal callback sets the journal's expiry. */
+async function cancelUnfinished(
+  ctx: MutationCtx,
+  component: WorkflowComponent,
+  workflowId: WorkflowId,
+) {
+  const owner = componentFor(component);
+
+  const status = await ctx.runQuery(owner.workflow.getStatus, { workflowId });
+
+  if (!status.workflow.runResult) await cancel(ctx, owner, workflowId);
+}
+
+/**
+ * Cancels a receipt's unfinished runs of one component before a replacement
+ * starts. Callers that replace every launch keep at most one run unfinished,
+ * the newest; the bound leaves room for runs started before that rule.
+ */
+export async function cancelReceiptWorkflows(
+  ctx: MutationCtx,
+  receiptId: Id<"receipts">,
+  component: WorkflowComponent,
+) {
+  const journals = await ctx.db
+    .query("workflowJournals")
+    .withIndex("by_receiptId_and_component", (q) =>
+      q.eq("receiptId", receiptId).eq("component", component),
+    )
+    .order("desc")
+    .take(20);
+
+  for (const journal of journals)
+    // A journal with an expiry belongs to a finished run.
+    if (journal.expiresAt === undefined)
+      await cancelUnfinished(ctx, component, journal.workflowId);
+}
+
 /** Cancel deleted receipts in small pages; terminal callbacks remove their journals. */
 export const deletedReceiptWorkflows = internalMutation({
   args: { receiptId: v.id("receipts"), cursor: v.string().optional() },
@@ -207,18 +251,13 @@ export const deletedReceiptWorkflows = internalMutation({
 
     const page = await ctx.db
       .query("workflowJournals")
-      .withIndex("by_receiptId", (q) => q.eq("receiptId", receiptId))
+      .withIndex("by_receiptId_and_component", (q) =>
+        q.eq("receiptId", receiptId),
+      )
       .paginate({ cursor: cursor ?? null, numItems: 5 });
 
     for (const record of page.page) {
-      const owner = componentFor(record.component);
-
-      const status = await ctx.runQuery(owner.workflow.getStatus, {
-        workflowId: record.workflowId,
-      });
-
-      if (!status.workflow.runResult)
-        await cancel(ctx, owner, record.workflowId);
+      await cancelUnfinished(ctx, record.component, record.workflowId);
       await ctx.db.patch("workflowJournals", record._id, {
         expiresAt: Date.now(),
       });

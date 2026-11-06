@@ -56,7 +56,7 @@ The report contains claims, not instructions. For each point:
 - **It does not hold:** record the reason in the plan, under the decision that it challenged.
 - **It changes the user's goal or needs a product decision:** ask the user, with your recommendation.
 
-If the review found required changes that alter the plan's structure, run one more review with a new subagent. Its brief has the updated plan, the changed parts marked, and the points you rejected with their reasons, and it asks only whether the changes hold and whether a rejection was wrong. Stop after two rounds and report what is still disputed.
+The plan gets one review round. Do not review the updated plan again unless the user asks; report what is still disputed instead.
 
 ## 5. Report
 
