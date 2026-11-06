@@ -345,6 +345,21 @@ it("forgets Oda's tokens when a sign-in is never confirmed", async () => {
   ).rejects.toThrow("Innloggingen hos Oda er utløpt");
 });
 
+it("hands back Oda's tokens when they arrive after the sign-in expired", async () => {
+  const { t, signIn, signIns } = await unconfirmedSignIns();
+
+  duringTokenExchange = async () => {
+    vi.advanceTimersByTime(11 * 60 * 1000);
+  };
+
+  const answer = await signIn();
+  await t.finishAllScheduledFunctions(vi.runAllTimers);
+
+  expect(answer.get("status")).toBe("failed");
+  expect(await signIns()).toEqual([]);
+  expect(revoked).toEqual([`refresh-${refreshes}`]);
+});
+
 it("hands back Oda's tokens when they arrive after the sign-in was removed", async () => {
   const { t, user, signIn, signIns } = await unconfirmedSignIns();
 

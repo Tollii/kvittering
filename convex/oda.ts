@@ -350,6 +350,7 @@ export const holdTokens = internalMutation({
     const client = clientId ?? row?.signIn?.clientId;
 
     if (client) await revokeAtOda(ctx, client, pending);
+    else console.warn("oda.revoke_skipped", { reason: "unknown_client" });
 
     return "expired";
   },
