@@ -1,4 +1,7 @@
-import { isReceiptBeingRead } from "../src/lib/domain/receipt-state";
+import {
+  duplicateState,
+  isReceiptBeingRead,
+} from "../src/lib/domain/receipt-state";
 import { notifyReceiptActivities } from "./liveActivities";
 import { linkCatalogProduct } from "./catalogLinks";
 import { compatibleCatalogProduct } from "../src/lib/catalog/matching";
@@ -560,7 +563,10 @@ export const finish = internalMutation({
     }
 
     const autoAccepted =
-      canAcceptReceipt(data, !!duplicateOf && !receipt.duplicateResolved) &&
+      canAcceptReceipt(
+        data,
+        duplicateState({ ...receipt, duplicateOf }) === "suspected",
+      ) &&
       !args.provider.includes("mock") &&
       receipt.revision === 0;
 

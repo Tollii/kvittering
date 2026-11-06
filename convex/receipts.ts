@@ -9,6 +9,7 @@ import { CalendarDate } from "../src/lib/domain/calendar";
 import { userError } from "./userErrors";
 import {
   attentionStatuses,
+  duplicateState,
   isReceiptProcessing,
   isUploadAbandoned,
 } from "../src/lib/domain/receipt-state";
@@ -439,7 +440,10 @@ export const save = mutation({
 
     const acceptable = canAcceptReceipt(
       args.data,
-      !!receipt.duplicateOf && !args.duplicateResolved,
+      duplicateState({
+        ...receipt,
+        duplicateResolved: args.duplicateResolved,
+      }) === "suspected",
     );
 
     if (args.reviewed && !acceptable)

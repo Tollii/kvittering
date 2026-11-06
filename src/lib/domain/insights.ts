@@ -9,7 +9,7 @@ import type { Doc } from "../../../convex/_generated/dataModel";
 import { categoryOf } from "./categories";
 import { type ReceiptLine } from "./receipt";
 import type { StorePurchase } from "./store-spending";
-import type { ExtractedReceipt } from "./receipt-state";
+import { duplicateState, type ExtractedReceipt } from "./receipt-state";
 
 export type Receipt = Doc<"receipts">;
 
@@ -182,7 +182,7 @@ export function monthlyInsights(
       )
       .map((item) => item.receipt),
     suspectedDuplicates: selected.filter(
-      (receipt) => receipt.duplicateOf && !receipt.duplicateResolved,
+      (receipt) => duplicateState(receipt) === "suspected",
     ),
     provisional: selected.filter((r) => r.status !== "reviewed").length,
     categories: [...category.values()].sort((a, b) =>

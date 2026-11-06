@@ -16,7 +16,10 @@ import { categoryOf } from "../src/lib/domain/categories";
 import { maxSummaryDays } from "../src/lib/mcp/tools";
 import { calendarDateValidator } from "../src/lib/domain/calendar";
 import { lineValidator, type ReceiptLine } from "../src/lib/domain/receipt";
-import { receiptStatusValidator } from "../src/lib/domain/receipt-state";
+import {
+  duplicateState,
+  receiptStatusValidator,
+} from "../src/lib/domain/receipt-state";
 import { Ore } from "../src/lib/domain/ore";
 import {
   addCategoryTotals,
@@ -324,7 +327,7 @@ export const getReceipt = internalQuery({
       purchaseDate: listed.purchaseDate,
       status: receipt.status,
       excluded: receipt.excluded,
-      unresolvedDuplicate: !!receipt.duplicateOf && !receipt.duplicateResolved,
+      unresolvedDuplicate: duplicateState(receipt) === "suspected",
       branch: data?.branch ?? null,
       purchaseTime: data?.purchaseTime ?? null,
       currency: data?.currency ?? null,

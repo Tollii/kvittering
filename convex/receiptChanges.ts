@@ -14,6 +14,7 @@ import {
   type ReceiptData,
 } from "../src/lib/domain/receipt";
 import { assessReceipt } from "../src/lib/domain/receipt-review";
+import { duplicateState } from "../src/lib/domain/receipt-state";
 
 export const receiptCommitValidator = v.object({
   receiptId: v.id("receipts"),
@@ -127,7 +128,8 @@ export async function commitReceiptChange(
   const decision = decideReceiptChange({
     previous,
     data: parsed.receipt,
-    unresolvedDuplicate: !!duplicateOf && !duplicateResolved,
+    unresolvedDuplicate:
+      duplicateState({ duplicateOf, duplicateResolved }) === "suspected",
     origin: input.origin,
   });
 

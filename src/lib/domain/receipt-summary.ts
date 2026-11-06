@@ -1,6 +1,6 @@
 import { Ore, oreValidator } from "./ore";
 import { CalendarDate, calendarDateValidator } from "./calendar";
-import { receiptStatusValidator } from "./receipt-state";
+import { duplicateState, receiptStatusValidator } from "./receipt-state";
 import { v, type Infer } from "convex/values";
 import { monthlyInsights, type Receipt } from "./insights";
 import { reconcile } from "./receipt";
@@ -68,7 +68,7 @@ export function receiptSpendingTotals(receipt: Receipt): SpendingTotals {
 
   if (!date) return { ...emptySpendingTotals };
   const insight = monthlyInsights([receipt], CalendarDate.month(date));
-  const comparable = !receipt.duplicateOf || receipt.duplicateResolved;
+  const comparable = duplicateState(receipt) !== "suspected";
 
   return {
     products: insight.products,
@@ -132,7 +132,7 @@ export function receiptSearchText(receipt: Receipt) {
 export function receiptComparisonCategories(
   receipt: Receipt,
 ): Record<string, number> {
-  if (receipt.duplicateOf && !receipt.duplicateResolved) return {};
+  if (duplicateState(receipt) === "suspected") return {};
   const date = receipt.data?.purchaseDate;
 
   if (!date) return {};

@@ -9,6 +9,7 @@ import { Copy, Icon, useLargeText } from "@/components/ui";
 import { radius, useTheme } from "@/constants/theme";
 import type { Receipt } from "@/lib/domain/insights";
 import { quickApproveData } from "@/lib/domain/receipt-review";
+import { duplicateState } from "@/lib/domain/receipt-state";
 import { errorFeedback, successFeedback } from "@/lib/haptics";
 import { failureMessage } from "@/lib/failure-message";
 
@@ -31,8 +32,7 @@ export function SwipeToApprove({
   const swipeable = useRef<SwipeableMethods>(null);
   const [busy, setBusy] = useState(false);
 
-  const unresolvedDuplicate =
-    !!receipt.duplicateOf && !receipt.duplicateResolved;
+  const unresolvedDuplicate = duplicateState(receipt) === "suspected";
 
   const approvable =
     enabled &&

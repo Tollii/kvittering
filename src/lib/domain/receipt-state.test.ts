@@ -1,7 +1,9 @@
 import { expect, it } from "vitest";
+import { testId } from "../testing/receipts";
 import {
   abandonedUploadMs,
   attentionStatuses,
+  duplicateState,
   hasReceiptBeenRead,
   isReceiptBeingRead,
   isReceiptProcessing,
@@ -34,6 +36,23 @@ it("treats a receipt as processing until its images have been read", () => {
 it("separates read receipts from those that need a person", () => {
   expect(matching(hasReceiptBeenRead)).toEqual(["needs_review", "reviewed"]);
   expect(matching(needsAttention)).toEqual([...attentionStatuses]);
+});
+
+it("only holds back a receipt that matches another and is still undecided", () => {
+  const other = testId<"receipts">("other");
+
+  expect(
+    duplicateState({ duplicateOf: undefined, duplicateResolved: false }),
+  ).toBe("none");
+  expect(
+    duplicateState({ duplicateOf: undefined, duplicateResolved: true }),
+  ).toBe("none");
+  expect(duplicateState({ duplicateOf: other, duplicateResolved: false })).toBe(
+    "suspected",
+  );
+  expect(duplicateState({ duplicateOf: other, duplicateResolved: true })).toBe(
+    "separate",
+  );
 });
 
 it("counts an upload as abandoned after a full day without progress", () => {

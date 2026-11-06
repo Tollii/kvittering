@@ -1,6 +1,9 @@
 import { CalendarDate } from "@/lib/domain/calendar";
 import { Ore } from "@/lib/domain/ore";
-import { isReceiptProcessing } from "@/lib/domain/receipt-state";
+import {
+  duplicateState,
+  isReceiptProcessing,
+} from "@/lib/domain/receipt-state";
 import { router } from "expo-router";
 import { ActivityIndicator, View } from "react-native";
 import { Chevron, Copy, Press, useLargeText } from "./ui";
@@ -29,10 +32,7 @@ export function receiptStatusLabel(
 }
 
 export function receiptNeeds(receipt: Receipt) {
-  return reviewSummary(
-    receipt.data,
-    !!receipt.duplicateOf && !receipt.duplicateResolved,
-  );
+  return reviewSummary(receipt.data, duplicateState(receipt) === "suspected");
 }
 
 export function openReceipt(receipt: Receipt) {
