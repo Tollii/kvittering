@@ -121,16 +121,16 @@ export function registerOdaRoutes(http: HttpRouter) {
 
         const confirmation = randomToken();
 
-        const held = await ctx.runMutation(internal.oda.holdTokens, {
+        const expired = await ctx.runMutation(internal.oda.holdTokens, {
           id: authorization.id,
           clientId: authorization.clientId,
           confirmation,
           ...tokens,
         });
 
-        return held
-          ? back(authorization.returnUrl, "connected", confirmation)
-          : back(authorization.returnUrl, "failed");
+        return expired
+          ? back(authorization.returnUrl, "failed")
+          : back(authorization.returnUrl, "connected", confirmation);
       } catch (error) {
         console.error("oda.connect_failed", errorDetails(error));
         await ctx.runMutation(internal.oda.forgetAuthorization, {

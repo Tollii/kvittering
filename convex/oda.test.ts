@@ -13,7 +13,7 @@ const modules = import.meta.glob("./**/*.ts");
 afterEach(() => {
   orders.splice(1);
   revoked.splice(0);
-  slowTokenExchange = false;
+  duringTokenExchange = undefined;
   vi.useRealTimers();
   vi.unstubAllEnvs();
   vi.unstubAllGlobals();
@@ -41,8 +41,8 @@ let refreshes = 0;
 /** Tokens Kvitto handed back to Oda. */
 const revoked: string[] = [];
 
-/** When set, the token exchange outlasts the sign-in. */
-let slowTokenExchange = false;
+/** Runs while Oda exchanges the sign-in code, before Kvitto holds the tokens. */
+let duringTokenExchange: (() => Promise<void>) | undefined;
 
 const rpcRequest = z.object({ id: z.number().optional(), method: z.string() });
 
@@ -60,7 +60,7 @@ async function oda(url: string, init?: RequestInit) {
   }
 
   if (url === "https://oda.com/o/token/") {
-    if (slowTokenExchange) vi.advanceTimersByTime(11 * 60 * 1000);
+    await duringTokenExchange?.();
 
     // Like Oda, each refresh replaces the refresh token and refuses the old one.
     const used = z
@@ -276,7 +276,8 @@ it("signs in at Oda once and imports a delivered order as one receipt", async ()
   ).toEqual(["oda-k4mz8q", "oda-r2fy3e"]);
 });
 
-it("forgets Oda's tokens when a sign-in is never confirmed", async () => {
+/** A household member who signs in at Oda without the app confirming it. */
+async function unconfirmedSignIns() {
   vi.useFakeTimers();
   vi.stubEnv("CONVEX_SITE_URL", "https://kvitto.convex.site");
   vi.stubGlobal("fetch", vi.fn(oda));
@@ -293,11 +294,11 @@ it("forgets Oda's tokens when a sign-in is never confirmed", async () => {
     invitation: "0123456789abcdef0123456789abcdef",
   });
 
-  /** Sign in at Oda without the app confirming it, and return Oda's answer. */
-  const signInAtOda = async (request: string) => {
+  /** Sign in at Oda and return Oda's answer to the app. */
+  const signIn = async () => {
     const started = new URL(
       await user.mutation(api.oda.start, {
-        request,
+        request: "0123456789abcdef0123456789abcdef",
         returnUrl: "kvitto://oda",
       }),
     );
@@ -315,39 +316,49 @@ it("forgets Oda's tokens when a sign-in is never confirmed", async () => {
     ).searchParams;
   };
 
-  const abandoned = await signInAtOda("0123456789abcdef0123456789abcdef");
-  expect(abandoned.get("status")).toBe("connected");
+  const signIns = () =>
+    t.run((ctx) => ctx.db.query("odaAuthorizations").collect());
+
+  return { t, user, signIn, signIns };
+}
+
+it("forgets Oda's tokens when a sign-in is never confirmed", async () => {
+  const { t, user, signIn, signIns } = await unconfirmedSignIns();
+
+  const answer = await signIn();
+  expect(answer.get("status")).toBe("connected");
 
   // Still in time, the sign-in keeps its tokens for the app.
   await t.mutation(internal.oda.removeExpiredAuthorizations, {});
-  expect(
-    await t.run((ctx) => ctx.db.query("odaAuthorizations").collect()),
-  ).toHaveLength(1);
+  expect(await signIns()).toHaveLength(1);
 
   vi.advanceTimersByTime(11 * 60 * 1000);
   await t.mutation(internal.oda.removeExpiredAuthorizations, {});
   await t.finishAllScheduledFunctions(vi.runAllTimers);
 
-  expect(
-    await t.run((ctx) => ctx.db.query("odaAuthorizations").collect()),
-  ).toEqual([]);
+  expect(await signIns()).toEqual([]);
   expect(revoked).toEqual([`refresh-${refreshes}`]);
   await expect(
     user.mutation(api.oda.confirm, {
-      confirmation: abandoned.get("confirmation")!,
+      confirmation: answer.get("confirmation")!,
     }),
   ).rejects.toThrow("Innloggingen hos Oda er utløpt");
+});
 
-  // Tokens that arrive after the sign-in expired are not kept either.
-  slowTokenExchange = true;
-  const late = await signInAtOda("abcdef0123456789abcdef0123456789");
+it("hands back Oda's tokens when they arrive after the sign-in was removed", async () => {
+  const { t, user, signIn, signIns } = await unconfirmedSignIns();
+
+  duringTokenExchange = async () => {
+    vi.advanceTimersByTime(11 * 60 * 1000);
+    await t.mutation(internal.oda.removeExpiredAuthorizations, {});
+  };
+
+  const answer = await signIn();
   await t.finishAllScheduledFunctions(vi.runAllTimers);
 
-  expect(late.get("status")).toBe("failed");
-  expect(
-    await t.run((ctx) => ctx.db.query("odaAuthorizations").collect()),
-  ).toEqual([]);
-  expect(revoked).toHaveLength(2);
+  expect(answer.get("status")).toBe("failed");
+  expect(await signIns()).toEqual([]);
+  expect(revoked).toEqual([`refresh-${refreshes}`]);
   expect(await user.query(api.oda.status, {})).toBeNull();
 });
 
