@@ -204,7 +204,9 @@ it("lets a person replace a run that stays pending past the stale limit", async 
   const runs = await t.run(async (ctx) => {
     const journals = await ctx.db
       .query("workflowJournals")
-      .withIndex("by_receiptId", (q) => q.eq("receiptId", id))
+      .withIndex("by_receiptId_and_component", (q) =>
+        q.eq("receiptId", id).eq("component", "analysis"),
+      )
       .collect();
 
     return Promise.all(

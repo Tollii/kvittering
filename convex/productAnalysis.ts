@@ -1,7 +1,7 @@
 import { unclearCategoryId } from "../src/lib/domain/categories";
 import { userError } from "./userErrors";
 import { consumeWorkQuota, type QuotaActor } from "./rateLimits";
-import { trackWorkflow } from "./retention";
+import { cancelReceiptWorkflows, trackWorkflow } from "./retention";
 import { featureEnabled } from "./featureFlags";
 import { clientMutation as mutation } from "./clientFunctions";
 import { productAttributesValidator } from "../src/lib/domain/product-attributes";
@@ -92,28 +92,6 @@ export const process = manager
     return null;
   });
 
-/**
- * Stops the receipt's unfinished runs, so a replaced run spends no more model
- * calls. Every launch replaces the previous run, so it is among the newest journals.
- */
-async function cancelRuns(ctx: MutationCtx, receiptId: Id<"receipts">) {
-  const journals = await ctx.db
-    .query("workflowJournals")
-    .withIndex("by_receiptId", (q) => q.eq("receiptId", receiptId))
-    .order("desc")
-    .take(20);
-
-  for (const journal of journals) {
-    if (journal.component !== "analysis" || journal.expiresAt !== undefined)
-      continue;
-
-    const status = await manager.status(ctx, journal.workflowId);
-
-    if (status.type === "inProgress")
-      await manager.cancel(ctx, journal.workflowId);
-  }
-}
-
 async function launch(
   ctx: MutationCtx,
   receipt: Doc<"receipts">,
@@ -132,18 +110,22 @@ async function launch(
     return "ineligible" as const;
   const previous = receipt.productAnalysis;
 
+  const now = Date.now();
+
   if (
     previous?.version === productAnalysisVersion &&
     previous.generation === receipt.generation &&
     previous.revision === receipt.revision &&
-    (!requester || !productAnalysisRestartable(previous, Date.now()))
+    (!requester || !productAnalysisRestartable(previous, now))
   )
     return "current" as const;
 
   if (requester && requester !== "operator")
     await consumeWorkQuota(ctx, requester, "analysis");
 
-  if (previous?.state === "pending") await cancelRuns(ctx, receipt._id);
+  // A replaced run stops at its next step. A step already running still
+  // completes, and its results apply only if the snapshot is still current.
+  await cancelReceiptWorkflows(ctx, receipt._id, "analysis");
 
   const workflowId = await manager.start(
     ctx,
@@ -167,7 +149,7 @@ async function launch(
       generation: receipt.generation,
       revision: receipt.revision,
       state: "pending",
-      updatedAt: Date.now(),
+      updatedAt: now,
       results: [],
     },
   });
@@ -187,7 +169,7 @@ export const start = internalMutation({
   },
 });
 
-/** Explicit household recovery after bounded workflow attempts are exhausted. */
+/** Explicit household recovery of a failed run, or of one presumed lost after the stale limit. */
 export const ensure = mutation({
   service: "spendingAnalysis",
   args: { ids: v.array(v.id("receipts")) },

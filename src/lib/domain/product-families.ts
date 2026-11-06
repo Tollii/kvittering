@@ -61,8 +61,9 @@ export type ProductAnalysisResult = Infer<
 >;
 
 /**
- * A run still pending this long after it started is presumed lost. Workflow
- * retries finish within minutes, so this leaves room for a queue backlog.
+ * A run still pending this long after it started is presumed lost, and a
+ * person may replace it. Runs share one queue, so a long backlog can also
+ * reach this limit; replacing a queued run then only moves it to the back.
  */
 export const productAnalysisStaleAfterMs = 30 * 60_000;
 
