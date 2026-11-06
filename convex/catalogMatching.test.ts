@@ -81,7 +81,8 @@ async function matchingStuckOnLookup() {
         result: emptyCatalogResult(),
         expiresAt: 0,
         attempts: 1,
-        scheduledAt: Date.now(),
+        // Live while the run starts, however far fake timers move the clock.
+        scheduledAt: Number.MAX_SAFE_INTEGER,
       });
     }
   });
@@ -97,6 +98,14 @@ async function matchingStuckOnLookup() {
 
   const { workflow } = await t.query(components.workflow.workflow.getStatus, {
     workflowId,
+  });
+
+  // The lost worker was scheduled when the run started.
+  await t.run(async (ctx) => {
+    for (const request of await ctx.db.query("catalogRequests").collect())
+      await ctx.db.patch("catalogRequests", request._id, {
+        scheduledAt: workflow._creationTime,
+      });
   });
 
   return {
