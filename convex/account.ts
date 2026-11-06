@@ -1,4 +1,4 @@
-import { v } from "convex/values";
+import { type ObjectType, v } from "convex/values";
 import { z } from "zod";
 import { components, internal } from "./_generated/api";
 import type { Doc, Id, TableNames } from "./_generated/dataModel";
@@ -132,7 +132,6 @@ export const deleteAccount = internalMutation({
         await ctx.db.delete("households", member.householdId);
         await ctx.scheduler.runAfter(0, internal.account.purgeHousehold, {
           householdId: member.householdId,
-          stage: 0,
         });
       }
     }
@@ -140,7 +139,6 @@ export const deleteAccount = internalMutation({
     await forgetOdaConnection(ctx, identity);
     await ctx.scheduler.runAfter(0, internal.account.purgeIdentity, {
       identity,
-      stage: 0,
     });
 
     await deleteAuthRecords(ctx, "session", userId);
@@ -153,8 +151,15 @@ export const deleteAccount = internalMutation({
   },
 });
 
-/** One step removes a batch of records and returns how many it removed. */
-type Step<Key> = (ctx: MutationCtx, key: Key) => Promise<number>;
+/**
+ * One step removes a batch of records and returns how many it removed. A
+ * scheduled purge names the step it continues with, so a deploy that adds,
+ * removes, or reorders steps cannot make a running purge skip one.
+ */
+type Step<Key> = {
+  name: string;
+  remove: (ctx: MutationCtx, key: Key) => Promise<number>;
+};
 
 async function removeRows<Table extends TableNames>(
   ctx: MutationCtx,
@@ -166,23 +171,62 @@ async function removeRows<Table extends TableNames>(
   return rows.length;
 }
 
-/** Repeat a step while it removes records, then move to the next one. */
-async function runStage<Key>(
-  ctx: MutationCtx,
-  steps: Step<Key>[],
-  stage: number,
-  key: Key,
-  next: (stage: number) => Promise<Id<"_scheduled_functions">>,
+const purgeArgs = {
+  step: v.optional(v.string()),
+  // Jobs scheduled before steps had names carry the step's position instead.
+  stage: v.optional(v.number()),
+};
+
+type Position = ObjectType<typeof purgeArgs>;
+
+/**
+ * Where a scheduled purge continues. A step no longer in the list starts the
+ * purge over: every step only removes what is left, so repeating one is safe.
+ */
+function stepIndex<Key>(
+  steps: readonly Step<Key>[],
+  { step, stage }: Position,
 ) {
-  const step = steps[stage];
+  if (step === undefined) return stage ?? 0;
+
+  return Math.max(
+    0,
+    steps.findIndex(({ name }) => name === step),
+  );
+}
+
+/** Repeat a step while it removes records, then schedule the next one. */
+async function runStep<Key>(
+  ctx: MutationCtx,
+  steps: readonly Step<Key>[],
+  position: Position,
+  key: Key,
+  next: (step: string) => Promise<Id<"_scheduled_functions">>,
+) {
+  const index = stepIndex(steps, position);
+  const step = steps[index];
 
   if (!step) return;
 
-  await next((await step(ctx, key)) > 0 ? stage : stage + 1);
+  const following = (await step.remove(ctx, key)) > 0 ? step : steps[index + 1];
+
+  if (following) await next(following.name);
+}
+
+/** A step that removes a batch of rows from one table. */
+function tableStep<Table extends TableNames, Key>(
+  table: Table,
+  take: (ctx: MutationCtx, table: Table, key: Key) => Promise<Doc<Table>[]>,
+): Step<Key> {
+  return {
+    name: table,
+    remove: async (ctx, key) =>
+      removeRows(ctx, table, await take(ctx, table, key)),
+  };
 }
 
 /** Devices go with their reminders, whose scheduled pushes are cancelled. */
-const removeDevices: Step<string> = async (ctx, identity) => {
+const removeDevices = async (ctx: MutationCtx, identity: string) => {
   const subscriptions = await ctx.db
     .query("deviceSubscriptions")
     .withIndex("by_identity", (q) => q.eq("identity", identity))
@@ -209,42 +253,36 @@ const removeDevices: Step<string> = async (ctx, identity) => {
   return subscriptions.length;
 };
 
-const identitySteps: Step<string>[] = [
-  removeDevices,
+const identitySteps: readonly Step<string>[] = [
+  { name: "deviceSubscriptions", remove: removeDevices },
   ...(["receiptActivities", "mcpTokens", "odaAuthorizations"] as const).map(
-    (table): Step<string> =>
-      async (ctx, identity) =>
-        removeRows(
-          ctx,
-          table,
-          await ctx.db
-            .query(table)
-            .withIndex("by_identity", (q) => q.eq("identity", identity))
-            .take(batchSize),
-        ),
+    (table) =>
+      tableStep(table, (ctx, table, identity: string) =>
+        ctx.db
+          .query(table)
+          .withIndex("by_identity", (q) => q.eq("identity", identity))
+          .take(batchSize),
+      ),
   ),
-  async (ctx, identity) =>
-    removeRows(
-      ctx,
-      "clientReleases",
-      await ctx.db
-        .query("clientReleases")
-        .withIndex("by_identity_and_installationId", (q) =>
-          q.eq("identity", identity),
-        )
-        .take(batchSize),
-    ),
+  tableStep("clientReleases", (ctx, table, identity: string) =>
+    ctx.db
+      .query(table)
+      .withIndex("by_identity_and_installationId", (q) =>
+        q.eq("identity", identity),
+      )
+      .take(batchSize),
+  ),
 ];
 
 /** Remove a deleted member's devices, tokens, and sign-ins in bounded batches. */
 export const purgeIdentity = internalMutation({
-  args: { identity: v.string(), stage: v.number() },
+  args: { identity: v.string(), ...purgeArgs },
   returns: v.null(),
-  handler: async (ctx, { identity, stage }) => {
-    await runStage(ctx, identitySteps, stage, identity, (next) =>
+  handler: async (ctx, { identity, ...position }) => {
+    await runStep(ctx, identitySteps, position, identity, (step) =>
       ctx.scheduler.runAfter(0, internal.account.purgeIdentity, {
         identity,
-        stage: next,
+        step,
       }),
     );
 
@@ -252,7 +290,10 @@ export const purgeIdentity = internalMutation({
   },
 });
 
-const removeReceipts: Step<Id<"households">> = async (ctx, householdId) => {
+const removeReceipts = async (
+  ctx: MutationCtx,
+  householdId: Id<"households">,
+) => {
   const receipts = await ctx.db
     .query("receipts")
     .withIndex("by_householdId", (q) => q.eq("householdId", householdId))
@@ -272,18 +313,15 @@ function householdTables<Table extends TableNames>(
     householdId: Id<"households">,
   ) => Promise<Doc<Table>[]>,
 ): Step<Id<"households">>[] {
-  return tables.map(
-    (table) => async (ctx, householdId) =>
-      removeRows(ctx, table, await take(ctx, table, householdId)),
-  );
+  return tables.map((table) => tableStep(table, take));
 }
 
 /**
  * Receipts go first: deleting one updates the summaries, totals, and imports
  * after it, so those are removed only once no receipt is left to change them.
  */
-const householdSteps: Step<Id<"households">>[] = [
-  removeReceipts,
+const householdSteps: readonly Step<Id<"households">>[] = [
+  { name: "receipts", remove: removeReceipts },
   ...householdTables(
     [
       "receiptSyncHeads",
@@ -358,13 +396,13 @@ const householdSteps: Step<Id<"households">>[] = [
 
 /** Remove a deleted household's receipts, images, and derived data in bounded batches. */
 export const purgeHousehold = internalMutation({
-  args: { householdId: v.id("households"), stage: v.number() },
+  args: { householdId: v.id("households"), ...purgeArgs },
   returns: v.null(),
-  handler: async (ctx, { householdId, stage }) => {
-    await runStage(ctx, householdSteps, stage, householdId, (next) =>
+  handler: async (ctx, { householdId, ...position }) => {
+    await runStep(ctx, householdSteps, position, householdId, (step) =>
       ctx.scheduler.runAfter(0, internal.account.purgeHousehold, {
         householdId,
-        stage: next,
+        step,
       }),
     );
 
