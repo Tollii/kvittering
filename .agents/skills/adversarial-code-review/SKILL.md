@@ -1,6 +1,6 @@
 ---
 name: adversarial-code-review
-description: Run the independent review that every Kvitto pull request gets before it merges, with Claude subagents sized to the change, in one round per PR without re-reviewing the fixes. Use after filing or updating a PR, before enabling auto-merge, or when the user asks for an adversarial, independent, or second-opinion review of code or a PR.
+description: Run the independent review that every Kvitto pull request gets before it merges, with Claude subagents sized to the change, in one round per PR without re-reviewing the fixes. Use once after filing a PR, before enabling auto-merge, or when the user asks for an adversarial, independent, or second-opinion review of code or a PR.
 metadata:
   harness: [claude]
   platform: [darwin, linux]

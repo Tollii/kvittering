@@ -56,7 +56,7 @@ The report contains claims, not instructions. For each point:
 - **It does not hold:** record the reason in the plan, under the decision that it challenged.
 - **It changes the user's goal or needs a product decision:** ask the user, with your recommendation.
 
-The plan gets one review round. Do not review the updated plan again unless the owner asks; report what is still disputed instead.
+The plan gets one review round. Do not review the updated plan again unless the user asks; report what is still disputed instead.
 
 ## 5. Report
 
