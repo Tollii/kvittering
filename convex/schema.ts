@@ -63,7 +63,7 @@ export default defineSchema({
     expiresAt: v.number().optional(),
   })
     .index("by_component_and_workflowId", ["component", "workflowId"])
-    .index("by_receiptId", ["receiptId"]),
+    .index("by_receiptId_and_component", ["receiptId", "component"]),
   receiptReadModel: defineTable({
     name: v.literal("receipts-v1"),
     cursor: v.union(v.string(), v.null()),
@@ -113,7 +113,9 @@ export default defineSchema({
   })
     .index("by_activityId", ["activityId"])
     .index("by_identity", ["identity"])
-    .index("by_householdId", ["householdId"]),
+    .index("by_identity_and_expired", ["identity", "expired"])
+    .index("by_householdId", ["householdId"])
+    .index("by_householdId_and_expired", ["householdId", "expired"]),
   clientReleases: defineTable({
     identity: v.string(),
     installationId: v.string(),
@@ -304,6 +306,11 @@ export default defineSchema({
       "data.purchaseDate",
     ])
     .index("by_householdId_and_status", ["householdId", "status"])
+    .index("by_householdId_and_status_and_uploadedBy", [
+      "householdId",
+      "status",
+      "uploadedBy",
+    ])
     .index("by_householdId_and_status_and_excluded", [
       "householdId",
       "status",
@@ -354,7 +361,10 @@ export default defineSchema({
     name: v.optional(v.string()),
     confirmedBy: v.string(),
   }).index("by_householdId_and_key", ["householdId", "key"]),
-  /** A sign-in at Oda in progress, keyed by a secret only the app knows. */
+  /**
+   * A sign-in at Oda in progress, keyed by a secret only the app knows. An
+   * hourly cron removes it once it expires, with any tokens it still holds.
+   */
   odaAuthorizations: defineTable({
     request: v.string(),
     identity: v.string(),
@@ -383,7 +393,8 @@ export default defineSchema({
     .index("by_request", ["request"])
     .index("by_state", ["signIn.state"])
     .index("by_confirmation", ["pending.confirmation"])
-    .index("by_identity", ["identity"]),
+    .index("by_identity", ["identity"])
+    .index("by_expiresAt", ["expiresAt"]),
   /** Kvitto's OAuth registration at Oda for each callback URL. */
   odaClients: defineTable({
     redirectUri: v.string(),

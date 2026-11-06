@@ -5,12 +5,15 @@ import { Ore } from "../src/lib/domain/ore";
 /// <reference types="vite/client" />
 import { register as registerRateLimiter } from "@convex-dev/rate-limiter/test";
 import { convexTest } from "convex-test";
-import { expect, it } from "vitest";
+import { afterEach, expect, it, vi } from "vitest";
 import { api, internal } from "./_generated/api";
 import schema from "./schema";
 import { batteryFixture, weeklyShopFixture } from "../src/lib/mock-receipts";
+import { abandonedUploadMs } from "../src/lib/domain/receipt-state";
 
 const modules = import.meta.glob("./**/*.ts");
+
+afterEach(() => vi.useRealTimers());
 
 async function setup() {
   const t = convexTest(schema, modules);
@@ -495,21 +498,51 @@ it("deletes a household receipt, its images and history without allowing a late 
   });
 });
 
-it("requires an upload to finish before deleting it", async () => {
-  const { first, householdId } = await setup();
+it("deletes an upload only after it has stopped making progress", async () => {
+  vi.useFakeTimers();
+  const { t, first, second, householdId } = await setup();
 
   const id = await first.mutation(api.receipts.reserve, {
     clientId: "delete-request-0001",
     householdId,
-    imageCount: 1,
+    imageCount: 2,
   });
 
   await expect(
     first.mutation(api.receipts.remove, { id, revision: 0 }),
   ).rejects.toThrow("lastet opp");
+
+  // An image that arrives late keeps the upload alive for another day.
+  vi.advanceTimersByTime(abandonedUploadMs);
+
+  const storageId = await t.run(async (ctx) => {
+    const storageId = await ctx.storage.store(new Blob(["receipt"]));
+    await ctx.db.insert("images", {
+      receiptId: id,
+      position: 0,
+      storageId,
+      sha256: "late-image",
+    });
+
+    return storageId;
+  });
+
+  await expect(
+    second.mutation(api.receipts.remove, { id, revision: 0 }),
+  ).rejects.toThrow("lastet opp");
   expect((await first.query(api.receipts.detail, { id }))!.receipt.status).toBe(
     "uploading",
   );
+
+  // A phone that lost the capture never sends the second image.
+  vi.advanceTimersByTime(abandonedUploadMs + 1);
+  await second.mutation(api.receipts.remove, { id, revision: 0 });
+  await t.finishAllScheduledFunctions(vi.runAllTimers);
+
+  await expect(first.query(api.receipts.detail, { id })).resolves.toBeNull();
+  await t.run(async (ctx) => {
+    expect(await ctx.storage.get(storageId)).toBeNull();
+  });
 });
 
 it("treats malformed receipt links and IDs from other tables as unavailable", async () => {

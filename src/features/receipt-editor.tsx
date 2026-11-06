@@ -35,10 +35,12 @@ import {
   type ReceiptActionMenu,
 } from "@/features/receipt-editor-actions";
 import {
+  AbandonedUploadNotice,
   ReceiptDetails,
   ReceiptLineControls,
   ReceiptPlaceholder,
   StaleRevisionNotice,
+  useUploadDeletion,
 } from "@/features/receipt-editor-panels";
 import {
   aliasKey,
@@ -122,6 +124,7 @@ export function ReceiptEditor({
   const [sheet, setSheet] = useState<"fields" | "actions" | null>(null);
 
   const processing = isReceiptProcessing(receipt.status);
+  const { abandoned, deletable } = useUploadDeletion(receipt);
 
   const unresolvedDuplicate =
     duplicateState({ ...receipt, duplicateResolved }) === "suspected";
@@ -329,6 +332,8 @@ export function ReceiptEditor({
     if (isCategoryDecided(line, next)) rememberLines([line.id]);
   }
 
+  const deleteDisabled = !online || busy || !deletable;
+
   const menu: ReceiptActionMenu = {
     busy,
     summaryLines,
@@ -336,7 +341,7 @@ export function ReceiptEditor({
     fieldsDisabled: !data || busy,
     addLineDisabled: !data || busy || processing,
     retryDisabled,
-    deleteDisabled: !online || busy || receipt.status === "uploading",
+    deleteDisabled,
     onEditFields: () => setSheet("fields"),
     onAddLine: addLine,
     onSummaryLines: (value) => {
@@ -405,6 +410,11 @@ export function ReceiptEditor({
 
         {receipt.provider.includes("mock") && <Notice>Demodata</Notice>}
         {!!receipt.error && <Notice tone="error">{receipt.error}</Notice>}
+        <AbandonedUploadNotice
+          abandoned={abandoned}
+          disabled={deleteDisabled}
+          onDelete={removeReceipt}
+        />
         {receipt.status === "failed" && !processing && (
           <Button
             title="Les bildene på nytt"

@@ -1,11 +1,13 @@
 import { expect, it } from "vitest";
 import { testId } from "../testing/receipts";
 import {
+  abandonedUploadMs,
   attentionStatuses,
   duplicateState,
   hasReceiptBeenRead,
   isReceiptBeingRead,
   isReceiptProcessing,
+  isUploadAbandoned,
   needsAttention,
   type ReceiptStatus,
 } from "./receipt-state";
@@ -51,4 +53,15 @@ it("only holds back a receipt that matches another and is still undecided", () =
   expect(duplicateState({ duplicateOf: other, duplicateResolved: true })).toBe(
     "separate",
   );
+});
+
+it("counts an upload as abandoned after a full day without progress", () => {
+  const lastProgress = Date.UTC(2026, 10, 1);
+
+  expect(
+    isUploadAbandoned(lastProgress, lastProgress + abandonedUploadMs - 1),
+  ).toBe(false);
+  expect(
+    isUploadAbandoned(lastProgress, lastProgress + abandonedUploadMs),
+  ).toBe(true);
 });
