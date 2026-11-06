@@ -4,7 +4,7 @@ import { register as registerWorkflow } from "@convex-dev/workflow/test";
 import type { WorkflowId } from "@convex-dev/workflow";
 import { convexTest } from "convex-test";
 import { afterEach, expect, it, vi } from "vitest";
-import { api, internal } from "./_generated/api";
+import { api, components, internal } from "./_generated/api";
 import schema from "./schema";
 import { sharedHousehold } from "../src/lib/testing/households";
 import { date } from "../src/lib/testing/calendar";
@@ -69,6 +69,28 @@ it("finds a duplicate several pages back while reading the receipt", async () =>
   });
 });
 
+it("fails a receipt whose reading run is cancelled", async () => {
+  const { t, first, householdId } = await setup();
+
+  const id = await first.mutation(api.manualPurchases.add, {
+    clientId: "cancelled-reading-run",
+    householdId,
+    purchase,
+  });
+
+  const [journal] = await t.run((ctx) =>
+    ctx.db.query("workflowJournals").collect(),
+  );
+
+  await t.mutation(components.workflow.workflow.cancel, {
+    workflowId: journal!.workflowId,
+  });
+  await t.finishAllScheduledFunctions(vi.runAllTimers);
+  expect(await t.run((ctx) => ctx.db.get("receipts", id))).toMatchObject({
+    status: "failed",
+  });
+});
+
 it.each([
   { kind: "failed", error: "step failed" },
   { kind: "canceled" },
@@ -102,11 +124,11 @@ it.each([
     });
 
     for (const receiptId of [current, retried])
-      await t.mutation(internal.retention.workflowCompleted, {
+      await t.mutation(internal.processing.readingCompleted, {
         // SAFETY: The callback only stores the ID; no workflow is read.
         workflowId: `reading-${receiptId}` as WorkflowId,
         result,
-        context: { component: "processing", receiptId, readGeneration: 1 },
+        context: { receiptId, generation: 1 },
       });
 
     expect(await t.run((ctx) => ctx.db.get("receipts", current))).toMatchObject(

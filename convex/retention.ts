@@ -9,7 +9,6 @@ import {
 import { vResultValidator } from "@convex-dev/workpool";
 import { internalMutation } from "./serverFunctions";
 import { components, internal } from "./_generated/api";
-import { failReceiptReading } from "./processing";
 
 import type { MutationCtx } from "./_generated/server";
 import type { Id } from "./_generated/dataModel";
@@ -52,6 +51,30 @@ export async function trackWorkflow(
 
 const thirtyDays = 30 * 24 * 60 * 60_000;
 
+/** Keep an ended run's journal for diagnostics while its receipt exists. */
+export async function recordWorkflowCompletion(
+  ctx: MutationCtx,
+  workflowId: WorkflowId,
+  context: { component: WorkflowComponent; receiptId: Id<"receipts"> },
+) {
+  const id = await trackWorkflow(
+    ctx,
+    workflowId,
+    context.component,
+    context.receiptId,
+  );
+
+  const receipt = await ctx.db.get("receipts", context.receiptId);
+  const delay = receipt ? thirtyDays : 0;
+  await ctx.db.patch("workflowJournals", id, {
+    expiresAt: Date.now() + delay,
+  });
+  await ctx.scheduler.runAfter(delay, internal.retention.workflowJournal, {
+    workflowId,
+    component: context.component,
+  });
+}
+
 /** All terminal results have the same diagnostic retention period. Null is the legacy context. */
 export const workflowCompleted = internalMutation({
   args: {
@@ -59,45 +82,13 @@ export const workflowCompleted = internalMutation({
     result: vResultValidator,
     context: v.union(
       v.null(),
-      v.object({
-        component: workflowComponent,
-        receiptId: v.id("receipts"),
-        // Only a run that reads the receipt sets it. Runs started before it existed omit it.
-        readGeneration: v.number().optional(),
-      }),
+      v.object({ component: workflowComponent, receiptId: v.id("receipts") }),
     ),
   },
   returns: v.null(),
-  handler: async (ctx, { workflowId, result, context }) => {
+  handler: async (ctx, { workflowId, context }) => {
     // The daily inventory registers legacy journals without one scan per callback.
-    if (!context) return null;
-
-    // A reading run that ends with its receipt still being read would leave it stuck.
-    if (context.readGeneration !== undefined)
-      await failReceiptReading(ctx, {
-        id: context.receiptId,
-        generation: context.readGeneration,
-        error: "Behandlingen mislyktes.",
-        stage: "workflow",
-        errorType: `workflow_${result.kind}`,
-      });
-
-    const id = await trackWorkflow(
-      ctx,
-      workflowId,
-      context.component,
-      context.receiptId,
-    );
-
-    const receipt = await ctx.db.get("receipts", context.receiptId);
-    const delay = receipt ? thirtyDays : 0;
-    await ctx.db.patch("workflowJournals", id, {
-      expiresAt: Date.now() + delay,
-    });
-    await ctx.scheduler.runAfter(delay, internal.retention.workflowJournal, {
-      workflowId,
-      component: context.component,
-    });
+    if (context) await recordWorkflowCompletion(ctx, workflowId, context);
 
     return null;
   },

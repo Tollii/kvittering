@@ -7,7 +7,9 @@ import { withProductReference } from "../src/lib/domain/product-reference";
 import { commitReceiptChange } from "./receiptChanges";
 import { v, type Infer, type ObjectType } from "convex/values";
 import { errorDetails } from "../src/lib/diagnostics";
-import { WorkflowManager } from "@convex-dev/workflow";
+import { WorkflowManager, start, vWorkflowId } from "@convex-dev/workflow";
+import { vResultValidator } from "@convex-dev/workpool";
+import { recordWorkflowCompletion, trackWorkflow } from "./retention";
 import { components, internal } from "./_generated/api";
 import { internalQuery, env, type MutationCtx } from "./_generated/server";
 import { hasProductModel } from "./providerConfig";
@@ -38,6 +40,8 @@ import {
 } from "../src/lib/domain/receipt-review";
 
 const workflow = new WorkflowManager(components.workflow);
+
+const readingFailed = "Behandlingen mislyktes.";
 
 export const processReceipt = workflow
   .define({
@@ -114,21 +118,25 @@ export const processReceipt = workflow
 
       stage = "finish";
 
-      // Each step searches one page for a duplicate, so a failure on any page reaches `fail`.
-      let duplicateSearch: DuplicateSearch | undefined;
+      const commit = {
+        matches,
+        durationMs: extraction.durationMs + classification.durationMs,
+        ...args,
+        data: prepared,
+        original: extraction.data,
+        provider: `${extraction.provider} / ${classification.provider}`,
+      };
 
-      do {
-        duplicateSearch =
+      // Each step searches one page for a duplicate, so a failure on any page reaches `fail`.
+      let next: DuplicateSearch | undefined;
+
+      do
+        next =
           (await step.runMutation(internal.processing.finish, {
-            matches,
-            durationMs: extraction.durationMs + classification.durationMs,
-            ...args,
-            data: prepared,
-            original: extraction.data,
-            provider: `${extraction.provider} / ${classification.provider}`,
-            ...duplicateSearch,
+            ...commit,
+            ...next,
           })) ?? undefined;
-      } while (duplicateSearch);
+      while (next);
     } catch (error) {
       await step.runMutation(
         internal.processing.fail,
@@ -136,8 +144,7 @@ export const processReceipt = workflow
           ...args,
           stage,
           errorType: errorDetails(error).errorType,
-          error:
-            error instanceof Error ? error.message : "Behandlingen mislyktes.",
+          error: error instanceof Error ? error.message : readingFailed,
         },
         { unstableArgs: true },
       );
@@ -594,7 +601,7 @@ const failureArgs = {
 };
 
 /** Mark a receipt failed when it is still being read for the generation that failed. */
-export async function failReceiptReading(
+async function failReceiptReading(
   ctx: MutationCtx,
   args: ObjectType<typeof failureArgs>,
 ) {
@@ -626,6 +633,53 @@ export const fail = internalMutation({
   returns: v.null(),
   handler: async (ctx, args) => {
     await failReceiptReading(ctx, args);
+
+    return null;
+  },
+});
+
+/** Start reading a receipt's evidence for a generation. */
+export async function startReading(
+  ctx: MutationCtx,
+  id: Id<"receipts">,
+  generation: number,
+) {
+  const workflowId = await start(
+    ctx,
+    internal.processing.processReceipt,
+    { id, generation },
+    {
+      onComplete: internal.processing.readingCompleted,
+      context: { receiptId: id, generation },
+    },
+  );
+
+  await trackWorkflow(ctx, workflowId, "processing", id);
+}
+
+/**
+ * A run that ends while its generation is still being read would leave the
+ * receipt stuck, so it fails and can be read again.
+ */
+export const readingCompleted = internalMutation({
+  args: {
+    workflowId: vWorkflowId,
+    result: vResultValidator,
+    context: v.object({ receiptId: v.id("receipts"), generation: v.number() }),
+  },
+  returns: v.null(),
+  handler: async (ctx, { workflowId, result, context }) => {
+    await failReceiptReading(ctx, {
+      id: context.receiptId,
+      generation: context.generation,
+      error: readingFailed,
+      stage: "workflow",
+      errorType: `workflow_${result.kind}`,
+    });
+    await recordWorkflowCompletion(ctx, workflowId, {
+      component: "processing",
+      receiptId: context.receiptId,
+    });
 
     return null;
   },
