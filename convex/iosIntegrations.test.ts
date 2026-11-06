@@ -222,6 +222,32 @@ it("publishes expiry without a receipt change and rejects stale cleanup", async 
   ).not.toBeNull();
 });
 
+it("ends a person's oldest activities instead of refusing a new one", async () => {
+  const { owner, ids } = await setup();
+
+  const start = (activityId: string) =>
+    owner.mutation(api.liveActivities.register, {
+      activityId,
+      receiptIds: ids,
+    });
+
+  const current = (activityId: string) =>
+    owner.query(api.liveActivities.current, { activityId });
+
+  for (const n of [1, 2, 3, 4]) await start(`activity-${n}`);
+  expect(await current("activity-1")).toMatchObject({ ended: true });
+
+  for (const n of [2, 3, 4])
+    expect(await current(`activity-${n}`)).toMatchObject({ ended: false });
+
+  await start("activity-5");
+  expect(await current("activity-1")).toBeNull();
+  expect(await current("activity-2")).toMatchObject({ ended: true });
+
+  for (const n of [3, 4, 5])
+    expect(await current(`activity-${n}`)).toMatchObject({ ended: false });
+});
+
 it("keeps rejected image uploads on the plain-text contract that installed clients read", async () => {
   const { outsider, ids } = await setup();
 
