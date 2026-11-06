@@ -165,28 +165,24 @@ async function removeRows<Table extends TableNames>(
 }
 
 /**
- * Run the first step that still finds records, and run again while one does.
- * A purge keeps no position between runs, so a deploy that adds, removes, or
- * reorders steps cannot make a running purge skip one. A finished step costs
- * one empty read per run.
+ * Remove one batch with the first step that still finds records, and report
+ * whether one did. A purge keeps no position between runs, so a deploy that
+ * adds, removes, or reorders steps cannot make a running purge skip one. A
+ * finished step costs one empty read per run.
  */
-async function runSteps<Key>(
+async function removeBatch<Key>(
   ctx: MutationCtx,
   steps: Step<Key>[],
   key: Key,
-  next: () => Promise<Id<"_scheduled_functions">>,
 ) {
-  for (const step of steps)
-    if ((await step(ctx, key)) > 0) {
-      await next();
+  for (const step of steps) if ((await step(ctx, key)) > 0) return true;
 
-      return;
-    }
+  return false;
 }
 
 /**
- * Purges queued before runs kept no position carry one. It is ignored, and can
- * go once those jobs have run.
+ * Purges queued by an earlier deploy carry a step index in `stage`. It is
+ * ignored. Remove it, and the test that passes it, once no such job is queued.
  */
 const legacyStage = v.optional(v.number());
 
@@ -250,9 +246,10 @@ export const purgeIdentity = internalMutation({
   args: { identity: v.string(), stage: legacyStage },
   returns: v.null(),
   handler: async (ctx, { identity }) => {
-    await runSteps(ctx, identitySteps, identity, () =>
-      ctx.scheduler.runAfter(0, internal.account.purgeIdentity, { identity }),
-    );
+    if (await removeBatch(ctx, identitySteps, identity))
+      await ctx.scheduler.runAfter(0, internal.account.purgeIdentity, {
+        identity,
+      });
 
     return null;
   },
@@ -367,11 +364,10 @@ export const purgeHousehold = internalMutation({
   args: { householdId: v.id("households"), stage: legacyStage },
   returns: v.null(),
   handler: async (ctx, { householdId }) => {
-    await runSteps(ctx, householdSteps, householdId, () =>
-      ctx.scheduler.runAfter(0, internal.account.purgeHousehold, {
+    if (await removeBatch(ctx, householdSteps, householdId))
+      await ctx.scheduler.runAfter(0, internal.account.purgeHousehold, {
         householdId,
-      }),
-    );
+      });
 
     return null;
   },

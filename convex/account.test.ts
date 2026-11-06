@@ -399,7 +399,7 @@ it("revokes the linked Apple ID before deleting, and deletes nothing when it can
   });
 });
 
-// An earlier deploy queued purges with a position; a step now ahead of it must still run.
+// An earlier deploy queued purges with a position (`legacyStage`); a step now ahead of it must still run.
 it("runs every step of a household purge queued past one by an earlier deploy", async () => {
   const t = setup();
   const member = testUser(t, "earlier");
