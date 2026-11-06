@@ -3,13 +3,13 @@ import Animated from "react-native-reanimated";
 import { Button, Copy, IconTile, Panel, easeOut } from "@/components/ui";
 import { motion, useTheme } from "@/constants/theme";
 import { maxReceiptImages } from "@/lib/domain/receipt-images";
+import type { LocalReceipt } from "@/lib/upload-queue";
 import {
   phaseAction,
   phaseTone,
   uploadPhase,
-  type LocalReceipt,
   type UploadPhase,
-} from "@/lib/upload-queue";
+} from "@/lib/upload-phase";
 import { QueueRegroup } from "./queue-regroup";
 import { phaseSymbol, toneColor } from "./upload-phase-style";
 

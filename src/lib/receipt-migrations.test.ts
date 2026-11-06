@@ -6,7 +6,8 @@ import {
   serializeReceipt,
 } from "./receipt-migrations";
 import { receiptImageLimitMessage } from "./domain/receipt-images";
-import type { LocalReceipt, UploadFailure } from "./upload-queue";
+import type { LocalReceipt } from "./upload-queue";
+import type { UploadFailure } from "./upload-failure";
 import { v } from "convex/values";
 import { parse } from "convex-helpers/validators";
 import { sqliteDatabase } from "./testing/sqlite";

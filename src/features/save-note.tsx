@@ -1,12 +1,8 @@
 import { ActivityIndicator, View } from "react-native";
 import { Copy, Icon, IconButton, Panel } from "@/components/ui";
 import { useTheme } from "@/constants/theme";
-import {
-  phaseTone,
-  uploadPhase,
-  type LocalReceipt,
-  type UploadPhase,
-} from "@/lib/upload-queue";
+import type { LocalReceipt } from "@/lib/upload-queue";
+import { phaseTone, uploadPhase, type UploadPhase } from "@/lib/upload-phase";
 import { phaseSymbol, toneColor } from "./upload-phase-style";
 
 /** What Kamera last saved: photos that follow through upload, or a typed purchase. */
@@ -86,21 +82,23 @@ export function SaveNotePanel({
   onClose,
 }: Readonly<{ note: SaveNote; onClose: () => void }>) {
   const colors = useTheme();
-  const symbol = note.phase ? phaseSymbol[note.phase.kind] : null;
+
+  // Once nothing is left to upload, the note shows a check.
+  const symbol = note.phase
+    ? phaseSymbol[note.phase.kind]
+    : "checkmark.circle.fill";
+
+  const color = note.phase
+    ? toneColor(phaseTone(note.phase), colors)
+    : colors.success;
 
   return (
     <Panel style={{ gap: 4 }}>
       <View style={{ flexDirection: "row", alignItems: "center", gap: 10 }}>
-        {!note.phase ? (
-          <Icon name="checkmark.circle.fill" size={22} color={colors.success} />
-        ) : symbol ? (
-          <Icon
-            name={symbol}
-            size={22}
-            color={toneColor(phaseTone(note.phase), colors)}
-          />
+        {symbol ? (
+          <Icon name={symbol} size={22} color={color} />
         ) : (
-          <ActivityIndicator color={colors.primary} />
+          <ActivityIndicator color={color} />
         )}
         <Copy weight="700" style={{ flex: 1 }}>
           {note.title}

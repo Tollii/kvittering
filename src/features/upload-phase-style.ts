@@ -1,6 +1,6 @@
 import type { SymbolViewProps } from "expo-symbols";
 import type { Theme } from "@/constants/theme";
-import type { UploadPhase, UploadTone } from "@/lib/upload-queue";
+import type { UploadPhase, UploadTone } from "@/lib/upload-phase";
 
 /** The symbol for a phase that has stopped; a phase in progress shows a spinner. */
 export const phaseSymbol = {

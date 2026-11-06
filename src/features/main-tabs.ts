@@ -4,7 +4,7 @@ import { useHousehold } from "@/features/household-context";
 import { useQuery } from "convex/react";
 import { type SFSymbol } from "expo-symbols";
 import { api } from "../../convex/_generated/api";
-import { needsPerson } from "@/lib/upload-queue";
+import { needsPerson } from "@/lib/upload-phase";
 
 /**
  * The main tabs, in order. The iOS layout shows them as native tabs; the web

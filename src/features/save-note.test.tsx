@@ -1,6 +1,7 @@
 import { expect, it } from "@jest/globals";
 import { saveNote } from "./save-note";
-import type { LocalReceipt, UploadFailure } from "@/lib/upload-queue";
+import type { LocalReceipt } from "@/lib/upload-queue";
+import type { UploadFailure } from "@/lib/upload-failure";
 import type { Id } from "../../convex/_generated/dataModel";
 
 const uploading: LocalReceipt = {

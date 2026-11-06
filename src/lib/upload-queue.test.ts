@@ -659,9 +659,14 @@ it("records another image's real error instead of a stall beside it", async () =
 });
 
 it("keeps the quota error and the later deadline on manual retry and household deferral", async () => {
-  const { run, retries, append, rows, clock } = fixture();
+  const { run, store, retries, append, rows, clock } = fixture();
   append("later");
   retries.write("later", { attempts: 1, restricted: true, retryAt: 120_000 });
+  append("failed-earlier");
+  store.update({
+    ...present(rows().find((entry) => entry.id === "failed-earlier")),
+    failure: { kind: "failed" },
+  });
   const contacted: string[] = [];
 
   const transport: UploadTransport = {
@@ -677,7 +682,9 @@ it("keeps the quota error and the later deadline on manual retry and household d
   const deferred = structuredClone(rows());
   await run("user", household, transport, () => true, { retryFailed: true });
   expect(rows()).toEqual(deferred);
+  // An earlier failure now waits for the same deadline, so it reads as deferred.
   expect(rows().map((entry) => entry.failure)).toEqual([
+    { kind: "deferred", message: "Quota wait" },
     { kind: "deferred", message: "Quota wait" },
     { kind: "deferred", message: "Quota wait" },
   ]);

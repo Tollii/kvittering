@@ -1,15 +1,9 @@
-import {
-  legacyReceiptImages,
-  receiptImageLimitMessage,
-} from "./domain/receipt-images";
+import { legacyReceiptImages } from "./domain/receipt-images";
 import { z } from "zod";
 import { v } from "convex/values";
 import { parse } from "convex-helpers/validators";
-import {
-  uploadFailureSchema,
-  type LocalReceipt,
-  type UploadFailure,
-} from "./upload-queue";
+import type { LocalReceipt } from "./upload-queue";
+import { failureText, storedFailure } from "./upload-failure";
 
 export class ReceiptMigrationError extends Error {}
 
@@ -25,42 +19,6 @@ const receiptValidator = v.object({
   // Older releases keep the failure as text only.
   error: v.string().optional(),
 });
-
-/**
- * The failure of a stored capture. A row written by an older release, or by
- * one rolled back to after this one, has only the text: of that, only the
- * image limit still matters, because it is what lets the person regroup. A
- * typed failure counts only beside its text, which an older release clears
- * when the upload succeeds.
- */
-function storedFailure(
-  typed: UploadFailure | undefined,
-  error: string | undefined,
-  restricted: boolean,
-): UploadFailure | undefined {
-  // Older releases treat empty text as no failure.
-  if (!error) return undefined;
-
-  if (typed) return typed;
-
-  if (error.includes(receiptImageLimitMessage)) return { kind: "image_limit" };
-
-  // The text of a capture that waits for the service's deadline is that deferral's message.
-  return restricted ? { kind: "deferred", message: error } : { kind: "failed" };
-}
-
-/** The text an older release shows and matches for each failure. */
-function failureText(failure: UploadFailure) {
-  switch (failure.kind) {
-    case "failed":
-      return "Opplastingen mislyktes.";
-    case "deferred":
-    case "rejected":
-      return failure.message;
-    case "image_limit":
-      return receiptImageLimitMessage;
-  }
-}
 
 /**
  * The stored form of a capture. It stays at schemaVersion 1 and keeps the
@@ -103,9 +61,6 @@ export function migrateReceipt(
     schemaVersion: 1,
   });
 
-  // A failure kind from a later release is not an error: its text still counts.
-  const typed = uploadFailureSchema.safeParse(input.data["failure"]).data;
-
   if (
     !result.id ||
     !result.owner ||
@@ -125,7 +80,7 @@ export function migrateReceipt(
     throw new ReceiptMigrationError(
       "Ugyldig lokal kvittering. Bildene er beholdt.",
     );
-  const stored = storedFailure(typed, error, restricted);
+  const stored = storedFailure(input.data["failure"], error, restricted);
 
   return stored ? { ...result, failure: stored } : result;
 }

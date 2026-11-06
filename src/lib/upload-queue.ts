@@ -6,26 +6,12 @@ import {
 } from "./request-retry";
 import type { Id } from "../../convex/_generated/dataModel";
 import type { DiagnosticFields } from "./diagnostics";
-import { parseUserError } from "./user-errors";
 import {
-  maxReceiptImages,
-  receiptImageLimitMessage,
-} from "./domain/receipt-images";
-import { z } from "zod";
-
-/** Why the last upload attempt of a capture stopped. */
-export const uploadFailureSchema = z.discriminatedUnion("kind", [
-  /** Something went wrong on the way; the queue tries again. */
-  z.object({ kind: z.literal("failed") }),
-  /** The service asked the queue to wait; the message says until when. */
-  z.object({ kind: z.literal("deferred"), message: z.string().min(1) }),
-  /** The service refused the capture as sent; the message says why. */
-  z.object({ kind: z.literal("rejected"), message: z.string().min(1) }),
-  /** An older capture has more images than one receipt takes. */
-  z.object({ kind: z.literal("image_limit") }),
-]);
-
-export type UploadFailure = z.infer<typeof uploadFailureSchema>;
+  deferral,
+  failureFromCause,
+  waitsForPerson,
+  type UploadFailure,
+} from "./upload-failure";
 
 export type LocalReceipt = {
   schemaVersion: 1;
@@ -38,100 +24,6 @@ export type LocalReceipt = {
   receiptId?: Id<"receipts">;
   failure?: UploadFailure;
 };
-
-/** Where a capture stands, for the interface. */
-export type UploadPhase =
-  | { kind: "uploading" }
-  | { kind: "offline" }
-  /** Waits for the time the service named, and then continues by itself. */
-  | { kind: "deferred"; message: string }
-  /** Failed; the queue tries again until its attempts run out, then waits for the person. */
-  | { kind: "failed" }
-  /** Waits for the person; only a manual retry sends it again. */
-  | { kind: "rejected"; message: string }
-  /** Waits for the person to split the images into two receipts. */
-  | { kind: "regroup" };
-
-/** How a phase reads: in progress, waiting by itself, or waiting for the person. */
-export type UploadTone = "active" | "waiting" | "attention";
-
-/** Each phase's tone and the one action the person can take. */
-const phaseTreatment = {
-  uploading: { tone: "active", action: null },
-  offline: { tone: "active", action: null },
-  deferred: { tone: "waiting", action: null },
-  failed: { tone: "attention", action: "retry" },
-  rejected: { tone: "attention", action: "retry" },
-  regroup: { tone: "attention", action: "regroup" },
-} as const satisfies Record<
-  UploadPhase["kind"],
-  { tone: UploadTone; action: "retry" | "regroup" | null }
->;
-
-export const phaseTone = (phase: UploadPhase) =>
-  phaseTreatment[phase.kind].tone;
-
-export const phaseAction = (phase: UploadPhase) =>
-  phaseTreatment[phase.kind].action;
-
-/** Whether the person can split an unreserved older capture into two receipts. */
-export function canRegroup(entry: LocalReceipt) {
-  return (
-    entry.failure?.kind === "image_limit" &&
-    !entry.receiptId &&
-    !entry.uploaded.some(Boolean) &&
-    entry.images.length > maxReceiptImages
-  );
-}
-
-export function uploadPhase(entry: LocalReceipt, online: boolean): UploadPhase {
-  switch (entry.failure?.kind) {
-    case undefined:
-      return { kind: online ? "uploading" : "offline" };
-    case "failed":
-    case "deferred":
-    case "rejected":
-      return entry.failure;
-    case "image_limit":
-      return canRegroup(entry)
-        ? { kind: "regroup" }
-        : { kind: "rejected", message: receiptImageLimitMessage };
-  }
-}
-
-/** Whether a capture waits for the person, which the tab badge counts. */
-export const needsPerson = (entry: LocalReceipt) =>
-  phaseTone(uploadPhase(entry, true)) === "attention";
-
-/** Whether automatic retries stop until the person acts. */
-const waitsForPerson = (failure: UploadFailure) =>
-  failure.kind === "rejected" || failure.kind === "image_limit";
-
-// The backend sends the image limit as the message itself.
-const imageLimitSchema = z.object({
-  data: z.literal(receiptImageLimitMessage),
-});
-
-const deferralMessage = (cause: RequestDeferred) =>
-  cause.message || "Opplastingen fortsetter senere.";
-
-/** Read the failure a capture keeps from what a step threw. */
-function uploadFailure(cause: unknown): UploadFailure {
-  if (cause instanceof RequestDeferred)
-    return { kind: "deferred", message: deferralMessage(cause) };
-
-  if (
-    imageLimitSchema.safeParse(cause).success ||
-    (cause instanceof Error && cause.message.includes(receiptImageLimitMessage))
-  )
-    return { kind: "image_limit" };
-  const rejection = parseUserError(cause);
-
-  if (rejection?.code === "REJECTED")
-    return { kind: "rejected", message: rejection.message };
-
-  return { kind: "failed" };
-}
 
 export interface QueueStore {
   list(owner: string, householdId: Id<"households">): LocalReceipt[];
@@ -257,11 +149,8 @@ function withDeadlines(
  * a deferral: the service named when to come back, so the capture waits for
  * that time instead of stopping as if it had failed.
  */
-function spendsRetry(failure: UploadFailure, cause: unknown) {
-  return (
-    failure.kind !== "deferred" &&
-    !(cause instanceof UploadStalled && cause.joinable)
-  );
+function spendsRetry(failure: UploadFailure, joinable: boolean) {
+  return failure.kind !== "deferred" && !joinable;
 }
 
 /**
@@ -477,6 +366,22 @@ export function createQueueRunner(
     return true;
   }
 
+  /**
+   * Keep a deferral on the row and its deadline in the retry store together.
+   * A capture that already waits for the person keeps that failure.
+   */
+  function applyDeferral(entry: LocalReceipt, cause: RequestDeferred) {
+    if (!entry.failure || !waitsForPerson(entry.failure))
+      entry.failure = deferral(cause);
+    store.update(entry);
+
+    try {
+      defer(entry.id, cause);
+    } catch {
+      storageFailure(entry);
+    }
+  }
+
   /** Apply a deferral to each other capture that has no server reservation yet. */
   function deferPendingCaptures(
     owner: string,
@@ -487,21 +392,7 @@ export function createQueueRunner(
     for (const pending of store.list(owner, householdId)) {
       if (pending.receiptId || pending.id === failedId) continue;
 
-      const deferred = {
-        ...pending,
-        failure: pending.failure ?? {
-          kind: "deferred" as const,
-          message: deferralMessage(cause),
-        },
-      };
-
-      store.update(deferred);
-
-      try {
-        defer(pending.id, cause);
-      } catch {
-        storageFailure(deferred);
-      }
+      applyDeferral({ ...pending }, cause);
     }
   }
 
@@ -513,12 +404,11 @@ export function createQueueRunner(
     retry: RetryState | undefined,
     cause: unknown,
   ) {
-    const failure = uploadFailure(cause);
-    entry.failure = failure;
-    store.update(entry);
+    const failure = failureFromCause(cause);
+    const joinable = cause instanceof UploadStalled && cause.joinable;
 
     const failures =
-      (retry?.failures ?? 0) + (spendsRetry(failure, cause) ? 1 : 0);
+      (retry?.failures ?? 0) + (spendsRetry(failure, joinable) ? 1 : 0);
 
     // A free retry still backs off, from the first delay up.
     const next = nextAttemptAt(
@@ -535,15 +425,22 @@ export function createQueueRunner(
         attempts: failures,
       });
 
+    entry.failure = failure;
+
+    if (cause instanceof RequestDeferred) {
+      applyDeferral(entry, cause);
+      deferPendingCaptures(owner, householdId, entry.id, cause);
+
+      return;
+    }
+
+    store.update(entry);
+
     try {
-      if (cause instanceof RequestDeferred) defer(entry.id, cause);
-      else retries.remove(entry.id);
+      retries.remove(entry.id);
     } catch {
       storageFailure(entry);
     }
-
-    if (cause instanceof RequestDeferred)
-      deferPendingCaptures(owner, householdId, entry.id, cause);
   }
 
   const run = async (
