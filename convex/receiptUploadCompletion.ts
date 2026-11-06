@@ -57,7 +57,11 @@ export async function beginUploadedReceipt(
     { id, generation: 1 },
     {
       onComplete: internal.retention.workflowCompleted,
-      context: { component: "processing", receiptId: id },
+      context: {
+        component: "processing",
+        receiptId: id,
+        readGeneration: 1,
+      },
     },
   );
 

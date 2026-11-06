@@ -113,14 +113,22 @@ export const processReceipt = workflow
       });
 
       stage = "finish";
-      await step.runMutation(internal.processing.finish, {
-        matches,
-        durationMs: extraction.durationMs + classification.durationMs,
-        ...args,
-        data: prepared,
-        original: extraction.data,
-        provider: `${extraction.provider} / ${classification.provider}`,
-      });
+
+      // Each step searches one page for a duplicate, so a failure on any page reaches `fail`.
+      let duplicateSearch: DuplicateSearch | undefined;
+
+      do {
+        duplicateSearch =
+          (await step.runMutation(internal.processing.finish, {
+            matches,
+            durationMs: extraction.durationMs + classification.durationMs,
+            ...args,
+            data: prepared,
+            original: extraction.data,
+            provider: `${extraction.provider} / ${classification.provider}`,
+            ...duplicateSearch,
+          })) ?? undefined;
+      } while (duplicateSearch);
     } catch (error) {
       await step.runMutation(
         internal.processing.fail,
@@ -212,6 +220,14 @@ const finishArgs = {
 
 type FinishArgs = ObjectType<typeof finishArgs>;
 
+/** Where the duplicate search continues when a page found none and more remain. */
+const duplicateSearch = v.object({
+  duplicateCursor: v.string(),
+  duplicateThrough: v.number(),
+});
+
+type DuplicateSearch = Infer<typeof duplicateSearch>;
+
 type ProductDecision = Infer<typeof productDecision>;
 
 /** A purchase typed in has no images and no receipt number or time to compare. */
@@ -246,7 +262,7 @@ function isDuplicateReceipt(
 
 /**
  * Search one page of the household's receipts for a duplicate. When the page
- * has no duplicate and more pages remain, schedule `finish` again for the next page.
+ * has no duplicate and more pages remain, say where the next page starts.
  */
 async function findDuplicate(
   ctx: MutationCtx,
@@ -254,7 +270,7 @@ async function findDuplicate(
   args: FinishArgs,
 ): Promise<
   | { kind: "resolved"; duplicateOf: Id<"receipts"> | undefined }
-  | { kind: "rescheduled" }
+  | { kind: "next_page"; search: DuplicateSearch }
 > {
   const { store, purchaseDate } = args.data;
 
@@ -288,15 +304,14 @@ async function findDuplicate(
     isDuplicateReceipt(other, receipt, args.data),
   )?._id;
 
-  if (!duplicateOf && !page.isDone) {
-    await ctx.scheduler.runAfter(0, internal.processing.finish, {
-      ...args,
-      duplicateCursor: page.continueCursor,
-      duplicateThrough: through,
-    });
-
-    return { kind: "rescheduled" };
-  }
+  if (!duplicateOf && !page.isDone)
+    return {
+      kind: "next_page",
+      search: {
+        duplicateCursor: page.continueCursor,
+        duplicateThrough: through,
+      },
+    };
 
   return { kind: "resolved", duplicateOf };
 }
@@ -474,10 +489,15 @@ async function notifyReceiptReady(ctx: MutationCtx, receipt: Doc<"receipts">) {
   }
 }
 
+/**
+ * Commit the extraction, or return where the duplicate search continues. The
+ * workflow calls it again with that position, so every page runs inside the
+ * workflow's error handling.
+ */
 export const finish = internalMutation({
   args: finishArgs,
-  returns: v.null(),
-  handler: async (ctx, args) => {
+  returns: v.union(v.null(), duplicateSearch),
+  handler: async (ctx, args): Promise<DuplicateSearch | null> => {
     const receipt = await ctx.db.get("receipts", args.id);
 
     if (
@@ -498,7 +518,7 @@ export const finish = internalMutation({
 
     const duplicate = await findDuplicate(ctx, receipt, args);
 
-    if (duplicate.kind === "rescheduled") return null;
+    if (duplicate.kind === "next_page") return duplicate.search;
     const { duplicateOf } = duplicate;
 
     await ctx.db.insert("extractions", {
@@ -565,36 +585,47 @@ export const finish = internalMutation({
   },
 });
 
+const failureArgs = {
+  id: v.id("receipts"),
+  generation: v.number(),
+  error: v.string(),
+  stage: v.string().optional(),
+  errorType: v.string().optional(),
+};
+
+/** Mark a receipt failed when it is still being read for the generation that failed. */
+export async function failReceiptReading(
+  ctx: MutationCtx,
+  args: ObjectType<typeof failureArgs>,
+) {
+  const receipt = await ctx.db.get("receipts", args.id);
+
+  if (
+    !receipt ||
+    receipt.generation !== args.generation ||
+    !isReceiptBeingRead(receipt.status)
+  )
+    return;
+
+  // The original failure stays on the receipt; do not duplicate OCR/provider text in logs.
+  console.error("receipt.processing_failed", {
+    receiptId: args.id,
+    generation: args.generation,
+    stage: args.stage,
+    errorType: args.errorType,
+  });
+  await ctx.db.patch("receipts", args.id, {
+    status: "failed",
+    error: args.error.slice(0, 400),
+  });
+  await notifyReceiptActivities(ctx, receipt.householdId);
+}
+
 export const fail = internalMutation({
-  args: {
-    id: v.id("receipts"),
-    generation: v.number(),
-    error: v.string(),
-    stage: v.string().optional(),
-    errorType: v.string().optional(),
-  },
+  args: failureArgs,
   returns: v.null(),
   handler: async (ctx, args) => {
-    const receipt = await ctx.db.get("receipts", args.id);
-
-    if (
-      receipt &&
-      receipt.generation === args.generation &&
-      isReceiptBeingRead(receipt.status)
-    ) {
-      // The original failure stays on the receipt; do not duplicate OCR/provider text in logs.
-      console.error("receipt.processing_failed", {
-        receiptId: args.id,
-        generation: args.generation,
-        stage: args.stage,
-        errorType: args.errorType,
-      });
-      await ctx.db.patch("receipts", args.id, {
-        status: "failed",
-        error: args.error.slice(0, 400),
-      });
-      await notifyReceiptActivities(ctx, receipt.householdId);
-    }
+    await failReceiptReading(ctx, args);
 
     return null;
   },

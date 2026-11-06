@@ -9,6 +9,7 @@ import {
 import { vResultValidator } from "@convex-dev/workpool";
 import { internalMutation } from "./serverFunctions";
 import { components, internal } from "./_generated/api";
+import { failReceiptReading } from "./processing";
 
 import type { MutationCtx } from "./_generated/server";
 import type { Id } from "./_generated/dataModel";
@@ -58,13 +59,28 @@ export const workflowCompleted = internalMutation({
     result: vResultValidator,
     context: v.union(
       v.null(),
-      v.object({ component: workflowComponent, receiptId: v.id("receipts") }),
+      v.object({
+        component: workflowComponent,
+        receiptId: v.id("receipts"),
+        // Only a run that reads the receipt sets it. Runs started before it existed omit it.
+        readGeneration: v.number().optional(),
+      }),
     ),
   },
   returns: v.null(),
-  handler: async (ctx, { workflowId, context }) => {
+  handler: async (ctx, { workflowId, result, context }) => {
     // The daily inventory registers legacy journals without one scan per callback.
     if (!context) return null;
+
+    // A reading run that ends with its receipt still being read would leave it stuck.
+    if (context.readGeneration !== undefined)
+      await failReceiptReading(ctx, {
+        id: context.receiptId,
+        generation: context.readGeneration,
+        error: "Behandlingen mislyktes.",
+        stage: "workflow",
+        errorType: `workflow_${result.kind}`,
+      });
 
     const id = await trackWorkflow(
       ctx,

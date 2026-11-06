@@ -212,7 +212,11 @@ export const retry = mutation({
       { id, generation },
       {
         onComplete: internal.retention.workflowCompleted,
-        context: { component: "processing", receiptId: id },
+        context: {
+          component: "processing",
+          receiptId: id,
+          readGeneration: generation,
+        },
       },
     );
 
