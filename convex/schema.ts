@@ -113,7 +113,9 @@ export default defineSchema({
   })
     .index("by_activityId", ["activityId"])
     .index("by_identity", ["identity"])
-    .index("by_householdId", ["householdId"]),
+    .index("by_identity_and_expired", ["identity", "expired"])
+    .index("by_householdId", ["householdId"])
+    .index("by_householdId_and_expired", ["householdId", "expired"]),
   clientReleases: defineTable({
     identity: v.string(),
     installationId: v.string(),
