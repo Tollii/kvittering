@@ -60,6 +60,24 @@ export type ProductAnalysisResult = Infer<
   typeof productAnalysisResultValidator
 >;
 
+/**
+ * A run still pending this long after it started is presumed lost. Workflow
+ * retries finish within minutes, so this leaves room for a queue backlog.
+ */
+export const productAnalysisStaleAfterMs = 30 * 60_000;
+
+/** Whether a person may start this snapshot's analysis again: it failed, or its run is presumed lost. */
+export function productAnalysisRestartable(
+  analysis: Pick<Infer<typeof productAnalysisValidator>, "state" | "updatedAt">,
+  now: number,
+) {
+  return (
+    analysis.state === "error" ||
+    (analysis.state === "pending" &&
+      now - analysis.updatedAt >= productAnalysisStaleAfterMs)
+  );
+}
+
 export const productAnalysisVersion = 6;
 
 /** A family name removes explicit package notation, while retaining the source's recipe and variant. */

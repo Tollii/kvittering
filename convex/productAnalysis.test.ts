@@ -16,6 +16,7 @@ import { batteryFixture } from "../src/lib/mock-receipts";
 import { readAttributes } from "../src/lib/domain/product-attributes";
 import {
   purchaseEvidenceKey,
+  productAnalysisStaleAfterMs,
   productAnalysisVersion,
 } from "../src/lib/domain/product-families";
 
@@ -170,6 +171,55 @@ it("starts once, exposes exhausted failure, and permits an explicit manual retry
   expect(
     (await t.run((ctx) => ctx.db.get("receipts", id)))?.productAnalysis?.state,
   ).toBe("pending");
+});
+
+it("lets a person replace a run that stays pending past the stale limit", async () => {
+  vi.useFakeTimers();
+  const { register } = await import("@convex-dev/workflow/test");
+  const { t, first, id } = await setup();
+  register(t, "productAnalysisWorkflow");
+  vi.stubEnv("TYPESAFE_API_KEY", "test-key");
+  await t.mutation(internal.productAnalysis.start, { id });
+
+  const analysis = async () =>
+    (await t.run((ctx) => ctx.db.get("receipts", id)))?.productAnalysis;
+
+  const initial = await analysis();
+  await first.mutation(api.productAnalysis.ensure, { ids: [id] });
+  expect(await analysis()).toEqual(initial);
+
+  const stale = Date.now() - productAnalysisStaleAfterMs;
+  await t.run((ctx) =>
+    ctx.db.patch("receipts", id, {
+      productAnalysis: { ...present(initial), updatedAt: stale },
+    }),
+  );
+  await t.mutation(internal.productAnalysis.start, { id });
+  expect((await analysis())?.updatedAt).toBe(stale);
+  await first.mutation(api.productAnalysis.ensure, { ids: [id] });
+  const restarted = await analysis();
+  expect(restarted?.state).toBe("pending");
+  expect(restarted?.updatedAt).toBeGreaterThan(stale);
+
+  const runs = await t.run(async (ctx) => {
+    const journals = await ctx.db
+      .query("workflowJournals")
+      .withIndex("by_receiptId", (q) => q.eq("receiptId", id))
+      .collect();
+
+    return Promise.all(
+      journals.map(async ({ workflowId }) => {
+        const { workflow } = await ctx.runQuery(
+          components.productAnalysisWorkflow.workflow.getStatus,
+          { workflowId },
+        );
+
+        return workflow.runResult?.kind ?? "running";
+      }),
+    );
+  });
+
+  expect(runs).toEqual(["canceled", "running"]);
 });
 
 it("continues past a paused catalog flag without starting catalog work", async () => {

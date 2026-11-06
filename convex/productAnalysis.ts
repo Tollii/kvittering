@@ -23,6 +23,7 @@ import {
   normalizeFamilyName,
   packageProfileValidator,
   productAnalysisResultValidator,
+  productAnalysisRestartable,
   productAnalysisVersion,
   productProfileKey,
   purchaseEvidenceKey,
@@ -91,6 +92,28 @@ export const process = manager
     return null;
   });
 
+/**
+ * Stops the receipt's unfinished runs, so a replaced run spends no more model
+ * calls. Every launch replaces the previous run, so it is among the newest journals.
+ */
+async function cancelRuns(ctx: MutationCtx, receiptId: Id<"receipts">) {
+  const journals = await ctx.db
+    .query("workflowJournals")
+    .withIndex("by_receiptId", (q) => q.eq("receiptId", receiptId))
+    .order("desc")
+    .take(20);
+
+  for (const journal of journals) {
+    if (journal.component !== "analysis" || journal.expiresAt !== undefined)
+      continue;
+
+    const status = await manager.status(ctx, journal.workflowId);
+
+    if (status.type === "inProgress")
+      await manager.cancel(ctx, journal.workflowId);
+  }
+}
+
 async function launch(
   ctx: MutationCtx,
   receipt: Doc<"receipts">,
@@ -113,12 +136,14 @@ async function launch(
     previous?.version === productAnalysisVersion &&
     previous.generation === receipt.generation &&
     previous.revision === receipt.revision &&
-    (previous.state !== "error" || !requester)
+    (!requester || !productAnalysisRestartable(previous, Date.now()))
   )
     return "current" as const;
 
   if (requester && requester !== "operator")
     await consumeWorkQuota(ctx, requester, "analysis");
+
+  if (previous?.state === "pending") await cancelRuns(ctx, receipt._id);
 
   const workflowId = await manager.start(
     ctx,
