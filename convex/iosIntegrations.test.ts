@@ -3,7 +3,7 @@ import { present } from "../src/lib/testing/receipts";
 import { register as registerRateLimiter } from "@convex-dev/rate-limiter/test";
 import { convexTest } from "convex-test";
 import { register } from "@convex-dev/workflow/test";
-import { expect, it } from "vitest";
+import { expect, it, onTestFinished, vi } from "vitest";
 import { api, internal } from "./_generated/api";
 import schema from "./schema";
 import { batteryFixture } from "../src/lib/mock-receipts";
@@ -223,7 +223,11 @@ it("publishes expiry without a receipt change and rejects stale cleanup", async 
 });
 
 it("ends a person's oldest activities instead of refusing a new one", async () => {
-  const { owner, ids } = await setup();
+  vi.useFakeTimers();
+  onTestFinished(() => {
+    vi.useRealTimers();
+  });
+  const { t, owner, ids } = await setup();
 
   const start = (activityId: string) =>
     owner.mutation(api.liveActivities.register, {
@@ -244,6 +248,12 @@ it("ends a person's oldest activities instead of refusing a new one", async () =
 
   for (const n of [1, 2])
     expect(await current(`activity-${n}`)).toMatchObject({ ended: true });
+
+  // Run the deliveries that are due now, but not the hourly expiry.
+  vi.advanceTimersByTime(1);
+  await t.finishInProgressScheduledFunctions();
+
+  for (const n of [1, 2]) expect(await current(`activity-${n}`)).toBeNull();
 
   for (const n of [3, 4, 5])
     expect(await current(`activity-${n}`)).toMatchObject({ ended: false });

@@ -40,8 +40,8 @@ async function progress(ctx: QueryCtx, activity: Doc<"receiptActivities">) {
 }
 
 /**
- * Marks the activity ended, which publishes the end to its subscription and over APNs. Moving
- * `expiresAt` forward lets every later delivery, including one without a token, remove the row.
+ * Marks the activity ended, which publishes the end to its subscription and over APNs. Clamping
+ * `expiresAt` to now lets every later delivery, including one without a token, remove the row.
  */
 async function endActivity(
   ctx: MutationCtx,
