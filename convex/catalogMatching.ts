@@ -9,6 +9,7 @@ import { clientMutation as mutation } from "./clientFunctions";
 import { v, type Infer } from "convex/values";
 import {
   WorkflowManager,
+  cancel as cancelWorkflow,
   start as startWorkflow,
   vWorkflowId,
 } from "@convex-dev/workflow";
@@ -44,7 +45,7 @@ import {
   type ReceiptData,
   type ReceiptLine,
 } from "../src/lib/domain/receipt";
-import type { Id } from "./_generated/dataModel";
+import type { Doc, Id } from "./_generated/dataModel";
 
 import {
   catalogDecision,
@@ -569,11 +570,93 @@ export const failed = internalMutation({
         receiptId: args.id,
         generation: args.generation,
       });
-      await ctx.db.patch("receipts", args.id, { catalogStatus: "error" });
-      await ctx.scheduler.runAfter(0, internal.productAnalysis.start, {
-        id: args.id,
-      });
+      await settleFailedMatching(ctx, args.id);
     }
+
+    return null;
+  },
+});
+
+/**
+ * Ends matching with the retryable error state and lets product analysis,
+ * which waits for matching, continue.
+ */
+async function settleFailedMatching(ctx: MutationCtx, id: Id<"receipts">) {
+  await ctx.db.patch("receipts", id, { catalogStatus: "error" });
+  await ctx.scheduler.runAfter(0, internal.productAnalysis.start, { id });
+}
+
+/**
+ * Lookups retry for a few minutes at most, so a run this old is stalled, for
+ * example waiting on a catalog result whose notification never arrived.
+ */
+const matchingDeadlineMs = 30 * 60_000;
+
+/**
+ * Why a pending receipt's matching can no longer finish by itself, or null
+ * while its run may still finish.
+ */
+async function stalledMatching(
+  ctx: MutationCtx,
+  receipt: Doc<"receipts">,
+  now: number,
+): Promise<"missing" | "ended" | "timed_out" | null> {
+  const workflowId = receipt.catalogWorkflowId;
+
+  if (!workflowId) return "missing";
+
+  // Runs are journaled when they start, and a journal goes only with its cleaned-up run.
+  const journal = await ctx.db
+    .query("workflowJournals")
+    .withIndex("by_component_and_workflowId", (q) =>
+      q.eq("component", "processing").eq("workflowId", workflowId),
+    )
+    .unique();
+
+  if (!journal) return "missing";
+
+  const { workflow } = await ctx.runQuery(
+    components.workflow.workflow.getStatus,
+    { workflowId },
+  );
+
+  // A run that ended without `finish` or `failed` leaves the receipt pending.
+  if (workflow.runResult) return "ended";
+
+  if (now - workflow._creationTime < matchingDeadlineMs) return null;
+  await cancelWorkflow(ctx, components.workflow, workflowId);
+
+  return "timed_out";
+}
+
+/** Settles pending matching that will never finish, so retry and analysis are not blocked. */
+export const recoverStalled = internalMutation({
+  args: { cursor: v.union(v.string(), v.null()) },
+  returns: v.null(),
+  handler: async (ctx, { cursor }) => {
+    const page = await ctx.db
+      .query("receipts")
+      .withIndex("by_catalogStatus", (q) => q.eq("catalogStatus", "pending"))
+      .paginate({ cursor, numItems: 20 });
+
+    const now = Date.now();
+
+    for (const receipt of page.page) {
+      const reason = await stalledMatching(ctx, receipt, now);
+
+      if (!reason) continue;
+      console.error("catalog.matching_stalled", {
+        receiptId: receipt._id,
+        generation: receipt.generation,
+        reason,
+      });
+      await settleFailedMatching(ctx, receipt._id);
+    }
+
+    if (!page.isDone)
+      await ctx.scheduler.runAfter(0, internal.catalogMatching.recoverStalled, {
+        cursor: page.continueCursor,
+      });
 
     return null;
   },

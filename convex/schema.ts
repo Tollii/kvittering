@@ -311,7 +311,8 @@ export default defineSchema({
     ])
     .index("by_duplicateOf", ["duplicateOf"])
     .index("by_householdId", ["householdId"])
-    .index("by_householdId_and_clientId", ["householdId", "clientId"]),
+    .index("by_householdId_and_clientId", ["householdId", "clientId"])
+    .index("by_catalogStatus", ["catalogStatus"]),
   images: defineTable({
     receiptId: v.id("receipts"),
     position: v.number(),
