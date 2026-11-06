@@ -3,8 +3,34 @@ import {
   migrateReceipt,
   ReceiptMigrationError,
   migrateReceiptDatabase,
+  serializeReceipt,
 } from "./receipt-migrations";
+import { receiptImageLimitMessage } from "./domain/receipt-images";
+import type { LocalReceipt } from "./upload-queue";
+import type { UploadFailure } from "./upload-failure";
+import { v } from "convex/values";
+import { parse } from "convex-helpers/validators";
 import { sqliteDatabase } from "./testing/sqlite";
+
+/** The reader of the releases before typed failures, as they shipped. */
+const olderReader = v.object({
+  schemaVersion: v.literal(1),
+  id: v.string(),
+  owner: v.string(),
+  householdId: v.id("households"),
+  createdAt: v.number(),
+  images: v.array(v.string()),
+  uploaded: v.array(v.boolean()),
+  receiptId: v.id("receipts").optional(),
+  error: v.string().optional(),
+});
+
+/** What an older release rolled back to reads from a stored capture. */
+function storedForOlderRelease(entry: LocalReceipt) {
+  const stored: unknown = JSON.parse(serializeReceipt(entry));
+
+  return parse(olderReader, stored);
+}
 
 const legacy = {
   id: "capture",
@@ -40,6 +66,8 @@ it("migrates an old queued receipt without losing identity, image paths or progr
     expect(JSON.parse(String(row.data))).toEqual({
       ...legacy,
       schemaVersion: 1,
+      failure: { kind: "failed" },
+      error: "Opplastingen mislyktes.",
     });
     expect(db.prepare("PRAGMA user_version").get()?.user_version).toBe(1);
   } finally {
@@ -90,4 +118,69 @@ it("refuses unknown future schemas and invalid upload progress", () => {
   } finally {
     db.close();
   }
+});
+
+it("stores each failure so this release and an older one rolled back to both read it", () => {
+  const { error: legacyError, ...uploading } = legacy;
+  const capture = migrateReceipt(uploading);
+
+  const failures: UploadFailure[] = [
+    { kind: "failed" },
+    { kind: "deferred", message: "Vent ett minutt." },
+    { kind: "rejected", message: "Husstanden er endret." },
+    { kind: "image_limit" },
+  ];
+
+  for (const failure of failures) {
+    const stored: unknown = JSON.parse(
+      serializeReceipt({ ...capture, failure }),
+    );
+
+    // The older reader accepts the row and drops the field it does not know.
+    expect(storedForOlderRelease({ ...capture, failure })).not.toHaveProperty(
+      "failure",
+    );
+    expect(migrateReceipt(stored)).toEqual({ ...capture, failure });
+  }
+
+  // Older releases show the deferral and match the image limit by its text.
+  expect(
+    storedForOlderRelease({
+      ...capture,
+      failure: { kind: "deferred", message: "Vent ett minutt." },
+    }).error,
+  ).toBe("Vent ett minutt.");
+  expect(
+    storedForOlderRelease({ ...capture, failure: { kind: "image_limit" } })
+      .error,
+  ).toContain(receiptImageLimitMessage);
+  expect(migrateReceipt({ ...uploading, error: legacyError }).failure).toEqual({
+    kind: "failed",
+  });
+});
+
+it("reads the failure from the text older releases wrote", () => {
+  const { error: _, ...uploading } = legacy;
+
+  expect(
+    migrateReceipt({ ...uploading, error: receiptImageLimitMessage }).failure,
+  ).toEqual({ kind: "image_limit" });
+  // An older release cleared the text when the retry went through.
+  expect(
+    migrateReceipt({
+      ...uploading,
+      failure: { kind: "rejected", message: "Husstanden er endret." },
+    }).failure,
+  ).toBeUndefined();
+  // A capture an older release deferred keeps waiting for the service's deadline.
+  expect(
+    migrateReceipt(
+      { ...uploading, error: "Vent ett minutt." },
+      { restricted: true },
+    ).failure,
+  ).toEqual({ kind: "deferred", message: "Vent ett minutt." });
+  // A failure kind from a later release falls back to its text.
+  expect(
+    migrateReceipt({ ...legacy, failure: { kind: "later" } }).failure,
+  ).toEqual({ kind: "failed" });
 });

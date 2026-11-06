@@ -1,16 +1,18 @@
-import {
-  maxReceiptImages,
-  receiptImageLimitMessage,
-} from "./domain/receipt-images";
+import { maxReceiptImages } from "./domain/receipt-images";
 import type { RetryStore } from "./request-retry";
 import { parse } from "convex-helpers/validators";
 import { v } from "convex/values";
-import { migrateReceipt, migrateReceiptDatabase } from "./receipt-migrations";
+import {
+  migrateReceipt,
+  migrateReceiptDatabase,
+  serializeReceipt,
+} from "./receipt-migrations";
 import { Directory, File, Paths } from "expo-file-system";
 import { openDatabaseSync } from "expo-sqlite";
 import { randomUUID } from "expo-crypto";
 import type { Id } from "../../convex/_generated/dataModel";
 import type { LocalReceipt, QueueStore } from "./upload-queue";
+import { canRegroup } from "./upload-phase";
 import { storageSuffix } from "./deployment-storage";
 import { getOrInsert } from "./map-cache";
 import { UserError } from "./user-errors";
@@ -64,7 +66,7 @@ function writeEntry(entry: LocalReceipt) {
     entry.id,
     entry.owner,
     entry.householdId,
-    JSON.stringify(entry),
+    serializeReceipt(entry),
   );
 }
 
@@ -113,12 +115,18 @@ export const receiptStorage: QueueStore = {
   list(owner, householdId) {
     return getOrInsert(queueSnapshots, scopeKey(owner, householdId), () => {
       const entries = storage()
-        .getAllSync<{ data: string }>(
-          "SELECT data FROM receipt_queue WHERE owner = ? AND household = ? ORDER BY rowid",
+        .getAllSync<{ data: string; restricted: number | null }>(
+          "SELECT receipt_queue.data, receipt_retry.restricted FROM receipt_queue LEFT JOIN receipt_retry ON receipt_retry.id = receipt_queue.id WHERE receipt_queue.owner = ? AND receipt_queue.household = ? ORDER BY receipt_queue.rowid",
           owner,
           householdId,
         )
-        .map((row) => freezeReceipt(migrateReceipt(JSON.parse(row.data))));
+        .map((row) =>
+          freezeReceipt(
+            migrateReceipt(JSON.parse(row.data), {
+              restricted: row.restricted === 1,
+            }),
+          ),
+        );
 
       Object.freeze(entries);
 
@@ -264,11 +272,7 @@ export function regroupQueuedReceipt(
       });
     const entry = migrateReceipt(JSON.parse(row.data));
 
-    if (
-      entry.receiptId ||
-      entry.uploaded.some(Boolean) ||
-      !entry.error?.includes(receiptImageLimitMessage)
-    )
+    if (!canRegroup(entry))
       throw new UserError({
         code: "REJECTED",
         message: "Vent til opplastingen er avklart før du deler opp bildene.",

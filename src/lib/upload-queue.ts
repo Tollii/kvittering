@@ -6,7 +6,12 @@ import {
 } from "./request-retry";
 import type { Id } from "../../convex/_generated/dataModel";
 import type { DiagnosticFields } from "./diagnostics";
-import { parseUserError } from "./user-errors";
+import {
+  deferral,
+  failureFromCause,
+  waitsForPerson,
+  type UploadFailure,
+} from "./upload-failure";
 
 export type LocalReceipt = {
   schemaVersion: 1;
@@ -17,7 +22,7 @@ export type LocalReceipt = {
   images: string[];
   uploaded: boolean[];
   receiptId?: Id<"receipts">;
-  error?: string;
+  failure?: UploadFailure;
 };
 
 export interface QueueStore {
@@ -46,6 +51,9 @@ export const stepDeadlineMs = {
 type UploadStep = keyof typeof stepDeadlineMs;
 
 const deadlineTickMs = 5_000;
+
+/** The longest delay setTimeout keeps; a longer one overflows and fires at once. */
+const longestTimerMs = 2 ** 31 - 1;
 
 /** A request that never answered. It holds no server result, so the capture retries. */
 class UploadStalled extends Error {
@@ -137,10 +145,12 @@ function withDeadlines(
 /**
  * Whether a failure spends the automatic retry budget. A stall whose retry
  * joins the transfer in flight does not: retrying sends nothing new, and
- * stopping would leave the capture waiting after the transfer lands.
+ * stopping would leave the capture waiting after the transfer lands. Nor does
+ * a deferral: the service named when to come back, so the capture waits for
+ * that time instead of stopping as if it had failed.
  */
-function spendsRetry(cause: unknown) {
-  return !(cause instanceof UploadStalled && cause.joinable);
+function spendsRetry(failure: UploadFailure, joinable: boolean) {
+  return failure.kind !== "deferred" && !joinable;
 }
 
 /**
@@ -207,10 +217,12 @@ export function createQueueRunner(
     retries.write(id, retained);
   }
 
+  /** The capture waits for a manual retry, so a deferral no longer waits by itself. */
   function storageFailure(entry: LocalReceipt) {
     attempts.set(entry.id, { failures: 0, nextAttemptAt: null });
-    entry.error ??=
-      "Kunne ikke lese eller lagre ventetiden. Prøv igjen når lagringen virker.";
+
+    if (!entry.failure || entry.failure.kind === "deferred")
+      entry.failure = { kind: "failed" };
     store.update(entry);
     record("receipt.retry_storage_failed", { captureId: entry.id });
   }
@@ -252,10 +264,11 @@ export function createQueueRunner(
         }
       }
 
+      // A longer delay than setTimeout holds would fire at once, again and again.
       if (Number.isFinite(next))
         timer = setTimeout(
           () => void synchronize(),
-          Math.max(0, next - clock()),
+          Math.min(Math.max(0, next - clock()), longestTimerMs),
         );
     };
 
@@ -294,7 +307,7 @@ export function createQueueRunner(
     transport: UploadTransport,
     active: () => boolean,
   ) {
-    entry.error = undefined;
+    entry.failure = undefined;
 
     if (!entry.receiptId) {
       entry.receiptId = await transport.reserve(entry);
@@ -353,6 +366,22 @@ export function createQueueRunner(
     return true;
   }
 
+  /**
+   * Keep a deferral on the row and its deadline in the retry store together.
+   * A capture that already waits for the person keeps that failure.
+   */
+  function applyDeferral(entry: LocalReceipt, cause: RequestDeferred) {
+    if (!entry.failure || !waitsForPerson(entry.failure))
+      entry.failure = deferral(cause);
+    store.update(entry);
+
+    try {
+      defer(entry.id, cause);
+    } catch {
+      storageFailure(entry);
+    }
+  }
+
   /** Apply a deferral to each other capture that has no server reservation yet. */
   function deferPendingCaptures(
     owner: string,
@@ -363,18 +392,7 @@ export function createQueueRunner(
     for (const pending of store.list(owner, householdId)) {
       if (pending.receiptId || pending.id === failedId) continue;
 
-      const deferred = {
-        ...pending,
-        error: pending.error ?? cause.message,
-      };
-
-      store.update(deferred);
-
-      try {
-        defer(pending.id, cause);
-      } catch {
-        storageFailure(deferred);
-      }
+      applyDeferral({ ...pending }, cause);
     }
   }
 
@@ -386,16 +404,16 @@ export function createQueueRunner(
     retry: RetryState | undefined,
     cause: unknown,
   ) {
-    entry.error =
-      cause instanceof Error ? cause.message : "Opplastingen mislyktes.";
-    store.update(entry);
+    const failure = failureFromCause(cause);
+    const joinable = cause instanceof UploadStalled && cause.joinable;
 
-    const failures = (retry?.failures ?? 0) + (spendsRetry(cause) ? 1 : 0);
+    const failures =
+      (retry?.failures ?? 0) + (spendsRetry(failure, joinable) ? 1 : 0);
 
     // A free retry still backs off, from the first delay up.
     const next = nextAttemptAt(
       Math.max(failures, 1),
-      parseUserError(cause)?.code === "REJECTED",
+      waitsForPerson(failure),
       clock(),
     );
 
@@ -407,15 +425,22 @@ export function createQueueRunner(
         attempts: failures,
       });
 
+    entry.failure = failure;
+
+    if (cause instanceof RequestDeferred) {
+      applyDeferral(entry, cause);
+      deferPendingCaptures(owner, householdId, entry.id, cause);
+
+      return;
+    }
+
+    store.update(entry);
+
     try {
-      if (cause instanceof RequestDeferred) defer(entry.id, cause);
-      else retries.remove(entry.id);
+      retries.remove(entry.id);
     } catch {
       storageFailure(entry);
     }
-
-    if (cause instanceof RequestDeferred)
-      deferPendingCaptures(owner, householdId, entry.id, cause);
   }
 
   const run = async (

@@ -1,28 +1,23 @@
 import { useState } from "react";
 import { Image, View } from "react-native";
 import { Button, Copy, Notice, Sheet, Toggle } from "@/components/ui";
-import {
-  maxReceiptImages,
-  receiptImageLimitMessage,
-} from "@/lib/domain/receipt-images";
+import { maxReceiptImages } from "@/lib/domain/receipt-images";
 import { imageFile } from "@/lib/receipt-storage";
 import type { LocalReceipt } from "@/lib/upload-queue";
 import { useHousehold } from "./household-context";
 import { failureMessage } from "@/lib/failure-message";
 
-/** Older unreserved queues keep every image until the person selects two receipt groups. */
+/**
+ * Older unreserved queues keep every image until the person selects two
+ * receipt groups. The card shows this only in the regroup phase; storage
+ * checks it again before it writes.
+ */
 export function QueueRegroup({ entry }: Readonly<{ entry: LocalReceipt }>) {
   const { regroup } = useHousehold();
   const [visible, setVisible] = useState(false);
   const [selected, setSelected] = useState<number[]>([]);
   const [error, setError] = useState("");
 
-  if (
-    entry.receiptId ||
-    entry.images.length <= maxReceiptImages ||
-    !entry.error?.includes(receiptImageLimitMessage)
-  )
-    return null;
   const remaining = entry.images.length - selected.length;
 
   return (
