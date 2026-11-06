@@ -90,7 +90,7 @@ gh pr view <number-or-url> --json url,state,isDraft,headRefOid,mergeable,mergeSt
 gh pr checks <number-or-url>
 ```
 
-Confirm that the expected quality workflow actually ran and passed for the current PR head. Missing checks, cancelled checks, or skipped required checks are not a pass. Wait for pending checks and unresolved mergeability calculations. Inspect unresolved review threads directly; previously seen comments still need a disposition. Approving reviews and bot review completion are not required. Do not request CodeRabbit reviews for Dependabot PRs.
+Confirm that the expected quality workflow actually ran and passed for the current PR head. Missing checks, cancelled checks, or skipped required checks are not a pass. Wait for pending checks and unresolved mergeability calculations. Inspect unresolved review threads directly; previously seen comments still need a disposition. Approving reviews and bot review completion are not required. Do not request Macroscope reviews for Dependabot PRs.
 
 If merge was requested, use a merge method supported by the repository and consistent with recent PR history. Pass `--match-head-commit <verified-sha>` to `gh pr merge` so a new commit cannot bypass verification. Do not bypass branch protection with `--admin`. If the repository queues the merge, keep monitoring until GitHub reports it as merged. Do not delete branches unless requested.
 
