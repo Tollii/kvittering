@@ -14,6 +14,12 @@ import {
   type ReceiptData,
 } from "../src/lib/domain/receipt";
 import { assessReceipt } from "../src/lib/domain/receipt-review";
+import {
+  isReceiptProcessing,
+  receiptTransition,
+  type ReceiptEvent,
+  type ReceiptStatus,
+} from "../src/lib/domain/receipt-state";
 
 export const receiptCommitValidator = v.object({
   receiptId: v.id("receipts"),
@@ -56,7 +62,7 @@ export function decideReceiptChange({
   if (origin.kind === "product_link")
     return {
       revision: previous.revision + 1,
-      status: previous.status,
+      status: transition(previous.status, { kind: "product_linked" }),
       autoAccepted: previous.autoAccepted,
     };
   const acceptable = assessReceipt(data, unresolvedDuplicate).acceptable;
@@ -81,13 +87,30 @@ export function decideReceiptChange({
 
   return {
     revision: previous.revision + (origin.kind === "extraction" ? 0 : 1),
-    status: reviewed ? ("reviewed" as const) : ("needs_review" as const),
+    status: transition(previous.status, {
+      kind: origin.kind === "extraction" ? "read" : "edited",
+      reviewed,
+    }),
     autoAccepted:
       origin.kind === "human"
         ? false
         : reviewed &&
           (previous.status !== "reviewed" || previous.autoAccepted === true),
   };
+}
+
+/** A change the lifecycle refuses means the caller saw an older status. */
+function transition(from: ReceiptStatus, event: ReceiptEvent) {
+  const status = receiptTransition(from, event);
+
+  if (status) return status;
+
+  throw isReceiptProcessing(from)
+    ? userError("Vent til behandlingen er ferdig.")
+    : userError(
+        "Kvitteringen er endret. Hent siste versjon.",
+        "RECEIPT_CHANGED",
+      );
 }
 
 /** Commit within the caller's mutation. Recheck the snapshot before writing history or data. */

@@ -1,4 +1,7 @@
-import { isReceiptBeingRead } from "../src/lib/domain/receipt-state";
+import {
+  acceptsReceiptEvent,
+  receiptTransition,
+} from "../src/lib/domain/receipt-state";
 import { notifyReceiptActivities } from "./liveActivities";
 import { linkCatalogProduct } from "./catalogLinks";
 import { compatibleCatalogProduct } from "../src/lib/catalog/matching";
@@ -160,13 +163,14 @@ export const begin = internalMutation({
   handler: async (ctx, args) => {
     const receipt = await ctx.db.get("receipts", args.id);
 
-    if (
-      !receipt ||
-      receipt.generation !== args.generation ||
-      receipt.status !== "uploaded"
-    )
-      return null;
-    await ctx.db.patch("receipts", args.id, { status: "processing" });
+    if (!receipt || receipt.generation !== args.generation) return null;
+
+    const status = receiptTransition(receipt.status, {
+      kind: "reading_started",
+    });
+
+    if (!status) return null;
+    await ctx.db.patch("receipts", args.id, { status });
     await notifyReceiptActivities(ctx, receipt.householdId);
 
     const images = await ctx.db
@@ -511,7 +515,7 @@ export const finish = internalMutation({
     if (
       !receipt ||
       receipt.generation !== args.generation ||
-      receipt.status !== "processing"
+      !acceptsReceiptEvent(receipt.status, "read")
     )
       return null;
 
@@ -608,12 +612,11 @@ async function failReceiptReading(
 ) {
   const receipt = await ctx.db.get("receipts", args.id);
 
-  if (
-    !receipt ||
-    receipt.generation !== args.generation ||
-    !isReceiptBeingRead(receipt.status)
-  )
-    return;
+  if (!receipt || receipt.generation !== args.generation) return;
+
+  const status = receiptTransition(receipt.status, { kind: "reading_failed" });
+
+  if (!status) return;
 
   // The original failure stays on the receipt; do not duplicate OCR/provider text in logs.
   console.error("receipt.processing_failed", {
@@ -623,7 +626,7 @@ async function failReceiptReading(
     errorType: args.errorType,
   });
   await ctx.db.patch("receipts", args.id, {
-    status: "failed",
+    status,
     error: args.error.slice(0, 400),
   });
   await notifyReceiptActivities(ctx, receipt.householdId);

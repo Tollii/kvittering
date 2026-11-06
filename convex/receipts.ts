@@ -8,9 +8,10 @@ import { receiptPeriodPage } from "./receiptPeriod";
 import { CalendarDate } from "../src/lib/domain/calendar";
 import { userError } from "./userErrors";
 import {
+  acceptsReceiptEvent,
   attentionStatuses,
-  isReceiptProcessing,
   isUploadAbandoned,
+  receiptTransition,
 } from "../src/lib/domain/receipt-state";
 import {
   maxReceiptImages,
@@ -176,13 +177,13 @@ export const completeUpload = mutation({
   handler: async (ctx, { id }) => {
     const { receipt } = await requireReceipt(ctx, id);
 
-    if (receipt.status !== "uploading") return null;
+    if (!acceptsReceiptEvent(receipt.status, "upload_completed")) return null;
 
     const images = await receiptImages(ctx, id);
 
     if (images.length !== receipt.imageCount)
       throw userError("Noen bilder er ikke lastet opp.");
-    await beginUploadedReceipt(ctx, id, images.length);
+    await beginUploadedReceipt(ctx, receipt, images.length);
 
     return null;
   },
@@ -195,12 +196,13 @@ export const retry = mutation({
   handler: async (ctx, { id }) => {
     const { receipt, member } = await requireReceipt(ctx, id);
 
-    if (isReceiptProcessing(receipt.status))
-      throw userError("Kvitteringen behandles allerede.");
+    const status = receiptTransition(receipt.status, { kind: "retried" });
+
+    if (!status) throw userError("Kvitteringen behandles allerede.");
     await consumeReceiptQuota(ctx, member);
     const generation = receipt.generation + 1;
     await ctx.db.patch("receipts", id, {
-      status: "uploaded",
+      status,
       generation,
       error: undefined,
     });
@@ -430,7 +432,8 @@ export const save = mutation({
         "RECEIPT_CHANGED",
       );
 
-    if (isReceiptProcessing(receipt.status))
+    // Fail before the checks below; only a receipt being processed refuses an edit.
+    if (!acceptsReceiptEvent(receipt.status, "edited"))
       throw userError("Vent til behandlingen er ferdig.");
     args = { ...args, data: structuredClone(args.data) };
     const checked = checkReceipt(args.data);
@@ -598,7 +601,7 @@ export const attachImage = internalMutation({
       const images = await receiptImages(ctx, receipt._id);
 
       if (images.length === receipt.imageCount)
-        await beginUploadedReceipt(ctx, receipt._id, images.length);
+        await beginUploadedReceipt(ctx, receipt, images.length);
     }
 
     return null;
