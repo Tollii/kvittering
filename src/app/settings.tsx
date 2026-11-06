@@ -30,6 +30,7 @@ import { OdaSettings } from "@/features/oda-settings";
 import { NotificationSettings } from "@/features/notifications";
 import { radius, useTheme } from "@/constants/theme";
 import { failureMessage } from "@/lib/failure-message";
+import { householdMemberLimit } from "@/lib/domain/household";
 
 export default function Settings() {
   const colors = useTheme();
@@ -54,7 +55,7 @@ export default function Settings() {
     }
   }
 
-  const full = (details?.members.length ?? 0) >= 2;
+  const full = (details?.members.length ?? 0) >= householdMemberLimit;
   const invitation = details?.household.invitation;
 
   return (

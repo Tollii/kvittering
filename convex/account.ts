@@ -47,7 +47,7 @@ export const remove = action({
   },
 });
 
-const batchSize = 100;
+export const batchSize = 100;
 
 /** The component types adapter pages as `any`; only the cursor is needed. */
 const deletedPage = z.object({
@@ -116,17 +116,18 @@ export const deleteAccount = internalMutation({
           invitation: crypto.randomUUID().replaceAll("-", ""),
         });
 
-        // Their unfinished uploads can no longer complete, and the partner cannot delete them.
+        // Their unfinished uploads can no longer complete.
         const uploading = await ctx.db
           .query("receipts")
-          .withIndex("by_householdId_and_status", (q) =>
-            q.eq("householdId", member.householdId).eq("status", "uploading"),
+          .withIndex("by_householdId_and_status_and_uploadedBy", (q) =>
+            q
+              .eq("householdId", member.householdId)
+              .eq("status", "uploading")
+              .eq("uploadedBy", identity),
           )
           .take(batchSize);
 
-        for (const receipt of uploading)
-          if (receipt.uploadedBy === identity)
-            await deleteReceipt(ctx, receipt);
+        for (const receipt of uploading) await deleteReceipt(ctx, receipt);
       } else {
         // Removing the household first ends its invitation and every read.
         await ctx.db.delete("households", member.householdId);

@@ -1,5 +1,9 @@
 import { userError } from "./userErrors";
-import { householdName, householdNameLimit } from "../src/lib/domain/household";
+import {
+  householdMemberLimit,
+  householdName,
+  householdNameLimit,
+} from "../src/lib/domain/household";
 import { oreValidator } from "../src/lib/domain/ore";
 import { clientMutation as mutation } from "./clientFunctions";
 import { query, type QueryCtx } from "./_generated/server";
@@ -45,7 +49,7 @@ export const current = query({
         .withIndex("by_householdId", (q) =>
           q.eq("householdId", member.householdId),
         )
-        .take(2),
+        .take(householdMemberLimit),
     };
   },
 });
@@ -109,9 +113,9 @@ export const join = mutation({
     const members = await ctx.db
       .query("members")
       .withIndex("by_householdId", (q) => q.eq("householdId", household._id))
-      .take(2);
+      .take(householdMemberLimit);
 
-    if (members.length >= 2)
+    if (members.length >= householdMemberLimit)
       throw userError("Husstanden har allerede to medlemmer.");
     await ctx.db.insert("members", {
       householdId: household._id,

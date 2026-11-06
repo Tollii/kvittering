@@ -9,6 +9,7 @@ import { clientMutation as mutation } from "./clientFunctions";
 import { v, type Infer } from "convex/values";
 import {
   WorkflowManager,
+  cancel as cancelWorkflow,
   start as startWorkflow,
   vWorkflowId,
 } from "@convex-dev/workflow";
@@ -36,7 +37,10 @@ import {
   lineEvidenceKey,
   exactPhysicalStore,
 } from "../src/lib/catalog/matching";
-import { normalizeSearch } from "../src/lib/catalog/policy";
+import {
+  catalogMatchingDeadlineMs,
+  normalizeSearch,
+} from "../src/lib/catalog/policy";
 import { matchingKey } from "../src/lib/domain/product-matching";
 import { isDecidedCategory } from "../src/lib/domain/categories";
 import {
@@ -44,7 +48,7 @@ import {
   type ReceiptData,
   type ReceiptLine,
 } from "../src/lib/domain/receipt";
-import type { Id } from "./_generated/dataModel";
+import type { Doc, Id } from "./_generated/dataModel";
 
 import {
   catalogDecision,
@@ -569,11 +573,96 @@ export const failed = internalMutation({
         receiptId: args.id,
         generation: args.generation,
       });
-      await ctx.db.patch("receipts", args.id, { catalogStatus: "error" });
-      await ctx.scheduler.runAfter(0, internal.productAnalysis.start, {
-        id: args.id,
-      });
+      await settleFailedMatching(ctx, args.id);
     }
+
+    return null;
+  },
+});
+
+/**
+ * Ends matching with the retryable error state and lets product analysis,
+ * which waits for matching, continue.
+ */
+async function settleFailedMatching(ctx: MutationCtx, id: Id<"receipts">) {
+  await ctx.db.patch("receipts", id, { catalogStatus: "error" });
+  await ctx.scheduler.runAfter(0, internal.productAnalysis.start, { id });
+}
+
+/** The run's state, or null once retention has cleaned it up. */
+async function workflowRun(ctx: MutationCtx, workflowId: string) {
+  try {
+    const { workflow } = await ctx.runQuery(
+      components.workflow.workflow.getStatus,
+      { workflowId },
+    );
+
+    return workflow;
+  } catch (cause) {
+    // The installed workflow API reports this once retention has cleaned the run up.
+    if (
+      cause instanceof Error &&
+      cause.message.includes(`Workflow not found: ${workflowId}`)
+    )
+      return null;
+
+    throw cause;
+  }
+}
+
+/**
+ * Ends a pending receipt's matching when its run can no longer finish it: the
+ * run is gone, ended without `finish` or `failed`, or outlived its deadline,
+ * in which case it is cancelled first.
+ */
+async function endStalledMatching(ctx: MutationCtx, receipt: Doc<"receipts">) {
+  const workflowId = receipt.catalogWorkflowId;
+  const run = workflowId ? await workflowRun(ctx, workflowId) : null;
+  let reason: "no_run" | "cleaned_up" | "ended" | "timed_out";
+
+  if (!workflowId) reason = "no_run";
+  else if (!run) reason = "cleaned_up";
+  else if (run.runResult) reason = "ended";
+  else if (Date.now() - run._creationTime < catalogMatchingDeadlineMs) return;
+  else {
+    await cancelWorkflow(ctx, components.workflow, workflowId);
+    reason = "timed_out";
+  }
+
+  console.error("catalog.matching_stalled", {
+    receiptId: receipt._id,
+    generation: receipt.generation,
+    reason,
+  });
+  await settleFailedMatching(ctx, receipt._id);
+}
+
+/** Settles pending matching that will never finish, so retry and analysis are not blocked. */
+export const recoverStalled = internalMutation({
+  args: { cursor: v.union(v.string(), v.null()) },
+  returns: v.null(),
+  handler: async (ctx, { cursor }) => {
+    const page = await ctx.db
+      .query("receipts")
+      .withIndex("by_catalogStatus", (q) => q.eq("catalogStatus", "pending"))
+      .paginate({ cursor, numItems: 20 });
+
+    for (const receipt of page.page) {
+      try {
+        await endStalledMatching(ctx, receipt);
+      } catch (cause) {
+        // One unreadable run must not hold back the receipts after it.
+        console.error("catalog.matching_recovery_failed", {
+          receiptId: receipt._id,
+          error: cause instanceof Error ? cause.message : String(cause),
+        });
+      }
+    }
+
+    if (!page.isDone)
+      await ctx.scheduler.runAfter(0, internal.catalogMatching.recoverStalled, {
+        cursor: page.continueCursor,
+      });
 
     return null;
   },

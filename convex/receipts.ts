@@ -10,6 +10,7 @@ import { userError } from "./userErrors";
 import {
   acceptsReceiptEvent,
   attentionStatuses,
+  isUploadAbandoned,
   receiptTransition,
 } from "../src/lib/domain/receipt-state";
 import {
@@ -44,8 +45,13 @@ import {
   paginationOptsValidator,
   paginationResultValidator,
 } from "convex/server";
-import { query, internalQuery, type MutationCtx } from "./_generated/server";
-import type { Id } from "./_generated/dataModel";
+import {
+  query,
+  internalQuery,
+  type MutationCtx,
+  type QueryCtx,
+} from "./_generated/server";
+import type { Doc, Id } from "./_generated/dataModel";
 import { internalMutation } from "./serverFunctions";
 import { internal } from "./_generated/api";
 import schema from "./schema";
@@ -106,10 +112,7 @@ export const detail = query({
 
     return {
       receipt,
-      images: await ctx.db
-        .query("images")
-        .withIndex("by_receiptId", (q) => q.eq("receiptId", id))
-        .take(8),
+      images: await receiptImages(ctx, id),
     };
   },
 });
@@ -176,10 +179,7 @@ export const completeUpload = mutation({
 
     if (!acceptsReceiptEvent(receipt.status, "upload_completed")) return null;
 
-    const images = await ctx.db
-      .query("images")
-      .withIndex("by_receiptId", (q) => q.eq("receiptId", id))
-      .take(8);
+    const images = await receiptImages(ctx, id);
 
     if (images.length !== receipt.imageCount)
       throw userError("Noen bilder er ikke lastet opp.");
@@ -598,10 +598,7 @@ export const attachImage = internalMutation({
     });
 
     if (receipt.backgroundUpload) {
-      const images = await ctx.db
-        .query("images")
-        .withIndex("by_receiptId", (q) => q.eq("receiptId", receipt._id))
-        .take(8);
+      const images = await receiptImages(ctx, receipt._id);
 
       if (images.length === receipt.imageCount)
         await beginUploadedReceipt(ctx, receipt, images.length);
@@ -611,7 +608,29 @@ export const attachImage = internalMutation({
   },
 });
 
-/** Delete only a household receipt that has finished uploading. Processing cannot recreate it. */
+/** The receipt's images, which an upload caps well below this limit. */
+function receiptImages(ctx: QueryCtx, id: Id<"receipts">) {
+  return ctx.db
+    .query("images")
+    .withIndex("by_receiptId", (q) => q.eq("receiptId", id))
+    .take(8);
+}
+
+/** When the upload last moved: its reservation or its newest image. */
+async function lastUploadProgress(ctx: QueryCtx, receipt: Doc<"receipts">) {
+  const images = await receiptImages(ctx, receipt._id);
+
+  return Math.max(
+    receipt._creationTime,
+    ...images.map((image) => image._creationTime),
+  );
+}
+
+/**
+ * Delete a household receipt, unless its upload made progress in the last day:
+ * an abandoned upload lost its capture and never completes. Processing cannot
+ * recreate a deleted receipt.
+ */
 export const remove = mutation({
   args: { id: v.id("receipts"), revision: v.number() },
   returns: v.null(),
@@ -624,7 +643,10 @@ export const remove = mutation({
     if (receipt.householdId !== member.householdId)
       throw userError("Kvitteringen er ikke tilgjengelig.");
 
-    if (receipt.status === "uploading")
+    if (
+      receipt.status === "uploading" &&
+      !isUploadAbandoned(await lastUploadProgress(ctx, receipt), Date.now())
+    )
       throw userError("Vent til bildene er lastet opp.");
 
     if (receipt.revision !== revision)

@@ -1,8 +1,10 @@
 import { expect, it } from "vitest";
 import {
+  abandonedUploadMs,
   attentionStatuses,
   hasReceiptBeenRead,
   isReceiptProcessing,
+  isUploadAbandoned,
   needsAttention,
   receiptTransition,
   type ReceiptEvent,
@@ -85,4 +87,15 @@ it("lets the approval decision, not the previous status, settle a read or edit",
   expect(receiptTransition("reviewed", { kind: "product_linked" })).toBe(
     "reviewed",
   );
+});
+
+it("counts an upload as abandoned after a full day without progress", () => {
+  const lastProgress = Date.UTC(2026, 10, 1);
+
+  expect(
+    isUploadAbandoned(lastProgress, lastProgress + abandonedUploadMs - 1),
+  ).toBe(false);
+  expect(
+    isUploadAbandoned(lastProgress, lastProgress + abandonedUploadMs),
+  ).toBe(true);
 });

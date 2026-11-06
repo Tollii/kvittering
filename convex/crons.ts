@@ -33,6 +33,20 @@ for (const component of ["processing", "analysis"] as const)
     { component },
   );
 
+crons.interval(
+  "recover stalled catalog matching",
+  { minutes: 10 },
+  internal.catalogMatching.recoverStalled,
+  { cursor: null },
+);
+
 crons.interval("sync Oda orders", { hours: 6 }, internal.oda.syncAll, {});
+
+crons.interval(
+  "remove expired Oda sign-ins",
+  { hours: 1 },
+  internal.oda.removeExpiredAuthorizations,
+  {},
+);
 
 export default crons;
