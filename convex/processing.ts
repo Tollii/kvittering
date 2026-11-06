@@ -163,11 +163,13 @@ export const begin = internalMutation({
   handler: async (ctx, args) => {
     const receipt = await ctx.db.get("receipts", args.id);
 
-    const status =
-      receipt?.generation === args.generation &&
-      receiptTransition(receipt.status, { kind: "reading_started" });
+    if (!receipt || receipt.generation !== args.generation) return null;
 
-    if (!receipt || !status) return null;
+    const status = receiptTransition(receipt.status, {
+      kind: "reading_started",
+    });
+
+    if (!status) return null;
     await ctx.db.patch("receipts", args.id, { status });
     await notifyReceiptActivities(ctx, receipt.householdId);
 
@@ -610,11 +612,11 @@ async function failReceiptReading(
 ) {
   const receipt = await ctx.db.get("receipts", args.id);
 
-  const status =
-    receipt?.generation === args.generation &&
-    receiptTransition(receipt.status, { kind: "reading_failed" });
+  if (!receipt || receipt.generation !== args.generation) return;
 
-  if (!receipt || !status) return;
+  const status = receiptTransition(receipt.status, { kind: "reading_failed" });
+
+  if (!status) return;
 
   // The original failure stays on the receipt; do not duplicate OCR/provider text in logs.
   console.error("receipt.processing_failed", {

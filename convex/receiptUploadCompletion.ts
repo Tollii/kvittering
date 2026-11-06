@@ -45,13 +45,10 @@ export function receiptByClientId(
 
 export async function beginUploadedReceipt(
   ctx: MutationCtx,
-  id: Id<"receipts">,
+  { _id: id, status: current }: Pick<Doc<"receipts">, "_id" | "status">,
   imageCount: number,
 ) {
-  const receipt = await ctx.db.get("receipts", id);
-
-  const status =
-    receipt && receiptTransition(receipt.status, { kind: "upload_completed" });
+  const status = receiptTransition(current, { kind: "upload_completed" });
 
   if (!status) throw new Error("Kvitteringen venter ikke på bilder.");
   await ctx.db.patch("receipts", id, { status, generation: 1 });
@@ -77,10 +74,8 @@ export async function startImportedReceipt(
     data: ReceiptData;
   },
 ) {
-  const id = await ctx.db.insert(
-    "receipts",
-    newReceipt(member, evidence.clientId, 0),
-  );
+  const receipt = newReceipt(member, evidence.clientId, 0);
+  const id = await ctx.db.insert("receipts", receipt);
 
   await ctx.db.insert("receiptImports", {
     householdId: member.householdId,
@@ -89,7 +84,7 @@ export async function startImportedReceipt(
     receiptId: id,
     data: evidence.data,
   });
-  await beginUploadedReceipt(ctx, id, 0);
+  await beginUploadedReceipt(ctx, { ...receipt, _id: id }, 0);
 
   return id;
 }

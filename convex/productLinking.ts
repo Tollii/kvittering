@@ -24,7 +24,10 @@ import { findMapping } from "./products";
 import { resolveProductSelections } from "./catalogLinks";
 import { commitReceiptChange, receiptCommitValidator } from "./receiptChanges";
 import type { ReceiptData } from "../src/lib/domain/receipt";
-import type { ExtractedReceipt } from "../src/lib/domain/receipt-state";
+import {
+  acceptsReceiptEvent,
+  type ExtractedReceipt,
+} from "../src/lib/domain/receipt-state";
 
 /** A read receipt whose store is known, so its products can be linked. */
 type LinkableReceipt = ExtractedReceipt & {
@@ -37,7 +40,7 @@ function linkable(receipt: Doc<"receipts">): LinkableReceipt | null {
 
   return data &&
     store?.trim() &&
-    (receipt.status === "reviewed" || receipt.status === "needs_review") &&
+    acceptsReceiptEvent(receipt.status, "product_linked") &&
     !receipt.excluded &&
     (!receipt.duplicateOf || receipt.duplicateResolved) &&
     receipt.catalogStatus !== "pending"

@@ -72,11 +72,7 @@ it("records a typed purchase once and reads it through the receipt rules", async
     },
   });
 
-  // A read purchase is not read again; after a failure, a retry reads the typed purchase again.
-  await expect(first.mutation(api.receipts.retry, { id })).rejects.toThrow(
-    "allerede lest",
-  );
-  await t.run((ctx) => ctx.db.patch("receipts", id, { status: "failed" }));
+  // With no images to read, a retry reads the typed purchase again.
   await first.mutation(api.receipts.retry, { id });
   await t.finishAllScheduledFunctions(vi.runAllTimers);
   expect(await t.run((ctx) => ctx.db.get("receipts", id))).toMatchObject({

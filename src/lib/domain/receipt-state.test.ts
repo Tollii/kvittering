@@ -2,7 +2,6 @@ import { expect, it } from "vitest";
 import {
   attentionStatuses,
   hasReceiptBeenRead,
-  isReceiptBeingRead,
   isReceiptProcessing,
   needsAttention,
   receiptTransition,
@@ -28,7 +27,6 @@ it("treats a receipt as processing until its images have been read", () => {
     "uploaded",
     "processing",
   ]);
-  expect(matching(isReceiptBeingRead)).toEqual(["uploaded", "processing"]);
 });
 
 it("separates read receipts from those that need a person", () => {
@@ -72,13 +70,6 @@ it("refuses a person's change while images are uploading or being read", () => {
     expect(receiptTransition(status, { kind: "product_linked" })).toBeNull();
     expect(receiptTransition(status, { kind: "retried" })).toBeNull();
   }
-});
-
-it("reads a receipt again only after reading it failed", () => {
-  expect(
-    statuses.filter((status) => receiptTransition(status, { kind: "retried" })),
-  ).toEqual(["failed"]);
-  expect(receiptTransition("failed", { kind: "retried" })).toBe("uploaded");
 });
 
 it("lets the approval decision, not the previous status, settle a read or edit", () => {

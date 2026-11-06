@@ -10,7 +10,6 @@ import { userError } from "./userErrors";
 import {
   acceptsReceiptEvent,
   attentionStatuses,
-  isReceiptProcessing,
   receiptTransition,
 } from "../src/lib/domain/receipt-state";
 import {
@@ -184,7 +183,7 @@ export const completeUpload = mutation({
 
     if (images.length !== receipt.imageCount)
       throw userError("Noen bilder er ikke lastet opp.");
-    await beginUploadedReceipt(ctx, id, images.length);
+    await beginUploadedReceipt(ctx, receipt, images.length);
 
     return null;
   },
@@ -199,12 +198,7 @@ export const retry = mutation({
 
     const status = receiptTransition(receipt.status, { kind: "retried" });
 
-    if (!status)
-      throw userError(
-        isReceiptProcessing(receipt.status)
-          ? "Kvitteringen behandles allerede."
-          : "Kvitteringen er allerede lest.",
-      );
+    if (!status) throw userError("Kvitteringen behandles allerede.");
     await consumeReceiptQuota(ctx, member);
     const generation = receipt.generation + 1;
     await ctx.db.patch("receipts", id, {
@@ -438,6 +432,7 @@ export const save = mutation({
         "RECEIPT_CHANGED",
       );
 
+    // Fail before the checks below; only a receipt being processed refuses an edit.
     if (!acceptsReceiptEvent(receipt.status, "edited"))
       throw userError("Vent til behandlingen er ferdig.");
     args = { ...args, data: structuredClone(args.data) };
@@ -550,7 +545,7 @@ export const attachImage = internalMutation({
     const { receipt } = await requireReceipt(ctx, args.id);
 
     if (
-      !acceptsReceiptEvent(receipt.status, "upload_completed") ||
+      receipt.status !== "uploading" ||
       !Number.isInteger(args.position) ||
       args.position < 0 ||
       args.position >= receipt.imageCount
@@ -609,7 +604,7 @@ export const attachImage = internalMutation({
         .take(8);
 
       if (images.length === receipt.imageCount)
-        await beginUploadedReceipt(ctx, receipt._id, images.length);
+        await beginUploadedReceipt(ctx, receipt, images.length);
     }
 
     return null;

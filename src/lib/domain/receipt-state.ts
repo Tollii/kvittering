@@ -27,20 +27,6 @@ export function isReceiptProcessing(status: ReceiptStatus): boolean {
   }
 }
 
-/** All images arrived and extraction was requested or is running. */
-export function isReceiptBeingRead(status: ReceiptStatus): boolean {
-  switch (status) {
-    case "uploaded":
-    case "processing":
-      return true;
-    case "uploading":
-    case "needs_review":
-    case "reviewed":
-    case "failed":
-      return false;
-  }
-}
-
 /** Extraction succeeded, so the receipt has purchase data a person can use. */
 export function hasReceiptBeenRead(status: ReceiptStatus): boolean {
   switch (status) {
@@ -71,28 +57,23 @@ export type ReceiptEvent =
 
 type ReceiptEventKind = ReceiptEvent["kind"];
 
-/** `approval` follows the event's decision; `unchanged` keeps the status. */
-type ReceiptTarget = ReceiptStatus | "approval" | "unchanged";
-
 /**
- * The receipt lifecycle's only legal moves. Every writer of `status` goes
- * through `receiptTransition`, so a move that is missing here cannot happen.
+ * The statuses each event may leave: the receipt lifecycle's only legal moves.
+ * Every writer of `status` goes through `receiptTransition`, so a move that is
+ * missing here cannot happen.
  *
- * Only a failed receipt is read again: every installed client offers
- * "Les bildene på nytt" only on failure, and a retry of a read receipt would
- * drop it back to review without new data.
+ * A read receipt can be read again, not only a failed one: installed clients
+ * offer "Les bildene på nytt" in the editor's menu for any receipt that is not
+ * being processed, and a misread receipt with no edits gets a fresh reading.
  */
-const receiptTransitions: Record<
-  ReceiptEventKind,
-  { from: readonly ReceiptStatus[]; to: ReceiptTarget }
-> = {
-  upload_completed: { from: ["uploading"], to: "uploaded" },
-  reading_started: { from: ["uploaded"], to: "processing" },
-  read: { from: ["processing"], to: "approval" },
-  reading_failed: { from: ["uploaded", "processing"], to: "failed" },
-  retried: { from: ["failed"], to: "uploaded" },
-  edited: { from: ["needs_review", "reviewed", "failed"], to: "approval" },
-  product_linked: { from: ["needs_review", "reviewed"], to: "unchanged" },
+const acceptedStatuses: Record<ReceiptEventKind, readonly ReceiptStatus[]> = {
+  upload_completed: ["uploading"],
+  reading_started: ["uploaded"],
+  read: ["processing"],
+  reading_failed: ["uploaded", "processing"],
+  retried: ["needs_review", "reviewed", "failed"],
+  edited: ["needs_review", "reviewed", "failed"],
+  product_linked: ["needs_review", "reviewed"],
 };
 
 /** Whether a receipt in this status accepts the event. */
@@ -100,7 +81,7 @@ export function acceptsReceiptEvent(
   status: ReceiptStatus,
   kind: ReceiptEventKind,
 ): boolean {
-  return receiptTransitions[kind].from.includes(status);
+  return acceptedStatuses[kind].includes(status);
 }
 
 /** The status after the event, or null when the receipt does not accept it. */
@@ -108,15 +89,22 @@ export function receiptTransition(
   from: ReceiptStatus,
   event: ReceiptEvent,
 ): ReceiptStatus | null {
-  const { from: accepted, to } = receiptTransitions[event.kind];
+  if (!acceptsReceiptEvent(from, event.kind)) return null;
 
-  if (!accepted.includes(from)) return null;
-
-  if (to === "unchanged") return from;
-
-  if (to !== "approval") return to;
-
-  return "reviewed" in event && event.reviewed ? "reviewed" : "needs_review";
+  switch (event.kind) {
+    case "upload_completed":
+    case "retried":
+      return "uploaded";
+    case "reading_started":
+      return "processing";
+    case "reading_failed":
+      return "failed";
+    case "read":
+    case "edited":
+      return event.reviewed ? "reviewed" : "needs_review";
+    case "product_linked":
+      return from;
+  }
 }
 
 /** Statuses that wait for a person: a review to confirm or a failure to resolve. */
