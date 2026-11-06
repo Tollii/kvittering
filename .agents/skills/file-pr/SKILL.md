@@ -50,6 +50,6 @@ End the description with the actual model and harness used for the change, for e
 
 Use a structured tool argument for the description, or write it to a temporary file and pass it as the body. Open a real PR, not a draft, so review bots run. In Codex, attach the created or updated PR to the task with the artifact tool when available.
 
-Every PR gets an [adversarial-code-review](../adversarial-code-review/SKILL.md) before it merges, sized to its diff. Run it after filing, while CI runs, and fix its valid findings before enabling auto-merge. Later pushes get a review of their own commits only.
+Every PR gets an [adversarial-code-review](../adversarial-code-review/SKILL.md) before it merges, sized to its diff. Run it after filing, while CI runs, and fix its valid findings before enabling auto-merge. It runs once per PR: fix commits and later pushes are not reviewed again.
 
 After filing, use [babysit-pr](../babysit-pr/SKILL.md) to follow CI and published review feedback through completion. Honor an explicit request to file only or a different stopping point. Carry the PR URL and any existing merge authorization into monitoring. Merge only if the user requested it; otherwise finish when the PR is ready.

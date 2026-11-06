@@ -196,10 +196,10 @@ is redundant. Published AI review findings still need a disposition before merge
 Address each valid finding and resolve its thread after verification. Explain
 why an invalid finding does not apply before resolving it.
 
-Keep CodeRabbit's `request_changes_workflow` disabled. Its findings remain useful,
-but an approving review or completed bot review is not a merge requirement.
-Dependabot PRs do not require CodeRabbit review. Do not use bulk approval or
-conversation-resolution commands to bypass individual findings.
+Macroscope is the review bot; CodeRabbit is no longer used. Macroscope's
+findings remain useful, but its approval or a completed bot review is not a
+merge requirement. Dependabot PRs do not require a bot review. Do not use bulk
+approval or conversation-resolution commands to bypass individual findings.
 
 Keep GitHub Actions approval disabled (`can_approve_pull_request_reviews: false`)
 and default workflow permissions read-only. Binding a status name to the GitHub
