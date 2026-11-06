@@ -1,8 +1,5 @@
 import { isDecidedCategory } from "@/lib/domain/categories";
-import {
-  isReceiptProcessing,
-  isUploadAbandoned,
-} from "@/lib/domain/receipt-state";
+import { isReceiptProcessing } from "@/lib/domain/receipt-state";
 import { releaseMutation } from "@/lib/releases/requests";
 import { useRef, useState, type ComponentProps } from "react";
 import { Alert, Platform, View } from "react-native";
@@ -20,7 +17,6 @@ import {
 import { Button, IconButton, Notice, Screen } from "@/components/ui";
 import { ReceiptLineEditor } from "@/features/receipt-line-editor";
 import { OfflineNotice } from "@/features/offline-notice";
-import { useHousehold } from "@/features/household-context";
 import { ReceiptCategorySpending } from "@/features/receipt-category-spending";
 import { ReceiptFields } from "@/features/receipt-fields";
 import {
@@ -36,10 +32,12 @@ import {
   type ReceiptActionMenu,
 } from "@/features/receipt-editor-actions";
 import {
+  AbandonedUploadNotice,
   ReceiptDetails,
   ReceiptLineControls,
   ReceiptPlaceholder,
   StaleRevisionNotice,
+  useUploadDeletion,
 } from "@/features/receipt-editor-panels";
 import {
   aliasKey,
@@ -330,6 +328,8 @@ export function ReceiptEditor({
     if (isCategoryDecided(line, next)) rememberLines([line.id]);
   }
 
+  const deleteDisabled = !online || busy || !deletable;
+
   const menu: ReceiptActionMenu = {
     busy,
     summaryLines,
@@ -337,7 +337,7 @@ export function ReceiptEditor({
     fieldsDisabled: !data || busy,
     addLineDisabled: !data || busy || processing,
     retryDisabled,
-    deleteDisabled: !online || busy || !deletable,
+    deleteDisabled,
     onEditFields: () => setSheet("fields"),
     onAddLine: addLine,
     onSummaryLines: (value) => {
@@ -408,7 +408,7 @@ export function ReceiptEditor({
         {!!receipt.error && <Notice tone="error">{receipt.error}</Notice>}
         <AbandonedUploadNotice
           abandoned={abandoned}
-          disabled={menu.deleteDisabled}
+          disabled={deleteDisabled}
           onDelete={removeReceipt}
         />
         {receipt.status === "failed" && !processing && (
@@ -654,42 +654,6 @@ function footerLabel({
       : "Klar til godkjenning";
 
   return taskCount === 1 ? "Én ting igjen" : `${taskCount} ting igjen`;
-}
-
-/**
- * An upload no phone will finish: a day without progress, and not waiting in
- * this phone's queue, which resumes it by itself. The server applies the same
- * rule to the receipt's last image before it deletes the receipt.
- */
-function useUploadDeletion(receipt: Receipt) {
-  const { queue } = useHousehold();
-  const [openedAt] = useState(Date.now);
-
-  const abandoned =
-    !queue.some((entry) => entry.receiptId === receipt._id) &&
-    isUploadAbandoned(receipt.status, receipt._creationTime, openedAt);
-
-  return { abandoned, deletable: receipt.status !== "uploading" || abandoned };
-}
-
-/** Tapping it offers the deletion, while the receipt can be deleted. */
-function AbandonedUploadNotice({
-  abandoned,
-  disabled,
-  onDelete,
-}: Readonly<{ abandoned: boolean; disabled: boolean; onDelete: () => void }>) {
-  if (!abandoned) return null;
-
-  return (
-    <Notice
-      tone="warning"
-      title="Bildene kom ikke fram"
-      onPress={disabled ? undefined : onDelete}
-    >
-      Opplastingen har stått stille i over et døgn. Slett kvitteringen, og ta
-      bildet på nytt.
-    </Notice>
-  );
 }
 
 /** Whether the last save approved the receipt, and the last request failure. */

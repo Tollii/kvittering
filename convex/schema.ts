@@ -304,6 +304,11 @@ export default defineSchema({
       "data.purchaseDate",
     ])
     .index("by_householdId_and_status", ["householdId", "status"])
+    .index("by_householdId_and_status_and_uploadedBy", [
+      "householdId",
+      "status",
+      "uploadedBy",
+    ])
     .index("by_householdId_and_status_and_excluded", [
       "householdId",
       "status",

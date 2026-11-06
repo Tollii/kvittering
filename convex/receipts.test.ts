@@ -13,6 +13,8 @@ import { abandonedUploadMs } from "../src/lib/domain/receipt-state";
 
 const modules = import.meta.glob("./**/*.ts");
 
+afterEach(() => vi.useRealTimers());
+
 async function setup() {
   const t = convexTest(schema, modules);
   registerRateLimiter(t);
@@ -495,8 +497,6 @@ it("deletes a household receipt, its images and history without allowing a late 
     expect((await ctx.db.get("receipts", other))?.duplicateOf).toBeUndefined();
   });
 });
-
-afterEach(() => vi.useRealTimers());
 
 it("deletes an upload only after it has stopped making progress", async () => {
   vi.useFakeTimers();

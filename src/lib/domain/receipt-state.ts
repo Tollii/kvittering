@@ -35,12 +35,8 @@ export const abandonedUploadMs = 24 * 60 * 60 * 1000;
  * likely lost the capture, for example by a reinstall, so nothing will finish
  * it and a person may delete it.
  */
-export function isUploadAbandoned(
-  status: ReceiptStatus,
-  lastProgressAt: number,
-  now: number,
-): boolean {
-  return status === "uploading" && now - lastProgressAt >= abandonedUploadMs;
+export function isUploadAbandoned(lastProgressAt: number, now: number) {
+  return now - lastProgressAt >= abandonedUploadMs;
 }
 
 /** All images arrived and extraction was requested or is running. */

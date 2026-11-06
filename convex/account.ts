@@ -47,7 +47,7 @@ export const remove = action({
   },
 });
 
-const batchSize = 100;
+export const batchSize = 100;
 
 /** The component types adapter pages as `any`; only the cursor is needed. */
 const deletedPage = z.object({
@@ -81,27 +81,6 @@ async function deleteAuthRecords(
     done = parsed.isDone;
     cursor = parsed.continueCursor;
   }
-}
-
-/**
- * The member's own receipts still uploading. Only theirs count toward the
- * limit, so the partner's waiting uploads cannot crowd them out; a household
- * has few uploads waiting at once.
- */
-async function waitingUploads(ctx: MutationCtx, member: Doc<"members">) {
-  const theirs: Doc<"receipts">[] = [];
-
-  for await (const receipt of ctx.db
-    .query("receipts")
-    .withIndex("by_householdId_and_status", (q) =>
-      q.eq("householdId", member.householdId).eq("status", "uploading"),
-    )) {
-    if (receipt.uploadedBy === member.identity) theirs.push(receipt);
-
-    if (theirs.length === batchSize) break;
-  }
-
-  return theirs;
 }
 
 export const deleteAccount = internalMutation({
@@ -138,8 +117,17 @@ export const deleteAccount = internalMutation({
         });
 
         // Their unfinished uploads can no longer complete.
-        for (const receipt of await waitingUploads(ctx, member))
-          await deleteReceipt(ctx, receipt);
+        const uploading = await ctx.db
+          .query("receipts")
+          .withIndex("by_householdId_and_status_and_uploadedBy", (q) =>
+            q
+              .eq("householdId", member.householdId)
+              .eq("status", "uploading")
+              .eq("uploadedBy", identity),
+          )
+          .take(batchSize);
+
+        for (const receipt of uploading) await deleteReceipt(ctx, receipt);
       } else {
         // Removing the household first ends its invitation and every read.
         await ctx.db.delete("households", member.householdId);

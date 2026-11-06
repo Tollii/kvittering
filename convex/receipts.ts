@@ -44,7 +44,12 @@ import {
   paginationOptsValidator,
   paginationResultValidator,
 } from "convex/server";
-import { query, internalQuery, type MutationCtx } from "./_generated/server";
+import {
+  query,
+  internalQuery,
+  type MutationCtx,
+  type QueryCtx,
+} from "./_generated/server";
 import type { Doc, Id } from "./_generated/dataModel";
 import { internalMutation } from "./serverFunctions";
 import { internal } from "./_generated/api";
@@ -107,10 +112,7 @@ export const detail = query({
 
     return {
       receipt,
-      images: await ctx.db
-        .query("images")
-        .withIndex("by_receiptId", (q) => q.eq("receiptId", id))
-        .take(8),
+      images: await receiptImages(ctx, id),
     };
   },
 });
@@ -177,10 +179,7 @@ export const completeUpload = mutation({
 
     if (receipt.status !== "uploading") return null;
 
-    const images = await ctx.db
-      .query("images")
-      .withIndex("by_receiptId", (q) => q.eq("receiptId", id))
-      .take(8);
+    const images = await receiptImages(ctx, id);
 
     if (images.length !== receipt.imageCount)
       throw userError("Noen bilder er ikke lastet opp.");
@@ -607,10 +606,7 @@ export const attachImage = internalMutation({
     });
 
     if (receipt.backgroundUpload) {
-      const images = await ctx.db
-        .query("images")
-        .withIndex("by_receiptId", (q) => q.eq("receiptId", receipt._id))
-        .take(8);
+      const images = await receiptImages(ctx, receipt._id);
 
       if (images.length === receipt.imageCount)
         await beginUploadedReceipt(ctx, receipt._id, images.length);
@@ -620,25 +616,26 @@ export const attachImage = internalMutation({
   },
 });
 
-/** An upload whose reservation or last image is less than a day old. */
-async function isUploadMoving(ctx: MutationCtx, receipt: Doc<"receipts">) {
-  if (receipt.status !== "uploading") return false;
-
-  const images = await ctx.db
+/** The receipt's images, which an upload caps well below this limit. */
+function receiptImages(ctx: QueryCtx, id: Id<"receipts">) {
+  return ctx.db
     .query("images")
-    .withIndex("by_receiptId", (q) => q.eq("receiptId", receipt._id))
+    .withIndex("by_receiptId", (q) => q.eq("receiptId", id))
     .take(8);
+}
 
-  const progress = Math.max(
+/** When the upload last moved: its reservation or its newest image. */
+async function lastUploadProgress(ctx: QueryCtx, receipt: Doc<"receipts">) {
+  const images = await receiptImages(ctx, receipt._id);
+
+  return Math.max(
     receipt._creationTime,
     ...images.map((image) => image._creationTime),
   );
-
-  return !isUploadAbandoned(receipt.status, progress, Date.now());
 }
 
 /**
- * Delete a household receipt, unless its upload is still moving: a stopped one
+ * Delete a household receipt, unless it is still uploading: an abandoned upload
  * lost its capture and never completes. Processing cannot recreate it.
  */
 export const remove = mutation({
@@ -653,7 +650,10 @@ export const remove = mutation({
     if (receipt.householdId !== member.householdId)
       throw userError("Kvitteringen er ikke tilgjengelig.");
 
-    if (await isUploadMoving(ctx, receipt))
+    if (
+      receipt.status === "uploading" &&
+      !isUploadAbandoned(await lastUploadProgress(ctx, receipt), Date.now())
+    )
       throw userError("Vent til bildene er lastet opp.");
 
     if (receipt.revision !== revision)

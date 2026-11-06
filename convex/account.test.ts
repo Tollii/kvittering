@@ -9,6 +9,7 @@ import { api, components } from "./_generated/api";
 import type { Id } from "./_generated/dataModel";
 import schema from "./schema";
 import { newReceipt } from "./receiptUploadCompletion";
+import { batchSize } from "./account";
 import {
   invitation,
   sharedHousehold,
@@ -254,21 +255,20 @@ it("keeps a shared household with the partner and removes the last member's hous
   );
 
   // The partner's own waiting uploads come first in the household's index.
+  const firstMember = await first.query(api.households.current, {});
+
   const partnerUploads = await t.run(async (ctx) => {
-    const members = await ctx.db
-      .query("members")
-      .withIndex("by_householdId", (q) => q.eq("householdId", householdId))
-      .take(2);
-
-    const partner = members.find((member) => member.name === "First");
-
     const ids: Id<"receipts">[] = [];
 
-    for (let index = 0; index < 101; index++)
+    for (let index = 0; index <= batchSize; index++)
       ids.push(
         await ctx.db.insert(
           "receipts",
-          newReceipt(partner!, `partner-upload-${index}`.padEnd(16, "0"), 1),
+          newReceipt(
+            firstMember!.member,
+            `partner-upload-${index}`.padEnd(16, "0"),
+            1,
+          ),
         ),
       );
 
@@ -286,8 +286,6 @@ it("keeps a shared household with the partner and removes the last member's hous
   await t.run((ctx) =>
     ctx.db.patch("receipts", kept.receiptId, { status: "reviewed" }),
   );
-
-  const firstMember = await first.query(api.households.current, {});
 
   await t.run(async (ctx) => {
     const identity = firstMember?.member.identity ?? "";
