@@ -1,5 +1,8 @@
 import { isDecidedCategory } from "@/lib/domain/categories";
-import { isReceiptProcessing } from "@/lib/domain/receipt-state";
+import {
+  duplicateState,
+  isReceiptProcessing,
+} from "@/lib/domain/receipt-state";
 import { releaseMutation } from "@/lib/releases/requests";
 import { useRef, useState, type ComponentProps } from "react";
 import { Alert, Platform, View } from "react-native";
@@ -120,7 +123,9 @@ export function ReceiptEditor({
 
   const processing = isReceiptProcessing(receipt.status);
 
-  const unresolvedDuplicate = !!receipt.duplicateOf && !duplicateResolved;
+  const unresolvedDuplicate =
+    duplicateState({ duplicateOf: receipt.duplicateOf, duplicateResolved }) ===
+    "suspected";
 
   const {
     totals,

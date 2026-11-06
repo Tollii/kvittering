@@ -1,4 +1,4 @@
-import { needsAttention } from "@/lib/domain/receipt-state";
+import { duplicateState, needsAttention } from "@/lib/domain/receipt-state";
 import { isPinned } from "@/lib/receipt-selection";
 import { ReceiptActivityButton } from "@/features/receipt-activity";
 import { useCompleteReceipts } from "@/features/receipt-queries";
@@ -60,7 +60,7 @@ export function PendingReceipts({
                 (receipt) =>
                   !!quickApproveData(
                     receipt.data,
-                    !!receipt.duplicateOf && !receipt.duplicateResolved,
+                    duplicateState(receipt) === "suspected",
                   ),
               )
                 ? "Sveip til venstre for å godkjenne"
