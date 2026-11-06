@@ -131,6 +131,9 @@ type UploadStep = keyof typeof stepDeadlineMs;
 
 const deadlineTickMs = 5_000;
 
+/** The longest delay setTimeout keeps; a longer one overflows and fires at once. */
+const longestTimerMs = 2 ** 31 - 1;
+
 /** A request that never answered. It holds no server result, so the capture retries. */
 class UploadStalled extends Error {
   override name = "UploadStalled";
@@ -343,10 +346,11 @@ export function createQueueRunner(
         }
       }
 
+      // A longer delay than setTimeout holds would fire at once, again and again.
       if (Number.isFinite(next))
         timer = setTimeout(
           () => void synchronize(),
-          Math.max(0, next - clock()),
+          Math.min(Math.max(0, next - clock()), longestTimerMs),
         );
     };
 

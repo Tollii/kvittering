@@ -425,6 +425,34 @@ it("wakes at each in-memory deadline and stops timers at the automatic attempt c
   }
 });
 
+it("waits for a deferral further away than a timer holds without draining again and again", async () => {
+  vi.useFakeTimers();
+  const { run, clock } = fixture();
+  const month = 30 * 24 * 60 * 60 * 1000;
+  let drains = 0;
+
+  const transport: UploadTransport = {
+    reserve: async () => {
+      throw new RequestDeferred("Quota wait", clock.now + month);
+    },
+    upload: async () => {},
+    complete: async () => {},
+  };
+
+  const stop = run.schedule("user", household, async () => {
+    drains++;
+    await run("user", household, transport, () => true);
+  });
+
+  try {
+    await vi.advanceTimersByTimeAsync(0);
+    await vi.advanceTimersByTimeAsync(1_000);
+    expect(drains).toBe(1);
+  } finally {
+    stop();
+  }
+});
+
 it("processes a capture added while another upload is in progress without another storage event", async () => {
   vi.useFakeTimers();
   const { run, append, rows } = fixture();
