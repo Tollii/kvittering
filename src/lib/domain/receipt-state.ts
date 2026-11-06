@@ -27,6 +27,22 @@ export function isReceiptProcessing(status: ReceiptStatus): boolean {
   }
 }
 
+/** How long an upload may go without a new image before it counts as abandoned. */
+export const abandonedUploadMs = 24 * 60 * 60 * 1000;
+
+/**
+ * An upload with no new image for a day. The phone that reserved it has most
+ * likely lost the capture, for example by a reinstall, so nothing will finish
+ * it and a person may delete it.
+ */
+export function isUploadAbandoned(
+  status: ReceiptStatus,
+  lastProgressAt: number,
+  now: number,
+): boolean {
+  return status === "uploading" && now - lastProgressAt >= abandonedUploadMs;
+}
+
 /** All images arrived and extraction was requested or is running. */
 export function isReceiptBeingRead(status: ReceiptStatus): boolean {
   switch (status) {

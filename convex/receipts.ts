@@ -9,6 +9,7 @@ import { userError } from "./userErrors";
 import {
   attentionStatuses,
   isReceiptProcessing,
+  isUploadAbandoned,
 } from "../src/lib/domain/receipt-state";
 import {
   maxReceiptImages,
@@ -44,7 +45,7 @@ import {
   paginationResultValidator,
 } from "convex/server";
 import { query, internalQuery, type MutationCtx } from "./_generated/server";
-import type { Id } from "./_generated/dataModel";
+import type { Doc, Id } from "./_generated/dataModel";
 import { internalMutation } from "./serverFunctions";
 import { internal } from "./_generated/api";
 import schema from "./schema";
@@ -619,7 +620,27 @@ export const attachImage = internalMutation({
   },
 });
 
-/** Delete only a household receipt that has finished uploading. Processing cannot recreate it. */
+/** An upload whose reservation or last image is less than a day old. */
+async function isUploadMoving(ctx: MutationCtx, receipt: Doc<"receipts">) {
+  if (receipt.status !== "uploading") return false;
+
+  const images = await ctx.db
+    .query("images")
+    .withIndex("by_receiptId", (q) => q.eq("receiptId", receipt._id))
+    .take(8);
+
+  const progress = Math.max(
+    receipt._creationTime,
+    ...images.map((image) => image._creationTime),
+  );
+
+  return !isUploadAbandoned(receipt.status, progress, Date.now());
+}
+
+/**
+ * Delete a household receipt, unless its upload is still moving: a stopped one
+ * lost its capture and never completes. Processing cannot recreate it.
+ */
 export const remove = mutation({
   args: { id: v.id("receipts"), revision: v.number() },
   returns: v.null(),
@@ -632,7 +653,7 @@ export const remove = mutation({
     if (receipt.householdId !== member.householdId)
       throw userError("Kvitteringen er ikke tilgjengelig.");
 
-    if (receipt.status === "uploading")
+    if (await isUploadMoving(ctx, receipt))
       throw userError("Vent til bildene er lastet opp.");
 
     if (receipt.revision !== revision)

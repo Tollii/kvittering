@@ -8,6 +8,7 @@ import appConfig from "../app.json";
 import { api, components } from "./_generated/api";
 import type { Id } from "./_generated/dataModel";
 import schema from "./schema";
+import { newReceipt } from "./receiptUploadCompletion";
 import {
   invitation,
   sharedHousehold,
@@ -252,7 +253,29 @@ it("keeps a shared household with the partner and removes the last member's hous
     "account-receipt-0001",
   );
 
-  // An upload the leaving member never finished, which nobody could complete or delete.
+  // The partner's own waiting uploads come first in the household's index.
+  const partnerUploads = await t.run(async (ctx) => {
+    const members = await ctx.db
+      .query("members")
+      .withIndex("by_householdId", (q) => q.eq("householdId", householdId))
+      .take(2);
+
+    const partner = members.find((member) => member.name === "First");
+
+    const ids: Id<"receipts">[] = [];
+
+    for (let index = 0; index < 101; index++)
+      ids.push(
+        await ctx.db.insert(
+          "receipts",
+          newReceipt(partner!, `partner-upload-${index}`.padEnd(16, "0"), 1),
+        ),
+      );
+
+    return ids;
+  });
+
+  // An upload the leaving member never finished, which nobody could complete.
   const unfinished = await receiptWithImage(
     t,
     second,
@@ -298,6 +321,9 @@ it("keeps a shared household with the partner and removes the last member's hous
   await t.run(async (ctx) => {
     expect(await ctx.db.get("receipts", unfinished.receiptId)).toBeNull();
     expect(await ctx.storage.get(unfinished.storageId)).toBeNull();
+
+    for (const id of partnerUploads)
+      expect(await ctx.db.get("receipts", id)).not.toBeNull();
   });
 
   // The person who left knows the old code, so it no longer admits anyone.

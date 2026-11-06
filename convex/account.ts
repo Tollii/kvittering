@@ -83,6 +83,27 @@ async function deleteAuthRecords(
   }
 }
 
+/**
+ * The member's own receipts still uploading. Only theirs count toward the
+ * limit, so the partner's waiting uploads cannot crowd them out; a household
+ * has few uploads waiting at once.
+ */
+async function waitingUploads(ctx: MutationCtx, member: Doc<"members">) {
+  const theirs: Doc<"receipts">[] = [];
+
+  for await (const receipt of ctx.db
+    .query("receipts")
+    .withIndex("by_householdId_and_status", (q) =>
+      q.eq("householdId", member.householdId).eq("status", "uploading"),
+    )) {
+    if (receipt.uploadedBy === member.identity) theirs.push(receipt);
+
+    if (theirs.length === batchSize) break;
+  }
+
+  return theirs;
+}
+
 export const deleteAccount = internalMutation({
   args: {
     identity: v.string(),
@@ -116,17 +137,9 @@ export const deleteAccount = internalMutation({
           invitation: crypto.randomUUID().replaceAll("-", ""),
         });
 
-        // Their unfinished uploads can no longer complete, and the partner cannot delete them.
-        const uploading = await ctx.db
-          .query("receipts")
-          .withIndex("by_householdId_and_status", (q) =>
-            q.eq("householdId", member.householdId).eq("status", "uploading"),
-          )
-          .take(batchSize);
-
-        for (const receipt of uploading)
-          if (receipt.uploadedBy === identity)
-            await deleteReceipt(ctx, receipt);
+        // Their unfinished uploads can no longer complete.
+        for (const receipt of await waitingUploads(ctx, member))
+          await deleteReceipt(ctx, receipt);
       } else {
         // Removing the household first ends its invitation and every read.
         await ctx.db.delete("households", member.householdId);
