@@ -7,6 +7,22 @@ import {
 import type { Id } from "../../convex/_generated/dataModel";
 import type { DiagnosticFields } from "./diagnostics";
 import { parseUserError } from "./user-errors";
+import {
+  maxReceiptImages,
+  receiptImageLimitMessage,
+} from "./domain/receipt-images";
+import { z } from "zod";
+
+/** Why the last upload attempt of a capture stopped. */
+export type UploadFailure =
+  /** Something went wrong on the way; the queue tries again. */
+  | { kind: "failed" }
+  /** The service asked the queue to wait; the message says until when. */
+  | { kind: "deferred"; message: string }
+  /** The service refused the capture as sent; the message says why. */
+  | { kind: "rejected"; message: string }
+  /** An older capture has more images than one receipt takes. */
+  | { kind: "image_limit" };
 
 export type LocalReceipt = {
   schemaVersion: 1;
@@ -17,8 +33,76 @@ export type LocalReceipt = {
   images: string[];
   uploaded: boolean[];
   receiptId?: Id<"receipts">;
-  error?: string;
+  failure?: UploadFailure;
 };
+
+/** Where a capture stands, for the interface. */
+export type UploadPhase =
+  | { kind: "uploading"; uploaded: number; total: number }
+  | { kind: "offline"; uploaded: number; total: number }
+  /** Waits for the time the service named, and then continues by itself. */
+  | { kind: "waiting"; message: string }
+  /** Failed; the queue tries again, or the person does. */
+  | { kind: "retrying" }
+  /** Waits for the person; only a manual retry sends it again. */
+  | { kind: "rejected"; message: string }
+  /** Waits for the person to split the images into two receipts. */
+  | { kind: "regroup" };
+
+/** Whether the person can split an unreserved older capture into two receipts. */
+export function canRegroup(entry: LocalReceipt) {
+  return (
+    entry.failure?.kind === "image_limit" &&
+    !entry.receiptId &&
+    !entry.uploaded.some(Boolean) &&
+    entry.images.length > maxReceiptImages
+  );
+}
+
+export function uploadPhase(entry: LocalReceipt, online: boolean): UploadPhase {
+  const uploaded = entry.uploaded.filter(Boolean).length;
+  const total = entry.images.length;
+
+  switch (entry.failure?.kind) {
+    case undefined:
+      return online
+        ? { kind: "uploading", uploaded, total }
+        : { kind: "offline", uploaded, total };
+    case "failed":
+      return { kind: "retrying" };
+    case "deferred":
+      return { kind: "waiting", message: entry.failure.message };
+    case "rejected":
+      return { kind: "rejected", message: entry.failure.message };
+    case "image_limit":
+      return canRegroup(entry)
+        ? { kind: "regroup" }
+        : { kind: "rejected", message: receiptImageLimitMessage };
+  }
+}
+
+// The backend sends the image limit as the message itself.
+const imageLimitSchema = z.object({
+  data: z.literal(receiptImageLimitMessage),
+});
+
+/** Read the failure a capture keeps from what a step threw. */
+export function uploadFailure(cause: unknown): UploadFailure {
+  if (cause instanceof RequestDeferred)
+    return { kind: "deferred", message: cause.message };
+
+  if (
+    imageLimitSchema.safeParse(cause).success ||
+    (cause instanceof Error && cause.message.includes(receiptImageLimitMessage))
+  )
+    return { kind: "image_limit" };
+  const rejection = parseUserError(cause);
+
+  if (rejection?.code === "REJECTED")
+    return { kind: "rejected", message: rejection.message };
+
+  return { kind: "failed" };
+}
 
 export interface QueueStore {
   list(owner: string, householdId: Id<"households">): LocalReceipt[];
@@ -137,10 +221,15 @@ function withDeadlines(
 /**
  * Whether a failure spends the automatic retry budget. A stall whose retry
  * joins the transfer in flight does not: retrying sends nothing new, and
- * stopping would leave the capture waiting after the transfer lands.
+ * stopping would leave the capture waiting after the transfer lands. Nor does
+ * a deferral: the service named when to come back, so the capture waits for
+ * that time instead of stopping as if it had failed.
  */
 function spendsRetry(cause: unknown) {
-  return !(cause instanceof UploadStalled && cause.joinable);
+  return !(
+    (cause instanceof UploadStalled && cause.joinable) ||
+    cause instanceof RequestDeferred
+  );
 }
 
 /**
@@ -207,10 +296,12 @@ export function createQueueRunner(
     retries.write(id, retained);
   }
 
+  /** The capture waits for a manual retry, so a deferral no longer waits by itself. */
   function storageFailure(entry: LocalReceipt) {
     attempts.set(entry.id, { failures: 0, nextAttemptAt: null });
-    entry.error ??=
-      "Kunne ikke lese eller lagre ventetiden. Prøv igjen når lagringen virker.";
+
+    if (!entry.failure || entry.failure.kind === "deferred")
+      entry.failure = { kind: "failed" };
     store.update(entry);
     record("receipt.retry_storage_failed", { captureId: entry.id });
   }
@@ -294,7 +385,7 @@ export function createQueueRunner(
     transport: UploadTransport,
     active: () => boolean,
   ) {
-    entry.error = undefined;
+    entry.failure = undefined;
 
     if (!entry.receiptId) {
       entry.receiptId = await transport.reserve(entry);
@@ -365,7 +456,7 @@ export function createQueueRunner(
 
       const deferred = {
         ...pending,
-        error: pending.error ?? cause.message,
+        failure: pending.failure ?? uploadFailure(cause),
       };
 
       store.update(deferred);
@@ -386,8 +477,7 @@ export function createQueueRunner(
     retry: RetryState | undefined,
     cause: unknown,
   ) {
-    entry.error =
-      cause instanceof Error ? cause.message : "Opplastingen mislyktes.";
+    entry.failure = uploadFailure(cause);
     store.update(entry);
 
     const failures = (retry?.failures ?? 0) + (spendsRetry(cause) ? 1 : 0);
@@ -395,7 +485,7 @@ export function createQueueRunner(
     // A free retry still backs off, from the first delay up.
     const next = nextAttemptAt(
       Math.max(failures, 1),
-      parseUserError(cause)?.code === "REJECTED",
+      entry.failure.kind === "rejected" || entry.failure.kind === "image_limit",
       clock(),
     );
 

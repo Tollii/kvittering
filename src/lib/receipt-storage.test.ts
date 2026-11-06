@@ -1,6 +1,5 @@
 import { present, testId } from "./testing/receipts";
 import { openDatabaseSync } from "expo-sqlite";
-import { receiptImageLimitMessage } from "./domain/receipt-images";
 import { expect, it, vi } from "vitest";
 import {
   receiptStorage,
@@ -150,7 +149,7 @@ it("atomically regroups all legacy images and keeps the original on write failur
     createdAt: 1,
     images: Array.from({ length: 8 }, (_, index) => `${index}.jpg`),
     uploaded: Array.from({ length: 8 }, () => false),
-    error: receiptImageLimitMessage,
+    failure: { kind: "image_limit" as const },
   };
 
   receiptStorage.update(entry);
@@ -193,7 +192,7 @@ it("refuses to regroup reserved or unknown future queue payloads", () => {
     images: Array.from({ length: 6 }, (_, index) => `${index}.jpg`),
     uploaded: Array.from({ length: 6 }, () => false),
     receiptId: testId<"receipts">("reserved"),
-    error: receiptImageLimitMessage,
+    failure: { kind: "image_limit" as const },
   };
 
   receiptStorage.update(entry);

@@ -1,6 +1,7 @@
 import { ActivityIndicator, View } from "react-native";
 import { Copy, Icon, IconButton, Panel } from "@/components/ui";
 import { useTheme } from "@/constants/theme";
+import { uploadPhase, type LocalReceipt } from "@/lib/upload-queue";
 
 /** What Kamera last saved: photos that follow through upload, or a typed purchase. */
 export type LastSave =
@@ -8,46 +9,78 @@ export type LastSave =
   | { kind: "purchase" }
   | null;
 
-type SaveNote = { uploading: boolean; failed: boolean; title: string };
+/**
+ * Where the saved receipts stand. `waiting` continues by itself at the time the
+ * service named; `stopped` waits for the person in Kvitteringer.
+ */
+type SaveNoteState = "uploading" | "retrying" | "stopped" | "waiting" | "done";
+
+type SaveNote = { state: SaveNoteState; title: string };
+
+/** The state of the whole queue: the one that most needs saying comes first. */
+function queueState(queue: readonly LocalReceipt[], online: boolean) {
+  const phases = new Set(queue.map((entry) => uploadPhase(entry, online).kind));
+
+  if (phases.has("uploading") || phases.has("offline")) return "uploading";
+
+  if (phases.has("retrying")) return "retrying";
+
+  if (phases.has("rejected") || phases.has("regroup")) return "stopped";
+
+  if (phases.has("waiting")) return "waiting";
+
+  return "done";
+}
 
 /** The title of the note that follows the saved receipts through upload. */
 function uploadStatusTitle(
   saved: number,
-  uploading: boolean,
-  failed: boolean,
+  state: SaveNoteState,
   online: boolean,
 ) {
-  if (uploading) return online ? "Laster opp …" : "Venter på nett";
-
-  if (failed) return "Prøver igjen";
-
-  return saved === 1 ? "Lastet opp" : `${saved} kvitteringer lastet opp`;
+  switch (state) {
+    case "uploading":
+      return online ? "Laster opp …" : "Venter på nett";
+    case "retrying":
+      return "Prøver igjen";
+    case "stopped":
+      return "Kunne ikke laste opp";
+    case "waiting":
+      return "Lastes opp senere";
+    case "done":
+      return saved === 1 ? "Lastet opp" : `${saved} kvitteringer lastet opp`;
+  }
 }
 
 /** The note Kamera shows after saving, or null when there is nothing to say. */
 export function saveNote(
   lastSave: LastSave,
-  queue: readonly { error?: unknown }[],
+  queue: readonly LocalReceipt[],
   online: boolean,
 ): SaveNote | null {
   switch (lastSave?.kind) {
     case "photos": {
-      const uploading = queue.some((entry) => !entry.error);
-      const failed = queue.some((entry) => !!entry.error);
+      const state = queueState(queue, online);
 
       return {
-        uploading,
-        failed,
-        title: uploadStatusTitle(lastSave.count, uploading, failed, online),
+        state,
+        title: uploadStatusTitle(lastSave.count, state, online),
       };
     }
 
     case "purchase":
-      return { uploading: false, failed: false, title: "Kjøpet er lagt inn" };
+      return { state: "done", title: "Kjøpet er lagt inn" };
     case undefined:
       return null;
   }
 }
+
+const noteIcons = {
+  retrying: "arrow.clockwise.circle",
+  stopped: "exclamationmark.circle",
+  waiting: "hourglass",
+  done: "checkmark.circle.fill",
+} as const;
 
 export function SaveNotePanel({
   note,
@@ -58,15 +91,19 @@ export function SaveNotePanel({
   return (
     <Panel style={{ gap: 4 }}>
       <View style={{ flexDirection: "row", alignItems: "center", gap: 10 }}>
-        {note.uploading ? (
+        {note.state === "uploading" ? (
           <ActivityIndicator color={colors.primary} />
         ) : (
           <Icon
-            name={
-              note.failed ? "arrow.clockwise.circle" : "checkmark.circle.fill"
-            }
+            name={noteIcons[note.state]}
             size={22}
-            color={note.failed ? colors.warning : colors.success}
+            color={
+              note.state === "done"
+                ? colors.success
+                : note.state === "waiting"
+                  ? colors.secondary
+                  : colors.warning
+            }
           />
         )}
         <Copy weight="700" style={{ flex: 1 }}>

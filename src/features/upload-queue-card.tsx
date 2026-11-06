@@ -2,8 +2,29 @@ import { ActivityIndicator, View } from "react-native";
 import Animated from "react-native-reanimated";
 import { Button, Copy, IconTile, Panel, easeOut } from "@/components/ui";
 import { motion, useTheme } from "@/constants/theme";
-import type { LocalReceipt } from "@/lib/upload-queue";
+import {
+  uploadPhase,
+  type LocalReceipt,
+  type UploadPhase,
+} from "@/lib/upload-queue";
 import { QueueRegroup } from "./queue-regroup";
+
+/** The one line under the title that says where the upload stands. */
+function phaseDetail(phase: UploadPhase) {
+  switch (phase.kind) {
+    case "uploading":
+      return `Laster opp · ${phase.uploaded} av ${phase.total}`;
+    case "offline":
+      return "Venter på nett";
+    case "waiting":
+    case "rejected":
+      return phase.message;
+    case "retrying":
+      return "Venter på nytt forsøk";
+    case "regroup":
+      return "Maks 5 bilder per kvittering. Bildene er beholdt.";
+  }
+}
 
 /** A receipt whose images are still on this phone, with its upload progress. */
 export function UploadQueueCard({
@@ -16,18 +37,34 @@ export function UploadQueueCard({
   onRetry: () => void;
 }>) {
   const colors = useTheme();
+  const phase = uploadPhase(entry, online);
   const uploaded = entry.uploaded.filter(Boolean).length;
+  const active = phase.kind === "uploading" || phase.kind === "offline";
+
+  // A failure is a warning: the images are safe and wait for the person.
+  const stopped =
+    phase.kind === "retrying" ||
+    phase.kind === "rejected" ||
+    phase.kind === "regroup";
 
   return (
     <Panel style={{ gap: 8 }}>
       <View style={{ flexDirection: "row", alignItems: "center", gap: 12 }}>
-        {/* A failed upload is a warning: the images are safe and wait for a retry. */}
-        {entry.error ? (
-          <IconTile icon="arrow.clockwise.circle" color={colors.warning} />
-        ) : (
+        {active ? (
           <IconTile>
             <ActivityIndicator color={colors.primary} />
           </IconTile>
+        ) : phase.kind === "waiting" ? (
+          <IconTile icon="hourglass" color={colors.secondary} />
+        ) : (
+          <IconTile
+            icon={
+              phase.kind === "retrying"
+                ? "arrow.clockwise.circle"
+                : "exclamationmark.circle"
+            }
+            color={colors.warning}
+          />
         )}
         <View style={{ flex: 1, gap: 2 }}>
           <Copy weight="600">
@@ -36,11 +73,7 @@ export function UploadQueueCard({
               : `Ny kvittering · ${entry.images.length} bilder`}
           </Copy>
           <Copy role="detail" muted>
-            {entry.error
-              ? "Venter på nytt forsøk"
-              : online
-                ? `Laster opp · ${uploaded} av ${entry.images.length}`
-                : "Venter på nett"}
+            {phaseDetail(phase)}
           </Copy>
         </View>
       </View>
@@ -57,15 +90,19 @@ export function UploadQueueCard({
           style={{
             height: 4,
             width: `${Math.max(6, (uploaded / entry.images.length) * 100)}%`,
-            backgroundColor: entry.error ? colors.warning : colors.primary,
+            backgroundColor: stopped
+              ? colors.warning
+              : active
+                ? colors.primary
+                : colors.secondary,
             transitionProperty: "width",
             transitionDuration: motion.state,
             transitionTimingFunction: easeOut,
           }}
         />
       </View>
-      <QueueRegroup entry={entry} />
-      {!!entry.error && (
+      {phase.kind === "regroup" && <QueueRegroup entry={entry} />}
+      {(phase.kind === "retrying" || phase.kind === "rejected") && (
         <Button
           title="Prøv igjen"
           variant="tint"

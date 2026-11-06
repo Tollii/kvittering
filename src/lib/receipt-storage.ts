@@ -1,16 +1,17 @@
-import {
-  maxReceiptImages,
-  receiptImageLimitMessage,
-} from "./domain/receipt-images";
+import { maxReceiptImages } from "./domain/receipt-images";
 import type { RetryStore } from "./request-retry";
 import { parse } from "convex-helpers/validators";
 import { v } from "convex/values";
-import { migrateReceipt, migrateReceiptDatabase } from "./receipt-migrations";
+import {
+  migrateReceipt,
+  migrateReceiptDatabase,
+  serializeReceipt,
+} from "./receipt-migrations";
 import { Directory, File, Paths } from "expo-file-system";
 import { openDatabaseSync } from "expo-sqlite";
 import { randomUUID } from "expo-crypto";
 import type { Id } from "../../convex/_generated/dataModel";
-import type { LocalReceipt, QueueStore } from "./upload-queue";
+import { canRegroup, type LocalReceipt, type QueueStore } from "./upload-queue";
 import { storageSuffix } from "./deployment-storage";
 import { getOrInsert } from "./map-cache";
 import { UserError } from "./user-errors";
@@ -64,7 +65,7 @@ function writeEntry(entry: LocalReceipt) {
     entry.id,
     entry.owner,
     entry.householdId,
-    JSON.stringify(entry),
+    serializeReceipt(entry),
   );
 }
 
@@ -264,11 +265,7 @@ export function regroupQueuedReceipt(
       });
     const entry = migrateReceipt(JSON.parse(row.data));
 
-    if (
-      entry.receiptId ||
-      entry.uploaded.some(Boolean) ||
-      !entry.error?.includes(receiptImageLimitMessage)
-    )
+    if (!canRegroup(entry))
       throw new UserError({
         code: "REJECTED",
         message: "Vent til opplastingen er avklart før du deler opp bildene.",

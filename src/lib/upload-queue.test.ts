@@ -6,6 +6,8 @@ import {
 } from "./request-retry";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { userError } from "../../convex/userErrors";
+import { ConvexError } from "convex/values";
+import { receiptImageLimitMessage } from "./domain/receipt-images";
 import {
   createQueueRunner,
   retryPolicy,
@@ -115,9 +117,7 @@ describe("durable receipt upload", () => {
     };
 
     await run("user", household, transport, () => true);
-    expect(rows()).toEqual([
-      { ...original, error: "Dagens grense for kvitteringer er nådd." },
-    ]);
+    expect(rows()).toEqual([{ ...original, failure: { kind: "failed" } }]);
     expect(uploads).toBe(0);
     blocked = false;
     advance(retryPolicy.firstDelayMs);
@@ -152,7 +152,7 @@ describe("durable receipt upload", () => {
 
     await run("user", household, transport, () => true);
     expect(present(rows()[0]).uploaded).toEqual([true, false]);
-    expect(present(rows()[0]).error).toBe("Connection lost");
+    expect(present(rows()[0]).failure).toEqual({ kind: "failed" });
     fail = false;
     advance(retryPolicy.firstDelayMs);
     await run("user", household, transport, () => true);
@@ -270,6 +270,45 @@ describe("automatic upload retries", () => {
     expect(attempts.count).toBe(retryPolicy.maxAttempts);
   });
 
+  it("waits for the person to split the images after the image limit", async () => {
+    const { run, rows, clock } = fixture();
+
+    const { attempts, transport } = failingTransport(
+      () => new ConvexError(receiptImageLimitMessage),
+    );
+
+    await run("user", household, transport, () => true);
+    clock.now += 24 * 60 * 60 * 1000;
+    await run("user", household, transport, () => true);
+    expect(attempts.count).toBe(1);
+    expect(present(rows()[0]).failure).toEqual({ kind: "image_limit" });
+  });
+
+  it("comes back at every deferral's time without spending the automatic attempts", async () => {
+    const { run, rows, clock } = fixture();
+    let contacted = 0;
+
+    const transport: UploadTransport = {
+      reserve: async () => {
+        contacted++;
+        throw new RequestDeferred("Quota wait", clock.now + 60_000);
+      },
+      upload: async () => {},
+      complete: async () => {},
+    };
+
+    for (let wait = 0; wait <= retryPolicy.maxAttempts; wait++) {
+      await run("user", household, transport, () => true);
+      clock.now += 60_000;
+    }
+
+    expect(contacted).toBe(retryPolicy.maxAttempts + 1);
+    expect(present(rows()[0]).failure).toEqual({
+      kind: "deferred",
+      message: "Quota wait",
+    });
+  });
+
   it("waits for the person after a rejection, then tries again on request or app start", async () => {
     const { run, restart, rows, clock } = fixture();
 
@@ -281,7 +320,10 @@ describe("automatic upload retries", () => {
     clock.now += 24 * 60 * 60 * 1000;
     await run("user", household, transport, () => true);
     expect(attempts.count).toBe(1);
-    expect(present(rows()[0]).error).toContain("Husstanden er endret.");
+    expect(present(rows()[0]).failure).toEqual({
+      kind: "rejected",
+      message: "Husstanden er endret. Logg inn på nytt.",
+    });
 
     await run("user", household, transport, () => true, { retryFailed: true });
     expect(attempts.count).toBe(2);
@@ -347,7 +389,7 @@ it("reports an active reservation until its failure is persisted", async () => {
   rejectReservation(new Error("Image limit"));
   await pending;
   expect(run.isRunning()).toBe(false);
-  expect(present(rows()[0]).error).toBe("Image limit");
+  expect(present(rows()[0]).failure).toEqual({ kind: "failed" });
   expect(present(rows()[0]).images).toEqual(["first.jpg", "second.jpg"]);
 });
 
@@ -447,7 +489,7 @@ it("fails a reservation that never answers, reports it, and uploads the next cap
   expect(completed).toEqual(["next"]);
   expect(rows()).toHaveLength(1);
   expect(present(rows()[0]).id).toBe("capture");
-  expect(present(rows()[0]).error).toBeTruthy();
+  expect(present(rows()[0]).failure).toEqual({ kind: "failed" });
   expect(reports).toMatchObject([
     { operation: "receipt.upload_stalled", phase: "reserve" },
   ]);
@@ -574,7 +616,7 @@ it("records another image's real error instead of a stall beside it", async () =
     upload: (_id, position) =>
       position === 0
         ? new Promise<never>(() => {})
-        : Promise.reject(new Error("Bildet er for stort.")),
+        : Promise.reject(userError("Bildet er for stort.")),
     complete: async () => {},
   };
 
@@ -582,7 +624,10 @@ it("records another image's real error instead of a stall beside it", async () =
   await vi.advanceTimersByTimeAsync(stepDeadlineMs.upload);
   await drain;
 
-  expect(present(rows()[0]).error).toBe("Bildet er for stort.");
+  expect(present(rows()[0]).failure).toEqual({
+    kind: "rejected",
+    message: "Bildet er for stort.",
+  });
 });
 
 it("keeps the quota error and the later deadline on manual retry and household deferral", async () => {
@@ -604,9 +649,9 @@ it("keeps the quota error and the later deadline on manual retry and household d
   const deferred = structuredClone(rows());
   await run("user", household, transport, () => true, { retryFailed: true });
   expect(rows()).toEqual(deferred);
-  expect(rows().map((entry) => entry.error)).toEqual([
-    "Quota wait",
-    "Quota wait",
+  expect(rows().map((entry) => entry.failure)).toEqual([
+    { kind: "deferred", message: "Quota wait" },
+    { kind: "deferred", message: "Quota wait" },
   ]);
   expect(retries.read("later")?.retryAt).toBe(120_000);
   clock.now = 60_000;
@@ -660,18 +705,13 @@ it.each(["read", "write", "remove"] as const)(
     ).resolves.toBeUndefined();
     expect(rows()).toHaveLength(1);
     expect(present(rows()[0]).images).toHaveLength(2);
-    expect(present(rows()[0]).error).toBeTruthy();
+    expect(present(rows()[0]).failure).toBeDefined();
     expect(completed).toEqual(["healthy"]);
     await run("user", household, transport, () => true, { retryFailed: true });
     expect(contacted.filter((id) => id === "capture")).toHaveLength(
       operation === "read" ? 0 : operation === "write" ? 1 : 2,
     );
-    expect(present(rows()[0]).error).toBe(
-      operation === "read"
-        ? "Kunne ikke lese eller lagre ventetiden. Prøv igjen når lagringen virker."
-        : operation === "write"
-          ? "Quota wait"
-          : "Offline",
-    );
+    // Without a durable deadline the capture waits for the person, not the service.
+    expect(present(rows()[0]).failure).toEqual({ kind: "failed" });
   },
 );

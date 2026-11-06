@@ -301,7 +301,7 @@ export default function Capture() {
   const shutterDisabled = busy || !ready || !live;
 
   const note = saveNote(lastSave, queue, online);
-  const settled = !!note && !note.uploading && !note.failed;
+  const settled = note?.state === "done";
 
   // Let the success note fade away on its own once the upload has landed.
   useEffect(() => {

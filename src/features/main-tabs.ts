@@ -52,9 +52,11 @@ export function useReceiptsBadge() {
       }
     : legacy;
 
-  // Badge only what needs a person; processing receipts resolve on their own.
+  // Badge only what needs a person; processing receipts and deferred uploads resolve on their own.
   const pending =
-    (attention?.count ?? 0) + queue.filter((entry) => entry.error).length;
+    (attention?.count ?? 0) +
+    queue.filter((entry) => entry.failure && entry.failure.kind !== "deferred")
+      .length;
 
   if (pending === 0) return undefined;
 

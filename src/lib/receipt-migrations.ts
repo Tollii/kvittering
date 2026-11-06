@@ -1,8 +1,11 @@
-import { legacyReceiptImages } from "./domain/receipt-images";
+import {
+  legacyReceiptImages,
+  receiptImageLimitMessage,
+} from "./domain/receipt-images";
 import { z } from "zod";
 import { v } from "convex/values";
 import { parse } from "convex-helpers/validators";
-import type { LocalReceipt } from "./upload-queue";
+import type { LocalReceipt, UploadFailure } from "./upload-queue";
 
 export class ReceiptMigrationError extends Error {}
 
@@ -15,8 +18,60 @@ const receiptValidator = v.object({
   images: v.array(v.string()),
   uploaded: v.array(v.boolean()),
   receiptId: v.id("receipts").optional(),
+  // Older releases keep the failure as text only.
   error: v.string().optional(),
 });
+
+const failureSchema = z.discriminatedUnion("kind", [
+  z.object({ kind: z.literal("failed") }),
+  z.object({ kind: z.literal("deferred"), message: z.string().min(1) }),
+  z.object({ kind: z.literal("rejected"), message: z.string().min(1) }),
+  z.object({ kind: z.literal("image_limit") }),
+]);
+
+/**
+ * The failure of a stored capture. A row written by an older release, or by
+ * one rolled back to after this one, has only the text: of that, only the
+ * image limit still matters, because it is what lets the person regroup. A
+ * typed failure counts only beside its text, which an older release clears
+ * when the upload succeeds.
+ */
+function storedFailure(
+  typed: UploadFailure | undefined,
+  error: string | undefined,
+): UploadFailure | undefined {
+  if (typed && error !== undefined) return typed;
+
+  if (error === undefined) return undefined;
+
+  return error.includes(receiptImageLimitMessage)
+    ? { kind: "image_limit" }
+    : { kind: "failed" };
+}
+
+/** The text an older release shows and matches for each failure. */
+function failureText(failure: UploadFailure) {
+  switch (failure.kind) {
+    case "failed":
+      return "Opplastingen mislyktes.";
+    case "deferred":
+    case "rejected":
+      return failure.message;
+    case "image_limit":
+      return receiptImageLimitMessage;
+  }
+}
+
+/**
+ * The stored form of a capture. It stays at schemaVersion 1 and keeps the
+ * failure's text beside it, so a release rolled back to over the air still
+ * reads the queue: older readers ignore `failure` and match on `error`.
+ */
+export function serializeReceipt({ failure, ...entry }: LocalReceipt) {
+  return JSON.stringify(
+    failure ? { ...entry, failure, error: failureText(failure) } : entry,
+  );
+}
 
 /** Retain reservation IDs, upload progress and relative image paths during upgrades. */
 // oxlint-disable-next-line anti-slop/no-unknown-parameters -- This boundary parser validates external input before returning a domain value.
@@ -35,7 +90,14 @@ export function migrateReceipt(value: unknown): LocalReceipt {
     throw new ReceiptMigrationError(
       "Kvitteringen krever en nyere versjon av Kvitto. Bildene er beholdt.",
     );
-  const result = parse(receiptValidator, { ...input.data, schemaVersion: 1 });
+
+  const { error, ...result } = parse(receiptValidator, {
+    ...input.data,
+    schemaVersion: 1,
+  });
+
+  // A failure kind from a later release is not an error: its text still counts.
+  const typed = failureSchema.safeParse(input.data["failure"]).data;
 
   if (
     !result.id ||
@@ -56,8 +118,9 @@ export function migrateReceipt(value: unknown): LocalReceipt {
     throw new ReceiptMigrationError(
       "Ugyldig lokal kvittering. Bildene er beholdt.",
     );
+  const stored = storedFailure(typed, error);
 
-  return result;
+  return stored ? { ...result, failure: stored } : result;
 }
 
 export interface ReceiptDatabase {
@@ -95,7 +158,7 @@ export function migrateReceiptDatabase(database: ReceiptDatabase) {
           );
         database.runSync(
           "UPDATE receipt_queue SET data = ? WHERE id = ?",
-          JSON.stringify(receipt),
+          serializeReceipt(receipt),
           row.id,
         );
       }
