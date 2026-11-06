@@ -16,6 +16,49 @@ import type { ReceiptData } from "@/lib/domain/receipt";
 import { productAnalysisRestartable } from "@/lib/domain/product-families";
 import type { Receipt } from "@/lib/domain/insights";
 import { useTheme } from "@/constants/theme";
+import { isUploadAbandoned } from "@/lib/domain/receipt-state";
+import { useHousehold } from "@/features/household-context";
+import { useState } from "react";
+
+/**
+ * Whether the receipt can be deleted. An upload can be once no phone will
+ * finish it: a day without progress, and not waiting in this phone's queue,
+ * which resumes it by itself. The editor only knows the reservation time; the
+ * server also counts the receipt's newest image.
+ */
+export function useUploadDeletion(receipt: Receipt) {
+  const { queue } = useHousehold();
+  const [openedAt] = useState(Date.now);
+
+  if (receipt.status !== "uploading")
+    return { abandoned: false, deletable: true };
+
+  const abandoned =
+    !queue.some((entry) => entry.receiptId === receipt._id) &&
+    isUploadAbandoned(receipt._creationTime, openedAt);
+
+  return { abandoned, deletable: abandoned };
+}
+
+/** Explains an abandoned upload; tapping it offers the deletion when allowed. */
+export function AbandonedUploadNotice({
+  abandoned,
+  disabled,
+  onDelete,
+}: Readonly<{ abandoned: boolean; disabled: boolean; onDelete: () => void }>) {
+  if (!abandoned) return null;
+
+  return (
+    <Notice
+      tone="warning"
+      title="Bildene kom ikke fram"
+      onPress={disabled ? undefined : onDelete}
+    >
+      Opplastingen har stått stille i over et døgn. Slett kvitteringen, og ta
+      bildet på nytt.
+    </Notice>
+  );
+}
 
 /** Tells that another device saved the receipt, and loads that version. */
 export function StaleRevisionNotice({
