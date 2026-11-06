@@ -20,7 +20,8 @@ export const catalogRequestStaleMs = 30 * minute;
 
 /**
  * A matching run older than this is stalled: it is well past three capped
- * retries, queueing, and one requeue of a stale lookup.
+ * retries and queueing. A lookup it waits on that lost its worker is queued
+ * again only when the next run asks for it, as a retry does.
  */
 export const catalogMatchingDeadlineMs = 2 * 60 * minute;
 
