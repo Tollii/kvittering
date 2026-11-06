@@ -7,7 +7,9 @@ import { withProductReference } from "../src/lib/domain/product-reference";
 import { commitReceiptChange } from "./receiptChanges";
 import { v, type Infer, type ObjectType } from "convex/values";
 import { errorDetails } from "../src/lib/diagnostics";
-import { WorkflowManager } from "@convex-dev/workflow";
+import { WorkflowManager, start, vWorkflowId } from "@convex-dev/workflow";
+import { vResultValidator } from "@convex-dev/workpool";
+import { recordWorkflowCompletion, trackWorkflow } from "./retention";
 import { components, internal } from "./_generated/api";
 import { internalQuery, env, type MutationCtx } from "./_generated/server";
 import { hasProductModel } from "./providerConfig";
@@ -38,6 +40,8 @@ import {
 } from "../src/lib/domain/receipt-review";
 
 const workflow = new WorkflowManager(components.workflow);
+
+const readingFailed = "Behandlingen mislyktes.";
 
 export const processReceipt = workflow
   .define({
@@ -113,14 +117,27 @@ export const processReceipt = workflow
       });
 
       stage = "finish";
-      await step.runMutation(internal.processing.finish, {
+
+      // Running workflows compare step arguments on replay: keep these keys and their order.
+      const commit = {
         matches,
         durationMs: extraction.durationMs + classification.durationMs,
         ...args,
         data: prepared,
         original: extraction.data,
         provider: `${extraction.provider} / ${classification.provider}`,
-      });
+      };
+
+      // Each step searches one page for a duplicate, so a failure on any page reaches `fail`.
+      let next: DuplicateSearch | undefined;
+
+      do
+        next =
+          (await step.runMutation(internal.processing.finish, {
+            ...commit,
+            ...next,
+          })) ?? undefined;
+      while (next);
     } catch (error) {
       await step.runMutation(
         internal.processing.fail,
@@ -128,8 +145,7 @@ export const processReceipt = workflow
           ...args,
           stage,
           errorType: errorDetails(error).errorType,
-          error:
-            error instanceof Error ? error.message : "Behandlingen mislyktes.",
+          error: error instanceof Error ? error.message : readingFailed,
         },
         { unstableArgs: true },
       );
@@ -212,6 +228,14 @@ const finishArgs = {
 
 type FinishArgs = ObjectType<typeof finishArgs>;
 
+/** Where the duplicate search continues when a page found none and more remain. */
+const duplicateSearch = v.object({
+  duplicateCursor: v.string(),
+  duplicateThrough: v.number(),
+});
+
+type DuplicateSearch = Infer<typeof duplicateSearch>;
+
 type ProductDecision = Infer<typeof productDecision>;
 
 /** A purchase typed in has no images and no receipt number or time to compare. */
@@ -246,7 +270,7 @@ function isDuplicateReceipt(
 
 /**
  * Search one page of the household's receipts for a duplicate. When the page
- * has no duplicate and more pages remain, schedule `finish` again for the next page.
+ * has no duplicate and more pages remain, say where the next page starts.
  */
 async function findDuplicate(
   ctx: MutationCtx,
@@ -254,7 +278,7 @@ async function findDuplicate(
   args: FinishArgs,
 ): Promise<
   | { kind: "resolved"; duplicateOf: Id<"receipts"> | undefined }
-  | { kind: "rescheduled" }
+  | { kind: "next_page"; search: DuplicateSearch }
 > {
   const { store, purchaseDate } = args.data;
 
@@ -288,15 +312,14 @@ async function findDuplicate(
     isDuplicateReceipt(other, receipt, args.data),
   )?._id;
 
-  if (!duplicateOf && !page.isDone) {
-    await ctx.scheduler.runAfter(0, internal.processing.finish, {
-      ...args,
-      duplicateCursor: page.continueCursor,
-      duplicateThrough: through,
-    });
-
-    return { kind: "rescheduled" };
-  }
+  if (!duplicateOf && !page.isDone)
+    return {
+      kind: "next_page",
+      search: {
+        duplicateCursor: page.continueCursor,
+        duplicateThrough: through,
+      },
+    };
 
   return { kind: "resolved", duplicateOf };
 }
@@ -474,10 +497,15 @@ async function notifyReceiptReady(ctx: MutationCtx, receipt: Doc<"receipts">) {
   }
 }
 
+/**
+ * Commit the extraction, or return where the duplicate search continues. The
+ * workflow calls it again with that position, so every page runs inside the
+ * workflow's error handling.
+ */
 export const finish = internalMutation({
   args: finishArgs,
-  returns: v.null(),
-  handler: async (ctx, args) => {
+  returns: v.union(v.null(), duplicateSearch),
+  handler: async (ctx, args): Promise<DuplicateSearch | null> => {
     const receipt = await ctx.db.get("receipts", args.id);
 
     if (
@@ -498,7 +526,7 @@ export const finish = internalMutation({
 
     const duplicate = await findDuplicate(ctx, receipt, args);
 
-    if (duplicate.kind === "rescheduled") return null;
+    if (duplicate.kind === "next_page") return duplicate.search;
     const { duplicateOf } = duplicate;
 
     await ctx.db.insert("extractions", {
@@ -565,36 +593,95 @@ export const finish = internalMutation({
   },
 });
 
+const failureArgs = {
+  id: v.id("receipts"),
+  generation: v.number(),
+  error: v.string(),
+  stage: v.string().optional(),
+  errorType: v.string().optional(),
+};
+
+/** Mark a receipt failed when it is still being read for the generation that failed. */
+async function failReceiptReading(
+  ctx: MutationCtx,
+  args: ObjectType<typeof failureArgs>,
+) {
+  const receipt = await ctx.db.get("receipts", args.id);
+
+  if (
+    !receipt ||
+    receipt.generation !== args.generation ||
+    !isReceiptBeingRead(receipt.status)
+  )
+    return;
+
+  // The original failure stays on the receipt; do not duplicate OCR/provider text in logs.
+  console.error("receipt.processing_failed", {
+    receiptId: args.id,
+    generation: args.generation,
+    stage: args.stage,
+    errorType: args.errorType,
+  });
+  await ctx.db.patch("receipts", args.id, {
+    status: "failed",
+    error: args.error.slice(0, 400),
+  });
+  await notifyReceiptActivities(ctx, receipt.householdId);
+}
+
 export const fail = internalMutation({
-  args: {
-    id: v.id("receipts"),
-    generation: v.number(),
-    error: v.string(),
-    stage: v.string().optional(),
-    errorType: v.string().optional(),
-  },
+  args: failureArgs,
   returns: v.null(),
   handler: async (ctx, args) => {
-    const receipt = await ctx.db.get("receipts", args.id);
+    await failReceiptReading(ctx, args);
 
-    if (
-      receipt &&
-      receipt.generation === args.generation &&
-      isReceiptBeingRead(receipt.status)
-    ) {
-      // The original failure stays on the receipt; do not duplicate OCR/provider text in logs.
-      console.error("receipt.processing_failed", {
-        receiptId: args.id,
-        generation: args.generation,
-        stage: args.stage,
-        errorType: args.errorType,
-      });
-      await ctx.db.patch("receipts", args.id, {
-        status: "failed",
-        error: args.error.slice(0, 400),
-      });
-      await notifyReceiptActivities(ctx, receipt.householdId);
-    }
+    return null;
+  },
+});
+
+/** Start reading a receipt's evidence for a generation. */
+export async function startReading(
+  ctx: MutationCtx,
+  id: Id<"receipts">,
+  generation: number,
+) {
+  const workflowId = await start(
+    ctx,
+    internal.processing.processReceipt,
+    { id, generation },
+    {
+      onComplete: internal.processing.readingCompleted,
+      context: { receiptId: id, generation },
+    },
+  );
+
+  await trackWorkflow(ctx, workflowId, "processing", id);
+}
+
+/**
+ * A run that ends while its generation is still being read would leave the
+ * receipt stuck, so it fails and can be read again.
+ */
+export const readingCompleted = internalMutation({
+  args: {
+    workflowId: vWorkflowId,
+    result: vResultValidator,
+    context: v.object({ receiptId: v.id("receipts"), generation: v.number() }),
+  },
+  returns: v.null(),
+  handler: async (ctx, { workflowId, result, context }) => {
+    // A run of each generation must leave it read, so even a success that did not is a defect.
+    await failReceiptReading(ctx, {
+      id: context.receiptId,
+      generation: context.generation,
+      error: readingFailed,
+      stage: "workflow",
+      errorType: `workflow_${result.kind}`,
+    });
+    await recordWorkflowCompletion(ctx, workflowId, {
+      component: "processing",
+      receiptId: context.receiptId,
+    });
 
     return null;
   },
