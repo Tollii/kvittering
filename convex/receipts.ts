@@ -635,8 +635,9 @@ async function lastUploadProgress(ctx: QueryCtx, receipt: Doc<"receipts">) {
 }
 
 /**
- * Delete a household receipt, unless it is still uploading: an abandoned upload
- * lost its capture and never completes. Processing cannot recreate it.
+ * Delete a household receipt, unless its upload made progress in the last day:
+ * an abandoned upload lost its capture and never completes. Processing cannot
+ * recreate a deleted receipt.
  */
 export const remove = mutation({
   args: { id: v.id("receipts"), revision: v.number() },

@@ -254,7 +254,7 @@ it("keeps a shared household with the partner and removes the last member's hous
     "account-receipt-0001",
   );
 
-  // The partner's own waiting uploads come first in the household's index.
+  // More waiting uploads from the partner than one batch; they must all survive.
   const firstMember = await first.query(api.households.current, {});
 
   const partnerUploads = await t.run(async (ctx) => {
