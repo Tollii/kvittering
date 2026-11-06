@@ -12,6 +12,8 @@ const modules = import.meta.glob("./**/*.ts");
 
 afterEach(() => {
   orders.splice(1);
+  revoked.splice(0);
+  slowTokenExchange = false;
   vi.useRealTimers();
   vi.unstubAllEnvs();
   vi.unstubAllGlobals();
@@ -36,6 +38,12 @@ const orders = [order];
 
 let refreshes = 0;
 
+/** Tokens Kvitto handed back to Oda. */
+const revoked: string[] = [];
+
+/** When set, the token exchange outlasts the sign-in. */
+let slowTokenExchange = false;
+
 const rpcRequest = z.object({ id: z.number().optional(), method: z.string() });
 
 /** Oda's OAuth server and MCP endpoint, answering as they do in production. */
@@ -43,7 +51,17 @@ async function oda(url: string, init?: RequestInit) {
   if (url === "https://oda.com/o/register/")
     return Response.json({ client_id: "kvitto-client" }, { status: 201 });
 
+  if (url === "https://oda.com/o/revoke_token/") {
+    revoked.push(
+      z.instanceof(URLSearchParams).parse(init?.body).get("token") ?? "",
+    );
+
+    return new Response(null, { status: 200 });
+  }
+
   if (url === "https://oda.com/o/token/") {
+    if (slowTokenExchange) vi.advanceTimersByTime(11 * 60 * 1000);
+
     // Like Oda, each refresh replaces the refresh token and refuses the old one.
     const used = z
       .instanceof(URLSearchParams)
@@ -256,6 +274,81 @@ it("signs in at Oda once and imports a delivered order as one receipt", async ()
       .map((receipt) => receipt.clientId)
       .sort(),
   ).toEqual(["oda-k4mz8q", "oda-r2fy3e"]);
+});
+
+it("forgets Oda's tokens when a sign-in is never confirmed", async () => {
+  vi.useFakeTimers();
+  vi.stubEnv("CONVEX_SITE_URL", "https://kvitto.convex.site");
+  vi.stubGlobal("fetch", vi.fn(oda));
+  const t = convexTest(schema, modules);
+  registerRateLimiter(t);
+
+  const user = t.withIdentity({
+    subject: "owner",
+    issuer: "https://test.local",
+  });
+
+  await user.mutation(api.households.create, {
+    name: "Home",
+    invitation: "0123456789abcdef0123456789abcdef",
+  });
+
+  /** Sign in at Oda without the app confirming it, and return Oda's answer. */
+  const signInAtOda = async (request: string) => {
+    const started = new URL(
+      await user.mutation(api.oda.start, {
+        request,
+        returnUrl: "kvitto://oda",
+      }),
+    );
+
+    const state = new URL(
+      (await t.fetch(`${started.pathname}${started.search}`)).headers.get(
+        "Location",
+      )!,
+    ).searchParams.get("state");
+
+    return new URL(
+      (await t.fetch(`/oda/callback?code=code&state=${state}`)).headers.get(
+        "Location",
+      )!,
+    ).searchParams;
+  };
+
+  const abandoned = await signInAtOda("0123456789abcdef0123456789abcdef");
+  expect(abandoned.get("status")).toBe("connected");
+
+  // Still in time, the sign-in keeps its tokens for the app.
+  await t.mutation(internal.oda.removeExpiredAuthorizations, {});
+  expect(
+    await t.run((ctx) => ctx.db.query("odaAuthorizations").collect()),
+  ).toHaveLength(1);
+
+  vi.advanceTimersByTime(11 * 60 * 1000);
+  await t.mutation(internal.oda.removeExpiredAuthorizations, {});
+  await t.finishAllScheduledFunctions(vi.runAllTimers);
+
+  expect(
+    await t.run((ctx) => ctx.db.query("odaAuthorizations").collect()),
+  ).toEqual([]);
+  expect(revoked).toEqual([`refresh-${refreshes}`]);
+  await expect(
+    user.mutation(api.oda.confirm, {
+      confirmation: abandoned.get("confirmation")!,
+    }),
+  ).rejects.toThrow("Innloggingen hos Oda er utløpt");
+
+  // Tokens that arrive after the sign-in expired are not kept either.
+  slowTokenExchange = true;
+  const late = await signInAtOda("abcdef0123456789abcdef0123456789");
+  await t.finishAllScheduledFunctions(vi.runAllTimers);
+
+  expect(late.get("status")).toBe("failed");
+  expect(
+    await t.run((ctx) => ctx.db.query("odaAuthorizations").collect()),
+  ).toEqual([]);
+  expect(revoked).toHaveLength(2);
+  expect(await user.query(api.oda.status, {})).toBeNull();
 });
 
 it("links Oda lines to Oda's product until Kassalapp finds one", async () => {

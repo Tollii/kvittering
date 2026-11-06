@@ -354,7 +354,10 @@ export default defineSchema({
     name: v.optional(v.string()),
     confirmedBy: v.string(),
   }).index("by_householdId_and_key", ["householdId", "key"]),
-  /** A sign-in at Oda in progress, keyed by a secret only the app knows. */
+  /**
+   * A sign-in at Oda in progress, keyed by a secret only the app knows. An
+   * hourly cron removes it once it expires, with any tokens it still holds.
+   */
   odaAuthorizations: defineTable({
     request: v.string(),
     identity: v.string(),
@@ -383,7 +386,8 @@ export default defineSchema({
     .index("by_request", ["request"])
     .index("by_state", ["signIn.state"])
     .index("by_confirmation", ["pending.confirmation"])
-    .index("by_identity", ["identity"]),
+    .index("by_identity", ["identity"])
+    .index("by_expiresAt", ["expiresAt"]),
   /** Kvitto's OAuth registration at Oda for each callback URL. */
   odaClients: defineTable({
     redirectUri: v.string(),

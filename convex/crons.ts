@@ -35,4 +35,11 @@ for (const component of ["processing", "analysis"] as const)
 
 crons.interval("sync Oda orders", { hours: 6 }, internal.oda.syncAll, {});
 
+crons.interval(
+  "remove expired Oda sign-ins",
+  { hours: 1 },
+  internal.oda.removeExpiredAuthorizations,
+  {},
+);
+
 export default crons;

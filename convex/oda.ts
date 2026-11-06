@@ -8,7 +8,7 @@ import {
   type QueryCtx,
 } from "./_generated/server";
 import { internal } from "./_generated/api";
-import type { Id } from "./_generated/dataModel";
+import type { Doc, Id } from "./_generated/dataModel";
 import { internalMutation } from "./serverFunctions";
 import { clientMutation as mutation } from "./clientFunctions";
 import { requireMember } from "./access";
@@ -103,7 +103,7 @@ export const start = mutation({
       .query("odaAuthorizations")
       .withIndex("by_identity", (q) => q.eq("identity", member.identity))
       .take(20))
-      await ctx.db.delete("odaAuthorizations", old._id);
+      await forgetSignIn(ctx, old);
 
     await ctx.db.insert("odaAuthorizations", {
       request: args.request,
@@ -310,16 +310,68 @@ export const completeAuthorization = internalMutation({
   },
 });
 
-/** Hold Oda's tokens until the app confirms the sign-in. */
+/**
+ * Hold Oda's tokens until the app confirms the sign-in. Tokens that arrive
+ * after the sign-in expired are handed back to Oda instead.
+ */
 export const holdTokens = internalMutation({
   args: {
     id: v.id("odaAuthorizations"),
+    clientId: v.string(),
     confirmation: v.string(),
     ...tokensValidator,
   },
+  returns: v.boolean(),
+  handler: async (ctx, { id, clientId, ...pending }) => {
+    const row = await ctx.db.get("odaAuthorizations", id);
+
+    if (row && row.expiresAt >= Date.now()) {
+      await ctx.db.patch("odaAuthorizations", id, { pending });
+
+      return true;
+    }
+
+    if (row) await ctx.db.delete("odaAuthorizations", id);
+    await ctx.scheduler.runAfter(0, internal.oda.revoke, {
+      clientId,
+      token: pending.refreshToken ?? pending.accessToken,
+    });
+
+    return false;
+  },
+});
+
+/** Remove a sign-in, and ask Oda to forget any tokens it still holds. */
+async function forgetSignIn(ctx: MutationCtx, row: Doc<"odaAuthorizations">) {
+  await ctx.db.delete("odaAuthorizations", row._id);
+
+  if (row.pending && row.signIn)
+    await ctx.scheduler.runAfter(0, internal.oda.revoke, {
+      clientId: row.signIn.clientId,
+      token: row.pending.refreshToken ?? row.pending.accessToken,
+    });
+}
+
+const expiredSignInBatch = 100;
+
+/** Scheduled: remove sign-ins nobody finished, so no Oda tokens outlive them. */
+export const removeExpiredAuthorizations = internalMutation({
+  args: {},
   returns: v.null(),
-  handler: async (ctx, { id, ...pending }) => {
-    await ctx.db.patch("odaAuthorizations", id, { pending });
+  handler: async (ctx) => {
+    const expired = await ctx.db
+      .query("odaAuthorizations")
+      .withIndex("by_expiresAt", (q) => q.lt("expiresAt", Date.now()))
+      .take(expiredSignInBatch);
+
+    for (const row of expired) await forgetSignIn(ctx, row);
+
+    if (expired.length === expiredSignInBatch)
+      await ctx.scheduler.runAfter(
+        0,
+        internal.oda.removeExpiredAuthorizations,
+        {},
+      );
 
     return null;
   },
