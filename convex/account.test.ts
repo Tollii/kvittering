@@ -399,35 +399,29 @@ it("revokes the linked Apple ID before deleting, and deletes nothing when it can
   });
 });
 
-// A purge scheduled by an earlier deploy may name a step that is gone, or carry a step position.
-it.each([{ step: "aRemovedStep" }, { stage: 0 }])(
-  "finishes a household purge that an earlier deploy scheduled as %o",
-  async (position) => {
-    const t = setup();
-    const member = testUser(t, "earlier");
+// An earlier deploy queued purges with a position; a step now ahead of it must still run.
+it("runs every step of a household purge queued past one by an earlier deploy", async () => {
+  const t = setup();
+  const member = testUser(t, "earlier");
 
-    const householdId = await member.mutation(api.households.create, {
-      name: "Earlier",
-      invitation,
-    });
+  const householdId = await member.mutation(api.households.create, {
+    name: "Earlier",
+    invitation,
+  });
 
-    const { receiptId, storageId } = await receiptWithImage(
-      t,
-      member,
-      householdId,
-      "account-receipt-0004",
-    );
+  const { receiptId, storageId } = await receiptWithImage(
+    t,
+    member,
+    householdId,
+    "account-receipt-0004",
+  );
 
-    await t.mutation(internal.account.purgeHousehold, {
-      householdId,
-      ...position,
-    });
-    await settle(t);
+  await t.mutation(internal.account.purgeHousehold, { householdId, stage: 1 });
+  await settle(t);
 
-    await t.run(async (ctx) => {
-      expect(await ctx.db.get("receipts", receiptId)).toBeNull();
-      expect(await ctx.storage.get(storageId)).toBeNull();
-      expect(await ctx.db.query("images").take(1)).toEqual([]);
-    });
-  },
-);
+  await t.run(async (ctx) => {
+    expect(await ctx.db.get("receipts", receiptId)).toBeNull();
+    expect(await ctx.storage.get(storageId)).toBeNull();
+    expect(await ctx.db.query("images").take(1)).toEqual([]);
+  });
+});
