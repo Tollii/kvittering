@@ -1,3 +1,4 @@
+import { startReading } from "./processing";
 import {
   beginUploadedReceipt,
   newReceipt,
@@ -15,7 +16,6 @@ import {
   legacyReceiptImages,
   receiptImageLimitMessage,
 } from "../src/lib/domain/receipt-images";
-import { trackWorkflow } from "./retention";
 import { consumeReceiptQuota } from "./rateLimits";
 import { notifyReceiptActivities } from "./liveActivities";
 
@@ -63,7 +63,6 @@ import {
 } from "../src/lib/domain/receipt-summary";
 import { learnCategories } from "./aliases";
 import { renamedName } from "../src/lib/domain/category-memory";
-import { start } from "@convex-dev/workflow";
 
 export const list = query({
   args: { paginationOpts: paginationOptsValidator },
@@ -206,17 +205,7 @@ export const retry = mutation({
       error: undefined,
     });
 
-    const workflowId = await start(
-      ctx,
-      internal.processing.processReceipt,
-      { id, generation },
-      {
-        onComplete: internal.retention.workflowCompleted,
-        context: { component: "processing", receiptId: id },
-      },
-    );
-
-    await trackWorkflow(ctx, workflowId, "processing", id);
+    await startReading(ctx, id, generation);
     console.info("receipt.processing_retried", { receiptId: id, generation });
 
     return null;
