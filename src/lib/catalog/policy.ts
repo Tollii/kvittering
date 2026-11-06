@@ -7,6 +7,24 @@ export const day = 86_400_000;
 
 export const catalogDetailsTtl = 30 * day;
 
+const minute = 60_000;
+
+/** A provider's Retry-After is honored up to this, so three attempts fit well inside matching's deadline. */
+export const catalogRetryAfterCapMs = 10 * minute;
+
+/**
+ * An in-flight lookup scheduled this long ago lost its worker, for example to a
+ * crash that never reported back, so the next request queues it again.
+ */
+export const catalogRequestStaleMs = 30 * minute;
+
+/**
+ * A matching run older than this is stalled: it is well past three capped
+ * retries and queueing. A lookup it waits on that lost its worker is queued
+ * again only when the next run asks for it, as a retry does.
+ */
+export const catalogMatchingDeadlineMs = 2 * 60 * minute;
+
 export function normalizeRequest(request: CatalogRequest): CatalogRequest {
   if (request.kind === "details") return request;
 

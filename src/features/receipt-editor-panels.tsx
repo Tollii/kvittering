@@ -18,7 +18,6 @@ import type { Receipt } from "@/lib/domain/insights";
 import { useTheme } from "@/constants/theme";
 import { isUploadAbandoned } from "@/lib/domain/receipt-state";
 import { useHousehold } from "@/features/household-context";
-import { useState } from "react";
 
 /**
  * Whether the receipt can be deleted. An upload can be once no phone will
