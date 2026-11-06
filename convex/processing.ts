@@ -118,6 +118,7 @@ export const processReceipt = workflow
 
       stage = "finish";
 
+      // Running workflows compare step arguments on replay: keep these keys and their order.
       const commit = {
         matches,
         durationMs: extraction.durationMs + classification.durationMs,
@@ -669,6 +670,7 @@ export const readingCompleted = internalMutation({
   },
   returns: v.null(),
   handler: async (ctx, { workflowId, result, context }) => {
+    // A run of each generation must leave it read, so even a success that did not is a defect.
     await failReceiptReading(ctx, {
       id: context.receiptId,
       generation: context.generation,
