@@ -39,13 +39,17 @@ async function progress(ctx: QueryCtx, activity: Doc<"receiptActivities">) {
   );
 }
 
-/** Marks the activity ended, which publishes the end to its subscription and over APNs. */
+/**
+ * Marks the activity ended, which publishes the end to its subscription and over APNs. Moving
+ * `expiresAt` forward lets every later delivery, including one without a token, remove the row.
+ */
 async function endActivity(
   ctx: MutationCtx,
   activity: Doc<"receiptActivities">,
 ) {
   await ctx.db.patch("receiptActivities", activity._id, {
     expired: true,
+    expiresAt: Math.min(activity.expiresAt, Date.now()),
     updatedAt: Math.max(Date.now(), activity.updatedAt + 1000),
   });
   await ctx.scheduler.runAfter(0, internal.liveActivityPush.deliver, {
@@ -56,27 +60,23 @@ async function endActivity(
 }
 
 /**
- * Leaves room for one more activity. Rows that already ended are dropped, and the oldest running
- * ones are ended so their lock screen activity closes. A person therefore holds at most
- * `liveActivitiesPerPerson` running rows and `liveActivitiesPerPerson + 1` rows in all, which
- * is what lets this read and `notifyReceiptActivities` stay bounded.
+ * Leaves room for one more running activity by ending the person's oldest running ones. An ended
+ * row stays until `liveActivityPush.deliver` has pushed the end and removes it, and no longer
+ * counts toward `liveActivitiesPerPerson`.
  */
 async function makeRoomForActivity(ctx: MutationCtx, identity: string) {
-  const rows = await ctx.db
+  const running = await ctx.db
     .query("receiptActivities")
-    .withIndex("by_identity", (q) => q.eq("identity", identity))
-    .take(liveActivitiesPerPerson + 1);
+    .withIndex("by_identity_and_expired", (q) =>
+      q.eq("identity", identity).eq("expired", undefined),
+    )
+    .order("asc")
+    .take(liveActivitiesPerPerson);
 
-  const running: Doc<"receiptActivities">[] = [];
+  // Keep the newest ones and a slot for the row about to be inserted.
+  const excess = Math.max(0, running.length - (liveActivitiesPerPerson - 1));
 
-  for (const row of rows)
-    if (row.expired) await ctx.db.delete("receiptActivities", row._id);
-    else running.push(row);
-
-  const excess = running.length - (liveActivitiesPerPerson - 1);
-
-  for (const row of running.slice(0, Math.max(0, excess)))
-    await endActivity(ctx, row);
+  for (const row of running.slice(0, excess)) await endActivity(ctx, row);
 }
 
 export const register = mutation({
@@ -189,9 +189,11 @@ export async function notifyReceiptActivities(
 ) {
   const activities = await ctx.db
     .query("receiptActivities")
-    .withIndex("by_householdId", (q) => q.eq("householdId", householdId))
-    // Every row `makeRoomForActivity` allows for each member.
-    .take(householdMemberLimit * (liveActivitiesPerPerson + 1));
+    // An ended row already has its end delivery scheduled.
+    .withIndex("by_householdId_and_expired", (q) =>
+      q.eq("householdId", householdId).eq("expired", undefined),
+    )
+    .take(householdMemberLimit * liveActivitiesPerPerson);
 
   for (const activity of activities) {
     await ctx.db.patch("receiptActivities", activity._id, {

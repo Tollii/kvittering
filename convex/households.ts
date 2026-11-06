@@ -49,7 +49,7 @@ export const current = query({
         .withIndex("by_householdId", (q) =>
           q.eq("householdId", member.householdId),
         )
-        .take(2),
+        .take(householdMemberLimit),
     };
   },
 });

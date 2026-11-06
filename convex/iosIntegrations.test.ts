@@ -241,8 +241,9 @@ it("ends a person's oldest activities instead of refusing a new one", async () =
     expect(await current(`activity-${n}`)).toMatchObject({ ended: false });
 
   await start("activity-5");
-  expect(await current("activity-1")).toBeNull();
-  expect(await current("activity-2")).toMatchObject({ ended: true });
+
+  for (const n of [1, 2])
+    expect(await current(`activity-${n}`)).toMatchObject({ ended: true });
 
   for (const n of [3, 4, 5])
     expect(await current(`activity-${n}`)).toMatchObject({ ended: false });
