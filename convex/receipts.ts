@@ -452,7 +452,7 @@ export const save = mutation({
     const acceptable = canAcceptReceipt(
       args.data,
       duplicateState({
-        duplicateOf: receipt.duplicateOf,
+        ...receipt,
         duplicateResolved: args.duplicateResolved,
       }) === "suspected",
     );

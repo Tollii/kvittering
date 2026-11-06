@@ -1,5 +1,5 @@
 import { expect, it } from "vitest";
-import type { Id } from "../../../convex/_generated/dataModel";
+import { testId } from "../testing/receipts";
 import {
   attentionStatuses,
   duplicateState,
@@ -37,8 +37,7 @@ it("separates read receipts from those that need a person", () => {
 });
 
 it("only holds back a receipt that matches another and is still undecided", () => {
-  // SAFETY: The rule only checks whether an ID is present, never which receipt it names.
-  const other = "other" as Id<"receipts">;
+  const other = testId<"receipts">("other");
 
   expect(
     duplicateState({ duplicateOf: undefined, duplicateResolved: false }),

@@ -124,8 +124,7 @@ export function ReceiptEditor({
   const processing = isReceiptProcessing(receipt.status);
 
   const unresolvedDuplicate =
-    duplicateState({ duplicateOf: receipt.duplicateOf, duplicateResolved }) ===
-    "suspected";
+    duplicateState({ ...receipt, duplicateResolved }) === "suspected";
 
   const {
     totals,

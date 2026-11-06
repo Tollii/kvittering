@@ -6,6 +6,7 @@ import { convexTest, type TestConvex } from "convex-test";
 import { api } from "../../convex/_generated/api";
 import schema from "../../convex/schema";
 import { reviewSummary } from "../../src/lib/domain/receipt-review";
+import { duplicateState } from "../../src/lib/domain/receipt-state";
 import {
   importFixtureTables,
   loadFixture,
@@ -157,7 +158,7 @@ describe("end-to-end fixtures", () => {
           status: receipt.status,
           needs: reviewSummary(
             receipt.data,
-            !!receipt.duplicateOf && !receipt.duplicateResolved,
+            duplicateState(receipt) === "suspected",
           ),
         },
       ]),
