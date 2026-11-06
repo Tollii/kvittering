@@ -14,10 +14,21 @@ final class ReceiptBackgroundUploads: NSObject, URLSessionDataDelegate {
     var promises: [Promise] = []
     /// The task lookup in progress. Calls meanwhile share its outcome.
     var lookup: Int?
-    /// The task a call last measured, and the bytes it had moved by then.
-    var seen: (task: Int, bytes: Int64)?
-    /// Calls in a row that found the same task had moved nothing.
+    var watch: Watch?
+  }
+  /// The task a call last measured, how many bytes it had moved, and how many calls in a row found it idle.
+  private struct Watch {
+    let task: Int
+    var bytes: Int64
     var idleCalls = 0
+
+    /// Record a call that found `bytes` moved, and say whether it may keep waiting.
+    mutating func joinable(_ moved: Int64) -> Bool {
+      // The system may restart a transfer from zero, so any change counts as movement.
+      idleCalls = moved == bytes ? idleCalls + 1 : 0
+      bytes = moved
+      return idleCalls <= ReceiptBackgroundUploads.freeIdleJoins
+    }
   }
   private var transfers: [String: Transfer] = [:]
   private var lookups = 0
@@ -47,15 +58,11 @@ final class ReceiptBackgroundUploads: NSObject, URLSessionDataDelegate {
       promise.resolve(["status": 200, "body": ""])
       return
     }
-    var transfer = transfers[key, default: Transfer()]
-    transfer.promises.append(promise)
-    let looking = transfer.lookup != nil
-    if !looking {
-      lookups += 1
-      transfer.lookup = lookups
-    }
-    transfers[key] = transfer
-    guard !looking, let lookup = transfer.lookup else { return }
+    transfers[key, default: Transfer()].promises.append(promise)
+    guard transfers[key]?.lookup == nil else { return }
+    lookups += 1
+    let lookup = lookups
+    transfers[key]?.lookup = lookup
     session.getAllTasks { tasks in
       DispatchQueue.main.async {
         // A completion settled everyone first, or a newer lookup owns the key.
@@ -94,16 +101,12 @@ final class ReceiptBackgroundUploads: NSObject, URLSessionDataDelegate {
    instead of retrying forever.
    */
   private func keepsMoving(_ task: URLSessionTask, key: String) -> Bool {
-    var transfer = transfers[key, default: Transfer()]
-    let bytes = task.countOfBytesSent + task.countOfBytesReceived
-    if let seen = transfer.seen, seen.task == task.taskIdentifier, bytes <= seen.bytes {
-      transfer.idleCalls += 1
-    } else {
-      transfer.idleCalls = 0
+    let moved = task.countOfBytesSent + task.countOfBytesReceived
+    guard transfers[key]?.watch?.task == task.taskIdentifier else {
+      transfers[key]?.watch = Watch(task: task.taskIdentifier, bytes: moved)
+      return true
     }
-    transfer.seen = (task.taskIdentifier, bytes)
-    transfers[key] = transfer
-    return transfer.idleCalls <= Self.freeIdleJoins
+    return transfers[key]?.watch?.joinable(moved) ?? true
   }
 
   private func start(key: String, url: URL, headers: [String: String], file: URL) {
@@ -112,10 +115,7 @@ final class ReceiptBackgroundUploads: NSObject, URLSessionDataDelegate {
     request.allHTTPHeaderFields = headers
     let task = session.uploadTask(with: request, fromFile: file)
     task.taskDescription = key
-    var transfer = transfers[key, default: Transfer()]
-    transfer.seen = (task.taskIdentifier, 0)
-    transfer.idleCalls = 0
-    transfers[key] = transfer
+    transfers[key, default: Transfer()].watch = Watch(task: task.taskIdentifier, bytes: 0)
     task.resume()
   }
 
@@ -140,7 +140,10 @@ final class ReceiptBackgroundUploads: NSObject, URLSessionDataDelegate {
   }
 
   func forget(_ keys: [String]) {
-    for key in keys { UserDefaults.standard.removeObject(forKey: "receipt-upload:\(key)") }
+    for key in keys {
+      UserDefaults.standard.removeObject(forKey: "receipt-upload:\(key)")
+      if transfers[key]?.promises.isEmpty == true { transfers.removeValue(forKey: key) }
+    }
   }
 
   func urlSession(_ session: URLSession, dataTask: URLSessionDataTask, didReceive data: Data) {
