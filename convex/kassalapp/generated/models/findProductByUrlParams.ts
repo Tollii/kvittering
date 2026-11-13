@@ -7,8 +7,6 @@
  */
 
 export type FindProductByUrlParams = {
-/**
- * The url of the Product you want to get information on.
- */
-url: string;
+  /** The url of the Product you want to get information on. */
+  url: string;
 };

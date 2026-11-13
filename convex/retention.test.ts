@@ -13,6 +13,10 @@ import { emptyCatalogResult } from "../src/lib/catalog/model";
 
 const modules = import.meta.glob("./**/*.ts");
 
+// Commit timestamps advance past a frozen test clock, so a journal's expiry can
+// sit a millisecond after the time the test sees. Step past it by a second.
+const afterRetention = 30 * 24 * 60 * 60_000 + 1000;
+
 it("removes only expired terminal catalog results and preserves pending work", async () => {
   const t = convexTest(schema, modules);
 
@@ -166,7 +170,7 @@ it.each(["processing", "analysis"] as const)(
           })
         ).page,
       ).toHaveLength(1);
-      vi.setSystemTime(Date.now() + 30 * 24 * 60 * 60_000);
+      vi.setSystemTime(Date.now() + afterRetention);
       await t.mutation(internal.retention.workflowJournal, {
         workflowId,
         component,
@@ -303,7 +307,7 @@ it("inventories legacy terminal journals in the correct component and retains a 
       })
     ).page,
   ).toHaveLength(1);
-  vi.setSystemTime(Date.now() + 30 * 24 * 60 * 60_000);
+  vi.setSystemTime(Date.now() + afterRetention);
   await t.mutation(internal.retention.workflowJournal, {
     workflowId,
     component: "analysis",
@@ -349,7 +353,7 @@ it("removes a catalog waiter after its completed workflow journal has been clean
     generationNumber: 0,
     runResult: { kind: "success", returnValue: null },
   });
-  vi.setSystemTime(Date.now() + 30 * 24 * 60 * 60_000);
+  vi.setSystemTime(Date.now() + afterRetention);
   await t.mutation(internal.retention.workflowJournal, {
     workflowId,
     component: "processing",
