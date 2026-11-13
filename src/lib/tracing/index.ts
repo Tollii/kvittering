@@ -35,27 +35,10 @@ export type RequestContext = { attributes: Attributes };
 
 export const requestContextKey = createContextKey("kvitto.request");
 
-let ambientRequest: RequestContext | undefined;
-
-/**
- * The app has one person at a time, so its spans share one request context
- * instead of one per request. The backend never sets this: its requests run
- * side by side and must not share attributes.
- */
-export function shareRequestContext() {
-  ambientRequest ??= { attributes: {} };
-
-  return ambientRequest;
-}
-
-/** The request context of a span's parent, or the app's shared one. */
+/** The request context of a span's parent. */
 export function requestContextOf(parent: Context) {
-  // SAFETY: only tracedRequest stores a value under this key, a RequestContext.
-  const request = parent.getValue(requestContextKey) as
-    | RequestContext
-    | undefined;
-
-  return request ?? ambientRequest;
+  // SAFETY: tracedRequest and the app's root context store only RequestContext values under this key.
+  return parent.getValue(requestContextKey) as RequestContext | undefined;
 }
 
 /**
@@ -231,9 +214,11 @@ export function traceHeaders() {
 
 /** The context that an incoming request's W3C trace headers continue. */
 export function incomingTraceContext(headers: Headers) {
+  // A caller's `tracestate` is not passed on to the services this request calls.
   return propagation.extract(context.active(), headers, {
     keys: (carrier) => [...carrier.keys()],
-    get: (carrier, key) => carrier.get(key) ?? undefined,
+    get: (carrier, key) =>
+      key === "tracestate" ? undefined : (carrier.get(key) ?? undefined),
   });
 }
 
@@ -272,34 +257,42 @@ function withTraceHeaders(
   return { ...init, headers: merged };
 }
 
-export type FetchTracing = {
-  /**
-   * Whether to send W3C trace headers. Leave them off for services that
-   * ignore them where a browser would ask the service to allow a new header.
-   */
-  propagate: boolean;
-};
+/** The outcome of a response this process sends: a refused request is the caller's to fix. */
+export function httpOutcome(status: number): Outcome {
+  if (status >= 500) return "failure";
+
+  return status >= 400 ? "expected_failure" : "success";
+}
 
 /**
- * `fetch` with a client span that forwards the trace to the called service.
- * The span names the host and method, never the path or query, which can
- * carry identifiers or tokens.
+ * The outcome of a response this process received. A service that refuses
+ * our request as malformed or unauthorized points at a fault here, so only
+ * a missing resource, a conflict, or a rate limit counts as expected.
  */
-export function tracedFetchWith(
-  request: typeof fetch,
-  tracing: FetchTracing = { propagate: true },
-): typeof fetch {
+function responseOutcome(status: number): Outcome {
+  if (status < 400) return "success";
+
+  return [404, 409, 429].includes(status) ? "expected_failure" : "failure";
+}
+
+export type Fetch = typeof fetch;
+
+/**
+ * The global `fetch` with a client span. The span names the host and
+ * method, never the path or query, which can carry identifiers or tokens.
+ * `propagate` sends the W3C trace headers to the called service.
+ */
+function fetchTracer(propagate: boolean): Fetch {
   return traced(
     "http.request",
     async (input: RequestInfo | URL, init?: RequestInit) => {
       // Hermes loses the active span at the first await.
       const span = trace.getActiveSpan();
 
-      const response = await request(
+      // Resolved per call, so tests can replace the global.
+      const response = await fetch(
         input,
-        tracing.propagate
-          ? withTraceHeaders(input, init, traceHeaders())
-          : init,
+        propagate ? withTraceHeaders(input, init, traceHeaders()) : init,
       );
 
       span?.setAttribute("http.response.status_code", response.status);
@@ -313,23 +306,16 @@ export function tracedFetchWith(
         "http.request.method": requestMethod(input, init),
         "server.address": requestHost(input),
       }),
-      outcome: (response) =>
-        response.status >= 500
-          ? "failure"
-          : response.status >= 400
-            ? "expected_failure"
-            : "success",
+      outcome: (response) => responseOutcome(response.status),
     },
   );
 }
 
-// Resolved per call, so tests can replace the global.
-const globalFetch: typeof fetch = (input, init) => fetch(input, init);
+/** `fetch`, traced, forwarding the trace to the called service. */
+export const tracedFetch = fetchTracer(true);
 
-/** The global `fetch`, traced, forwarding the trace to the called service. */
-export const tracedFetch = tracedFetchWith(globalFetch);
-
-/** The global `fetch`, traced, for services that ignore trace headers. */
-export const tracedFetchWithoutHeaders = tracedFetchWith(globalFetch, {
-  propagate: false,
-});
+/**
+ * `fetch`, traced, without trace headers: for services that ignore them,
+ * where a browser would ask the service to allow a new header.
+ */
+export const tracedFetchWithoutHeaders = fetchTracer(false);

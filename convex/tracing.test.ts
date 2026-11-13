@@ -6,10 +6,7 @@ import { api } from "./_generated/api";
 import schema from "./schema";
 import "./tracing";
 import { traced, tracedFetch } from "../src/lib/tracing";
-import {
-  separateHouseholds,
-  testUser,
-} from "../src/lib/testing/households";
+import { separateHouseholds, testUser } from "../src/lib/testing/households";
 
 const modules = import.meta.glob("./**/*.ts");
 
@@ -19,7 +16,10 @@ const spanLine = z.object({
   parentSpanId: z.string().optional(),
   name: z.string(),
   failed: z.boolean(),
-  attributes: z.record(z.string(), z.union([z.string(), z.number(), z.boolean()])),
+  attributes: z.record(
+    z.string(),
+    z.union([z.string(), z.number(), z.boolean()]),
+  ),
 });
 
 let logged: z.infer<typeof spanLine>[] = [];
@@ -73,11 +73,11 @@ it("keeps the accounts of requests that run at the same time apart", async () =>
 
   const roots = rootOf("notifications:enabled");
 
-  expect(roots.map((root) => root.attributes["user.id"]).sort()).toEqual([
-    "first",
-    "first",
-    "other",
-  ]);
+  const accounts = roots
+    .map((root) => String(root.attributes["user.id"]))
+    .toSorted((a, b) => a.localeCompare(b));
+
+  expect(accounts).toEqual(["first", "first", "other"]);
 
   for (const root of roots) {
     const spans = logged.filter((span) => span.traceId === root.traceId);
@@ -116,17 +116,29 @@ it("records an unexpected error as a failed span", async () => {
 
   await expect(work()).rejects.toThrow(TypeError);
 
-  expect(logged).toEqual([
-    expect.objectContaining({
-      name: "tracing.test.failing",
-      failed: true,
-      attributes: expect.objectContaining({
-        "kvitto.outcome": "failure",
-        "error.type": "TypeError",
-      }),
-    }),
-  ]);
+  expect(logged).toHaveLength(1);
+  expect(logged[0]).toMatchObject({
+    name: "tracing.test.failing",
+    failed: true,
+    attributes: { "kvitto.outcome": "failure", "error.type": "TypeError" },
+  });
   expect(JSON.stringify(logged)).not.toContain("Melk");
+});
+
+it("bounds the lines a request logs and counts the spans it leaves out", async () => {
+  const inner = traced("tracing.test.row", async () => {});
+
+  await traced("tracing.test.rows", async () => {
+    for (let row = 0; row < 300; row += 1) await inner();
+  })();
+
+  const [root] = rootOf("tracing.test.rows");
+  const rows = logged.filter((span) => span.name === "tracing.test.row");
+
+  expect(logged.length).toBeLessThan(100);
+  expect(rows.length + Number(root?.attributes["kvitto.spans.omitted"])).toBe(
+    300,
+  );
 });
 
 it("continues the caller's trace in an HTTP action", async () => {
@@ -139,17 +151,16 @@ it("continues the caller's trace in an HTTP action", async () => {
     headers: { traceparent: `00-${traceId}-${parentId}-01` },
   });
 
-  expect(logged).toContainEqual(
-    expect.objectContaining({
-      name: "HTTP OPTIONS /receipt-image",
-      traceId,
-      parentSpanId: parentId,
-      attributes: expect.objectContaining({
-        "http.response.status_code": 204,
-        "url.path": "/receipt-image",
-      }),
-    }),
-  );
+  expect(
+    logged.find((span) => span.name === "HTTP OPTIONS /receipt-image"),
+  ).toMatchObject({
+    traceId,
+    parentSpanId: parentId,
+    attributes: {
+      "http.response.status_code": 204,
+      "url.path": "/receipt-image",
+    },
+  });
 });
 
 it("forwards the trace to the services it calls, without the request's path", async () => {

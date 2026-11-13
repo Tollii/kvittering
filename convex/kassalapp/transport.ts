@@ -1,5 +1,5 @@
 import { env } from "../_generated/server";
-import { traced } from "../../src/lib/tracing";
+import { traced, type Fetch } from "../../src/lib/tracing";
 
 export class CatalogRequestError extends Error {
   constructor(
@@ -26,7 +26,7 @@ export const kassalappFetch = traced(
   "transport.kassalappFetch",
   async function kassalappFetch<T>(
     path: string,
-    options?: RequestInit & { fetch?: typeof globalThis.fetch },
+    options?: RequestInit & { fetch?: Fetch },
   ): Promise<T> {
     const key = env.KASSALAPP_API_KEY;
 

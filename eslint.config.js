@@ -74,7 +74,7 @@ module.exports = defineConfig([
       "kvitto/traced-exports": [
         "error",
         {
-          tracers: ["traced", "tracedFetchWith"],
+          tracers: ["traced"],
           builders: [
             "query",
             "internalQuery",

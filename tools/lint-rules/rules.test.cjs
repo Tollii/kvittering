@@ -236,8 +236,10 @@ const tracing = [{ tracers: ["traced"], builders: ["query", "httpAction"] }];
 
 typedTester.run("traced-exports", plugin.rules["traced-exports"], {
   valid: [
-    'export const load = traced("load", async () => 1);',
-    'export const load = traced("load", function load(): Promise<number> { return Promise.resolve(1); });',
+    'export const load = traced("file.load", async () => 1);',
+    'export const load = traced("file.load", function load(): Promise<number> { return Promise.resolve(1); });',
+    'export const load = traced("file.load", async () => 1) satisfies () => Promise<number>;',
+    "declare const read: () => number; export const load = read;",
     "async function local() { return 1; } export const value = 1;",
     "export function sum(a: number, b: number) { return a + b; }",
     "export function Ready({ children }: { children: React.ReactNode }) { return children; }",
@@ -254,6 +256,9 @@ typedTester.run("traced-exports", plugin.rules["traced-exports"], {
     "declare function read(): Promise<number>; export function load() { return read(); }",
     "async function load() { return 1; } export { load };",
     "export const store = { async read() { return 1; } };",
+    "export const load = (async () => 1) as () => Promise<number>;",
+    "declare function once<F>(fn: F): F; export const load = once(async () => 1);",
+    "export default { async read() { return 1; } };",
   ]
     .map((code) => ({
       ...typed(code),
@@ -264,11 +269,29 @@ typedTester.run("traced-exports", plugin.rules["traced-exports"], {
       [
         'import { query } from "./_generated/server";',
         'import { httpAction as raw } from "../_generated/server";',
+        'import * as server from "./_generated/server";',
+        'export { query } from "./_generated/server";',
+        'export * from "./_generated/server";',
       ].map((code) => ({
         ...typed(code),
         options: tracing,
         errors: [{ messageId: "generatedBuilder" }],
       })),
+      [
+        'import { queryGeneric } from "convex/server";',
+        'import { httpActionGeneric as raw } from "convex/server";',
+      ].map((code) => ({
+        ...typed(code),
+        options: tracing,
+        errors: [{ messageId: "genericBuilder" }],
+      })),
+      [
+        {
+          ...typed('export const load = traced("load", async () => 1);'),
+          options: tracing,
+          errors: [{ messageId: "spanName" }],
+        },
+      ],
     ),
 });
 

@@ -1,15 +1,16 @@
 import { userError } from "./userErrors";
 import type { QueryCtx, MutationCtx } from "./_generated/server";
 import type { Id } from "./_generated/dataModel";
+import type { UserIdentity } from "convex/server";
 import { setRequester, traced } from "../src/lib/tracing";
 
-export const requireMember = traced(
-  "access.requireMember",
-  async function requireMember(ctx: QueryCtx | MutationCtx) {
-    const identity = await ctx.auth.getUserIdentity();
-
-    if (!identity) throw userError("Logg inn først.");
-
+/**
+ * The caller's membership, if any. Every access check looks members up
+ * here, so each request's spans name the account and household it acts for.
+ */
+export const memberOf = traced(
+  "access.memberOf",
+  async function memberOf(ctx: QueryCtx | MutationCtx, identity: UserIdentity) {
     const member = await ctx.db
       .query("members")
       .withIndex("by_identity", (q) =>
@@ -18,6 +19,19 @@ export const requireMember = traced(
       .unique();
 
     setRequester(identity.subject, member?.householdId);
+
+    return member;
+  },
+);
+
+export const requireMember = traced(
+  "access.requireMember",
+  async function requireMember(ctx: QueryCtx | MutationCtx) {
+    const identity = await ctx.auth.getUserIdentity();
+
+    if (!identity) throw userError("Logg inn først.");
+
+    const member = await memberOf(ctx, identity);
 
     if (!member) throw userError("Velg en husstand først.");
 

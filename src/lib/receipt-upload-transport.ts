@@ -79,7 +79,9 @@ export function receiptUploadTransport(
         };
 
         // The backend continues this trace, so both halves share one trace id.
-        // Web leaves the headers off until every backend allows them in CORS.
+        // Web leaves them off: a backend deployed before the CORS change in
+        // convex/http.ts would refuse the preflight. Send them from web once
+        // production runs that change.
         if (Platform.OS !== "web") Object.assign(headers, trace);
 
         const response = await (

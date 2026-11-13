@@ -8,9 +8,14 @@ import {
   type ReadableSpan,
   type SpanExporter,
 } from "@opentelemetry/sdk-trace";
-import type { Attributes, HrTime } from "@opentelemetry/api";
+import {
+  ROOT_CONTEXT,
+  type Attributes,
+  type Context,
+  type HrTime,
+} from "@opentelemetry/api";
 import { installedRelease, telemetryEnabled } from "../releases/installed";
-import { shareRequestContext } from "./index";
+import { requestContextKey, type RequestContext } from "./index";
 import { exportedAttributes, installTracing } from "./sdk";
 
 /**
@@ -116,11 +121,25 @@ class PostHogSpanExporter implements SpanExporter {
   }
 }
 
-shareRequestContext();
+/**
+ * The app has one person at a time, so all its spans share one request
+ * context: the root context carries it, and spans without a parent get it.
+ */
+const appRequest: RequestContext = { attributes: {} };
+
+class AppContextManager extends StackContextManager {
+  #root: Context = ROOT_CONTEXT.setValue(requestContextKey, appRequest);
+
+  override active() {
+    const active = super.active();
+
+    return active === ROOT_CONTEXT ? this.#root : active;
+  }
+}
 
 const provider = installTracing({
   resource,
-  contextManager: new StackContextManager(),
+  contextManager: new AppContextManager(),
   processor:
     projectToken && telemetryEnabled
       ? new BatchSpanProcessor({

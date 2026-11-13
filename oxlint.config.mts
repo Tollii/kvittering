@@ -36,6 +36,16 @@ const themeColor = {
   message: "Add a theme token in src/constants/theme.ts.",
 };
 
+/** `fetch` reached through the global object, which `no-restricted-globals` does not see. */
+const untracedFetch = ["globalThis", "window", "self", "global"].map(
+  (object) => ({
+    object,
+    property: "fetch",
+    message:
+      "Use tracedFetch from src/lib/tracing, so the request has a span and forwards the trace.",
+  }),
+);
+
 export default defineConfig({
   plugins: ["typescript", "unicorn", "oxc", "vitest", "react", "import"],
   categories: { correctness: "error" },
@@ -297,6 +307,7 @@ export default defineConfig({
             message:
               "Supported Hermes clients lack Array.toSorted. Copy the array before calling sort.",
           },
+          ...untracedFetch,
         ],
       },
     },
@@ -358,6 +369,7 @@ export default defineConfig({
             message:
               "Use providerConfig so a missing model key fails in one place instead of changing receipt data.",
           })),
+          ...untracedFetch,
         ],
       },
     },

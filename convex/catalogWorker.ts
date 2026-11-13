@@ -20,8 +20,9 @@ import {
 import { SearchPhysicalStoresGroup } from "./kassalapp/generated/models";
 import { broaderProductSearch } from "../src/lib/catalog/search";
 import { compatibleCatalogProduct } from "../src/lib/catalog/matching";
+import type { Fetch } from "../src/lib/tracing";
 
-type CatalogFetchOptions = { fetch: typeof globalThis.fetch };
+type CatalogFetchOptions = { fetch: Fetch };
 
 /** Searches products, and widens the search when retailer coverage or the exact term finds no usable product. */
 async function searchCatalogProducts(

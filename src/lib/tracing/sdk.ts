@@ -34,11 +34,18 @@ class RequestContextProcessor implements SpanProcessor {
     span.setAttributes(request.attributes);
   }
 
-  // Attributes learned after the span started, such as the household.
+  // Attributes learned after the span started, such as the household. In the
+  // app the context outlives an account, so a span that started under another
+  // account keeps what it had.
   onEnding(span: Span) {
     const request = this.#requests.get(span);
+    const account = span.attributes["user.id"];
 
-    if (request) span.setAttributes(request.attributes);
+    if (
+      request &&
+      (account === undefined || account === request.attributes["user.id"])
+    )
+      span.setAttributes(request.attributes);
   }
 
   onEnd() {}

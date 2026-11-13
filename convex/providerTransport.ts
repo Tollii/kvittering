@@ -1,5 +1,5 @@
 import type { FunctionArgs } from "convex/server";
-import { tracedFetch } from "../src/lib/tracing";
+import { tracedFetch, type Fetch } from "../src/lib/tracing";
 import { internal } from "./_generated/api";
 import type { ActionCtx } from "./_generated/server";
 import type { Provider, ProviderSource } from "./rateLimits";
@@ -9,7 +9,7 @@ export function providerFetch(
   ctx: Pick<ActionCtx, "runMutation">,
   provider: Provider,
   source?: ProviderSource,
-): typeof globalThis.fetch {
+): Fetch {
   return async (input, init) => {
     const args: FunctionArgs<typeof internal.rateLimits.consumeProvider> = {
       provider,
