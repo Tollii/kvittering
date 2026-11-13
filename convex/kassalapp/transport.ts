@@ -21,12 +21,14 @@ function retryAfterMs(retry: string | null): number {
   return Number.isFinite(delay) ? Math.max(0, delay) : 0;
 }
 
+type CatalogRequestOptions = RequestInit & { fetch?: Fetch };
+
 /** Called by the catalog worker; credentials remain on the server. */
-export const kassalappFetch = traced(
-  "transport.kassalappFetch",
-  async function kassalappFetch<T>(
+const kassalappRequest = traced(
+  "transport.kassalappRequest",
+  async function kassalappRequest<T>(
     path: string,
-    options?: RequestInit & { fetch?: Fetch },
+    options?: CatalogRequestOptions,
   ): Promise<T> {
     const key = env.KASSALAPP_API_KEY;
 
@@ -66,3 +68,14 @@ export const kassalappFetch = traced(
     return response.json() as Promise<T>;
   },
 );
+
+/**
+ * Orval's mutator. Orval reads this declaration's parameters to give each
+ * generated operation an options parameter, and cannot read them through
+ * `traced`.
+ */
+// eslint-disable-next-line kvitto/traced-exports -- It only forwards to kassalappRequest, which records the span.
+export const kassalappFetch = <T>(
+  path: string,
+  options?: CatalogRequestOptions,
+) => kassalappRequest<T>(path, options);
