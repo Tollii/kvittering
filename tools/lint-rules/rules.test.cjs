@@ -155,6 +155,9 @@ const typedTester = new TypedRuleTester({
       ecmaFeatures: { jsx: true },
       project: "./tsconfig.json",
       tsconfigRootDir: join(process.cwd(), "tools", "lint-rules", "fixtures"),
+      // On CI, typescript-eslint would otherwise build the program once from
+      // the files on disk, and type each test's code as the fixture file.
+      disallowAutomaticSingleRunInference: true,
     },
   },
 });
