@@ -34,13 +34,13 @@ The palette is cobalt ink on warm paper. Light and dark share token names, so a 
 
 Each status has a strong and a soft token. Use the soft one as a fill and the strong one for the text and icon on it, as `Notice` and `Chip` do.
 
-| Status  | Strong / soft             | Use                                                                                              |
-| ------- | ------------------------- | ------------------------------------------------------------------------------------------------ |
-| Success | `success` / `successSoft` | Reviewed receipt, completed upload, swipe-to-approve action.                                     |
-| Warning | `warning` / `warningSoft` | Unsaved changes, reading issues, a needs-review status, and a failed upload that waits to retry. |
-| Danger  | `danger` / `dangerSoft`   | Errors, destructive buttons, failed reading.                                                     |
+| Status  | Strong / soft             | Use                                                                                               |
+| ------- | ------------------------- | ------------------------------------------------------------------------------------------------- |
+| Success | `success` / `successSoft` | Reviewed receipt, completed upload, swipe-to-approve action.                                      |
+| Warning | `warning` / `warningSoft` | Unsaved changes, reading issues, a needs-review status, and an upload that failed or was refused. |
+| Danger  | `danger` / `dangerSoft`   | Errors, destructive buttons, failed reading.                                                      |
 
-A failed upload is a warning, not a danger: the images are safe in the queue and the app retries, so Kamera's upload note and the upload queue card in Kvitteringer both show the `arrow.clockwise.circle` symbol in `warning`.
+A failed upload is a warning, not a danger: the images are safe in the queue. Kamera's upload note and the upload queue card in Kvitteringer share one symbol and tone per upload phase ([upload phase style](../../src/features/upload-phase-style.ts)): `arrow.clockwise.circle` in `warning` for a failure the app retries, `exclamationmark.circle` in `warning` for one that waits for the person, and `hourglass` in `secondary` for an upload the service asked to wait, which continues by itself.
 
 ### Charts
 
@@ -108,7 +108,7 @@ Icons are SF Symbols through `Icon`, tinted `primary` by default and hidden from
 
 An icon carries the weight of the text beside it: semibold next to a semibold label, as in `Button`, `Chip`, a `Row`'s tile, and a `Notice` with a title; regular next to reading copy. A glyph alone in a control, as in `IconButton`, is semibold too, so every close mark and pager chevron matches a button's label. `Chevron` draws the chevrons, as the system's own disclosure indicators are drawn, so they share one size and weight.
 
-Recurring meanings: `wifi.slash` offline, `checkmark.seal` reviewed or approve, `exclamationmark.triangle` warning, `exclamationmark.circle` error, `arrow.clockwise` retry, `arrow.clockwise.circle` an upload waiting to retry, `barcode` product linking, `person.2` household and settings, `xmark` close, `chevron.right` navigates, `chevron.down` opens a menu or picker.
+Recurring meanings: `wifi.slash` offline, `checkmark.seal` reviewed or approve, `exclamationmark.triangle` warning, `exclamationmark.circle` error, `arrow.clockwise` retry, `arrow.clockwise.circle` an upload waiting to retry, `hourglass` an upload waiting for the service, `barcode` product linking, `person.2` household and settings, `xmark` close, `chevron.right` navigates, `chevron.down` opens a menu or picker.
 
 Illustrations are separate from icons. [Monument artwork](../../src/components/monument-artwork.tsx) supplies two decorative scenes (`nave`, the arched nave in the Forbruk band, and `monument`, the empty state of Kvitteringer) under arched masks, and `ArchMark` is the small arch logo in hero headers and on sign-in. Artwork is decorative: it is hidden from VoiceOver and disappears in compact layouts on narrow screens or with large text.
 

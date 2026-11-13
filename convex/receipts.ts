@@ -10,6 +10,7 @@ import { userError } from "./userErrors";
 import {
   acceptsReceiptEvent,
   attentionStatuses,
+  duplicateState,
   isUploadAbandoned,
   receiptTransition,
 } from "../src/lib/domain/receipt-state";
@@ -442,7 +443,10 @@ export const save = mutation({
 
     const acceptable = canAcceptReceipt(
       args.data,
-      !!receipt.duplicateOf && !args.duplicateResolved,
+      duplicateState({
+        ...receipt,
+        duplicateResolved: args.duplicateResolved,
+      }) === "suspected",
     );
 
     if (args.reviewed && !acceptable)

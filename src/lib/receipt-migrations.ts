@@ -3,6 +3,7 @@ import { z } from "zod";
 import { v } from "convex/values";
 import { parse } from "convex-helpers/validators";
 import type { LocalReceipt } from "./upload-queue";
+import { failureText, storedFailure } from "./upload-failure";
 
 export class ReceiptMigrationError extends Error {}
 
@@ -15,12 +16,31 @@ const receiptValidator = v.object({
   images: v.array(v.string()),
   uploaded: v.array(v.boolean()),
   receiptId: v.id("receipts").optional(),
+  // Older releases keep the failure as text only.
   error: v.string().optional(),
 });
 
-/** Retain reservation IDs, upload progress and relative image paths during upgrades. */
-// oxlint-disable-next-line anti-slop/no-unknown-parameters -- This boundary parser validates external input before returning a domain value.
-export function migrateReceipt(value: unknown): LocalReceipt {
+/**
+ * The stored form of a capture. It stays at schemaVersion 1 and keeps the
+ * failure's text beside it, so a release rolled back to over the air still
+ * reads the queue: older readers ignore `failure` and match on `error`.
+ */
+export function serializeReceipt({ failure, ...entry }: LocalReceipt) {
+  return JSON.stringify(
+    failure ? { ...entry, failure, error: failureText(failure) } : entry,
+  );
+}
+
+/**
+ * Retain reservation IDs, upload progress and relative image paths during
+ * upgrades. `restricted` says the capture waits for a deadline the service
+ * named, which an older release kept only as text.
+ */
+export function migrateReceipt(
+  // oxlint-disable-next-line anti-slop/no-unknown-parameters -- This boundary parser validates external input before returning a domain value.
+  value: unknown,
+  { restricted = false }: { restricted?: boolean } = {},
+): LocalReceipt {
   const input = z
     .looseObject({ schemaVersion: z.unknown().optional() })
     .safeParse(value);
@@ -35,7 +55,11 @@ export function migrateReceipt(value: unknown): LocalReceipt {
     throw new ReceiptMigrationError(
       "Kvitteringen krever en nyere versjon av Kvitto. Bildene er beholdt.",
     );
-  const result = parse(receiptValidator, { ...input.data, schemaVersion: 1 });
+
+  const { error, ...result } = parse(receiptValidator, {
+    ...input.data,
+    schemaVersion: 1,
+  });
 
   if (
     !result.id ||
@@ -56,8 +80,9 @@ export function migrateReceipt(value: unknown): LocalReceipt {
     throw new ReceiptMigrationError(
       "Ugyldig lokal kvittering. Bildene er beholdt.",
     );
+  const stored = storedFailure(input.data["failure"], error, restricted);
 
-  return result;
+  return stored ? { ...result, failure: stored } : result;
 }
 
 export interface ReceiptDatabase {
@@ -95,7 +120,7 @@ export function migrateReceiptDatabase(database: ReceiptDatabase) {
           );
         database.runSync(
           "UPDATE receipt_queue SET data = ? WHERE id = ?",
-          JSON.stringify(receipt),
+          serializeReceipt(receipt),
           row.id,
         );
       }

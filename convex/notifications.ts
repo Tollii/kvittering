@@ -8,6 +8,7 @@ import { requireMember, requireReceipt } from "./access";
 import schema from "./schema";
 import { internal } from "./_generated/api";
 import { reviewSummary } from "../src/lib/domain/receipt-review";
+import { duplicateState } from "../src/lib/domain/receipt-state";
 
 export function validPushToken(token: string) {
   return /^(ExponentPushToken|ExpoPushToken)\[[A-Za-z0-9_-]{10,200}\]$/.test(
@@ -134,7 +135,7 @@ export const delivery = internalQuery({
 
     const needs = reviewSummary(
       receipt.data,
-      !!receipt.duplicateOf && !receipt.duplicateResolved,
+      duplicateState(receipt) === "suspected",
     );
 
     const amount =

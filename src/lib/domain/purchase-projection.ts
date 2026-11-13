@@ -1,7 +1,11 @@
 import { CalendarDate } from "./calendar";
 import { Ore } from "./ore";
 import type { Receipt } from "./insights";
-import { extractedReceipt, type ExtractedReceipt } from "./receipt-state";
+import {
+  duplicateState,
+  extractedReceipt,
+  type ExtractedReceipt,
+} from "./receipt-state";
 import { reconcile, spendingLines, type ReceiptLine } from "./receipt";
 import {
   productAnalysisVersion,
@@ -61,8 +65,7 @@ export function includedReceipt(
     (policy.currency === "NOK" && data.currency !== "NOK") ||
     (policy.provisional === "exclude" && receipt.status !== "reviewed") ||
     (policy.duplicates === "exclude" &&
-      receipt.duplicateOf &&
-      !receipt.duplicateResolved) ||
+      duplicateState(receipt) === "suspected") ||
     (!data.purchaseDate && policy.undated === "exclude") ||
     (policy.period &&
       (!data.purchaseDate ||

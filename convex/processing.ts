@@ -1,5 +1,6 @@
 import {
   acceptsReceiptEvent,
+  duplicateState,
   receiptTransition,
 } from "../src/lib/domain/receipt-state";
 import { notifyReceiptActivities } from "./liveActivities";
@@ -564,7 +565,10 @@ export const finish = internalMutation({
     }
 
     const autoAccepted =
-      canAcceptReceipt(data, !!duplicateOf && !receipt.duplicateResolved) &&
+      canAcceptReceipt(
+        data,
+        duplicateState({ ...receipt, duplicateOf }) === "suspected",
+      ) &&
       !args.provider.includes("mock") &&
       receipt.revision === 0;
 

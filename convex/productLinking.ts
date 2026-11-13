@@ -26,6 +26,7 @@ import { commitReceiptChange, receiptCommitValidator } from "./receiptChanges";
 import type { ReceiptData } from "../src/lib/domain/receipt";
 import {
   acceptsReceiptEvent,
+  duplicateState,
   type ExtractedReceipt,
 } from "../src/lib/domain/receipt-state";
 
@@ -42,7 +43,7 @@ function linkable(receipt: Doc<"receipts">): LinkableReceipt | null {
     store?.trim() &&
     acceptsReceiptEvent(receipt.status, "product_linked") &&
     !receipt.excluded &&
-    (!receipt.duplicateOf || receipt.duplicateResolved) &&
+    duplicateState(receipt) !== "suspected" &&
     receipt.catalogStatus !== "pending"
     ? { ...receipt, data: { ...data, store } }
     : null;

@@ -1,7 +1,9 @@
 import { expect, it } from "vitest";
+import { testId } from "../testing/receipts";
 import {
   abandonedUploadMs,
   attentionStatuses,
+  duplicateState,
   hasReceiptBeenRead,
   isReceiptProcessing,
   isUploadAbandoned,
@@ -86,6 +88,23 @@ it("lets the approval decision, not the previous status, settle a read or edit",
   );
   expect(receiptTransition("reviewed", { kind: "product_linked" })).toBe(
     "reviewed",
+  );
+});
+
+it("only holds back a receipt that matches another and is still undecided", () => {
+  const other = testId<"receipts">("other");
+
+  expect(
+    duplicateState({ duplicateOf: undefined, duplicateResolved: false }),
+  ).toBe("none");
+  expect(
+    duplicateState({ duplicateOf: undefined, duplicateResolved: true }),
+  ).toBe("none");
+  expect(duplicateState({ duplicateOf: other, duplicateResolved: false })).toBe(
+    "suspected",
+  );
+  expect(duplicateState({ duplicateOf: other, duplicateResolved: true })).toBe(
+    "separate",
   );
 });
 

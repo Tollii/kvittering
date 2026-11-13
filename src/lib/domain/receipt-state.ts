@@ -135,6 +135,26 @@ export function needsAttention(status: ReceiptStatus): boolean {
   }
 }
 
+/**
+ * Whether a receipt may repeat one the household already has. `suspected` keeps
+ * it out of totals until a person decides; `separate` means they kept it as its
+ * own purchase.
+ */
+export type DuplicateState = "none" | "suspected" | "separate";
+
+/**
+ * Stored as two fields that installed clients still read and write. A resolved
+ * flag without a matching receipt has nothing to resolve, so it reads as `none`.
+ */
+export function duplicateState({
+  duplicateOf,
+  duplicateResolved,
+}: Pick<Doc<"receipts">, "duplicateOf" | "duplicateResolved">): DuplicateState {
+  if (!duplicateOf) return "none";
+
+  return duplicateResolved ? "separate" : "suspected";
+}
+
 /** A stored receipt whose reader result is present. */
 export type ExtractedReceipt = Doc<"receipts"> & { data: ReceiptData };
 
