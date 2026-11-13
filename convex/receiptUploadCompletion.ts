@@ -3,6 +3,7 @@ import type { MutationCtx } from "./_generated/server";
 import type { Doc, Id } from "./_generated/dataModel";
 import type { WithoutSystemFields } from "convex/server";
 import type { ReceiptData } from "../src/lib/domain/receipt";
+import { receiptTransition } from "../src/lib/domain/receipt-state";
 import { traced } from "../src/lib/tracing";
 
 type Uploader = Pick<Doc<"members">, "householdId" | "identity" | "name">;
@@ -50,10 +51,13 @@ export const beginUploadedReceipt = traced(
   "receiptUploadCompletion.beginUploadedReceipt",
   async function beginUploadedReceipt(
     ctx: MutationCtx,
-    id: Id<"receipts">,
+    { _id: id, status: current }: Pick<Doc<"receipts">, "_id" | "status">,
     imageCount: number,
   ) {
-    await ctx.db.patch("receipts", id, { status: "uploaded", generation: 1 });
+    const status = receiptTransition(current, { kind: "upload_completed" });
+
+    if (!status) throw new Error("Kvitteringen venter ikke på bilder.");
+    await ctx.db.patch("receipts", id, { status, generation: 1 });
 
     await startReading(ctx, id, 1);
     console.info("receipt.upload_completed", {
@@ -79,10 +83,8 @@ export const startImportedReceipt = traced(
       data: ReceiptData;
     },
   ) {
-    const id = await ctx.db.insert(
-      "receipts",
-      newReceipt(member, evidence.clientId, 0),
-    );
+    const receipt = newReceipt(member, evidence.clientId, 0);
+    const id = await ctx.db.insert("receipts", receipt);
 
     await ctx.db.insert("receiptImports", {
       householdId: member.householdId,
@@ -91,7 +93,7 @@ export const startImportedReceipt = traced(
       receiptId: id,
       data: evidence.data,
     });
-    await beginUploadedReceipt(ctx, id, 0);
+    await beginUploadedReceipt(ctx, { ...receipt, _id: id }, 0);
 
     return id;
   },

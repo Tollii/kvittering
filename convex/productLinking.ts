@@ -25,6 +25,7 @@ import { resolveProductSelections } from "./catalogLinks";
 import { commitReceiptChange, receiptCommitValidator } from "./receiptChanges";
 import type { ReceiptData } from "../src/lib/domain/receipt";
 import {
+  acceptsReceiptEvent,
   duplicateState,
   type ExtractedReceipt,
 } from "../src/lib/domain/receipt-state";
@@ -40,7 +41,7 @@ function linkable(receipt: Doc<"receipts">): LinkableReceipt | null {
 
   return data &&
     store?.trim() &&
-    (receipt.status === "reviewed" || receipt.status === "needs_review") &&
+    acceptsReceiptEvent(receipt.status, "product_linked") &&
     !receipt.excluded &&
     duplicateState(receipt) !== "suspected" &&
     receipt.catalogStatus !== "pending"
