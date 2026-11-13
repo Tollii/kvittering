@@ -1,12 +1,7 @@
 import { v } from "convex/values";
-import {
-  query,
-  internalQuery,
-  type QueryCtx,
-  type MutationCtx,
-} from "./_generated/server";
+import type { QueryCtx, MutationCtx } from "./_generated/server";
 import { deploymentChannel } from "./deployment";
-import { internalMutation } from "./serverFunctions";
+import { internalMutation, query, internalQuery } from "./serverFunctions";
 import {
   platformValidator,
   channelValidator,
@@ -21,6 +16,7 @@ import {
   type FeatureFlagSnapshot,
   type FeatureFlags,
 } from "../src/lib/featureFlags";
+import { traced } from "../src/lib/tracing";
 
 export const snapshotValidator = v.object({
   platform: platformValidator,
@@ -30,75 +26,81 @@ export const snapshotValidator = v.object({
 });
 
 /** Until a scope is transferred, its existing release settings are the authoritative fallback. */
-export async function readFeatureFlags(
-  ctx: Pick<QueryCtx, "db">,
-  platform: Platform,
-  channel: Channel,
-): Promise<FeatureFlagSnapshot> {
-  const row = await ctx.db
-    .query("featureFlags")
-    .withIndex("by_platform_and_channel", (q) =>
-      q.eq("platform", platform).eq("channel", channel),
-    )
-    .unique();
+export const readFeatureFlags = traced(
+  "featureFlags.readFeatureFlags",
+  async function readFeatureFlags(
+    ctx: Pick<QueryCtx, "db">,
+    platform: Platform,
+    channel: Channel,
+  ): Promise<FeatureFlagSnapshot> {
+    const row = await ctx.db
+      .query("featureFlags")
+      .withIndex("by_platform_and_channel", (q) =>
+        q.eq("platform", platform).eq("channel", channel),
+      )
+      .unique();
 
-  if (row)
+    if (row)
+      return {
+        platform,
+        channel,
+        revision: row.revision,
+        values: parseFeatureFlags(row.values),
+      };
+
+    const legacy = await ctx.db
+      .query("releasePolicies")
+      .withIndex("by_platform_and_channel", (q) =>
+        q.eq("platform", platform).eq("channel", channel),
+      )
+      .unique();
+
     return {
       platform,
       channel,
-      revision: row.revision,
-      values: parseFeatureFlags(row.values),
+      revision: 0,
+      values: parseFeatureFlags(legacy?.features ?? {}),
     };
-
-  const legacy = await ctx.db
-    .query("releasePolicies")
-    .withIndex("by_platform_and_channel", (q) =>
-      q.eq("platform", platform).eq("channel", channel),
-    )
-    .unique();
-
-  return {
-    platform,
-    channel,
-    revision: 0,
-    values: parseFeatureFlags(legacy?.features ?? {}),
-  };
-}
+  },
+);
 
 /** Transactional storage shared by the single-flag operation and the old operator adapter. */
-export async function writeFeatureFlags(
-  ctx: MutationCtx,
-  previous: FeatureFlagSnapshot,
-  values: FeatureFlags,
-  operator: string,
-  reason: string,
-) {
-  const { platform, channel } = previous;
-  const revision = previous.revision + 1;
+export const writeFeatureFlags = traced(
+  "featureFlags.writeFeatureFlags",
+  async function writeFeatureFlags(
+    ctx: MutationCtx,
+    previous: FeatureFlagSnapshot,
+    values: FeatureFlags,
+    operator: string,
+    reason: string,
+  ) {
+    const { platform, channel } = previous;
+    const revision = previous.revision + 1;
 
-  const row = await ctx.db
-    .query("featureFlags")
-    .withIndex("by_platform_and_channel", (q) =>
-      q.eq("platform", platform).eq("channel", channel),
-    )
-    .unique();
+    const row = await ctx.db
+      .query("featureFlags")
+      .withIndex("by_platform_and_channel", (q) =>
+        q.eq("platform", platform).eq("channel", channel),
+      )
+      .unique();
 
-  const next = { platform, channel, revision, values };
+    const next = { platform, channel, revision, values };
 
-  if (row) await ctx.db.replace("featureFlags", row._id, next);
-  else await ctx.db.insert("featureFlags", next);
-  await ctx.db.insert("featureFlagHistory", {
-    platform,
-    channel,
-    revision,
-    previous: previous.values,
-    values,
-    operator: operator.slice(0, 120),
-    reason: reason.slice(0, 500),
-  });
+    if (row) await ctx.db.replace("featureFlags", row._id, next);
+    else await ctx.db.insert("featureFlags", next);
+    await ctx.db.insert("featureFlagHistory", {
+      platform,
+      channel,
+      revision,
+      previous: previous.values,
+      values,
+      operator: operator.slice(0, 120),
+      reason: reason.slice(0, 500),
+    });
 
-  return revision;
-}
+    return revision;
+  },
+);
 
 // Access: public. Flags gate features before sign-in and hold no household data.
 export const get = query({
@@ -108,19 +110,22 @@ export const get = query({
     readFeatureFlags(ctx, platform, deploymentChannel()),
 });
 
-export async function featureEnabled(
-  ctx: Pick<QueryCtx, "db">,
-  name: FeatureName,
-): Promise<boolean> {
-  const channel = deploymentChannel();
+export const featureEnabled = traced(
+  "featureFlags.featureEnabled",
+  async function featureEnabled(
+    ctx: Pick<QueryCtx, "db">,
+    name: FeatureName,
+  ): Promise<boolean> {
+    const channel = deploymentChannel();
 
-  const snapshots = await Promise.all([
-    readFeatureFlags(ctx, "ios", channel),
-    readFeatureFlags(ctx, "android", channel),
-  ]);
+    const snapshots = await Promise.all([
+      readFeatureFlags(ctx, "ios", channel),
+      readFeatureFlags(ctx, "android", channel),
+    ]);
 
-  return snapshots.every((snapshot) => snapshot.values[name]);
-}
+    return snapshots.every((snapshot) => snapshot.values[name]);
+  },
+);
 
 export const enabled = internalQuery({
   args: { name: featureNameValidator },

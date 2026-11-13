@@ -14,10 +14,10 @@ import { WorkflowManager, start, vWorkflowId } from "@convex-dev/workflow";
 import { vResultValidator } from "@convex-dev/workpool";
 import { recordWorkflowCompletion, trackWorkflow } from "./retention";
 import { components, internal } from "./_generated/api";
-import { internalQuery, env, type MutationCtx } from "./_generated/server";
+import { env, type MutationCtx } from "./_generated/server";
 import { hasProductModel } from "./providerConfig";
 import type { Doc, Id } from "./_generated/dataModel";
-import { internalMutation } from "./serverFunctions";
+import { internalMutation, internalQuery } from "./serverFunctions";
 import {
   receiptDataValidator,
   normalizeAlias,
@@ -41,6 +41,7 @@ import {
   applyClassifications,
   canAcceptReceipt,
 } from "../src/lib/domain/receipt-review";
+import { traced } from "../src/lib/tracing";
 
 const workflow = new WorkflowManager(components.workflow);
 
@@ -646,23 +647,26 @@ export const fail = internalMutation({
 });
 
 /** Start reading a receipt's evidence for a generation. */
-export async function startReading(
-  ctx: MutationCtx,
-  id: Id<"receipts">,
-  generation: number,
-) {
-  const workflowId = await start(
-    ctx,
-    internal.processing.processReceipt,
-    { id, generation },
-    {
-      onComplete: internal.processing.readingCompleted,
-      context: { receiptId: id, generation },
-    },
-  );
+export const startReading = traced(
+  "processing.startReading",
+  async function startReading(
+    ctx: MutationCtx,
+    id: Id<"receipts">,
+    generation: number,
+  ) {
+    const workflowId = await start(
+      ctx,
+      internal.processing.processReceipt,
+      { id, generation },
+      {
+        onComplete: internal.processing.readingCompleted,
+        context: { receiptId: id, generation },
+      },
+    );
 
-  await trackWorkflow(ctx, workflowId, "processing", id);
-}
+    await trackWorkflow(ctx, workflowId, "processing", id);
+  },
+);
 
 /**
  * A run that ends while its generation is still being read would leave the

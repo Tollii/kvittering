@@ -5,77 +5,86 @@ import {
   randomUUID,
 } from "expo-crypto";
 import { z } from "zod";
+import { traced } from "./tracing";
 
 const nativeError = z.object({ code: z.string() });
 
 /** Obtain native credentials; Better Auth verifies the token on the server. */
-export async function requestAppleIdentity() {
-  const nonce = randomUUID();
+export const requestAppleIdentity = traced(
+  "apple-authentication.requestAppleIdentity",
+  async function requestAppleIdentity() {
+    const nonce = randomUUID();
 
-  const hashedNonce = await digestStringAsync(
-    CryptoDigestAlgorithm.SHA256,
-    nonce,
-  );
-
-  try {
-    const credential = await AppleAuthentication.signInAsync({
-      nonce: hashedNonce,
-      requestedScopes: [
-        AppleAuthentication.AppleAuthenticationScope.FULL_NAME,
-        AppleAuthentication.AppleAuthenticationScope.EMAIL,
-      ],
-    });
-
-    if (!credential.identityToken)
-      throw new Error("Apple returnerte ikke et identitetsbevis. Prøv igjen.");
-
-    return {
-      token: credential.identityToken,
+    const hashedNonce = await digestStringAsync(
+      CryptoDigestAlgorithm.SHA256,
       nonce,
-      // Apple supplies the name only on the first authorization.
-      user: credential.fullName
-        ? {
-            name: {
-              firstName: credential.fullName.givenName ?? undefined,
-              lastName: credential.fullName.familyName ?? undefined,
-            },
-          }
-        : undefined,
-    };
-  } catch (error) {
-    const parsed = nativeError.safeParse(error);
+    );
 
-    if (parsed.success && parsed.data.code === "ERR_REQUEST_CANCELED")
-      return null;
+    try {
+      const credential = await AppleAuthentication.signInAsync({
+        nonce: hashedNonce,
+        requestedScopes: [
+          AppleAuthentication.AppleAuthenticationScope.FULL_NAME,
+          AppleAuthentication.AppleAuthenticationScope.EMAIL,
+        ],
+      });
 
-    throw new Error("Kunne ikke logge inn med Apple. Prøv igjen.", {
-      cause: error,
-    });
-  }
-}
+      if (!credential.identityToken)
+        throw new Error(
+          "Apple returnerte ikke et identitetsbevis. Prøv igjen.",
+        );
+
+      return {
+        token: credential.identityToken,
+        nonce,
+        // Apple supplies the name only on the first authorization.
+        user: credential.fullName
+          ? {
+              name: {
+                firstName: credential.fullName.givenName ?? undefined,
+                lastName: credential.fullName.familyName ?? undefined,
+              },
+            }
+          : undefined,
+      };
+    } catch (error) {
+      const parsed = nativeError.safeParse(error);
+
+      if (parsed.success && parsed.data.code === "ERR_REQUEST_CANCELED")
+        return null;
+
+      throw new Error("Kunne ikke logge inn med Apple. Prøv igjen.", {
+        cause: error,
+      });
+    }
+  },
+);
 
 /** A fresh authorization code, which the backend exchanges to revoke Kvitto's Apple access. */
-export async function requestAppleAuthorization() {
-  try {
-    const credential = await AppleAuthentication.signInAsync({
-      requestedScopes: [],
-    });
+export const requestAppleAuthorization = traced(
+  "apple-authentication.requestAppleAuthorization",
+  async function requestAppleAuthorization() {
+    try {
+      const credential = await AppleAuthentication.signInAsync({
+        requestedScopes: [],
+      });
 
-    if (!credential.authorizationCode)
-      throw new Error("Apple returnerte ingen bekreftelse. Prøv igjen.");
+      if (!credential.authorizationCode)
+        throw new Error("Apple returnerte ingen bekreftelse. Prøv igjen.");
 
-    return credential.authorizationCode;
-  } catch (error) {
-    const parsed = nativeError.safeParse(error);
+      return credential.authorizationCode;
+    } catch (error) {
+      const parsed = nativeError.safeParse(error);
 
-    if (parsed.success && parsed.data.code === "ERR_REQUEST_CANCELED")
-      return null;
+      if (parsed.success && parsed.data.code === "ERR_REQUEST_CANCELED")
+        return null;
 
-    throw new Error("Kunne ikke bekrefte med Apple. Prøv igjen.", {
-      cause: error,
-    });
-  }
-}
+      throw new Error("Kunne ikke bekrefte med Apple. Prøv igjen.", {
+        cause: error,
+      });
+    }
+  },
+);
 
 /** Rejections the person can act on; any other code is a failure worth reporting. */
 export function isAppleRejection(code?: string) {

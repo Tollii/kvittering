@@ -3,7 +3,8 @@ import { ConvexError, v } from "convex/values";
 import { parse } from "convex-helpers/validators";
 import { clientValidator } from "../src/lib/releases/policy";
 import { httpRouter } from "convex/server";
-import { httpAction, env } from "./_generated/server";
+import { env } from "./_generated/server";
+import { httpAction } from "./serverFunctions";
 import { internal } from "./_generated/api";
 import { authComponent, createAuth } from "./auth";
 import { errorDetails } from "../src/lib/diagnostics";
@@ -26,7 +27,7 @@ function headers(request: Request) {
       request.headers.get("Origin") === env.SITE_URL ? env.SITE_URL : "",
     Vary: "Origin",
     "Access-Control-Allow-Headers":
-      "Authorization, Content-Type, X-Kvitto-Client",
+      "Authorization, Content-Type, X-Kvitto-Client, traceparent, tracestate",
     "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
     "Cache-Control": "no-store",
   };

@@ -1,11 +1,8 @@
 import { v, type Infer } from "convex/values";
 import { internal } from "./_generated/api";
 import type { Doc, Id } from "./_generated/dataModel";
-import {
-  internalAction,
-  internalQuery,
-  type QueryCtx,
-} from "./_generated/server";
+import type { QueryCtx } from "./_generated/server";
+import { internalAction, internalQuery } from "./serverFunctions";
 import {
   classificationInputs,
   normalizeAlias,

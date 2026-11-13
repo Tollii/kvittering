@@ -7,6 +7,7 @@ import { components } from "./_generated/api";
 import { type MutationCtx } from "./_generated/server";
 import { internalMutation } from "./serverFunctions";
 import type { Doc, Id } from "./_generated/dataModel";
+import { traced } from "../src/lib/tracing";
 
 /** Fixed UTC windows have no rollover. Provider allowances are shared by all accounts. */
 export const providerAllowances = {
@@ -57,54 +58,63 @@ const limiter = new RateLimiter(components.rateLimiter, {
  * Each MCP request is a bounded read; the limits stop a looping client. A
  * refused request may still spend a burst token, which only shortens the burst.
  */
-export async function consumeMcpQuota(
-  ctx: MutationCtx,
-  tokenId: Id<"mcpTokens">,
-): Promise<{ ok: true } | { ok: false; retryAfter: number }> {
-  for (const name of ["mcpBurst", "mcpDaily"] as const) {
-    const result = await limiter.limit(ctx, name, { key: tokenId });
+export const consumeMcpQuota = traced(
+  "rateLimits.consumeMcpQuota",
+  async function consumeMcpQuota(
+    ctx: MutationCtx,
+    tokenId: Id<"mcpTokens">,
+  ): Promise<{ ok: true } | { ok: false; retryAfter: number }> {
+    for (const name of ["mcpBurst", "mcpDaily"] as const) {
+      const result = await limiter.limit(ctx, name, { key: tokenId });
 
-    if (!result.ok) return { ok: false, retryAfter: result.retryAfter };
-  }
+      if (!result.ok) return { ok: false, retryAfter: result.retryAfter };
+    }
 
-  return { ok: true };
-}
+    return { ok: true };
+  },
+);
 
 /** The caller's mutation rolls back all counters if any quota or receipt write fails. */
-export async function consumeReceiptQuota(
-  ctx: MutationCtx,
-  member: Pick<Doc<"members">, "identity" | "householdId">,
-  { retryMetadata = false, imagesWait = true } = {},
-) {
-  // Callers without queued images leave out the sentence about the queue.
-  const waiting = imagesWait ? " Bildene blir liggende i køen." : "";
+export const consumeReceiptQuota = traced(
+  "rateLimits.consumeReceiptQuota",
+  async function consumeReceiptQuota(
+    ctx: MutationCtx,
+    member: Pick<Doc<"members">, "identity" | "householdId">,
+    {
+      retryMetadata = false,
+      imagesWait = true,
+    }: { retryMetadata?: boolean; imagesWait?: boolean } = {},
+  ) {
+    // Callers without queued images leave out the sentence about the queue.
+    const waiting = imagesWait ? " Bildene blir liggende i køen." : "";
 
-  for (const key of [
-    `user:${member.identity}`,
-    `household:${member.householdId}`,
-  ]) {
-    for (const name of ["receiptDaily", "receiptBurst"] as const) {
-      const result = await limiter.limit(ctx, name, { key });
+    for (const key of [
+      `user:${member.identity}`,
+      `household:${member.householdId}`,
+    ]) {
+      for (const name of ["receiptDaily", "receiptBurst"] as const) {
+        const result = await limiter.limit(ctx, name, { key });
 
-      if (!result.ok) {
-        const message =
-          name === "receiptDaily"
-            ? `Dagens grense for kvitteringer er nådd. Prøv igjen i morgen.${waiting}`
-            : `For mange kvitteringer på kort tid. Vent ett minutt og prøv igjen.${waiting}`;
+        if (!result.ok) {
+          const message =
+            name === "receiptDaily"
+              ? `Dagens grense for kvitteringer er nådd. Prøv igjen i morgen.${waiting}`
+              : `For mange kvitteringer på kort tid. Vent ett minutt og prøv igjen.${waiting}`;
 
-        throw new ConvexError(
-          retryMetadata
-            ? {
-                code: "RATE_LIMITED",
-                message,
-                retryAt: Date.now() + result.retryAfter,
-              }
-            : message,
-        );
+          throw new ConvexError(
+            retryMetadata
+              ? {
+                  code: "RATE_LIMITED",
+                  message,
+                  retryAt: Date.now() + result.retryAfter,
+                }
+              : message,
+          );
+        }
       }
     }
-  }
-}
+  },
+);
 
 /** Fixed-hour and daily admission survives restarts and household changes. */
 async function consumeActorQuota(
@@ -134,13 +144,16 @@ async function consumeActorQuota(
   }
 }
 
-export function consumeWorkQuota(
-  ctx: MutationCtx,
-  actor: QuotaActor,
-  kind: keyof typeof workAllowances,
-) {
-  return consumeActorQuota(ctx, actor, `work:${kind}`, workAllowances[kind]);
-}
+export const consumeWorkQuota = traced(
+  "rateLimits.consumeWorkQuota",
+  function consumeWorkQuota(
+    ctx: MutationCtx,
+    actor: QuotaActor,
+    kind: keyof typeof workAllowances,
+  ) {
+    return consumeActorQuota(ctx, actor, `work:${kind}`, workAllowances[kind]);
+  },
+);
 
 export const admitEvaluation = internalMutation({
   args: { client: clientValidator.optional() },

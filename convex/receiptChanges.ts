@@ -15,6 +15,7 @@ import {
 } from "../src/lib/domain/receipt";
 import { assessReceipt } from "../src/lib/domain/receipt-review";
 import { duplicateState } from "../src/lib/domain/receipt-state";
+import { traced } from "../src/lib/tracing";
 
 export const receiptCommitValidator = v.object({
   receiptId: v.id("receipts"),
@@ -92,118 +93,130 @@ export function decideReceiptChange({
 }
 
 /** Commit within the caller's mutation. Recheck the snapshot before writing history or data. */
-export async function commitReceiptChange(
-  ctx: MutationCtx,
-  input: {
-    receiptId: Id<"receipts">;
-    expected: { revision: number; generation: number };
-    data: ReceiptData;
-    origin: ReceiptChangeOrigin;
-    duplicate?: { duplicateOf: Id<"receipts"> | undefined; resolved: boolean };
-    excluded?: boolean;
-  },
-): Promise<ReceiptCommitAcknowledgement> {
-  const previous = await ctx.db.get("receipts", input.receiptId);
+export const commitReceiptChange = traced(
+  "receiptChanges.commitReceiptChange",
+  async function commitReceiptChange(
+    ctx: MutationCtx,
+    input: {
+      receiptId: Id<"receipts">;
+      expected: { revision: number; generation: number };
+      data: ReceiptData;
+      origin: ReceiptChangeOrigin;
+      duplicate?: {
+        duplicateOf: Id<"receipts"> | undefined;
+        resolved: boolean;
+      };
+      excluded?: boolean;
+    },
+  ): Promise<ReceiptCommitAcknowledgement> {
+    const previous = await ctx.db.get("receipts", input.receiptId);
 
-  if (
-    !previous ||
-    previous.revision !== input.expected.revision ||
-    previous.generation !== input.expected.generation
-  )
-    throw userError(
-      "Kvitteringen er endret. Hent siste versjon.",
-      "RECEIPT_CHANGED",
-    );
-  const parsed = parseReceipt(input.data);
+    if (
+      !previous ||
+      previous.revision !== input.expected.revision ||
+      previous.generation !== input.expected.generation
+    )
+      throw userError(
+        "Kvitteringen er endret. Hent siste versjon.",
+        "RECEIPT_CHANGED",
+      );
+    const parsed = parseReceipt(input.data);
 
-  if (parsed.kind === "rejected") throw userError(parsed.issue.message);
+    if (parsed.kind === "rejected") throw userError(parsed.issue.message);
 
-  const duplicateOf = input.duplicate
-    ? input.duplicate.duplicateOf
-    : previous.duplicateOf;
+    const duplicateOf = input.duplicate
+      ? input.duplicate.duplicateOf
+      : previous.duplicateOf;
 
-  const duplicateResolved =
-    input.duplicate?.resolved ?? previous.duplicateResolved;
+    const duplicateResolved =
+      input.duplicate?.resolved ?? previous.duplicateResolved;
 
-  const decision = decideReceiptChange({
-    previous,
-    data: parsed.receipt,
-    unresolvedDuplicate:
-      duplicateState({ duplicateOf, duplicateResolved }) === "suspected",
-    origin: input.origin,
-  });
-
-  if (previous.data && input.origin.kind !== "extraction")
-    await ctx.db.insert("revisions", {
-      receiptId: previous._id,
-      data: previous.data,
-      revision: previous.revision,
-      editor: "editor" in input.origin ? input.origin.editor : "catalog",
+    const decision = decideReceiptChange({
+      previous,
+      data: parsed.receipt,
+      unresolvedDuplicate:
+        duplicateState({ duplicateOf, duplicateResolved }) === "suspected",
+      origin: input.origin,
     });
 
-  const patch: Partial<Doc<"receipts">> = {
-    ...decision,
-    productLinkUndo: undefined,
-    // Keep the installed-client representation at the storage boundary.
-    data: {
-      ...parsed.receipt,
-      issues: parsed.receipt.issues.map((issue) =>
-        receiptIssueText(parseReceiptIssue(issue)),
-      ),
-      lines: parsed.receipt.lines.map((line) => ({
-        ...line,
-        issues: line.issues.map((issue) =>
+    if (previous.data && input.origin.kind !== "extraction")
+      await ctx.db.insert("revisions", {
+        receiptId: previous._id,
+        data: previous.data,
+        revision: previous.revision,
+        editor: "editor" in input.origin ? input.origin.editor : "catalog",
+      });
+
+    const patch: Partial<Doc<"receipts">> = {
+      ...decision,
+      productLinkUndo: undefined,
+      // Keep the installed-client representation at the storage boundary.
+      data: {
+        ...parsed.receipt,
+        issues: parsed.receipt.issues.map((issue) =>
           receiptIssueText(parseReceiptIssue(issue)),
         ),
-      })),
-    },
-    duplicateOf,
-    duplicateResolved,
-    excluded: input.excluded ?? previous.excluded,
-  };
+        lines: parsed.receipt.lines.map((line) => ({
+          ...line,
+          issues: line.issues.map((issue) =>
+            receiptIssueText(parseReceiptIssue(issue)),
+          ),
+        })),
+      },
+      duplicateOf,
+      duplicateResolved,
+      excluded: input.excluded ?? previous.excluded,
+    };
 
-  if (input.origin.kind === "human" || input.origin.kind === "extraction")
-    patch.error = undefined;
+    if (input.origin.kind === "human" || input.origin.kind === "extraction")
+      patch.error = undefined;
 
-  if (input.origin.kind === "extraction") {
-    patch.provider = input.origin.provider;
-    patch.catalogStatus = undefined;
-    patch.catalogWorkflowId = undefined;
-  }
+    if (input.origin.kind === "extraction") {
+      patch.provider = input.origin.provider;
+      patch.catalogStatus = undefined;
+      patch.catalogWorkflowId = undefined;
+    }
 
-  await ctx.db.patch("receipts", previous._id, patch);
+    await ctx.db.patch("receipts", previous._id, patch);
 
-  if (decision.status !== previous.status)
-    await notifyReceiptActivities(ctx, previous.householdId);
+    if (decision.status !== previous.status)
+      await notifyReceiptActivities(ctx, previous.householdId);
 
-  if (input.origin.kind === "extraction" && input.origin.next === "catalog")
-    await ctx.scheduler.runAfter(0, internal.catalogMatching.start, {
-      id: previous._id,
-      generation: previous.generation,
-    });
-  else if (
-    input.origin.kind !== "extraction" ||
-    input.origin.next === "analysis"
-  )
-    await ctx.scheduler.runAfter(0, internal.productAnalysis.start, {
-      id: previous._id,
-    });
+    if (input.origin.kind === "extraction" && input.origin.next === "catalog")
+      await ctx.scheduler.runAfter(0, internal.catalogMatching.start, {
+        id: previous._id,
+        generation: previous.generation,
+      });
+    else if (
+      input.origin.kind !== "extraction" ||
+      input.origin.next === "analysis"
+    )
+      await ctx.scheduler.runAfter(0, internal.productAnalysis.start, {
+        id: previous._id,
+      });
 
-  return { receiptId: previous._id, revision: decision.revision };
-}
+    return { receiptId: previous._id, revision: decision.revision };
+  },
+);
 
 /** Delete a receipt with its images, history, workflows, and correction batches. */
-export async function deleteReceipt(
-  ctx: MutationCtx,
-  receipt: Doc<"receipts">,
-) {
-  await ctx.db.delete("receipts", receipt._id);
-  await ctx.scheduler.runAfter(0, internal.retention.deletedReceiptWorkflows, {
-    receiptId: receipt._id,
-  });
-  await ctx.runMutation(internal.receipts.cleanupDeleted, { id: receipt._id });
-  await ctx.scheduler.runAfter(0, internal.retention.deletedReceiptBatches, {
-    householdId: receipt.householdId,
-    receiptId: receipt._id,
-  });
-}
+export const deleteReceipt = traced(
+  "receiptChanges.deleteReceipt",
+  async function deleteReceipt(ctx: MutationCtx, receipt: Doc<"receipts">) {
+    await ctx.db.delete("receipts", receipt._id);
+    await ctx.scheduler.runAfter(
+      0,
+      internal.retention.deletedReceiptWorkflows,
+      {
+        receiptId: receipt._id,
+      },
+    );
+    await ctx.runMutation(internal.receipts.cleanupDeleted, {
+      id: receipt._id,
+    });
+    await ctx.scheduler.runAfter(0, internal.retention.deletedReceiptBatches, {
+      householdId: receipt.householdId,
+      receiptId: receipt._id,
+    });
+  },
+);

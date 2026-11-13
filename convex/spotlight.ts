@@ -1,5 +1,5 @@
 import { v } from "convex/values";
-import { query } from "./_generated/server";
+import { query } from "./serverFunctions";
 import { requireMember } from "./access";
 
 /** The optional device index covers up to 100 recent receipts within a byte budget; it is not household storage. */

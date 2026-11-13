@@ -1,4 +1,5 @@
-import { query, type QueryCtx, type MutationCtx } from "./_generated/server";
+import type { QueryCtx, MutationCtx } from "./_generated/server";
+import { query } from "./serverFunctions";
 import { requireCompatibleClient } from "./releasePolicy";
 import { clientValidator } from "../src/lib/releases/policy";
 import {

@@ -3,6 +3,7 @@ import * as Sentry from "@sentry/react-native";
 import { errorDetails, type DiagnosticFields } from "./diagnostics";
 import { diagnosticText } from "./sentry-event";
 import { analytics } from "./analytics";
+import { setRequestAttributes } from "./tracing";
 
 /** Record deliberate milestones; do not pass request arguments or response bodies. */
 export function recordEvent(
@@ -37,18 +38,22 @@ export function recordScreen(screen: string) {
 /** Tie PostHog events to the internal account id. Returns the cleanup for sign-out or an account switch. */
 export function identifyAccount(owner: string) {
   analytics?.identify(owner);
+  setRequestAttributes({ "user.id": owner });
 
   return () => {
     analytics?.reset();
+    setRequestAttributes({ "user.id": undefined });
   };
 }
 
 /** Tag later PostHog events with the household. Returns the cleanup for leaving it. */
 export function tagHousehold(householdId: string) {
   void analytics?.register({ household_id: householdId });
+  setRequestAttributes({ "kvitto.household.id": householdId });
 
   return () => {
     void analytics?.unregister("household_id");
+    setRequestAttributes({ "kvitto.household.id": undefined });
   };
 }
 

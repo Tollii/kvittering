@@ -10,8 +10,8 @@ import {
   vWorkflowId,
 } from "@convex-dev/workflow";
 import { components, internal } from "./_generated/api";
-import { internalQuery, type MutationCtx } from "./_generated/server";
-import { internalMutation } from "./serverFunctions";
+import type { MutationCtx } from "./_generated/server";
+import { internalMutation, internalQuery } from "./serverFunctions";
 import type { Doc, Id } from "./_generated/dataModel";
 import schema from "./schema";
 import {
@@ -28,6 +28,7 @@ import {
   requestKey,
   resultLifetime,
 } from "../src/lib/catalog/policy";
+import { traced } from "../src/lib/tracing";
 
 const pool = new Workpool(components.catalogWorkpool, {
   maxParallelism: 4,
@@ -93,71 +94,78 @@ function isRequestLive(request: Doc<"catalogRequests">, now: number): boolean {
   );
 }
 
-export async function ensureRequest(
-  ctx: MutationCtx,
-  input: CatalogRequest,
-  options?: { payer: QuotaActor; interactive?: boolean },
-): Promise<Doc<"catalogRequests">> {
-  if (!(await featureEnabled(ctx, "productLookup")))
-    throw userError("Produktkatalogen er midlertidig satt på pause.");
-  const request = normalizeRequest(input);
-  const key = requestKey(request);
+export const ensureRequest = traced(
+  "catalogQueue.ensureRequest",
+  async function ensureRequest(
+    ctx: MutationCtx,
+    input: CatalogRequest,
+    options?: { payer: QuotaActor; interactive?: boolean },
+  ): Promise<Doc<"catalogRequests">> {
+    if (!(await featureEnabled(ctx, "productLookup")))
+      throw userError("Produktkatalogen er midlertidig satt på pause.");
+    const request = normalizeRequest(input);
+    const key = requestKey(request);
 
-  const existing = await ctx.db
-    .query("catalogRequests")
-    .withIndex("by_key", (q) => q.eq("key", key))
-    .unique();
+    const existing = await ctx.db
+      .query("catalogRequests")
+      .withIndex("by_key", (q) => q.eq("key", key))
+      .unique();
 
-  const now = Date.now();
+    const now = Date.now();
 
-  // A stale in-flight row is queued again on the same id, so its waiters still hear the result.
-  if (existing && (isRequestLive(existing, now) || existing.expiresAt > now)) {
-    console.info("catalog.request_reused", {
-      requestId: existing._id,
+    // A stale in-flight row is queued again on the same id, so its waiters still hear the result.
+    if (
+      existing &&
+      (isRequestLive(existing, now) || existing.expiresAt > now)
+    ) {
+      console.info("catalog.request_reused", {
+        requestId: existing._id,
+        kind: request.kind,
+        state: existing.state,
+      });
+
+      return existing;
+    }
+
+    if (options?.interactive)
+      await consumeWorkQuota(ctx, options.payer, "catalog");
+
+    const values = {
+      payer: options
+        ? {
+            identity: options.payer.identity,
+            householdId: options.payer.householdId,
+          }
+        : undefined,
+      key,
+      request,
+      state: "pending" as const,
+      result: existing?.result ?? emptyCatalogResult(),
+      fetchedAt: existing?.fetchedAt,
+      expiresAt: 0,
+      attempts: 0,
+      scheduledAt: Date.now(),
+    };
+
+    const id =
+      existing?._id ?? (await ctx.db.insert("catalogRequests", values));
+
+    if (existing) await ctx.db.replace("catalogRequests", id, values);
+    await enqueue(ctx, id);
+    console.info("catalog.request_queued", {
+      requestId: id,
       kind: request.kind,
-      state: existing.state,
+      refresh: !!existing,
+      stale: existing ? isRequestInFlight(existing.state) : false,
     });
 
-    return existing;
-  }
+    const saved = await ctx.db.get("catalogRequests", id);
 
-  if (options?.interactive)
-    await consumeWorkQuota(ctx, options.payer, "catalog");
+    if (!saved) throw new Error("Catalog request was not saved.");
 
-  const values = {
-    payer: options
-      ? {
-          identity: options.payer.identity,
-          householdId: options.payer.householdId,
-        }
-      : undefined,
-    key,
-    request,
-    state: "pending" as const,
-    result: existing?.result ?? emptyCatalogResult(),
-    fetchedAt: existing?.fetchedAt,
-    expiresAt: 0,
-    attempts: 0,
-    scheduledAt: Date.now(),
-  };
-
-  const id = existing?._id ?? (await ctx.db.insert("catalogRequests", values));
-
-  if (existing) await ctx.db.replace("catalogRequests", id, values);
-  await enqueue(ctx, id);
-  console.info("catalog.request_queued", {
-    requestId: id,
-    kind: request.kind,
-    refresh: !!existing,
-    stale: existing ? isRequestInFlight(existing.state) : false,
-  });
-
-  const saved = await ctx.db.get("catalogRequests", id);
-
-  if (!saved) throw new Error("Catalog request was not saved.");
-
-  return saved;
-}
+    return saved;
+  },
+);
 
 export const request = internalMutation({
   args: { request: catalogRequestValidator },

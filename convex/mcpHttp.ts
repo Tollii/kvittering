@@ -1,7 +1,8 @@
 import { ConvexError } from "convex/values";
 import { z } from "zod";
 import type { HttpRouter } from "convex/server";
-import { httpAction, type ActionCtx } from "./_generated/server";
+import type { ActionCtx } from "./_generated/server";
+import { httpAction } from "./serverFunctions";
 import { internal } from "./_generated/api";
 import type { Id } from "./_generated/dataModel";
 import { sha256Hex } from "./tokens";
@@ -17,6 +18,7 @@ import {
   type ToolResult,
 } from "../src/lib/mcp/tools";
 import { errorDetails } from "../src/lib/diagnostics";
+import { setRequestAttributes } from "../src/lib/tracing";
 
 async function runTool(
   ctx: ActionCtx,
@@ -169,6 +171,9 @@ const endpoint = httpAction(async (ctx, request) => {
       });
 
     case "allowed":
+      // A personal token stands for its household; its account stays unnamed.
+      setRequestAttributes({ "kvitto.household.id": access.householdId });
+
       return respond(
         ctx,
         access.householdId,

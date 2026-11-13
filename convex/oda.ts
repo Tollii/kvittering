@@ -1,15 +1,13 @@
 import { v } from "convex/values";
+import { env, type MutationCtx, type QueryCtx } from "./_generated/server";
+import { internal } from "./_generated/api";
+import type { Doc, Id } from "./_generated/dataModel";
 import {
-  env,
+  internalMutation,
   internalAction,
   internalQuery,
   query,
-  type MutationCtx,
-  type QueryCtx,
-} from "./_generated/server";
-import { internal } from "./_generated/api";
-import type { Doc, Id } from "./_generated/dataModel";
-import { internalMutation } from "./serverFunctions";
+} from "./serverFunctions";
 import { clientMutation as mutation } from "./clientFunctions";
 import { requireMember } from "./access";
 import { userError } from "./userErrors";
@@ -30,6 +28,7 @@ import {
   refreshOdaTokens,
   revokeOdaToken,
 } from "./odaApi";
+import { traced } from "../src/lib/tracing";
 
 const authorizationLifetimeMs = 10 * 60 * 1000;
 
@@ -231,14 +230,17 @@ export const sync = mutation({
 });
 
 /** Stop importing at once; Oda forgets the sign-in in the background. */
-export async function forgetOdaConnection(ctx: MutationCtx, identity: string) {
-  const connection = await connectionOf(ctx, identity);
+export const forgetOdaConnection = traced(
+  "oda.forgetOdaConnection",
+  async function forgetOdaConnection(ctx: MutationCtx, identity: string) {
+    const connection = await connectionOf(ctx, identity);
 
-  if (!connection) return;
+    if (!connection) return;
 
-  await ctx.db.delete("odaConnections", connection._id);
-  await revokeAtOda(ctx, connection.clientId, connection);
-}
+    await ctx.db.delete("odaConnections", connection._id);
+    await revokeAtOda(ctx, connection.clientId, connection);
+  },
+);
 
 /** Ask Oda to forget a sign-in's tokens; the refresh token outlives the access token. */
 function revokeAtOda(

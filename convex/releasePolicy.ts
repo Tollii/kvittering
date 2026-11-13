@@ -6,8 +6,8 @@ import {
 import { deploymentChannel } from "./deployment";
 import { featureNameValidator, legacyFeatures } from "../src/lib/featureFlags";
 import { ConvexError, v } from "convex/values";
-import { query, internalQuery, type QueryCtx } from "./_generated/server";
-import { internalMutation } from "./serverFunctions";
+import type { QueryCtx } from "./_generated/server";
+import { internalMutation, query, internalQuery } from "./serverFunctions";
 import {
   apiVersion,
   clientValidator,
@@ -23,69 +23,76 @@ import {
   type Platform,
   type ReleasePolicy,
 } from "../src/lib/releases/policy";
+import { traced } from "../src/lib/tracing";
 
-export async function readPolicy(
-  ctx: Pick<QueryCtx, "db">,
-  platform: Platform,
-): Promise<ReleasePolicy> {
-  const channel = deploymentChannel();
+export const readPolicy = traced(
+  "releasePolicy.readPolicy",
+  async function readPolicy(
+    ctx: Pick<QueryCtx, "db">,
+    platform: Platform,
+  ): Promise<ReleasePolicy> {
+    const channel = deploymentChannel();
 
-  const row = await ctx.db
-    .query("releasePolicies")
-    .withIndex("by_platform_and_channel", (q) =>
-      q.eq("platform", platform).eq("channel", channel),
-    )
-    .unique();
+    const row = await ctx.db
+      .query("releasePolicies")
+      .withIndex("by_platform_and_channel", (q) =>
+        q.eq("platform", platform).eq("channel", channel),
+      )
+      .unique();
 
-  const flags = await readFeatureFlags(ctx, platform, channel);
+    const flags = await readFeatureFlags(ctx, platform, channel);
 
-  if (!row)
-    return {
-      ...defaultPolicy(platform, channel),
-      features: legacyFeatures(flags.values),
-    };
-  const { _id, _creationTime, ...policy } = row;
+    if (!row)
+      return {
+        ...defaultPolicy(platform, channel),
+        features: legacyFeatures(flags.values),
+      };
+    const { _id, _creationTime, ...policy } = row;
 
-  return { ...policy, features: legacyFeatures(flags.values) };
-}
+    return { ...policy, features: legacyFeatures(flags.values) };
+  },
+);
 
-export async function requireCompatibleClient(
-  ctx: Pick<QueryCtx, "db">,
-  client?: ClientRelease,
-  feature?: Feature,
-) {
-  if (
-    client &&
-    (!Number.isSafeInteger(client.apiVersion) ||
-      client.apiVersion < 1 ||
-      client.apiVersion > apiVersion)
+export const requireCompatibleClient = traced(
+  "releasePolicy.requireCompatibleClient",
+  async function requireCompatibleClient(
+    ctx: Pick<QueryCtx, "db">,
+    client?: ClientRelease,
+    feature?: Feature,
   ) {
-    throw new ConvexError({
-      code: "UNSUPPORTED_API_VERSION",
-      message:
-        "Denne appversjonen støttes ikke av tjenesten ennå. Prøv igjen senere.",
-    });
-  }
+    if (
+      client &&
+      (!Number.isSafeInteger(client.apiVersion) ||
+        client.apiVersion < 1 ||
+        client.apiVersion > apiVersion)
+    ) {
+      throw new ConvexError({
+        code: "UNSUPPORTED_API_VERSION",
+        message:
+          "Denne appversjonen støttes ikke av tjenesten ennå. Prøv igjen senere.",
+      });
+    }
 
-  const policy = await readPolicy(ctx, client?.platform ?? "ios");
+    const policy = await readPolicy(ctx, client?.platform ?? "ios");
 
-  if (updateRequirement(policy, client) === "required")
-    throw new ConvexError({
-      code: "UPDATE_REQUIRED",
-      message: "Oppdater Kvitto for å fortsette.",
-      policy,
-    });
+    if (updateRequirement(policy, client) === "required")
+      throw new ConvexError({
+        code: "UPDATE_REQUIRED",
+        message: "Oppdater Kvitto for å fortsette.",
+        policy,
+      });
 
-  if (feature && !(await featureEnabled(ctx, feature)))
-    throw new ConvexError({
-      code: "SERVICE_PAUSED",
-      message:
-        policy.message || "Denne funksjonen er midlertidig satt på pause.",
-      policy,
-    });
+    if (feature && !(await featureEnabled(ctx, feature)))
+      throw new ConvexError({
+        code: "SERVICE_PAUSED",
+        message:
+          policy.message || "Denne funksjonen er midlertidig satt på pause.",
+        policy,
+      });
 
-  return policy;
-}
+    return policy;
+  },
+);
 
 // Access: public. Installed clients read the version policy before sign-in.
 export const get = query({

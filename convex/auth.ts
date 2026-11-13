@@ -15,11 +15,12 @@ import type { DataModel } from "./_generated/dataModel";
 import authConfig from "./auth.config";
 import {
   env,
-  query,
   type ActionCtx,
   type MutationCtx,
   type QueryCtx,
 } from "./_generated/server";
+import { query } from "./serverFunctions";
+import { traced } from "../src/lib/tracing";
 
 /** The component types adapter pages as `any`; only the count is needed. */
 const linkedAccounts = z.object({ page: z.array(z.unknown()) });
@@ -60,27 +61,30 @@ export const { onCreate } = authComponent.triggersApi();
 const appleAccount = z.object({ accountId: z.string() }).nullable();
 
 /** The Apple ID linked to a Better Auth user, or null. */
-export async function appleAccountOf(
-  ctx:
-    | Pick<QueryCtx, "runQuery">
-    | Pick<MutationCtx, "runQuery">
-    | Pick<ActionCtx, "runQuery">,
-  userId: string,
-) {
-  // The component types adapter results as `any`.
-  const account: unknown = await ctx.runQuery(
-    components.betterAuth.adapter.findOne,
-    {
-      model: "account",
-      where: [
-        { field: "userId", value: userId },
-        { field: "providerId", value: "apple" },
-      ],
-    },
-  );
+export const appleAccountOf = traced(
+  "auth.appleAccountOf",
+  async function appleAccountOf(
+    ctx:
+      | Pick<QueryCtx, "runQuery">
+      | Pick<MutationCtx, "runQuery">
+      | Pick<ActionCtx, "runQuery">,
+    userId: string,
+  ) {
+    // The component types adapter results as `any`.
+    const account: unknown = await ctx.runQuery(
+      components.betterAuth.adapter.findOne,
+      {
+        model: "account",
+        where: [
+          { field: "userId", value: userId },
+          { field: "providerId", value: "apple" },
+        ],
+      },
+    );
 
-  return appleAccount.parse(account)?.accountId ?? null;
-}
+    return appleAccount.parse(account)?.accountId ?? null;
+  },
+);
 
 export const appleConnected = query({
   args: {},

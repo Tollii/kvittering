@@ -21,6 +21,7 @@ import { Button, Copy, Notice } from "@/components/ui";
 import { useHousehold } from "./household-context";
 import { failureMessage } from "@/lib/failure-message";
 import { UserError } from "@/lib/user-errors";
+import { traced } from "../lib/tracing";
 
 const tokenKey = "kvitto.push-token";
 
@@ -36,14 +37,17 @@ Notifications.setNotificationHandler({
   }),
 });
 
-export async function disableNotifications(client: ConvexReactClient) {
-  const token = await SecureStore.getItemAsync(tokenKey);
+export const disableNotifications = traced(
+  "notifications.disableNotifications",
+  async function disableNotifications(client: ConvexReactClient) {
+    const token = await SecureStore.getItemAsync(tokenKey);
 
-  if (token) {
-    await releaseMutation(client, api.notifications.unsubscribe, { token });
-    await SecureStore.deleteItemAsync(tokenKey);
-  }
-}
+    if (token) {
+      await releaseMutation(client, api.notifications.unsubscribe, { token });
+      await SecureStore.deleteItemAsync(tokenKey);
+    }
+  },
+);
 
 export function NotificationSettings() {
   const client = useConvex();

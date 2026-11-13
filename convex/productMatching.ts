@@ -2,7 +2,7 @@
 
 import { v, type Infer } from "convex/values";
 import { choice } from "@typesafe-ai/sdk";
-import { internalAction } from "./_generated/server";
+import { internalAction } from "./serverFunctions";
 import { productJudgments } from "./aiModels";
 import { contextBatches } from "./decisions";
 import { receiptProductModel } from "./providerConfig";
