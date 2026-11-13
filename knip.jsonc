@@ -23,12 +23,14 @@
   // Stryker core bundles its command runner under this name.
   // PostHog's Xcode script and the eas env:exec command string run posthog-cli.
   // Render-boundary tests swap @sentry/react-native for the @sentry/react it wraps.
+  // Jest names the babel-preset-expo that expo installs and Metro applies.
   "ignoreDependencies": [
     "expo-glass-effect",
     "@stryker-mutator/command-runner",
     "expo-sqlite-web-worker-channel",
     "@posthog/cli",
     "@sentry/react",
+    "babel-preset-expo",
   ],
   // Visual checks encode recordings with the environment's ffmpeg.
   "ignoreBinaries": ["ffmpeg"],
