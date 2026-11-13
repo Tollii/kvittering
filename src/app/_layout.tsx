@@ -1,3 +1,5 @@
+// Installs tracing before any traced call runs.
+import "@/lib/tracing/app";
 import { NotificationRouting } from "@/features/notifications";
 import { NavigationDiagnostics } from "@/features/navigation-diagnostics";
 import { sentryEnabled } from "@/lib/sentry";

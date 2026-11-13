@@ -438,11 +438,14 @@ it("honors Retry-After on 429 and ends repeated failures without caching an empt
     status: 429,
     retryAfterMs: 120000,
   });
-  expect(await t.query(internal.catalogQueue.read, { id })).toMatchObject({
-    state: "pending",
-    scheduledAt: start + 120000,
-    attempts: 1,
-  });
+  const end = Date.now();
+  const retry = await t.query(internal.catalogQueue.read, { id });
+
+  expect(retry).toMatchObject({ state: "pending", attempts: 1 });
+  // A mutation's clock is its start time, and commit timestamps can run a
+  // millisecond ahead of the wall clock.
+  expect(retry?.scheduledAt).toBeGreaterThanOrEqual(start + 120000);
+  expect(retry?.scheduledAt).toBeLessThanOrEqual(end + 120001);
 
   for (let attempt = 0; attempt < 2; attempt++) {
     await t.mutation(internal.catalogQueue.claim, { id });

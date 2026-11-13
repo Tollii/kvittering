@@ -8,37 +8,37 @@
 import type { SearchPhysicalStoresGroup } from './searchPhysicalStoresGroup';
 
 export type SearchPhysicalStoresParams = {
-/**
- * Filter by group name.
- * @nullable
- */
-group?: SearchPhysicalStoresGroup;
-/**
- * Perform a search based on a keyword.
- * @nullable
- */
-search?: string | null;
-/**
- * Latitude coordinate for proximity search.
- * @nullable
- */
-lat?: number | null;
-/**
- * Longitude coordinate for proximity search.
- * @nullable
- */
-lng?: number | null;
-/**
- * Search radius in kilometers for proximity search.
- * @nullable
- */
-km?: number | null;
-/**
- * The number of results to be displayed per page.
- * Must be an integer between 1 and 100.
- * @minimum 1
- * @maximum 100
- * @nullable
- */
-size?: number | null;
+  /**
+   * Filter by group name.
+   * @nullable
+   */
+  group?: SearchPhysicalStoresGroup;
+  /**
+   * Perform a search based on a keyword.
+   * @nullable
+   */
+  search?: string | null;
+  /**
+   * Latitude coordinate for proximity search.
+   * @nullable
+   */
+  lat?: number | null;
+  /**
+   * Longitude coordinate for proximity search.
+   * @nullable
+   */
+  lng?: number | null;
+  /**
+   * Search radius in kilometers for proximity search.
+   * @nullable
+   */
+  km?: number | null;
+  /**
+   * The number of results to be displayed per page.
+   * Must be an integer between 1 and 100.
+   * @minimum 1
+   * @maximum 100
+   * @nullable
+   */
+  size?: number | null;
 };

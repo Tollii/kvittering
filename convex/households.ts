@@ -6,18 +6,11 @@ import {
 } from "../src/lib/domain/household";
 import { oreValidator } from "../src/lib/domain/ore";
 import { clientMutation as mutation } from "./clientFunctions";
-import { query, type QueryCtx } from "./_generated/server";
+import type { QueryCtx } from "./_generated/server";
+import { query } from "./serverFunctions";
 import { v } from "convex/values";
-import type { UserIdentity } from "convex/server";
 import schema from "./schema";
-import { requireMember } from "./access";
-
-function membership(ctx: QueryCtx, identity: UserIdentity) {
-  return ctx.db
-    .query("members")
-    .withIndex("by_identity", (q) => q.eq("identity", identity.tokenIdentifier))
-    .unique();
-}
+import { memberOf, requireMember } from "./access";
 
 export const current = query({
   args: {},
@@ -34,7 +27,7 @@ export const current = query({
 
     if (!identity) return null;
 
-    const member = await membership(ctx, identity);
+    const member = await memberOf(ctx, identity);
 
     if (!member) return null;
     const household = await ctx.db.get("households", member.householdId);
@@ -60,7 +53,7 @@ async function signedInMembership(ctx: QueryCtx) {
 
   if (!identity) throw userError("Logg inn først.");
 
-  return { identity, existing: await membership(ctx, identity) };
+  return { identity, existing: await memberOf(ctx, identity) };
 }
 
 // Access: signedInMembership requires a signed-in caller.

@@ -1,7 +1,8 @@
 "use node";
 
 import { v, type Infer } from "convex/values";
-import { internalAction, type ActionCtx } from "./_generated/server";
+import type { ActionCtx } from "./_generated/server";
+import { internalAction } from "./serverFunctions";
 import { internal } from "./_generated/api";
 import { decisionModel } from "./aiModels";
 import {

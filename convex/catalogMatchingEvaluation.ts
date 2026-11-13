@@ -1,12 +1,13 @@
 "use node";
 
 import { v } from "convex/values";
-import { internalAction } from "./_generated/server";
+import { internalAction } from "./serverFunctions";
 import { productJudgments } from "./aiModels";
 import { classifyCatalogProducts } from "./catalogClassifier";
 import { normalizeProducts } from "./kassalapp/normalize";
 import { emptyLine } from "../src/lib/domain/receipt";
 import type { JudgmentClient } from "./decisions";
+import { traced } from "../src/lib/tracing";
 
 const catalogCases = [
   {
@@ -55,48 +56,51 @@ const catalogCases = [
 ];
 
 /** Fixed matching cases through the production classifier, with any judgment client. */
-export async function evaluateCatalogCases(client: JudgmentClient) {
-  const results = await classifyCatalogProducts(
-    catalogCases.map((item, index) => ({
-      line: {
-        ...emptyLine(`evaluation_${index}`),
-        name: item.name,
-        manual: true,
-      },
-      product: null,
-      candidates: normalizeProducts({
-        data: item.candidates.map((name, candidate) => ({
-          id: index * 100 + candidate,
-          name,
-          ean: `7030000${index}0000${candidate}`,
-        })),
-      }),
-    })),
-    client,
-  );
+export const evaluateCatalogCases = traced(
+  "catalogMatchingEvaluation.evaluateCatalogCases",
+  async function evaluateCatalogCases(client: JudgmentClient) {
+    const results = await classifyCatalogProducts(
+      catalogCases.map((item, index) => ({
+        line: {
+          ...emptyLine(`evaluation_${index}`),
+          name: item.name,
+          manual: true,
+        },
+        product: null,
+        candidates: normalizeProducts({
+          data: item.candidates.map((name, candidate) => ({
+            id: index * 100 + candidate,
+            name,
+            ean: `7030000${index}0000${candidate}`,
+          })),
+        }),
+      })),
+      client,
+    );
 
-  return results.map((result, index) => {
-    const testCase = catalogCases[index];
+    return results.map((result, index) => {
+      const testCase = catalogCases[index];
 
-    if (!testCase) throw new Error("Each evaluation case needs a result.");
+      if (!testCase) throw new Error("Each evaluation case needs a result.");
 
-    const actual = result.productKey
-      ? result.equivalentKeys
-        ? "equivalent"
-        : "exact"
-      : "unresolved";
+      const actual = result.productKey
+        ? result.equivalentKeys
+          ? "equivalent"
+          : "exact"
+        : "unresolved";
 
-    return {
-      name: testCase.name,
-      expected: testCase.expected,
-      actual,
-      passed: actual === testCase.expected,
-      reason: result.reason ?? "unspecified",
-      probabilities:
-        result.candidates?.map((candidate) => candidate.probability) ?? [],
-    };
-  });
-}
+      return {
+        name: testCase.name,
+        expected: testCase.expected,
+        actual,
+        passed: actual === testCase.expected,
+        reason: result.reason ?? "unspecified",
+        probabilities:
+          result.candidates?.map((candidate) => candidate.probability) ?? [],
+      };
+    });
+  },
+);
 
 /** Fixed matching cases exercise the deployed classifier without changing receipts. */
 export const evaluate = internalAction({

@@ -17,6 +17,7 @@ import {
   useQuery,
 } from "@tanstack/react-query";
 import { ConvexHttpClient } from "convex/browser";
+import { tracedFetchWithoutHeaders } from "@/lib/tracing";
 import { api } from "../../convex/_generated/api";
 import { Button, Copy, IconButton, Notice, Screen } from "@/components/ui";
 import {
@@ -87,8 +88,13 @@ function PolicyProvider({
   const http = useMemo(
     () =>
       new ConvexHttpClient(convexUrl, {
+        // Convex's query API ignores trace headers, and on web a new header
+        // would need its CORS approval, so the request keeps only its span.
         fetch: (input, init) =>
-          fetch(input, { ...init, signal: AbortSignal.timeout(8000) }),
+          tracedFetchWithoutHeaders(input, {
+            ...init,
+            signal: AbortSignal.timeout(8000),
+          }),
       }),
     [convexUrl],
   );

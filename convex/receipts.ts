@@ -46,14 +46,9 @@ import {
   paginationOptsValidator,
   paginationResultValidator,
 } from "convex/server";
-import {
-  query,
-  internalQuery,
-  type MutationCtx,
-  type QueryCtx,
-} from "./_generated/server";
+import type { MutationCtx, QueryCtx } from "./_generated/server";
 import type { Doc, Id } from "./_generated/dataModel";
-import { internalMutation } from "./serverFunctions";
+import { internalMutation, query, internalQuery } from "./serverFunctions";
 import { internal } from "./_generated/api";
 import schema from "./schema";
 import { requireMember, requireReceipt } from "./access";

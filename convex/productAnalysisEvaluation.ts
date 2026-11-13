@@ -7,10 +7,11 @@ import {
   readAttributes,
 } from "../src/lib/domain/product-attributes";
 import type { Questions } from "@typesafe-ai/sdk";
-import { internalAction } from "./_generated/server";
+import { internalAction } from "./serverFunctions";
 import { productJudgments } from "./aiModels";
 import { familyQuestion } from "./productAnalysisWorker";
 import type { JudgmentClient } from "./decisions";
+import { traced } from "../src/lib/tracing";
 
 const familyCandidates = [
   { name: "Coca-Cola 500ml" },
@@ -29,34 +30,37 @@ const familyCases = [
 ];
 
 /** One request per case, as the worker asks about one product at a time. */
-export async function evaluateFamilies(client: JudgmentClient) {
-  const results = [];
+export const evaluateFamilies = traced(
+  "productAnalysisEvaluation.evaluateFamilies",
+  async function evaluateFamilies(client: JudgmentClient) {
+    const results = [];
 
-  for (const item of familyCases) {
-    const result = await client.systemOne({
-      state: {
-        product: {
-          name: item.name,
-          brand: null,
-          attributes: [],
-          catalog: null,
+    for (const item of familyCases) {
+      const result = await client.systemOne({
+        state: {
+          product: {
+            name: item.name,
+            brand: null,
+            attributes: [],
+            catalog: null,
+          },
+          candidates: familyCandidates,
         },
-        candidates: familyCandidates,
-      },
-      questions: { family: familyQuestion(familyCandidates) },
-    });
+        questions: { family: familyQuestion(familyCandidates) },
+      });
 
-    const answer = result.answers.family;
+      const answer = result.answers.family;
 
-    results.push({
-      ...item,
-      choice: answer.choice,
-      confidence: answer.confidence,
-    });
-  }
+      results.push({
+        ...item,
+        choice: answer.choice,
+        confidence: answer.confidence,
+      });
+    }
 
-  return results;
-}
+    return results;
+  },
+);
 
 const attributeCases = [
   {
@@ -88,34 +92,37 @@ const attributeCases = [
 ];
 
 /** All attribute cases share one request, as a receipt's products do. */
-export async function evaluateAttributeCases(client: JudgmentClient) {
-  const questions: Questions = {};
-  attributeCases.forEach((_, index) => {
-    for (const [key, question] of Object.entries(
-      attributeQuestions(`products[${index}]`),
-    ))
-      questions[`${key}_${index}`] = question;
-  });
+export const evaluateAttributeCases = traced(
+  "productAnalysisEvaluation.evaluateAttributeCases",
+  async function evaluateAttributeCases(client: JudgmentClient) {
+    const questions: Questions = {};
+    attributeCases.forEach((_, index) => {
+      for (const [key, question] of Object.entries(
+        attributeQuestions(`products[${index}]`),
+      ))
+        questions[`${key}_${index}`] = question;
+    });
 
-  const response = await client.systemOne({
-    state: { products: attributeCases.map(({ name }) => ({ name })) },
-    questions,
-  });
+    const response = await client.systemOne({
+      state: { products: attributeCases.map(({ name }) => ({ name })) },
+      questions,
+    });
 
-  return attributeCases.map((item, index) => ({
-    ...item,
-    attributes: readAttributes(
-      Object.fromEntries(
-        Object.keys(attributeQuestions()).map((key) => {
-          const answer = response.answers[`${key}_${index}`];
+    return attributeCases.map((item, index) => ({
+      ...item,
+      attributes: readAttributes(
+        Object.fromEntries(
+          Object.keys(attributeQuestions()).map((key) => {
+            const answer = response.answers[`${key}_${index}`];
 
-          return [key, answer?.type === "choice" ? answer : {}];
-        }),
+            return [key, answer?.type === "choice" ? answer : {}];
+          }),
+        ),
+        "receipt",
       ),
-      "receipt",
-    ),
-  }));
-}
+    }));
+  },
+);
 
 export const evaluate = internalAction({
   args: {},

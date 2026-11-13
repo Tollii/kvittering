@@ -1,18 +1,22 @@
 import { useSyncExternalStore } from "react";
 import { importPendingFiles } from "./receipt-import";
 import { createImportQueue } from "@/lib/capture-import";
+import { traced } from "./tracing";
 
 const imports = createImportQueue();
 
 export const offerImportedFiles = imports.offer;
 
-export function receiveImportedFiles(
-  id: number,
-  room: number,
-  receive: Parameters<typeof importPendingFiles>[3],
-) {
-  return importPendingFiles(imports, id, room, receive);
-}
+export const receiveImportedFiles = traced(
+  "pending-import.receiveImportedFiles",
+  function receiveImportedFiles(
+    id: number,
+    room: number,
+    receive: Parameters<typeof importPendingFiles>[3],
+  ) {
+    return importPendingFiles(imports, id, room, receive);
+  },
+);
 
 export const retryImportedFiles = imports.retry;
 

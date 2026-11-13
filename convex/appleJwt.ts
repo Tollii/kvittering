@@ -1,3 +1,5 @@
+import { traced } from "../src/lib/tracing";
+
 /** Base64url without padding, as JSON Web Tokens use. */
 export function toBase64url(bytes: Uint8Array) {
   return btoa(String.fromCodePoint(...bytes))
@@ -31,30 +33,33 @@ function pkcs8(pem: string) {
  * Apple expect. WebCrypto runs in both Convex runtimes and returns the raw
  * r||s signature that JWS uses.
  */
-export async function appleJwt({
-  keyId,
-  privateKey,
-  claims,
-}: Readonly<{
-  keyId: string;
-  privateKey: string;
-  claims: Record<string, string | number>;
-}>) {
-  const key = await crypto.subtle.importKey(
-    "pkcs8",
-    pkcs8(privateKey),
-    { name: "ECDSA", namedCurve: "P-256" },
-    false,
-    ["sign"],
-  );
+export const appleJwt = traced(
+  "appleJwt.appleJwt",
+  async function appleJwt({
+    keyId,
+    privateKey,
+    claims,
+  }: Readonly<{
+    keyId: string;
+    privateKey: string;
+    claims: Record<string, string | number>;
+  }>) {
+    const key = await crypto.subtle.importKey(
+      "pkcs8",
+      pkcs8(privateKey),
+      { name: "ECDSA", namedCurve: "P-256" },
+      false,
+      ["sign"],
+    );
 
-  const message = `${encodeJson({ alg: "ES256", kid: keyId })}.${encodeJson(claims)}`;
+    const message = `${encodeJson({ alg: "ES256", kid: keyId })}.${encodeJson(claims)}`;
 
-  const signature = await crypto.subtle.sign(
-    { name: "ECDSA", hash: "SHA-256" },
-    key,
-    new TextEncoder().encode(message),
-  );
+    const signature = await crypto.subtle.sign(
+      { name: "ECDSA", hash: "SHA-256" },
+      key,
+      new TextEncoder().encode(message),
+    );
 
-  return `${message}.${toBase64url(new Uint8Array(signature))}`;
-}
+    return `${message}.${toBase64url(new Uint8Array(signature))}`;
+  },
+);

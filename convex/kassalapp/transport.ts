@@ -1,4 +1,5 @@
 import { env } from "../_generated/server";
+import { traced, type Fetch } from "../../src/lib/tracing";
 
 export class CatalogRequestError extends Error {
   constructor(
@@ -20,45 +21,61 @@ function retryAfterMs(retry: string | null): number {
   return Number.isFinite(delay) ? Math.max(0, delay) : 0;
 }
 
+type CatalogRequestOptions = RequestInit & { fetch?: Fetch };
+
 /** Called by the catalog worker; credentials remain on the server. */
-export async function kassalappFetch<T>(
+const kassalappRequest = traced(
+  "transport.kassalappRequest",
+  async function kassalappRequest<T>(
+    path: string,
+    options?: CatalogRequestOptions,
+  ): Promise<T> {
+    const key = env.KASSALAPP_API_KEY;
+
+    if (!key) throw new CatalogRequestError(401);
+    const url = new URL(`https://kassal.app/api/v1${path}`);
+
+    // Kassalapp accepts boolean query parameters as 1/0, despite the OpenAPI schema.
+    for (const [name, value] of url.searchParams) {
+      if (value === "true" || value === "false")
+        url.searchParams.set(name, value === "true" ? "1" : "0");
+    }
+
+    const { fetch: request, ...requestOptions } = options ?? {};
+
+    if (!request)
+      throw new Error("Catalog requests require a quota-controlled transport.");
+
+    // Headers reads every HeadersInit form; spreading an array or a Headers
+    // object into an object literal would drop the caller's headers.
+    const headers = new Headers(requestOptions.headers);
+    headers.set("Accept", "application/json");
+    headers.set("Authorization", `Bearer ${key}`);
+
+    const response = await request(url, {
+      ...requestOptions,
+      signal: AbortSignal.timeout(15000),
+      headers,
+    });
+
+    if (!response.ok)
+      throw new CatalogRequestError(
+        response.status,
+        retryAfterMs(response.headers.get("Retry-After")),
+      );
+
+    // SAFETY: Generated client types describe transport data only; worker schemas parse every result before domain use.
+    return response.json() as Promise<T>;
+  },
+);
+
+/**
+ * Orval's mutator. Orval reads this declaration's parameters to give each
+ * generated operation an options parameter, and cannot read them through
+ * `traced`.
+ */
+// eslint-disable-next-line kvitto/traced-exports -- It only forwards to kassalappRequest, which records the span.
+export const kassalappFetch = <T>(
   path: string,
-  options?: RequestInit & { fetch?: typeof fetch },
-): Promise<T> {
-  const key = env.KASSALAPP_API_KEY;
-
-  if (!key) throw new CatalogRequestError(401);
-  const url = new URL(`https://kassal.app/api/v1${path}`);
-
-  // Kassalapp accepts boolean query parameters as 1/0, despite the OpenAPI schema.
-  for (const [name, value] of url.searchParams) {
-    if (value === "true" || value === "false")
-      url.searchParams.set(name, value === "true" ? "1" : "0");
-  }
-
-  const { fetch: request, ...requestOptions } = options ?? {};
-
-  if (!request)
-    throw new Error("Catalog requests require a quota-controlled transport.");
-
-  // Headers reads every HeadersInit form; spreading an array or a Headers
-  // object into an object literal would drop the caller's headers.
-  const headers = new Headers(requestOptions.headers);
-  headers.set("Accept", "application/json");
-  headers.set("Authorization", `Bearer ${key}`);
-
-  const response = await request(url, {
-    ...requestOptions,
-    signal: AbortSignal.timeout(15000),
-    headers,
-  });
-
-  if (!response.ok)
-    throw new CatalogRequestError(
-      response.status,
-      retryAfterMs(response.headers.get("Retry-After")),
-    );
-
-  // SAFETY: Generated client types describe transport data only; worker schemas parse every result before domain use.
-  return response.json() as Promise<T>;
-}
+  options?: CatalogRequestOptions,
+) => kassalappRequest<T>(path, options);

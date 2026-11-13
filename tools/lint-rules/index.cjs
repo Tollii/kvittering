@@ -5,6 +5,8 @@ const path = require("node:path");
 
 const readsDatabase = require("./reads-database.cjs");
 
+const tracedExports = require("./traced-exports.cjs");
+
 const quoted = /^["'`]/;
 
 module.exports = {
@@ -641,6 +643,7 @@ module.exports = {
         };
       },
     },
+    "traced-exports": tracedExports,
     "no-undefined-record": {
       meta: {
         type: "problem",

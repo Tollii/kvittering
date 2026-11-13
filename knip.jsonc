@@ -22,11 +22,13 @@
   // Metro resolves the expo-sqlite name in web bundles (metro.config.js).
   // Stryker core bundles its command runner under this name.
   // PostHog's Xcode script and the eas env:exec command string run posthog-cli.
+  // Render-boundary tests swap @sentry/react-native for the @sentry/react it wraps.
   "ignoreDependencies": [
     "expo-glass-effect",
     "@stryker-mutator/command-runner",
     "expo-sqlite-web-worker-channel",
     "@posthog/cli",
+    "@sentry/react",
   ],
   // Visual checks encode recordings with the environment's ffmpeg.
   "ignoreBinaries": ["ffmpeg"],

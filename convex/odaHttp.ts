@@ -1,5 +1,5 @@
 import type { HttpRouter } from "convex/server";
-import { httpAction } from "./_generated/server";
+import { httpAction } from "./serverFunctions";
 import { internal } from "./_generated/api";
 import { errorDetails } from "../src/lib/diagnostics";
 import { odaCallbackUrl, signInExpiredMessage } from "./oda";

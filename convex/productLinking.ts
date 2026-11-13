@@ -4,7 +4,7 @@ import {
   paginationOptsValidator,
   paginationResultValidator,
 } from "convex/server";
-import { query } from "./_generated/server";
+import { query } from "./serverFunctions";
 import type { Doc } from "./_generated/dataModel";
 import { clientMutation as mutation } from "./clientFunctions";
 import { requireMember, requireReceipt } from "./access";

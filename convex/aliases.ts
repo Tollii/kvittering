@@ -18,6 +18,7 @@ import {
   recordCategoryDecision,
   settleLine,
 } from "../src/lib/domain/category-memory";
+import { traced } from "../src/lib/tracing";
 
 /**
  * A remembered household alias settles the line like category memory does,
@@ -42,93 +43,99 @@ export function settleLineWithAlias(
  * household has approved often enough for this store and name settles the
  * category alone.
  */
-export async function applyHouseholdAliases(
-  ctx: QueryCtx,
-  householdId: Id<"households">,
-  data: ReceiptData,
-): Promise<ReceiptData> {
-  for (const line of data.lines) {
-    if (line.kind !== "product") continue;
-    const key = aliasKey(data, line);
+export const applyHouseholdAliases = traced(
+  "aliases.applyHouseholdAliases",
+  async function applyHouseholdAliases(
+    ctx: QueryCtx,
+    householdId: Id<"households">,
+    data: ReceiptData,
+  ): Promise<ReceiptData> {
+    for (const line of data.lines) {
+      if (line.kind !== "product") continue;
+      const key = aliasKey(data, line);
 
-    const alias = key
-      ? await ctx.db
-          .query("aliases")
-          .withIndex("by_householdId_and_key", (q) =>
-            q.eq("householdId", householdId).eq("key", key),
-          )
-          .unique()
-      : null;
+      const alias = key
+        ? await ctx.db
+            .query("aliases")
+            .withIndex("by_householdId_and_key", (q) =>
+              q.eq("householdId", householdId).eq("key", key),
+            )
+            .unique()
+        : null;
 
-    if (alias && key && isCategoryId(alias.categoryId)) {
-      settleLineWithAlias(line, key, alias.categoryId, alias.name);
-      continue;
+      if (alias && key && isCategoryId(alias.categoryId)) {
+        settleLineWithAlias(line, key, alias.categoryId, alias.name);
+        continue;
+      }
+
+      const memoryKey = categoryMemoryKey(data.store, printedName(line));
+
+      const memory = memoryKey
+        ? await ctx.db
+            .query("categoryMemory")
+            .withIndex("by_householdId_and_key", (q) =>
+              q.eq("householdId", householdId).eq("key", memoryKey),
+            )
+            .unique()
+        : null;
+
+      if (memory) applyCategoryMemory(line, memory);
     }
 
-    const memoryKey = categoryMemoryKey(data.store, printedName(line));
-
-    const memory = memoryKey
-      ? await ctx.db
-          .query("categoryMemory")
-          .withIndex("by_householdId_and_key", (q) =>
-            q.eq("householdId", householdId).eq("key", memoryKey),
-          )
-          .unique()
-      : null;
-
-    if (memory) applyCategoryMemory(line, memory);
-  }
-
-  return data;
-}
+    return data;
+  },
+);
 
 /**
  * A person approved this receipt: every settled product line is one more vote
  * for its category. Items the person asked to remember are trusted at once.
  */
-export async function learnCategories(
-  ctx: MutationCtx,
-  householdId: Id<"households">,
-  identity: string,
-  data: ReceiptData,
-  rememberLineIds: string[],
-) {
-  const seen = new Set<string>();
+export const learnCategories = traced(
+  "aliases.learnCategories",
+  async function learnCategories(
+    ctx: MutationCtx,
+    householdId: Id<"households">,
+    identity: string,
+    data: ReceiptData,
+    rememberLineIds: string[],
+  ) {
+    const seen = new Set<string>();
 
-  for (const line of data.lines) {
-    if (!learnableLine(line)) continue;
-    const key = categoryMemoryKey(data.store, printedName(line));
+    for (const line of data.lines) {
+      if (!learnableLine(line)) continue;
+      const key = categoryMemoryKey(data.store, printedName(line));
 
-    if (!key || seen.has(key)) continue;
-    seen.add(key);
+      if (!key || seen.has(key)) continue;
+      seen.add(key);
 
-    const existing = await ctx.db
-      .query("categoryMemory")
-      .withIndex("by_householdId_and_key", (q) =>
-        q.eq("householdId", householdId).eq("key", key),
-      )
-      .unique();
+      const existing = await ctx.db
+        .query("categoryMemory")
+        .withIndex("by_householdId_and_key", (q) =>
+          q.eq("householdId", householdId).eq("key", key),
+        )
+        .unique();
 
-    const next = recordCategoryDecision(
-      existing,
-      line,
-      rememberLineIds.includes(line.id),
-    );
+      const next = recordCategoryDecision(
+        existing,
+        line,
+        rememberLineIds.includes(line.id),
+      );
 
-    if (existing)
-      await ctx.db.patch("categoryMemory", existing._id, {
-        ...next,
-        confirmedBy: identity,
-      });
-    else
-      await ctx.db.insert("categoryMemory", {
-        householdId,
-        key,
-        ...next,
-        confirmedBy: identity,
-      });
-  }
-}
+      if (existing)
+        await ctx.db.patch("categoryMemory", existing._id, {
+          ...next,
+          confirmedBy: identity,
+        });
+      else
+        await ctx.db.insert("categoryMemory", {
+          householdId,
+          key,
+          ...next,
+          confirmedBy: identity,
+        });
+    }
+  },
+);
 
 /** Existing scheduled calls retain their original argument contract. */
 export const applyToMatching = internalMutation({

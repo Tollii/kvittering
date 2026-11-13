@@ -1,7 +1,6 @@
 import type { Doc, Id } from "./_generated/dataModel";
 import { v } from "convex/values";
-import { query } from "./_generated/server";
-import { internalMutation } from "./serverFunctions";
+import { internalMutation, query } from "./serverFunctions";
 import { internal } from "./_generated/api";
 import { requireMember } from "./access";
 import schema from "./schema";
