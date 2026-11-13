@@ -7,8 +7,6 @@
  */
 
 export type FindProductsByUrlParams = {
-/**
- * The url of the Product you want to get comparisons for.
- */
-url: string;
+  /** The url of the Product you want to get comparisons for. */
+  url: string;
 };

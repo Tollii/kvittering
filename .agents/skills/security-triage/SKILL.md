@@ -48,8 +48,7 @@ Constraints:
 
 **Dependabot alerts.** Fix an alert when a patched version is reachable through an upgrade or an `overrides` entry. When no patch exists and the vulnerable code is unreachable in the app and its tooling, report it for the owner to dismiss, with the call path you checked; cloud sessions cannot dismiss Dependabot alerts. The owner accepted these advisories as "Vulnerable code is not actually used" and dismisses them in GitHub, but `npm audit` still lists them, so skip exactly these IDs and treat any other advisory on the same package as new:
 
-- `GHSA-86w9-cpqp-85rv` in `node-forge`: Expo CLI and expo-updates code signing, which is not configured.
-- `GHSA-vfj7-8cjw-p6xm` in `braces` and `GHSA-hp3w-g68c-fv3c` in `sprintf-js`: Jest tooling.
+- None at present.
 
 Remove an entry when `npm audit` no longer reports it.
 
