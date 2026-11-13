@@ -444,8 +444,8 @@ it("honors Retry-After on 429 and ends repeated failures without caching an empt
   expect(retry).toMatchObject({ state: "pending", attempts: 1 });
   // A mutation's clock is its start time, and commit timestamps can run a
   // millisecond ahead of the wall clock.
-  expect(retry!.scheduledAt - 120000).toBeGreaterThanOrEqual(start);
-  expect(retry!.scheduledAt - 120000).toBeLessThanOrEqual(end + 1);
+  expect(retry?.scheduledAt).toBeGreaterThanOrEqual(start + 120000);
+  expect(retry?.scheduledAt).toBeLessThanOrEqual(end + 120001);
 
   for (let attempt = 0; attempt < 2; attempt++) {
     await t.mutation(internal.catalogQueue.claim, { id });
