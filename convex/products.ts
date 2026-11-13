@@ -4,12 +4,8 @@ import {
   type ProductReference,
 } from "../src/lib/domain/product-reference";
 import { v } from "convex/values";
-import {
-  query,
-  internalQuery,
-  type MutationCtx,
-  type QueryCtx,
-} from "./_generated/server";
+import type { MutationCtx, QueryCtx } from "./_generated/server";
+import { query, internalQuery } from "./serverFunctions";
 import type { Id } from "./_generated/dataModel";
 import schema from "./schema";
 import { requireReceipt } from "./access";
@@ -25,6 +21,7 @@ import {
   productEvidence,
   similarProducts,
 } from "../src/lib/domain/product-matching";
+import { traced } from "../src/lib/tracing";
 
 export const productDecision = v.object({
   lineId: v.string(),
@@ -38,22 +35,25 @@ export const productChange = v.object({
   createNew: v.boolean(),
 });
 
-export async function findMapping(
-  ctx: QueryCtx,
-  householdId: Id<"households">,
-  retailer: string,
-  line: ReceiptLine,
-) {
-  return ctx.db
-    .query("productMappings")
-    .withIndex("by_householdId_and_retailer_and_key", (q) =>
-      q
-        .eq("householdId", householdId)
-        .eq("retailer", retailer)
-        .eq("key", matchingKey(printedName(line))),
-    )
-    .unique();
-}
+export const findMapping = traced(
+  "products.findMapping",
+  async function findMapping(
+    ctx: QueryCtx,
+    householdId: Id<"households">,
+    retailer: string,
+    line: ReceiptLine,
+  ) {
+    return ctx.db
+      .query("productMappings")
+      .withIndex("by_householdId_and_retailer_and_key", (q) =>
+        q
+          .eq("householdId", householdId)
+          .eq("retailer", retailer)
+          .eq("key", matchingKey(printedName(line))),
+      )
+      .unique();
+  },
+);
 
 async function candidates(
   ctx: QueryCtx,
@@ -162,72 +162,81 @@ export const prepare = internalQuery({
   },
 });
 
-export async function saveMapping(
-  ctx: MutationCtx,
-  householdId: Id<"households">,
-  retailer: string,
-  line: ReceiptLine,
-  productId: Id<"products"> | null,
-  confirmedBy: string | null,
-  reference?: ProductReference,
-) {
-  const existing = await findMapping(ctx, householdId, retailer, line);
+export const saveMapping = traced(
+  "products.saveMapping",
+  async function saveMapping(
+    ctx: MutationCtx,
+    householdId: Id<"households">,
+    retailer: string,
+    line: ReceiptLine,
+    productId: Id<"products"> | null,
+    confirmedBy: string | null,
+    reference?: ProductReference,
+  ) {
+    const existing = await findMapping(ctx, householdId, retailer, line);
 
-  const values = {
-    revision: (existing?.revision ?? 0) + 1,
-    householdId,
-    retailer,
-    key: matchingKey(printedName(line)),
-    productId,
-    reference,
-    confirmedBy,
-  };
+    const values = {
+      revision: (existing?.revision ?? 0) + 1,
+      householdId,
+      retailer,
+      key: matchingKey(printedName(line)),
+      productId,
+      reference,
+      confirmedBy,
+    };
 
-  if (existing) await ctx.db.replace("productMappings", existing._id, values);
-  else await ctx.db.insert("productMappings", values);
-}
+    if (existing) await ctx.db.replace("productMappings", existing._id, values);
+    else await ctx.db.insert("productMappings", values);
+  },
+);
 
-export async function createProduct(
-  ctx: MutationCtx,
-  householdId: Id<"households">,
-  retailer: string,
-  line: ReceiptLine,
-) {
-  if (!line.name.trim() || line.name.length > receiptLineNameLimit)
-    throw userError(`Varen må ha et navn på 1–${receiptLineNameLimit} tegn.`);
+export const createProduct = traced(
+  "products.createProduct",
+  async function createProduct(
+    ctx: MutationCtx,
+    householdId: Id<"households">,
+    retailer: string,
+    line: ReceiptLine,
+  ) {
+    if (!line.name.trim() || line.name.length > receiptLineNameLimit)
+      throw userError(`Varen må ha et navn på 1–${receiptLineNameLimit} tegn.`);
 
-  return ctx.db.insert("products", {
-    householdId,
-    retailer,
-    ...productEvidence(line),
-    name: line.name.trim(),
-  });
-}
+    return ctx.db.insert("products", {
+      householdId,
+      retailer,
+      ...productEvidence(line),
+      name: line.name.trim(),
+    });
+  },
+);
 
-export async function linkProduct(
-  ctx: MutationCtx,
-  householdId: Id<"households">,
-  retailer: string,
-  line: ReceiptLine,
-  id: Id<"products"> | null,
-  provenance: "manual" | "automatic" = "automatic",
-): Promise<ReceiptLine> {
-  const product = id ? await ctx.db.get("products", id) : null;
+export const linkProduct = traced(
+  "products.linkProduct",
+  async function linkProduct(
+    ctx: MutationCtx,
+    householdId: Id<"households">,
+    retailer: string,
+    line: ReceiptLine,
+    id: Id<"products"> | null,
+    provenance: "manual" | "automatic" = "automatic",
+  ): Promise<ReceiptLine> {
+    const product = id ? await ctx.db.get("products", id) : null;
 
-  if (
-    id &&
-    (!product ||
-      product.householdId !== householdId ||
-      product.retailer !== retailer)
-  )
-    throw userError("Varen er ikke tilgjengelig i denne butikken.");
+    if (
+      id &&
+      (!product ||
+        product.householdId !== householdId ||
+        product.retailer !== retailer)
+    )
+      throw userError("Varen er ikke tilgjengelig i denne butikken.");
 
-  return withProductReference(
-    line,
-    product
-      ? { kind: "household", id: product._id, name: product.name, provenance }
-      : provenance === "manual"
-        ? { kind: "separate", provenance }
-        : { kind: "unresolved" },
-  );
-}
+    return withProductReference(
+      line,
+      product
+        ? { kind: "household", id: product._id, name: product.name, provenance }
+        : provenance === "manual"
+          ? { kind: "separate", provenance }
+          : { kind: "unresolved" },
+    );
+  },
+);

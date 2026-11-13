@@ -232,6 +232,46 @@ typedTester.run(
   },
 );
 
+const tracing = [{ tracers: ["traced"], builders: ["query", "httpAction"] }];
+
+typedTester.run("traced-exports", plugin.rules["traced-exports"], {
+  valid: [
+    'export const load = traced("load", async () => 1);',
+    'export const load = traced("load", function load(): Promise<number> { return Promise.resolve(1); });',
+    "async function local() { return 1; } export const value = 1;",
+    "export function sum(a: number, b: number) { return a + b; }",
+    "export function Ready({ children }: { children: React.ReactNode }) { return children; }",
+    "export const store = { size: 1, read: () => 1 };",
+    'import { type QueryCtx } from "./_generated/server";',
+    'import type { query } from "./_generated/server";',
+    'import { query } from "./serverFunctions";',
+  ].map((code) => ({ ...typed(code), options: tracing })),
+  invalid: [
+    "export async function load() { return 1; }",
+    "export default async function load() { return 1; }",
+    "export const load = async () => 1;",
+    "export function load(): Promise<number> { return Promise.resolve(1); }",
+    "declare function read(): Promise<number>; export function load() { return read(); }",
+    "async function load() { return 1; } export { load };",
+    "export const store = { async read() { return 1; } };",
+  ]
+    .map((code) => ({
+      ...typed(code),
+      options: tracing,
+      errors: [{ messageId: "untraced" }],
+    }))
+    .concat(
+      [
+        'import { query } from "./_generated/server";',
+        'import { httpAction as raw } from "../_generated/server";',
+      ].map((code) => ({
+        ...typed(code),
+        options: tracing,
+        errors: [{ messageId: "generatedBuilder" }],
+      })),
+    ),
+});
+
 const fixtures = join(process.cwd(), "tools", "lint-rules", "fixtures");
 
 const variant = join(fixtures, "file.ios.tsx");

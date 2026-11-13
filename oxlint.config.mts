@@ -362,6 +362,27 @@ export default defineConfig({
       },
     },
     {
+      files: ["convex/**/*.ts", "src/**/*.ts", "src/**/*.tsx"],
+      // The tracing module wraps fetch; the web file-system stand-in mimics a native module.
+      excludeFiles: [
+        "**/*.test.ts",
+        "**/*.test.tsx",
+        "src/lib/testing/**",
+        "src/lib/tracing/**",
+        "src/web/**",
+      ],
+      rules: {
+        "no-restricted-globals": [
+          "error",
+          {
+            name: "fetch",
+            message:
+              "Use tracedFetch from src/lib/tracing, so the request has a span and forwards the trace.",
+          },
+        ],
+      },
+    },
+    {
       files: ["convex/**/*.ts"],
       excludeFiles: ["**/*.test.ts"],
       rules: {

@@ -2,7 +2,8 @@
 
 import { connect } from "node:http2";
 import { v } from "convex/values";
-import { internalAction, env } from "./_generated/server";
+import { env } from "./_generated/server";
+import { internalAction } from "./serverFunctions";
 import { internal } from "./_generated/api";
 import { appleJwt } from "./appleJwt";
 

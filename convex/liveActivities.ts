@@ -1,13 +1,8 @@
 import { userError } from "./userErrors";
 import { v } from "convex/values";
 import { clientMutation as mutation } from "./clientFunctions";
-import {
-  query,
-  internalQuery,
-  type MutationCtx,
-  type QueryCtx,
-} from "./_generated/server";
-import { internalMutation } from "./serverFunctions";
+import type { MutationCtx, QueryCtx } from "./_generated/server";
+import { internalMutation, query, internalQuery } from "./serverFunctions";
 import { internal } from "./_generated/api";
 import { requireMember, requireReceipt } from "./access";
 import type { Doc, Id } from "./_generated/dataModel";
@@ -18,6 +13,7 @@ import {
 } from "../src/lib/domain/receipt-activity";
 import { householdMemberLimit } from "../src/lib/domain/household";
 import schema from "./schema";
+import { traced } from "../src/lib/tracing";
 
 const progressValidator = v.object({
   total: v.number(),
@@ -183,29 +179,32 @@ export const stop = mutation({
 });
 
 /** Called in the transaction that changes receipt status. No client polling is required. */
-export async function notifyReceiptActivities(
-  ctx: MutationCtx,
-  householdId: Id<"households">,
-) {
-  const activities = await ctx.db
-    .query("receiptActivities")
-    // An ended row already has its end delivery scheduled.
-    .withIndex("by_householdId_and_expired", (q) =>
-      q.eq("householdId", householdId).eq("expired", undefined),
-    )
-    .take(householdMemberLimit * liveActivitiesPerPerson);
+export const notifyReceiptActivities = traced(
+  "liveActivities.notifyReceiptActivities",
+  async function notifyReceiptActivities(
+    ctx: MutationCtx,
+    householdId: Id<"households">,
+  ) {
+    const activities = await ctx.db
+      .query("receiptActivities")
+      // An ended row already has its end delivery scheduled.
+      .withIndex("by_householdId_and_expired", (q) =>
+        q.eq("householdId", householdId).eq("expired", undefined),
+      )
+      .take(householdMemberLimit * liveActivitiesPerPerson);
 
-  for (const activity of activities) {
-    await ctx.db.patch("receiptActivities", activity._id, {
-      updatedAt: Math.max(Date.now(), activity.updatedAt + 1000),
-    });
-    await ctx.scheduler.runAfter(0, internal.liveActivityPush.deliver, {
-      id: activity._id,
-      attempt: 0,
-      expired: false,
-    });
-  }
-}
+    for (const activity of activities) {
+      await ctx.db.patch("receiptActivities", activity._id, {
+        updatedAt: Math.max(Date.now(), activity.updatedAt + 1000),
+      });
+      await ctx.scheduler.runAfter(0, internal.liveActivityPush.deliver, {
+        id: activity._id,
+        attempt: 0,
+        expired: false,
+      });
+    }
+  },
+);
 
 export const delivery = internalQuery({
   args: { id: v.id("receiptActivities") },

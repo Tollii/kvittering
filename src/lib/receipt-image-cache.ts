@@ -3,6 +3,7 @@ import { Directory, File, Paths } from "expo-file-system";
 import { convexSiteUrl, fetchAccessToken } from "./auth-client";
 import { storageSuffix } from "./deployment-storage";
 import type { Id } from "../../convex/_generated/dataModel";
+import { traced } from "./tracing";
 
 const root = () =>
   new Directory(Paths.cache, `kvitto-receipt-images${storageSuffix}`);
@@ -81,57 +82,60 @@ function trimImages(directory: Directory, retained: Set<string>) {
   }
 }
 
-export async function cachedReceiptImages(id: Id<"receipts">, count: number) {
-  const directory = scopedDirectory();
-  const requestGeneration = generation;
-  directory.create({ intermediates: true, idempotent: true });
+export const cachedReceiptImages = traced(
+  "receipt-image-cache.cachedReceiptImages",
+  async function cachedReceiptImages(id: Id<"receipts">, count: number) {
+    const directory = scopedDirectory();
+    const requestGeneration = generation;
+    directory.create({ intermediates: true, idempotent: true });
 
-  const files = Array.from(
-    { length: count },
-    (_, position) => new File(directory, `${id}-${position}.jpg`),
-  );
-
-  let token: string | undefined;
-
-  for (const [position, file] of files.entries()) {
-    if (
-      file.exists &&
-      file.size > 0 &&
-      (file.lastModified ?? 0) >= Date.now() - lifetime
-    )
-      continue;
-    token ??= await fetchAccessToken();
-
-    if (requestGeneration !== generation)
-      throw new Error("Husstanden er endret.");
-
-    const temporary = new File(
-      directory,
-      `${id}-${position}-${Date.now()}.partial`,
+    const files = Array.from(
+      { length: count },
+      (_, position) => new File(directory, `${id}-${position}.jpg`),
     );
 
-    try {
-      await File.downloadFileAsync(
-        `${convexSiteUrl}/receipt-image?receipt=${id}&position=${position}`,
-        temporary,
-        { headers: { Authorization: `Bearer ${token}` } },
-      );
+    let token: string | undefined;
+
+    for (const [position, file] of files.entries()) {
+      if (
+        file.exists &&
+        file.size > 0 &&
+        (file.lastModified ?? 0) >= Date.now() - lifetime
+      )
+        continue;
+      token ??= await fetchAccessToken();
 
       if (requestGeneration !== generation)
         throw new Error("Husstanden er endret.");
 
-      if (temporary.size <= 0 || temporary.size > 10 * 1024 * 1024)
-        throw new Error("Ugyldig bildestørrelse.");
-      await temporary.move(file, { overwrite: true });
-      trimImages(directory, new Set(files.map((image) => image.name)));
-    } finally {
-      if (temporary.exists && temporary.uri !== file.uri) temporary.delete();
+      const temporary = new File(
+        directory,
+        `${id}-${position}-${Date.now()}.partial`,
+      );
+
+      try {
+        await File.downloadFileAsync(
+          `${convexSiteUrl}/receipt-image?receipt=${id}&position=${position}`,
+          temporary,
+          { headers: { Authorization: `Bearer ${token}` } },
+        );
+
+        if (requestGeneration !== generation)
+          throw new Error("Husstanden er endret.");
+
+        if (temporary.size <= 0 || temporary.size > 10 * 1024 * 1024)
+          throw new Error("Ugyldig bildestørrelse.");
+        await temporary.move(file, { overwrite: true });
+        trimImages(directory, new Set(files.map((image) => image.name)));
+      } finally {
+        if (temporary.exists && temporary.uri !== file.uri) temporary.delete();
+      }
     }
-  }
 
-  if (requestGeneration !== generation)
-    throw new Error("Husstanden er endret.");
-  trimImages(directory, new Set(files.map((file) => file.name)));
+    if (requestGeneration !== generation)
+      throw new Error("Husstanden er endret.");
+    trimImages(directory, new Set(files.map((file) => file.name)));
 
-  return files.map((file) => file.uri);
-}
+    return files.map((file) => file.uri);
+  },
+);

@@ -6,7 +6,8 @@ import {
 import { commitReceiptChange } from "./receiptChanges";
 import { clientMutation as mutation } from "./clientFunctions";
 import { v } from "convex/values";
-import { query, type MutationCtx, type QueryCtx } from "./_generated/server";
+import type { MutationCtx, QueryCtx } from "./_generated/server";
+import { query } from "./serverFunctions";
 import schema from "./schema";
 import type { Doc, Id } from "./_generated/dataModel";
 import { requireMember } from "./access";
@@ -31,6 +32,7 @@ import {
   hasReceiptBeenRead,
   type ExtractedReceipt,
 } from "../src/lib/domain/receipt-state";
+import { traced } from "../src/lib/tracing";
 
 /** Get the value of a line that a correction of this field records. */
 function correctedValue(line: ReceiptLine, field: "category" | "catalog") {
@@ -48,57 +50,60 @@ function isCategoryConfirmed(before: ReceiptLine, after: ReceiptLine) {
 }
 
 /** Only human saves create evaluation examples; automatic propagation does not. */
-export async function recordCorrections(
-  ctx: MutationCtx,
-  receipt: Doc<"receipts">,
-  data: ReceiptData,
-) {
-  if (!receipt.data) return;
+export const recordCorrections = traced(
+  "corrections.recordCorrections",
+  async function recordCorrections(
+    ctx: MutationCtx,
+    receipt: Doc<"receipts">,
+    data: ReceiptData,
+  ) {
+    if (!receipt.data) return;
 
-  const evidence = new Map(
-    classificationInputs({
-      ...data,
-      lines: data.lines.map((line) => ({
-        ...line,
-        productKey: null,
-        categoryAliasKey: null,
-      })),
-    }).map((item) => [item.id, item.evidence]),
-  );
-
-  for (const after of data.lines) {
-    const before = receipt.data.lines.find(
-      (line) => line.id === after.id && line.kind === "product",
+    const evidence = new Map(
+      classificationInputs({
+        ...data,
+        lines: data.lines.map((line) => ({
+          ...line,
+          productKey: null,
+          categoryAliasKey: null,
+        })),
+      }).map((item) => [item.id, item.evidence]),
     );
 
-    if (!before || after.kind !== "product") continue;
+    for (const after of data.lines) {
+      const before = receipt.data.lines.find(
+        (line) => line.id === after.id && line.kind === "product",
+      );
 
-    for (const field of ["category", "catalog"] as const) {
-      const previous = correctedValue(before, field);
-      const expected = correctedValue(after, field);
+      if (!before || after.kind !== "product") continue;
 
-      const confirmed =
-        field === "category" && isCategoryConfirmed(before, after);
+      for (const field of ["category", "catalog"] as const) {
+        const previous = correctedValue(before, field);
+        const expected = correctedValue(after, field);
 
-      if (previous === expected && !confirmed) continue;
-      await ctx.db.insert("corrections", {
-        householdId: receipt.householdId,
-        receiptId: receipt._id,
-        revision: receipt.revision + 1,
-        lineId: before.id,
-        store: data.store,
-        name: after.name,
-        field,
-        previous,
-        expected,
-        classificationEvidence: evidence.get(before.id) ?? {
-          name: before.name,
-        },
-        evidence: before,
-      });
+        const confirmed =
+          field === "category" && isCategoryConfirmed(before, after);
+
+        if (previous === expected && !confirmed) continue;
+        await ctx.db.insert("corrections", {
+          householdId: receipt.householdId,
+          receiptId: receipt._id,
+          revision: receipt.revision + 1,
+          lineId: before.id,
+          store: data.store,
+          name: after.name,
+          field,
+          previous,
+          expected,
+          classificationEvidence: evidence.get(before.id) ?? {
+            name: before.name,
+          },
+          evidence: before,
+        });
+      }
     }
-  }
-}
+  },
+);
 
 export const list = query({
   args: {},

@@ -1,31 +1,42 @@
 import { userError } from "./userErrors";
 import type { QueryCtx, MutationCtx } from "./_generated/server";
 import type { Id } from "./_generated/dataModel";
+import { setRequester, traced } from "../src/lib/tracing";
 
-export async function requireMember(ctx: QueryCtx | MutationCtx) {
-  const identity = await ctx.auth.getUserIdentity();
+export const requireMember = traced(
+  "access.requireMember",
+  async function requireMember(ctx: QueryCtx | MutationCtx) {
+    const identity = await ctx.auth.getUserIdentity();
 
-  if (!identity) throw userError("Logg inn først.");
+    if (!identity) throw userError("Logg inn først.");
 
-  const member = await ctx.db
-    .query("members")
-    .withIndex("by_identity", (q) => q.eq("identity", identity.tokenIdentifier))
-    .unique();
+    const member = await ctx.db
+      .query("members")
+      .withIndex("by_identity", (q) =>
+        q.eq("identity", identity.tokenIdentifier),
+      )
+      .unique();
 
-  if (!member) throw userError("Velg en husstand først.");
+    setRequester(identity.subject, member?.householdId);
 
-  return member;
-}
+    if (!member) throw userError("Velg en husstand først.");
 
-export async function requireReceipt(
-  ctx: QueryCtx | MutationCtx,
-  id: Id<"receipts">,
-) {
-  const member = await requireMember(ctx);
-  const receipt = await ctx.db.get("receipts", id);
+    return member;
+  },
+);
 
-  if (!receipt || receipt.householdId !== member.householdId)
-    throw userError("Kvitteringen er ikke tilgjengelig.");
+export const requireReceipt = traced(
+  "access.requireReceipt",
+  async function requireReceipt(
+    ctx: QueryCtx | MutationCtx,
+    id: Id<"receipts">,
+  ) {
+    const member = await requireMember(ctx);
+    const receipt = await ctx.db.get("receipts", id);
 
-  return { member, receipt };
-}
+    if (!receipt || receipt.householdId !== member.householdId)
+      throw userError("Kvitteringen er ikke tilgjengelig.");
+
+    return { member, receipt };
+  },
+);

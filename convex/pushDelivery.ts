@@ -1,7 +1,9 @@
 import { receiptReviewCategory } from "../src/lib/receipt-notifications";
+import { tracedFetch } from "../src/lib/tracing";
 import { z } from "zod";
 import { v } from "convex/values";
-import { internalAction, env } from "./_generated/server";
+import { env } from "./_generated/server";
+import { internalAction } from "./serverFunctions";
 import type { ActionCtx } from "./_generated/server";
 import type { Id } from "./_generated/dataModel";
 import { internal } from "./_generated/api";
@@ -42,7 +44,7 @@ async function request(
   message: PushMessage,
 ): Promise<PushOutcome> {
   try {
-    const response = await fetch("https://exp.host/--/api/v2/push/send", {
+    const response = await tracedFetch("https://exp.host/--/api/v2/push/send", {
       method: "POST",
       headers: headers(),
       body: JSON.stringify({ to: token, sound: "default", ...message }),
@@ -212,7 +214,7 @@ export const checkReceipt = internalAction({
   args: { ticketId: v.string(), subscriptionId: v.id("deviceSubscriptions") },
   returns: v.null(),
   handler: async (ctx, args) => {
-    const response = await fetch(
+    const response = await tracedFetch(
       "https://exp.host/--/api/v2/push/getReceipts",
       {
         method: "POST",

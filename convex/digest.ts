@@ -14,8 +14,11 @@ import {
   paginationOptsValidator,
   paginationResultValidator,
 } from "convex/server";
-import { internalAction, internalQuery } from "./_generated/server";
-import { internalMutation } from "./serverFunctions";
+import {
+  internalMutation,
+  internalAction,
+  internalQuery,
+} from "./serverFunctions";
 import { internal } from "./_generated/api";
 import type { Doc, Id } from "./_generated/dataModel";
 import schema from "./schema";

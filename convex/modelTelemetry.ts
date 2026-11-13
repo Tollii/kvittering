@@ -1,6 +1,7 @@
 import type { Attributes, Histogram } from "@opentelemetry/api";
 import type { Telemetry } from "ai";
 import { flushMetrics, meter } from "./metrics";
+import { traced } from "../src/lib/tracing";
 
 /**
  * Every model call reports its token use as a log line and as metrics, so
@@ -101,31 +102,45 @@ async function record(call: ModelCall) {
   await flushMetrics();
 }
 
+type LanguageModelCallEnd = Parameters<
+  NonNullable<Telemetry["onLanguageModelCallEnd"]>
+>[0];
+
+type DecisionModelCallEnd = Parameters<
+  NonNullable<Telemetry["experimental_onDecisionModelCallEnd"]>
+>[0];
+
 /** Pass as `telemetry: { integrations: modelUsage }` on each model call. */
 export const modelUsage: Telemetry = {
-  onLanguageModelCallEnd: (event) =>
-    record({
-      operation: "chat",
-      functionId: event.functionId,
-      provider: event.provider,
-      model: event.modelId,
-      inputTokens: event.usage.inputTokens,
-      cachedInputTokens: event.usage.inputTokenDetails.cacheReadTokens,
-      outputTokens: event.usage.outputTokens,
-      reasoningTokens: event.usage.outputTokenDetails.reasoningTokens,
-      durationMs: event.performance.responseTimeMs,
-    }),
+  onLanguageModelCallEnd: traced(
+    "modelTelemetry.onLanguageModelCallEnd",
+    (event: LanguageModelCallEnd) =>
+      record({
+        operation: "chat",
+        functionId: event.functionId,
+        provider: event.provider,
+        model: event.modelId,
+        inputTokens: event.usage.inputTokens,
+        cachedInputTokens: event.usage.inputTokenDetails.cacheReadTokens,
+        outputTokens: event.usage.outputTokens,
+        reasoningTokens: event.usage.outputTokenDetails.reasoningTokens,
+        durationMs: event.performance.responseTimeMs,
+      }),
+  ),
   // Decision models report only input and output tokens.
-  ["experimental_onDecisionModelCallEnd"]: (event) =>
-    record({
-      operation: "decide",
-      functionId: event.functionId,
-      provider: event.provider,
-      model: event.response?.modelId ?? event.modelId,
-      inputTokens: event.usage?.inputTokens,
-      cachedInputTokens: undefined,
-      outputTokens: event.usage?.outputTokens,
-      reasoningTokens: undefined,
-      durationMs: undefined,
-    }),
+  ["experimental_onDecisionModelCallEnd"]: traced(
+    "modelTelemetry.onDecisionModelCallEnd",
+    (event: DecisionModelCallEnd) =>
+      record({
+        operation: "decide",
+        functionId: event.functionId,
+        provider: event.provider,
+        model: event.response?.modelId ?? event.modelId,
+        inputTokens: event.usage?.inputTokens,
+        cachedInputTokens: undefined,
+        outputTokens: event.usage?.outputTokens,
+        reasoningTokens: undefined,
+        durationMs: undefined,
+      }),
+  ),
 };

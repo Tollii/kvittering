@@ -12,6 +12,7 @@ import { components, internal } from "./_generated/api";
 
 import type { MutationCtx } from "./_generated/server";
 import type { Id } from "./_generated/dataModel";
+import { traced } from "../src/lib/tracing";
 
 const workflowComponent = v.union(
   v.literal("processing"),
@@ -27,53 +28,59 @@ function componentFor(component: WorkflowComponent) {
 }
 
 /** Persist only identifiers needed for cleanup; never copy receipt content here. */
-export async function trackWorkflow(
-  ctx: MutationCtx,
-  workflowId: WorkflowId,
-  component: WorkflowComponent,
-  receiptId?: Id<"receipts">,
-) {
-  const existing = await ctx.db
-    .query("workflowJournals")
-    .withIndex("by_component_and_workflowId", (q) =>
-      q.eq("component", component).eq("workflowId", workflowId),
-    )
-    .unique();
+export const trackWorkflow = traced(
+  "retention.trackWorkflow",
+  async function trackWorkflow(
+    ctx: MutationCtx,
+    workflowId: WorkflowId,
+    component: WorkflowComponent,
+    receiptId?: Id<"receipts">,
+  ) {
+    const existing = await ctx.db
+      .query("workflowJournals")
+      .withIndex("by_component_and_workflowId", (q) =>
+        q.eq("component", component).eq("workflowId", workflowId),
+      )
+      .unique();
 
-  if (existing) return existing._id;
+    if (existing) return existing._id;
 
-  return ctx.db.insert("workflowJournals", {
-    workflowId,
-    component,
-    receiptId,
-  });
-}
+    return ctx.db.insert("workflowJournals", {
+      workflowId,
+      component,
+      receiptId,
+    });
+  },
+);
 
 const thirtyDays = 30 * 24 * 60 * 60_000;
 
 /** Keep an ended run's journal for diagnostics while its receipt exists. */
-export async function recordWorkflowCompletion(
-  ctx: MutationCtx,
-  workflowId: WorkflowId,
-  context: { component: WorkflowComponent; receiptId: Id<"receipts"> },
-) {
-  const id = await trackWorkflow(
-    ctx,
-    workflowId,
-    context.component,
-    context.receiptId,
-  );
+export const recordWorkflowCompletion = traced(
+  "retention.recordWorkflowCompletion",
+  async function recordWorkflowCompletion(
+    ctx: MutationCtx,
+    workflowId: WorkflowId,
+    context: { component: WorkflowComponent; receiptId: Id<"receipts"> },
+  ) {
+    const id = await trackWorkflow(
+      ctx,
+      workflowId,
+      context.component,
+      context.receiptId,
+    );
 
-  const receipt = await ctx.db.get("receipts", context.receiptId);
-  const delay = receipt ? thirtyDays : 0;
-  await ctx.db.patch("workflowJournals", id, {
-    expiresAt: Date.now() + delay,
-  });
-  await ctx.scheduler.runAfter(delay, internal.retention.workflowJournal, {
-    workflowId,
-    component: context.component,
-  });
-}
+    const receipt = await ctx.db.get("receipts", context.receiptId);
+    const delay = receipt ? thirtyDays : 0;
+    await ctx.db.patch("workflowJournals", id, {
+      expiresAt: Date.now() + delay,
+    });
+    await ctx.scheduler.runAfter(delay, internal.retention.workflowJournal, {
+      workflowId,
+      component: context.component,
+    });
+  },
+);
 
 /** All terminal results have the same diagnostic retention period. Null is the legacy context. */
 export const workflowCompleted = internalMutation({
@@ -223,24 +230,27 @@ async function cancelUnfinished(
  * starts. Callers that replace every launch keep at most one run unfinished,
  * the newest; the bound leaves room for runs started before that rule.
  */
-export async function cancelReceiptWorkflows(
-  ctx: MutationCtx,
-  receiptId: Id<"receipts">,
-  component: WorkflowComponent,
-) {
-  const journals = await ctx.db
-    .query("workflowJournals")
-    .withIndex("by_receiptId_and_component", (q) =>
-      q.eq("receiptId", receiptId).eq("component", component),
-    )
-    .order("desc")
-    .take(20);
+export const cancelReceiptWorkflows = traced(
+  "retention.cancelReceiptWorkflows",
+  async function cancelReceiptWorkflows(
+    ctx: MutationCtx,
+    receiptId: Id<"receipts">,
+    component: WorkflowComponent,
+  ) {
+    const journals = await ctx.db
+      .query("workflowJournals")
+      .withIndex("by_receiptId_and_component", (q) =>
+        q.eq("receiptId", receiptId).eq("component", component),
+      )
+      .order("desc")
+      .take(20);
 
-  for (const journal of journals)
-    // A journal with an expiry belongs to a finished run.
-    if (journal.expiresAt === undefined)
-      await cancelUnfinished(ctx, component, journal.workflowId);
-}
+    for (const journal of journals)
+      // A journal with an expiry belongs to a finished run.
+      if (journal.expiresAt === undefined)
+        await cancelUnfinished(ctx, component, journal.workflowId);
+  },
+);
 
 /** Cancel deleted receipts in small pages; terminal callbacks remove their journals. */
 export const deletedReceiptWorkflows = internalMutation({

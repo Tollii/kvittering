@@ -9,6 +9,7 @@ import {
   receiptSpendingTotals,
   type SpendingTotals,
 } from "../src/lib/domain/receipt-summary";
+import { traced } from "../src/lib/tracing";
 
 async function adjustDay(
   ctx: MutationCtx,
@@ -65,77 +66,81 @@ async function adjustDay(
 }
 
 /** Summary, deletion record, totals, and cursor commit with the receipt write. */
-export async function updateReceiptReadModel(
-  ctx: MutationCtx,
-  receipt: Doc<"receipts">,
-  deleted = false,
-) {
-  const previous = await ctx.db
-    .query("receiptSummaries")
-    .withIndex("by_receiptId", (q) => q.eq("receiptId", receipt._id))
-    .unique();
-
-  const head = await ctx.db
-    .query("receiptSyncHeads")
-    .withIndex("by_householdId", (q) =>
-      q.eq("householdId", receipt.householdId),
-    )
-    .unique();
-
-  const sequence = (head?.sequence ?? 0) + 1;
-  const item = receiptListItem(receipt);
-
-  const totals = deleted
-    ? { ...emptySpendingTotals }
-    : receiptSpendingTotals(receipt);
-
-  const summary = {
-    householdId: receipt.householdId,
-    receiptId: receipt._id,
-    sequence,
-    deleted,
-    createdAt: item._creationTime,
-    status: item.status,
-    store: deleted ? null : item.store,
-    purchaseDate: deleted ? null : item.purchaseDate,
-    totalOre: deleted ? null : item.totalOre,
-    spendingOre: deleted ? 0 : item.spendingOre,
-    excluded: item.excluded,
-    totals,
-    categories: deleted ? {} : receiptComparisonCategories(receipt),
-  };
-
-  if (
-    previous?.purchaseDate !== summary.purchaseDate ||
-    JSON.stringify(previous.totals) !== JSON.stringify(totals) ||
-    JSON.stringify(previous.categories) !== JSON.stringify(summary.categories)
+export const updateReceiptReadModel = traced(
+  "receiptReadModel.updateReceiptReadModel",
+  async function updateReceiptReadModel(
+    ctx: MutationCtx,
+    receipt: Doc<"receipts">,
+    deleted = false,
   ) {
-    if (previous)
+    const previous = await ctx.db
+      .query("receiptSummaries")
+      .withIndex("by_receiptId", (q) => q.eq("receiptId", receipt._id))
+      .unique();
+
+    const head = await ctx.db
+      .query("receiptSyncHeads")
+      .withIndex("by_householdId", (q) =>
+        q.eq("householdId", receipt.householdId),
+      )
+      .unique();
+
+    const sequence = (head?.sequence ?? 0) + 1;
+    const item = receiptListItem(receipt);
+
+    const totals = deleted
+      ? { ...emptySpendingTotals }
+      : receiptSpendingTotals(receipt);
+
+    const summary = {
+      householdId: receipt.householdId,
+      receiptId: receipt._id,
+      sequence,
+      deleted,
+      createdAt: item._creationTime,
+      status: item.status,
+      store: deleted ? null : item.store,
+      purchaseDate: deleted ? null : item.purchaseDate,
+      totalOre: deleted ? null : item.totalOre,
+      spendingOre: deleted ? 0 : item.spendingOre,
+      excluded: item.excluded,
+      totals,
+      categories: deleted ? {} : receiptComparisonCategories(receipt),
+    };
+
+    if (
+      previous?.purchaseDate !== summary.purchaseDate ||
+      JSON.stringify(previous.totals) !== JSON.stringify(totals) ||
+      JSON.stringify(previous.categories) !== JSON.stringify(summary.categories)
+    ) {
+      if (previous)
+        await adjustDay(
+          ctx,
+          previous.householdId,
+          previous.purchaseDate,
+          previous.totals,
+          previous.categories,
+          -1,
+        );
       await adjustDay(
         ctx,
-        previous.householdId,
-        previous.purchaseDate,
-        previous.totals,
-        previous.categories,
-        -1,
+        receipt.householdId,
+        summary.purchaseDate,
+        totals,
+        summary.categories,
+        1,
       );
-    await adjustDay(
-      ctx,
-      receipt.householdId,
-      summary.purchaseDate,
-      totals,
-      summary.categories,
-      1,
-    );
-  }
+    }
 
-  if (previous) await ctx.db.replace("receiptSummaries", previous._id, summary);
-  else await ctx.db.insert("receiptSummaries", summary);
+    if (previous)
+      await ctx.db.replace("receiptSummaries", previous._id, summary);
+    else await ctx.db.insert("receiptSummaries", summary);
 
-  if (head) await ctx.db.patch("receiptSyncHeads", head._id, { sequence });
-  else
-    await ctx.db.insert("receiptSyncHeads", {
-      householdId: receipt.householdId,
-      sequence,
-    });
-}
+    if (head) await ctx.db.patch("receiptSyncHeads", head._id, { sequence });
+    else
+      await ctx.db.insert("receiptSyncHeads", {
+        householdId: receipt.householdId,
+        sequence,
+      });
+  },
+);

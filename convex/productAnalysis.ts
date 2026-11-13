@@ -8,13 +8,9 @@ import { productAttributesValidator } from "../src/lib/domain/product-attributes
 import { v, type Infer } from "convex/values";
 import { WorkflowManager } from "@convex-dev/workflow";
 import { components, internal } from "./_generated/api";
-import {
-  internalQuery,
-  type MutationCtx,
-  type QueryCtx,
-} from "./_generated/server";
+import type { MutationCtx, QueryCtx } from "./_generated/server";
 import { hasProductModel } from "./providerConfig";
-import { internalMutation } from "./serverFunctions";
+import { internalMutation, internalQuery } from "./serverFunctions";
 import type { Doc, Id } from "./_generated/dataModel";
 import schema from "./schema";
 import { requireReceipt } from "./access";

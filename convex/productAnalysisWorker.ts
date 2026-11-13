@@ -9,7 +9,8 @@ import {
 import { attributeQuestions } from "../src/lib/domain/product-attribute-classification";
 import { v } from "convex/values";
 import { choice } from "@typesafe-ai/sdk";
-import { internalAction, type ActionCtx } from "./_generated/server";
+import type { ActionCtx } from "./_generated/server";
+import { internalAction } from "./serverFunctions";
 import { productJudgments } from "./aiModels";
 import { contextBatches, type JudgmentClient } from "./decisions";
 import type { Id } from "./_generated/dataModel";

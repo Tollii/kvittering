@@ -3,7 +3,7 @@
 import { providerFetch } from "./providerTransport";
 
 import { v } from "convex/values";
-import { internalAction } from "./_generated/server";
+import { internalAction } from "./serverFunctions";
 import { internal } from "./_generated/api";
 import {
   searchProducts,
@@ -21,7 +21,7 @@ import { SearchPhysicalStoresGroup } from "./kassalapp/generated/models";
 import { broaderProductSearch } from "../src/lib/catalog/search";
 import { compatibleCatalogProduct } from "../src/lib/catalog/matching";
 
-type CatalogFetchOptions = { fetch: typeof fetch };
+type CatalogFetchOptions = { fetch: typeof globalThis.fetch };
 
 /** Searches products, and widens the search when retailer coverage or the exact term finds no usable product. */
 async function searchCatalogProducts(

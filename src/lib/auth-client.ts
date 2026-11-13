@@ -4,6 +4,7 @@ import { expoClient } from "@better-auth/expo/client";
 import * as SecureStore from "expo-secure-store";
 import { Platform } from "react-native";
 import { storageSuffix } from "./deployment-storage";
+import { traced } from "./tracing";
 
 export const convexUrl = process.env.EXPO_PUBLIC_CONVEX_URL;
 
@@ -25,10 +26,13 @@ export const authClient = createAuthClient({
   ],
 });
 
-export async function fetchAccessToken() {
-  const result = await authClient.convex.token();
+export const fetchAccessToken = traced(
+  "auth-client.fetchAccessToken",
+  async function fetchAccessToken() {
+    const result = await authClient.convex.token();
 
-  if (!result.data?.token) throw new Error("Logg inn for å fortsette.");
+    if (!result.data?.token) throw new Error("Logg inn for å fortsette.");
 
-  return result.data.token;
-}
+    return result.data.token;
+  },
+);

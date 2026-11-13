@@ -11,6 +11,7 @@ import { unclearCategoryId } from "../src/lib/domain/categories";
 import { base64Url } from "./tokens";
 import { odaCatalogProduct } from "../src/lib/catalog/oda";
 import { catalogIdentity } from "../src/lib/catalog/model";
+import { traced, tracedFetch } from "../src/lib/tracing";
 
 /**
  * Oda's official MCP server, the same one AI assistants connect to. A person
@@ -41,26 +42,30 @@ export type OdaTokens = {
 export class OdaSignInExpired extends Error {}
 
 /** Registers Kvitto as an OAuth client for one callback URL. */
-export async function registerOdaClient(redirectUri: string): Promise<string> {
-  const response = await fetch(`${authorizationServer}/register/`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      client_name: "Kvitto",
-      redirect_uris: [redirectUri],
-      grant_types: ["authorization_code", "refresh_token"],
-      response_types: ["code"],
-      token_endpoint_auth_method: "none",
-      scope: "mcp",
-    }),
-  });
+export const registerOdaClient = traced(
+  "odaApi.registerOdaClient",
+  async function registerOdaClient(redirectUri: string): Promise<string> {
+    const response = await tracedFetch(`${authorizationServer}/register/`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        client_name: "Kvitto",
+        redirect_uris: [redirectUri],
+        grant_types: ["authorization_code", "refresh_token"],
+        response_types: ["code"],
+        token_endpoint_auth_method: "none",
+        scope: "mcp",
+      }),
+    });
 
-  if (!response.ok)
-    throw new Error(`Oda client registration failed: ${response.status}`);
+    if (!response.ok)
+      throw new Error(`Oda client registration failed: ${response.status}`);
 
-  return z.object({ client_id: z.string().min(1) }).parse(await response.json())
-    .client_id;
-}
+    return z
+      .object({ client_id: z.string().min(1) })
+      .parse(await response.json()).client_id;
+  },
+);
 
 export function odaAuthorizationUrl(args: {
   clientId: string;
@@ -89,7 +94,7 @@ async function requestTokens(
 ): Promise<OdaTokens> {
   const started = Date.now();
 
-  const response = await fetch(`${authorizationServer}/token/`, {
+  const response = await tracedFetch(`${authorizationServer}/token/`, {
     method: "POST",
     headers: { "Content-Type": "application/x-www-form-urlencoded" },
     body: new URLSearchParams({ ...fields, resource: odaResource }),
@@ -113,45 +118,60 @@ async function requestTokens(
   };
 }
 
-export const exchangeOdaCode = (args: {
-  clientId: string;
-  redirectUri: string;
-  code: string;
-  verifier: string;
-}) =>
-  requestTokens({
-    grant_type: "authorization_code",
-    client_id: args.clientId,
-    redirect_uri: args.redirectUri,
-    code: args.code,
-    code_verifier: args.verifier,
-  });
+export const exchangeOdaCode = traced(
+  "odaApi.exchangeOdaCode",
+  (args: {
+    clientId: string;
+    redirectUri: string;
+    code: string;
+    verifier: string;
+  }) =>
+    requestTokens({
+      grant_type: "authorization_code",
+      client_id: args.clientId,
+      redirect_uri: args.redirectUri,
+      code: args.code,
+      code_verifier: args.verifier,
+    }),
+);
 
-export const refreshOdaTokens = (clientId: string, refreshToken: string) =>
-  requestTokens({
-    grant_type: "refresh_token",
-    client_id: clientId,
-    refresh_token: refreshToken,
-  });
+export const refreshOdaTokens = traced(
+  "odaApi.refreshOdaTokens",
+  (clientId: string, refreshToken: string) =>
+    requestTokens({
+      grant_type: "refresh_token",
+      client_id: clientId,
+      refresh_token: refreshToken,
+    }),
+);
 
-export async function revokeOdaToken(clientId: string, token: string) {
-  const response = await fetch(`${authorizationServer}/revoke_token/`, {
-    method: "POST",
-    headers: { "Content-Type": "application/x-www-form-urlencoded" },
-    body: new URLSearchParams({ client_id: clientId, token }),
-  });
+export const revokeOdaToken = traced(
+  "odaApi.revokeOdaToken",
+  async function revokeOdaToken(clientId: string, token: string) {
+    const response = await tracedFetch(`${authorizationServer}/revoke_token/`, {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body: new URLSearchParams({ client_id: clientId, token }),
+    });
 
-  if (!response.ok)
-    throw new Error(`Oda token revocation failed: ${response.status}`);
-}
+    if (!response.ok)
+      throw new Error(`Oda token revocation failed: ${response.status}`);
+  },
+);
 
-export async function pkceChallenge(verifier: string) {
-  return base64Url(
-    new Uint8Array(
-      await crypto.subtle.digest("SHA-256", new TextEncoder().encode(verifier)),
-    ),
-  );
-}
+export const pkceChallenge = traced(
+  "odaApi.pkceChallenge",
+  async function pkceChallenge(verifier: string) {
+    return base64Url(
+      new Uint8Array(
+        await crypto.subtle.digest(
+          "SHA-256",
+          new TextEncoder().encode(verifier),
+        ),
+      ),
+    );
+  },
+);
 
 const jsonRpcResponse = z.object({
   id: z.union([z.number(), z.string()]).optional(),
@@ -200,77 +220,80 @@ const toolResult = z.object({
 type ToolArguments = Readonly<Record<string, string | number>>;
 
 /** Opens an MCP session, calls one tool, and parses its answer. */
-export async function callOdaTool<Output>(
-  accessToken: string,
-  name: string,
-  args: ToolArguments,
-  output: z.ZodType<Output>,
-): Promise<Output> {
-  const headers = new Headers({
-    Authorization: `Bearer ${accessToken}`,
-    "Content-Type": "application/json",
-    Accept: "application/json, text/event-stream",
-  });
-
-  async function post(body: string) {
-    const response = await fetch(odaResource, {
-      method: "POST",
-      headers,
-      body,
+export const callOdaTool = traced(
+  "odaApi.callOdaTool",
+  async function callOdaTool<Output>(
+    accessToken: string,
+    name: string,
+    args: ToolArguments,
+    output: z.ZodType<Output>,
+  ): Promise<Output> {
+    const headers = new Headers({
+      Authorization: `Bearer ${accessToken}`,
+      "Content-Type": "application/json",
+      Accept: "application/json, text/event-stream",
     });
 
-    if (response.status === 401 || response.status === 403)
-      throw new OdaSignInExpired(
-        `Oda rejected the access token: ${response.status}`,
-      );
+    async function post(body: string) {
+      const response = await tracedFetch(odaResource, {
+        method: "POST",
+        headers,
+        body,
+      });
 
-    if (!response.ok) throw new Error(`Oda MCP failed: ${response.status}`);
+      if (response.status === 401 || response.status === 403)
+        throw new OdaSignInExpired(
+          `Oda rejected the access token: ${response.status}`,
+        );
 
-    return response;
-  }
+      if (!response.ok) throw new Error(`Oda MCP failed: ${response.status}`);
 
-  const initialized = await post(
-    JSON.stringify({
-      jsonrpc: "2.0",
-      id: 1,
-      method: "initialize",
-      params: {
-        protocolVersion: "2025-06-18",
-        capabilities: {},
-        clientInfo: { name: "kvitto", version: "1.0.0" },
-      },
-    }),
-  );
+      return response;
+    }
 
-  const session = initialized.headers.get("Mcp-Session-Id");
+    const initialized = await post(
+      JSON.stringify({
+        jsonrpc: "2.0",
+        id: 1,
+        method: "initialize",
+        params: {
+          protocolVersion: "2025-06-18",
+          capabilities: {},
+          clientInfo: { name: "kvitto", version: "1.0.0" },
+        },
+      }),
+    );
 
-  if (session) headers.set("Mcp-Session-Id", session);
-  await readRpc(initialized, 1);
-  headers.set("MCP-Protocol-Version", "2025-06-18");
-  await post(
-    JSON.stringify({ jsonrpc: "2.0", method: "notifications/initialized" }),
-  );
+    const session = initialized.headers.get("Mcp-Session-Id");
 
-  const result = toolResult.parse(
-    await readRpc(
-      await post(
-        JSON.stringify({
-          jsonrpc: "2.0",
-          id: 2,
-          method: "tools/call",
-          params: { name, arguments: args },
-        }),
+    if (session) headers.set("Mcp-Session-Id", session);
+    await readRpc(initialized, 1);
+    headers.set("MCP-Protocol-Version", "2025-06-18");
+    await post(
+      JSON.stringify({ jsonrpc: "2.0", method: "notifications/initialized" }),
+    );
+
+    const result = toolResult.parse(
+      await readRpc(
+        await post(
+          JSON.stringify({
+            jsonrpc: "2.0",
+            id: 2,
+            method: "tools/call",
+            params: { name, arguments: args },
+          }),
+        ),
+        2,
       ),
-      2,
-    ),
-  );
+    );
 
-  const text = result.content.find((part) => part.type === "text")?.text;
+    const text = result.content.find((part) => part.type === "text")?.text;
 
-  if (result.isError) throw new Error(`Oda: ${text ?? name} failed.`);
+    if (result.isError) throw new Error(`Oda: ${text ?? name} failed.`);
 
-  return output.parse(result.structuredContent ?? JSON.parse(text ?? "null"));
-}
+    return output.parse(result.structuredContent ?? JSON.parse(text ?? "null"));
+  },
+);
 
 const amount = z.union([z.string(), z.number()]).transform((value, ctx) => {
   const parsed = Ore.parse(String(value));

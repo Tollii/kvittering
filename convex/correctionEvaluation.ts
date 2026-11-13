@@ -4,7 +4,7 @@ import { userError } from "./userErrors";
 
 import { clientValidator } from "../src/lib/releases/policy";
 import { v } from "convex/values";
-import { action } from "./_generated/server";
+import { action } from "./serverFunctions";
 import { productJudgments } from "./aiModels";
 import { modelKey, parseModel, productModelName } from "./providerConfig";
 import { api, internal } from "./_generated/api";

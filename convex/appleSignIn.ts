@@ -3,6 +3,7 @@ import appConfig from "../app.json";
 import { env } from "./_generated/server";
 import { appleJwt, fromBase64url } from "./appleJwt";
 import { userError } from "./userErrors";
+import { traced, tracedFetch } from "../src/lib/tracing";
 
 const apple = "https://appleid.apple.com";
 
@@ -57,58 +58,63 @@ async function clientSecret() {
  * authorization code is exchanged first; its identity must be the linked
  * Apple account, which also confirms the person holds it.
  */
-export async function revokeAppleAccess(code: string, appleAccountId: string) {
-  const secret = await clientSecret();
+export const revokeAppleAccess = traced(
+  "appleSignIn.revokeAppleAccess",
+  async function revokeAppleAccess(code: string, appleAccountId: string) {
+    const secret = await clientSecret();
 
-  if (!secret) {
-    console.error("account.apple_key_missing", {
-      required: [
-        "APNS_TEAM_ID",
-        "APPLE_SIGN_IN_KEY_ID",
-        "APPLE_SIGN_IN_PRIVATE_KEY",
-      ],
+    if (!secret) {
+      console.error("account.apple_key_missing", {
+        required: [
+          "APNS_TEAM_ID",
+          "APPLE_SIGN_IN_KEY_ID",
+          "APPLE_SIGN_IN_PRIVATE_KEY",
+        ],
+      });
+
+      throw userError("Kan ikke slette kontoen akkurat nå. Prøv igjen senere.");
+    }
+
+    const exchanged = await tracedFetch(`${apple}/auth/token`, {
+      method: "POST",
+      body: new URLSearchParams({
+        client_id: clientId,
+        client_secret: secret,
+        code,
+        grant_type: "authorization_code",
+      }),
     });
 
-    throw userError("Kan ikke slette kontoen akkurat nå. Prøv igjen senere.");
-  }
+    if (!exchanged.ok) {
+      const body: unknown = await exchanged.json().catch(() => null);
 
-  const exchanged = await fetch(`${apple}/auth/token`, {
-    method: "POST",
-    body: new URLSearchParams({
-      client_id: clientId,
-      client_secret: secret,
-      code,
-      grant_type: "authorization_code",
-    }),
-  });
+      if (tokenError.safeParse(body).data?.error === "invalid_grant")
+        throw userError("Apple-bekreftelsen er utløpt. Prøv igjen.");
 
-  if (!exchanged.ok) {
-    const body: unknown = await exchanged.json().catch(() => null);
+      throw new Error(
+        `Apple refused the authorization code (${exchanged.status}).`,
+      );
+    }
 
-    if (tokenError.safeParse(body).data?.error === "invalid_grant")
-      throw userError("Apple-bekreftelsen er utløpt. Prøv igjen.");
+    const issued = tokens.parse(await exchanged.json());
 
-    throw new Error(
-      `Apple refused the authorization code (${exchanged.status}).`,
-    );
-  }
+    // The token came straight from Apple over TLS, so its claims need no signature check.
+    if (tokenSubject(issued.id_token) !== appleAccountId)
+      throw userError("Bekreft med Apple-kontoen som er koblet til Kvitto.");
 
-  const issued = tokens.parse(await exchanged.json());
+    const revoked = await tracedFetch(`${apple}/auth/revoke`, {
+      method: "POST",
+      body: new URLSearchParams({
+        client_id: clientId,
+        client_secret: secret,
+        token: issued.refresh_token ?? issued.access_token,
+        token_type_hint: issued.refresh_token
+          ? "refresh_token"
+          : "access_token",
+      }),
+    });
 
-  // The token came straight from Apple over TLS, so its claims need no signature check.
-  if (tokenSubject(issued.id_token) !== appleAccountId)
-    throw userError("Bekreft med Apple-kontoen som er koblet til Kvitto.");
-
-  const revoked = await fetch(`${apple}/auth/revoke`, {
-    method: "POST",
-    body: new URLSearchParams({
-      client_id: clientId,
-      client_secret: secret,
-      token: issued.refresh_token ?? issued.access_token,
-      token_type_hint: issued.refresh_token ? "refresh_token" : "access_token",
-    }),
-  });
-
-  if (!revoked.ok)
-    throw new Error(`Apple refused the revocation (${revoked.status}).`);
-}
+    if (!revoked.ok)
+      throw new Error(`Apple refused the revocation (${revoked.status}).`);
+  },
+);

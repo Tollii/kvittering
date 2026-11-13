@@ -9,6 +9,8 @@ export default defineConfig({
     env: {
       OTEL_EXPORTER_OTLP_ENDPOINT: "",
       OTEL_EXPORTER_OTLP_METRICS_ENDPOINT: "",
+      // Spans are still recorded; their log lines would bury test output.
+      OTEL_TRACES_EXPORTER: "none",
     },
     include: [
       "convex/**/*.test.ts",

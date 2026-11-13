@@ -5,7 +5,7 @@ import { languageModel, productJudgments } from "./aiModels";
 import { modelUsage } from "./modelTelemetry";
 import { contextBatches } from "./decisions";
 import { v } from "convex/values";
-import { internalAction } from "./_generated/server";
+import { internalAction } from "./serverFunctions";
 import {
   reasoningValidator,
   receiptProductModel,

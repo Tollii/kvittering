@@ -1,4 +1,5 @@
 import { env } from "../_generated/server";
+import { traced } from "../../src/lib/tracing";
 
 export class CatalogRequestError extends Error {
   constructor(
@@ -21,44 +22,47 @@ function retryAfterMs(retry: string | null): number {
 }
 
 /** Called by the catalog worker; credentials remain on the server. */
-export async function kassalappFetch<T>(
-  path: string,
-  options?: RequestInit & { fetch?: typeof fetch },
-): Promise<T> {
-  const key = env.KASSALAPP_API_KEY;
+export const kassalappFetch = traced(
+  "transport.kassalappFetch",
+  async function kassalappFetch<T>(
+    path: string,
+    options?: RequestInit & { fetch?: typeof globalThis.fetch },
+  ): Promise<T> {
+    const key = env.KASSALAPP_API_KEY;
 
-  if (!key) throw new CatalogRequestError(401);
-  const url = new URL(`https://kassal.app/api/v1${path}`);
+    if (!key) throw new CatalogRequestError(401);
+    const url = new URL(`https://kassal.app/api/v1${path}`);
 
-  // Kassalapp accepts boolean query parameters as 1/0, despite the OpenAPI schema.
-  for (const [name, value] of url.searchParams) {
-    if (value === "true" || value === "false")
-      url.searchParams.set(name, value === "true" ? "1" : "0");
-  }
+    // Kassalapp accepts boolean query parameters as 1/0, despite the OpenAPI schema.
+    for (const [name, value] of url.searchParams) {
+      if (value === "true" || value === "false")
+        url.searchParams.set(name, value === "true" ? "1" : "0");
+    }
 
-  const { fetch: request, ...requestOptions } = options ?? {};
+    const { fetch: request, ...requestOptions } = options ?? {};
 
-  if (!request)
-    throw new Error("Catalog requests require a quota-controlled transport.");
+    if (!request)
+      throw new Error("Catalog requests require a quota-controlled transport.");
 
-  // Headers reads every HeadersInit form; spreading an array or a Headers
-  // object into an object literal would drop the caller's headers.
-  const headers = new Headers(requestOptions.headers);
-  headers.set("Accept", "application/json");
-  headers.set("Authorization", `Bearer ${key}`);
+    // Headers reads every HeadersInit form; spreading an array or a Headers
+    // object into an object literal would drop the caller's headers.
+    const headers = new Headers(requestOptions.headers);
+    headers.set("Accept", "application/json");
+    headers.set("Authorization", `Bearer ${key}`);
 
-  const response = await request(url, {
-    ...requestOptions,
-    signal: AbortSignal.timeout(15000),
-    headers,
-  });
+    const response = await request(url, {
+      ...requestOptions,
+      signal: AbortSignal.timeout(15000),
+      headers,
+    });
 
-  if (!response.ok)
-    throw new CatalogRequestError(
-      response.status,
-      retryAfterMs(response.headers.get("Retry-After")),
-    );
+    if (!response.ok)
+      throw new CatalogRequestError(
+        response.status,
+        retryAfterMs(response.headers.get("Retry-After")),
+      );
 
-  // SAFETY: Generated client types describe transport data only; worker schemas parse every result before domain use.
-  return response.json() as Promise<T>;
-}
+    // SAFETY: Generated client types describe transport data only; worker schemas parse every result before domain use.
+    return response.json() as Promise<T>;
+  },
+);

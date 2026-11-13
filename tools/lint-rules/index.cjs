@@ -5,6 +5,8 @@ const path = require("node:path");
 
 const readsDatabase = require("./reads-database.cjs");
 
+const ts = require("typescript");
+
 const quoted = /^["'`]/;
 
 module.exports = {
@@ -637,6 +639,173 @@ module.exports = {
           "Program:exit"(program) {
             program.body.forEach(recordLocals);
             program.body.forEach(checkExports);
+          },
+        };
+      },
+    },
+    "traced-exports": {
+      meta: {
+        type: "problem",
+        schema: [
+          {
+            type: "object",
+            properties: {
+              tracers: { type: "array", items: { type: "string" } },
+              builders: { type: "array", items: { type: "string" } },
+            },
+            additionalProperties: false,
+          },
+        ],
+        messages: {
+          untraced:
+            'Exported async function `{{name}}` is not traced. Wrap it where it is defined, as `traced("{{name}}", async (...) => ...)`, so every call records a span with its outcome and request context.',
+          generatedBuilder:
+            "Import `{{name}}` from serverFunctions; its builders trace every Convex function where it is defined.",
+        },
+      },
+      create(context) {
+        const options = context.options[0] ?? {};
+        const tracers = new Set(options.tracers ?? ["traced"]);
+        const builders = new Set(options.builders ?? []);
+        const services = context.sourceCode.parserServices;
+        const checker = services?.program?.getTypeChecker();
+
+        const isFunction = (node) =>
+          node?.type === "FunctionDeclaration" ||
+          node?.type === "FunctionExpression" ||
+          node?.type === "ArrowFunctionExpression";
+
+        function promiseAnnotation(node) {
+          const annotation = node.returnType?.typeAnnotation;
+
+          return (
+            annotation?.type === "TSTypeReference" &&
+            annotation.typeName.type === "Identifier" &&
+            /^(Promise|PromiseLike)$/.test(annotation.typeName.name)
+          );
+        }
+
+        /** With type information, any function that returns a promise counts. */
+        function returnsPromise(node) {
+          if (!checker) return false;
+
+          const signature = checker.getSignatureFromDeclaration(
+            services.esTreeNodeToTSNodeMap.get(node),
+          );
+
+          if (!signature) return false;
+
+          const type = checker.getReturnTypeOfSignature(signature);
+
+          // Every part but null and undefined must be a promise, so that a
+          // ReactNode, which may be one, does not count.
+          const parts = (type.isUnion() ? type.types : [type]).filter(
+            (part) =>
+              !(
+                part.flags &
+                (ts.TypeFlags.Null | ts.TypeFlags.Undefined | ts.TypeFlags.Void)
+              ),
+          );
+
+          return (
+            parts.length > 0 && parts.every((part) => part.getProperty("then"))
+          );
+        }
+
+        const isAsync = (node) =>
+          isFunction(node) &&
+          (node.async || promiseAnnotation(node) || returnsPromise(node));
+
+        const report = (node, name) =>
+          context.report({ node, messageId: "untraced", data: { name } });
+
+        /** Exported objects count too: their async methods are exported functions. */
+        function checkObject(object, owner) {
+          for (const property of object.properties) {
+            if (property.type !== "Property" || property.computed) continue;
+
+            const key = property.key.name ?? property.key.value;
+
+            if (isAsync(property.value)) report(property, `${owner}.${key}`);
+          }
+        }
+
+        function checkValue(node, name) {
+          if (isAsync(node)) report(node, name);
+          else if (node?.type === "ObjectExpression") checkObject(node, name);
+        }
+
+        const isTraced = (node) =>
+          node?.type === "CallExpression" &&
+          node.callee.type === "Identifier" &&
+          tracers.has(node.callee.name);
+
+        /** Top-level declarations by name, for `export { name }`. */
+        const declarations = new Map();
+
+        return {
+          "Program > FunctionDeclaration"(node) {
+            if (node.id) declarations.set(node.id.name, node);
+          },
+          "Program > VariableDeclaration > VariableDeclarator"(node) {
+            if (node.id.type === "Identifier")
+              declarations.set(node.id.name, node.init);
+          },
+          ExportNamedDeclaration(node) {
+            const declaration = node.declaration;
+
+            if (declaration?.type === "FunctionDeclaration") {
+              if (isAsync(declaration))
+                report(declaration, declaration.id.name);
+            } else if (declaration?.type === "VariableDeclaration") {
+              for (const declarator of declaration.declarations) {
+                if (declarator.id.type !== "Identifier") continue;
+
+                if (!isTraced(declarator.init))
+                  checkValue(declarator.init, declarator.id.name);
+              }
+            }
+          },
+          ExportDefaultDeclaration(node) {
+            if (isAsync(node.declaration))
+              report(node.declaration, node.declaration.id?.name ?? "default");
+          },
+          "Program:exit"() {
+            for (const statement of context.sourceCode.ast.body) {
+              if (
+                statement.type !== "ExportNamedDeclaration" ||
+                statement.source ||
+                statement.exportKind === "type"
+              )
+                continue;
+
+              for (const specifier of statement.specifiers) {
+                const local = specifier.local.name;
+                const value = declarations.get(local);
+
+                if (value && !isTraced(value)) checkValue(value, local);
+              }
+            }
+          },
+          ImportDeclaration(node) {
+            if (
+              !/(^|\/)_generated\/server$/.test(node.source.value) ||
+              node.importKind === "type"
+            )
+              return;
+
+            for (const specifier of node.specifiers) {
+              if (
+                specifier.type === "ImportSpecifier" &&
+                specifier.importKind !== "type" &&
+                builders.has(specifier.imported.name)
+              )
+                context.report({
+                  node: specifier,
+                  messageId: "generatedBuilder",
+                  data: { name: specifier.imported.name },
+                });
+            }
           },
         };
       },

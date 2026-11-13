@@ -6,17 +6,23 @@ import {
 } from "../src/lib/domain/household";
 import { oreValidator } from "../src/lib/domain/ore";
 import { clientMutation as mutation } from "./clientFunctions";
-import { query, type QueryCtx } from "./_generated/server";
+import type { QueryCtx } from "./_generated/server";
+import { query } from "./serverFunctions";
 import { v } from "convex/values";
 import type { UserIdentity } from "convex/server";
 import schema from "./schema";
 import { requireMember } from "./access";
+import { setRequester } from "../src/lib/tracing";
 
-function membership(ctx: QueryCtx, identity: UserIdentity) {
-  return ctx.db
+async function membership(ctx: QueryCtx, identity: UserIdentity) {
+  const member = await ctx.db
     .query("members")
     .withIndex("by_identity", (q) => q.eq("identity", identity.tokenIdentifier))
     .unique();
+
+  setRequester(identity.subject, member?.householdId);
+
+  return member;
 }
 
 export const current = query({

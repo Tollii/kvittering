@@ -2,12 +2,12 @@ import { v } from "convex/values";
 import { z } from "zod";
 import { components, internal } from "./_generated/api";
 import type { Doc, Id, TableNames } from "./_generated/dataModel";
-import { action, type MutationCtx } from "./_generated/server";
+import type { MutationCtx } from "./_generated/server";
 import { revokeAppleAccess } from "./appleSignIn";
 import { appleAccountOf } from "./auth";
 import { forgetOdaConnection } from "./oda";
 import { deleteReceipt } from "./receiptChanges";
-import { internalMutation } from "./serverFunctions";
+import { internalMutation, action } from "./serverFunctions";
 import { userError } from "./userErrors";
 import { clientValidator } from "../src/lib/releases/policy";
 

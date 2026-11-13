@@ -61,6 +61,39 @@ module.exports = defineConfig([
     },
   },
   {
+    files: ["convex/**/*.ts", "src/**/*.ts", "src/**/*.tsx"],
+    // The tracing module defines the wrappers themselves.
+    ignores: [
+      "**/*.test.ts",
+      "**/*.test.tsx",
+      "src/lib/testing/**",
+      "src/lib/tracing/**",
+    ],
+    rules: {
+      // Exported async functions and Convex handlers are traced where they are defined.
+      "kvitto/traced-exports": [
+        "error",
+        {
+          tracers: ["traced", "tracedFetchWith"],
+          builders: [
+            "query",
+            "internalQuery",
+            "mutation",
+            "internalMutation",
+            "action",
+            "internalAction",
+            "httpAction",
+          ],
+        },
+      ],
+    },
+  },
+  {
+    // The traced builders wrap the generated ones.
+    files: ["convex/serverFunctions.ts"],
+    rules: { "kvitto/traced-exports": ["error", { tracers: ["traced"] }] },
+  },
+  {
     files: ["src/lib/domain/ore.ts"],
     rules: { "kvitto/no-ore-arithmetic": "off" },
   },

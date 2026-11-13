@@ -14,6 +14,7 @@ import {
   PeriodicExportingMetricReader,
 } from "@opentelemetry/sdk-metrics";
 import { deploymentChannel } from "./deployment";
+import { traced } from "../src/lib/tracing";
 
 /**
  * Backend metrics leave over OTLP/HTTP once the deployment names a collector
@@ -83,24 +84,27 @@ let waitAgainAt = 0;
  * a slow export it stops waiting for a minute and lets exports finish in the
  * background. A failed export is logged, never thrown.
  */
-export async function flushMetrics() {
-  // The diagnostics logger reports failures; a background flush must not reject.
-  const flushing = exporting()
-    ?.forceFlush()
-    .catch(() => undefined);
+export const flushMetrics = traced(
+  "metrics.flushMetrics",
+  async function flushMetrics() {
+    // The diagnostics logger reports failures; a background flush must not reject.
+    const flushing = exporting()
+      ?.forceFlush()
+      .catch(() => undefined);
 
-  if (!flushing || Date.now() < waitAgainAt) return;
+    if (!flushing || Date.now() < waitAgainAt) return;
 
-  let timer: ReturnType<typeof setTimeout> | undefined;
+    let timer: ReturnType<typeof setTimeout> | undefined;
 
-  const finished = await Promise.race([
-    flushing.then(() => true),
-    new Promise<false>((resolve) => {
-      timer = setTimeout(() => resolve(false), flushWaitMs);
-    }),
-  ]);
+    const finished = await Promise.race([
+      flushing.then(() => true),
+      new Promise<false>((resolve) => {
+        timer = setTimeout(() => resolve(false), flushWaitMs);
+      }),
+    ]);
 
-  clearTimeout(timer);
+    clearTimeout(timer);
 
-  if (!finished) waitAgainAt = Date.now() + slowCollectorPauseMs;
-}
+    if (!finished) waitAgainAt = Date.now() + slowCollectorPauseMs;
+  },
+);

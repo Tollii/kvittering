@@ -2,7 +2,7 @@
 
 import { v } from "convex/values";
 import { noul, type Questions } from "@typesafe-ai/sdk";
-import { internalAction } from "./_generated/server";
+import { internalAction } from "./serverFunctions";
 import { productJudgments } from "./aiModels";
 import { internal } from "./_generated/api";
 import { contextBatches, type JudgmentClient } from "./decisions";
@@ -23,6 +23,7 @@ import {
 import type { CatalogProduct } from "../src/lib/catalog/model";
 import { groupCatalogProducts } from "../src/lib/catalog/equivalence";
 import { printedName, type ReceiptLine } from "../src/lib/domain/receipt";
+import { traced } from "../src/lib/tracing";
 
 export function catalogMatchQuestion(item: number, candidate: number) {
   return noul(
@@ -66,20 +67,23 @@ function prepareCatalogItem(item: CatalogItem) {
 }
 
 /** All questions are independent and use the complete, already collected candidate evidence. */
-export async function classifyCatalogProducts(
-  items: CatalogItem[],
-  client: JudgmentClient | null,
-): Promise<CatalogDecision[]> {
-  const prepared = items.map(prepareCatalogItem);
+export const classifyCatalogProducts = traced(
+  "catalogClassifier.classifyCatalogProducts",
+  async function classifyCatalogProducts(
+    items: CatalogItem[],
+    client: JudgmentClient | null,
+  ): Promise<CatalogDecision[]> {
+    const prepared = items.map(prepareCatalogItem);
 
-  return (
-    await Promise.all(
-      contextBatches(prepared, catalogRequest).map((batch) =>
-        classifyCatalogBatch(batch, client),
-      ),
-    )
-  ).flat();
-}
+    return (
+      await Promise.all(
+        contextBatches(prepared, catalogRequest).map((batch) =>
+          classifyCatalogBatch(batch, client),
+        ),
+      )
+    ).flat();
+  },
+);
 
 function catalogRequest(prepared: PreparedCatalogItem[]) {
   const questions: Questions = {};
