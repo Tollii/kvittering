@@ -31,7 +31,7 @@ This is the part his skill leaves open, because it does not assume tracing exist
 
 - **Trace and span ids on the event.** The event carries the trace id and span id of the unit of work's root span, so an event leads to its trace and back.
 - **One `enrich()` for handlers.** It writes each field to the wide event his middleware created, never to a second object, and to the root span, so the two always agree and nobody maintains two sets of fields. The event keeps the shape his rules give the fields, nested objects included; the span gets the same fields flattened to dotted keys, because a span attribute cannot hold an object. The middleware keeps a reference to the root span, because handlers call `enrich()` from inside traced helpers, where the active span is a child.
-- **The same names as the request context.** The fields PR 1 puts on every span (request id, user id, tenant id, route, entity ids) appear on the event under the same names.
+- **The request context is on the event too.** The values PR 1 puts on every span (request id, user id, tenant id, route, entity ids) also appear on the event. Name and shape them there as his rules say, not as the span does; the conventions doc records which event field matches which span attribute.
 
 ## Step 4: replace what is there, and keep it replaced
 
