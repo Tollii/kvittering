@@ -97,7 +97,7 @@ The final message to the user gives:
 
 ## In this repository
 
-Kvitto already has both halves (PR #188), so the mode here is the maintenance pass.
+Kvitto already has both halves, so the mode here is the maintenance pass.
 
 - **Conventions doc.** The [Tracing section of the architecture doc](../../../docs/architecture.md#tracing) plays that role. Do not create `docs/observability.md`, and do not add a `Last swept` line to the architecture doc; take the sweep's start date from the fallback in [references/maintenance.md](references/maintenance.md).
 - **Backend decision, already made.** Backend telemetry stays in the Convex logs, because the free plan has no log streams and queries and mutations cannot make network requests. The app sends spans to PostHog. Do not reopen this without being asked.
