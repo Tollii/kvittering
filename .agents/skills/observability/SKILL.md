@@ -29,7 +29,7 @@ Read only what the current step needs.
 | [references/maintenance.md](references/maintenance.md) | Both halves already exist |
 | [references/sources.md](references/sources.md) | A rule needs its reasoning, or someone asks where it comes from |
 | [assets/tracing-helper.md](assets/tracing-helper.md) | Writing the tracing helper and the request-context processor |
-| [assets/wide-event-middleware.md](assets/wide-event-middleware.md) | Adding trace ids and `enrich` to the event middleware |
+| [assets/wide-event-middleware.md](assets/wide-event-middleware.md) | Adding trace ids and `enrich()` to the middleware his skill describes |
 | [assets/conventions-doc.md](assets/conventions-doc.md) | Creating or extending the project's conventions doc |
 | [scripts/survey.sh](scripts/survey.sh) | Step 1, to collect the mechanical facts quickly |
 

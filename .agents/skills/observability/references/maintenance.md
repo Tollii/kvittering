@@ -23,7 +23,7 @@ Do not use the date the helper or its lint rule last changed. They change for un
 1. **Run the lint rules.** New untraced functions and stray `console` calls show up here.
 2. **Check the rules themselves.** Read the files changed since the start date; do not only lint them. If you find an untraced async function or a scattered log that lint passed, the rule has a hole. Fix the rule as well as the code, or the same gap returns.
 3. **Review what lint cannot judge**, in the changed files first and then more widely as time allows:
-   - New handlers enrich the wide event with business context, not only the fields the middleware sets. Judge new logging against the `logging-best-practices` skill, read again for the pass, not against memory of it.
+   - New handlers enrich the wide event with business context, not only the fields the middleware sets. Judge new logging against the `logging-best-practices` skill, read again for the pass, not against memory of it. If the repository no longer has it, get it as step 1 of [wide-events.md](wide-events.md) describes.
    - New kinds of work (a new job, consumer or webhook) have their own root span and their own event.
    - New outgoing calls carry trace context.
    - New fields follow the schema, and none of them holds personal data or secrets.

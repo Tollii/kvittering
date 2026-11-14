@@ -1,37 +1,50 @@
 # Wide-event tracing glue
 
-The lines that tie a wide event to the trace, shown for a Hono-style framework. The event itself (its fields, structure, logger and middleware shape) follows the `logging-best-practices` skill; its `rules/structure.md` has the full middleware. Add these lines to that middleware; do not treat this as a replacement for it.
+The lines that tie a wide event to the trace, shown for a Hono-style framework. The event itself (its fields, structure, logger and middleware) follows the `logging-best-practices` skill; its `rules/structure.md` has the full middleware. These lines go inside that middleware and write to the event object it already creates. They do not create a second event.
 
 Nothing in this repository compiles this code. Check the calls against the framework and OpenTelemetry versions the project installs.
 
 ```ts
 import { trace } from "@opentelemetry/api";
-import type { Span } from "@opentelemetry/api";
-import type { Context, Next } from "hono";
+import type { Attributes, Span } from "@opentelemetry/api";
+import type { Context } from "hono";
 
-type FieldValue = string | number | boolean;
+type WideEvent = Record<string, unknown>;
 
-export const wideEvent = () => async (c: Context, next: Next) => {
-  // Build the event as logging-best-practices describes, then add:
+/**
+ * Call inside his middleware, right after it creates the event and stores it
+ * with `c.set('wideEvent', wideEvent)`, and before `await next()`.
+ */
+export function linkToTrace(c: Context, wideEvent: WideEvent): void {
   const rootSpan = trace.getActiveSpan();
-  const event: Record<string, unknown> = {
-    trace_id: rootSpan?.spanContext().traceId,
-    span_id: rootSpan?.spanContext().spanId,
-  };
-  c.set("event", event);
+  wideEvent.trace_id = rootSpan?.spanContext().traceId;
+  wideEvent.span_id = rootSpan?.spanContext().spanId;
   // The span that is active here is the root span. Keep it, because handlers
   // call enrich() from inside traced helpers, where a child span is active.
   c.set("rootSpan", rootSpan);
-
-  await next(); // ...wrapped in the try / catch / finally his middleware uses
-};
+}
 
 /**
- * The one function handlers call to add business context. It writes each
- * field to the wide event and to the root span, so the two always agree.
+ * The one function handlers call to add business context. The event keeps the
+ * fields in the shape his rules give them, nested objects included. A span
+ * attribute cannot hold an object, so the root span gets the same fields
+ * flattened to dotted keys: `{ user: { id } }` becomes `user.id`.
  */
-export function enrich(c: Context, fields: Record<string, FieldValue>): void {
-  Object.assign(c.get("event") as Record<string, unknown>, fields);
-  (c.get("rootSpan") as Span | undefined)?.setAttributes(fields);
+export function enrich(c: Context, fields: WideEvent): void {
+  Object.assign(c.get("wideEvent") as WideEvent, fields);
+  (c.get("rootSpan") as Span | undefined)?.setAttributes(flatten(fields));
+}
+
+function flatten(fields: WideEvent, prefix = ""): Attributes {
+  const attributes: Attributes = {};
+  for (const [key, value] of Object.entries(fields)) {
+    const name = prefix + key;
+    if (value === null || value === undefined) continue;
+    if (typeof value === "object" && !Array.isArray(value))
+      Object.assign(attributes, flatten(value as WideEvent, `${name}.`));
+    else if (Array.isArray(value)) attributes[name] = value.map(String);
+    else attributes[name] = value as string | number | boolean;
+  }
+  return attributes;
 }
 ```

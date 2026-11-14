@@ -61,6 +61,7 @@ Last swept: <YYYY-MM-DD>
 
 ## Background
 
+- The `logging-best-practices` agent skill by Boris Tane, which sets this project's logging rules
 - [Logging Sucks](https://loggingsucks.com/) by Boris Tane
 - [Observability wide events 101](https://boristane.com/blog/observability-wide-events-101/) by Boris Tane
 - [Canonical log lines](https://stripe.com/blog/canonical-log-lines) on the Stripe blog

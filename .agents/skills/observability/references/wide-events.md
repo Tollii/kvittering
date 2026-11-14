@@ -6,7 +6,7 @@ Branch: `observability/wide-events`. If PR 1 is still open, branch from it and s
 
 The logging rules are not this skill's. They belong to Boris Tane's `logging-best-practices` skill, used as he wrote it. This file does not restate, summarize or adjust them. It covers only what his skill cannot know: how the event ties to the tracing from PR 1, how the work is enforced and proven, and how it ships.
 
-If anything in this skill seems to disagree with one of his rules, his rule wins. Say so in the final report, so this skill can be corrected.
+If anything in this skill seems to disagree with one of his rules, his rule wins, with one exception: the rule below about what stays out of an event. Say so in the final report, so this skill can be corrected.
 
 ## Step 1: get his skill and read all of it
 
@@ -17,7 +17,7 @@ If anything in this skill seems to disagree with one of his rules, his rule wins
    npx add-skill boristane/agent-skills --skill "logging-best-practices"
    ```
 
-   Commit the installed files in PR 2 as they arrive. Do not edit them; a changed copy can no longer be updated from upstream by running the command again.
+   Choose a project-local install if the command asks, and check that the folder landed inside the repository, next to its other agent skills, before going on. Commit the installed files in PR 2 as they arrive. Do not edit them; a changed copy can no longer be updated from upstream by running the command again.
 3. **Read it in full before writing any logging code:** its `SKILL.md`, then every file under `rules/` ([wide-events](../../logging-best-practices/rules/wide-events.md), [context](../../logging-best-practices/rules/context.md), [structure](../../logging-best-practices/rules/structure.md), [pitfalls](../../logging-best-practices/rules/pitfalls.md)). Its frontmatter turns off automatic loading, so nothing reads it unless you do.
 4. **If it cannot be installed**, for example with no network, read [Logging Sucks](https://loggingsucks.com/), which is where the rules come from. If neither can be reached, stop before the logging work and report that, instead of writing the rules from memory.
 
@@ -32,7 +32,7 @@ One clarification for this workflow: PR 1 gave every unit of work a root span, n
 This is the part his skill leaves open, because it does not assume tracing exists. [assets/wide-event-middleware.md](../assets/wide-event-middleware.md) shows the few lines involved.
 
 - **Trace and span ids on the event.** The event carries the trace id and span id of the unit of work's root span, so an event leads to its trace and back.
-- **One `enrich()` for handlers.** It writes each field to the wide event and to the root span, so the two always agree and nobody maintains two sets of fields. The middleware keeps a reference to the root span, because handlers call `enrich()` from inside traced helpers, where the active span is a child.
+- **One `enrich()` for handlers.** It writes each field to the wide event his middleware created, never to a second object, and to the root span, so the two always agree and nobody maintains two sets of fields. The event keeps the shape his rules give the fields, nested objects included; the span gets the same fields flattened to dotted keys, because a span attribute cannot hold an object. The middleware keeps a reference to the root span, because handlers call `enrich()` from inside traced helpers, where the active span is a child.
 - **The same names as the request context.** The fields PR 1 puts on every span (request id, user id, tenant id, route, entity ids) appear on the event under the same names.
 
 ## Step 4: replace what is there, and keep it replaced
@@ -62,7 +62,7 @@ Then run lint, typecheck and the test suite.
 
 ## Done when
 
-- [ ] `logging-best-practices` is in the repository, unmodified.
+- [ ] `logging-best-practices` is in the repository, unmodified, or the PR says why it is not and that Logging Sucks was used instead.
 - [ ] The lint rule runs in CI and reports nothing.
 - [ ] The four tests above pass.
 - [ ] The conventions doc holds the event's schema and the fields left out for privacy.
