@@ -1,6 +1,7 @@
 ---
 name: observability
 description: Set up or maintain observability in a codebase with OpenTelemetry tracing plus wide-event logging that follows the logging-best-practices skill, delivered as two pull requests. Use when asked to add tracing, replace scattered logs with one event per request, or check that existing observability still covers new code. Run it again later as a maintenance pass.
+disable-model-invocation: true
 metadata:
   harness: [claude, codex]
   platform: [darwin, linux]
