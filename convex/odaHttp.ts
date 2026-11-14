@@ -1,7 +1,6 @@
 import type { HttpRouter } from "convex/server";
 import { httpAction } from "./serverFunctions";
 import { internal } from "./_generated/api";
-import { errorDetails } from "../src/lib/diagnostics";
 import { odaCallbackUrl, signInExpiredMessage } from "./oda";
 import {
   exchangeOdaCode,
@@ -10,6 +9,7 @@ import {
   registerOdaClient,
 } from "./odaApi";
 import { randomToken } from "./tokens";
+import { annotateFailure } from "../src/lib/tracing";
 
 const noStore = { "Cache-Control": "no-store" };
 
@@ -132,7 +132,7 @@ export function registerOdaRoutes(http: HttpRouter) {
           ? back(authorization.returnUrl, "failed")
           : back(authorization.returnUrl, "connected", confirmation);
       } catch (error) {
-        console.error("oda.connect_failed", errorDetails(error));
+        annotateFailure("oda.connect", error);
         await ctx.runMutation(internal.oda.forgetAuthorization, {
           id: authorization.id,
         });

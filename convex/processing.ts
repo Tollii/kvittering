@@ -42,7 +42,7 @@ import {
   applyClassifications,
   canAcceptReceipt,
 } from "../src/lib/domain/receipt-review";
-import { traced } from "../src/lib/tracing";
+import { annotate, annotateFailure, traced } from "../src/lib/tracing";
 
 const workflow = new WorkflowManager(components.workflow);
 
@@ -180,10 +180,10 @@ export const begin = internalMutation({
       .withIndex("by_receiptId", (q) => q.eq("receiptId", args.id))
       .take(8);
 
-    console.info("receipt.processing_started", {
-      receiptId: args.id,
-      generation: args.generation,
-      imageCount: images.length,
+    annotate({
+      "kvitto.receipt.id": args.id,
+      "kvitto.receipt.generation": args.generation,
+      "kvitto.receipt.image_count": images.length,
     });
 
     images.sort((a, b) => a.position - b.position);
@@ -573,16 +573,17 @@ export const finish = internalMutation({
       !args.provider.includes("mock") &&
       receipt.revision === 0;
 
-    console.info("receipt.processing_completed", {
-      receiptId: args.id,
-      generation: args.generation,
-      provider: args.provider,
-      providerDurationMs: args.durationMs,
-      lineCount: data.lines.length,
-      uncertainLineCount: data.lines.filter((line) => line.issues.length > 0)
-        .length,
-      autoAccepted,
-      duplicate: !!duplicateOf,
+    annotate({
+      "kvitto.receipt.id": args.id,
+      "kvitto.receipt.generation": args.generation,
+      "kvitto.receipt.provider": args.provider,
+      "kvitto.receipt.provider_duration_ms": args.durationMs,
+      "kvitto.receipt.line_count": data.lines.length,
+      "kvitto.receipt.uncertain_line_count": data.lines.filter(
+        (line) => line.issues.length > 0,
+      ).length,
+      "kvitto.receipt.auto_accepted": autoAccepted,
+      "kvitto.receipt.duplicate": !!duplicateOf,
     });
     await commitReceiptChange(ctx, {
       receiptId: receipt._id,
@@ -624,12 +625,12 @@ async function failReceiptReading(
   if (!status) return;
 
   // The original failure stays on the receipt; do not duplicate OCR/provider text in logs.
-  console.error("receipt.processing_failed", {
-    receiptId: args.id,
-    generation: args.generation,
-    stage: args.stage,
-    errorType: args.errorType,
+  annotate({
+    "kvitto.receipt.id": args.id,
+    "kvitto.receipt.generation": args.generation,
+    "kvitto.receipt.failed_stage": args.stage,
   });
+  annotateFailure("receipt.reading", args.errorType ?? "unknown");
   await ctx.db.patch("receipts", args.id, {
     status,
     error: args.error.slice(0, 400),

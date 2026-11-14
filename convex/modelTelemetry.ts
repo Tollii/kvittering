@@ -1,10 +1,10 @@
 import type { Attributes, Histogram } from "@opentelemetry/api";
 import type { Telemetry } from "ai";
 import { flushMetrics, meter } from "./metrics";
-import { traced } from "../src/lib/tracing";
+import { annotate, count, traced } from "../src/lib/tracing";
 
 /**
- * Every model call reports its token use as a log line and as metrics, so
+ * Every model call adds its token use to the request's wide event and to metrics, so
  * production shows what reasoning and prompt caching cost before anyone tunes
  * them. Names follow the OpenTelemetry GenAI conventions; cached input and
  * reasoning output are parts of input and output, so they get their own
@@ -67,8 +67,30 @@ function instruments() {
   };
 }
 
+/** Sums a request's model calls onto its wide event, per operation, since one request can make several. */
+function annotateCall(call: ModelCall) {
+  const prefix = `kvitto.model.${call.operation}` as const;
+
+  annotate({
+    [`${prefix}.provider`]: call.provider,
+    [`${prefix}.model`]: call.model,
+  });
+  count(`${prefix}.calls`);
+
+  const totals = {
+    input_tokens: call.inputTokens,
+    cached_input_tokens: call.cachedInputTokens,
+    output_tokens: call.outputTokens,
+    reasoning_tokens: call.reasoningTokens,
+    duration_ms: call.durationMs,
+  };
+
+  for (const [field, value] of Object.entries(totals))
+    if (value !== undefined) count(`${prefix}.${field}`, value);
+}
+
 async function record(call: ModelCall) {
-  console.info("model.call_completed", call);
+  annotateCall(call);
 
   const recorded = instruments();
 

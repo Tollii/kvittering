@@ -7,9 +7,9 @@ import { env } from "./_generated/server";
 import { httpAction } from "./serverFunctions";
 import { internal } from "./_generated/api";
 import { authComponent, createAuth } from "./auth";
-import { errorDetails } from "../src/lib/diagnostics";
 import { registerMcpRoutes } from "./mcpHttp";
 import { registerOdaRoutes } from "./odaHttp";
+import { annotate, annotateFailure } from "../src/lib/tracing";
 
 const http = httpRouter();
 
@@ -47,13 +47,17 @@ http.route({
   method: "POST",
   handler: httpAction(async (ctx, request) => {
     const responseHeaders = headers(request);
-    const started = Date.now();
 
     try {
       const url = new URL(request.url);
       const id = parse(v.id("receipts"), url.searchParams.get("receipt"));
       const position = Number(url.searchParams.get("position"));
       const metadata = request.headers.get("X-Kvitto-Client");
+
+      annotate({
+        "kvitto.receipt.id": id,
+        "kvitto.receipt.image.position": position,
+      });
 
       const client = metadata
         ? parse(clientValidator, JSON.parse(metadata))
@@ -97,6 +101,10 @@ http.route({
           status: 413,
           headers: responseHeaders,
         });
+      annotate({
+        "kvitto.receipt.image.bytes": blob.size,
+        "kvitto.receipt.image.type": type,
+      });
       const storageId = await ctx.storage.store(blob);
 
       try {
@@ -113,10 +121,8 @@ http.route({
 
       return Response.json({ uploaded: true }, { headers: responseHeaders });
     } catch (error) {
-      console.warn("receipt.image_upload_failed", {
-        ...errorDetails(error),
-        durationMs: Date.now() - started,
-      });
+      // The response states the failure; the request's line keeps its kind.
+      annotateFailure("receipt.image_upload", error);
 
       // Installed upload clients read only release-policy errors from JSON bodies.
       if (

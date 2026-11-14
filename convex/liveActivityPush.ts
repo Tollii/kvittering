@@ -6,6 +6,7 @@ import { env } from "./_generated/server";
 import { internalAction } from "./serverFunctions";
 import { internal } from "./_generated/api";
 import { appleJwt } from "./appleJwt";
+import { annotate, annotateFailure } from "../src/lib/tracing";
 
 function authorization() {
   if (!env.APNS_KEY_ID || !env.APNS_TEAM_ID || !env.APNS_PRIVATE_KEY)
@@ -91,17 +92,18 @@ export const deliver = internalAction({
     const progress = { ...delivery.progress, ended };
     let status = 0;
 
+    annotate({
+      "kvitto.activity.attempt": args.attempt,
+      "kvitto.activity.ended": ended,
+    });
+
     try {
       const jwt = await authorization();
 
       if (!jwt || !activity.token || !activity.environment) {
         // Without APNs credentials, the Live Activity only changes while the app is open.
         if (!jwt && activity.token && !args.expired)
-          console.warn("receipt.activity_push_unconfigured", {
-            keyId: !!env.APNS_KEY_ID,
-            teamId: !!env.APNS_TEAM_ID,
-            privateKey: !!env.APNS_PRIVATE_KEY,
-          });
+          annotateFailure("activity.push", "apns_unconfigured");
 
         if (args.expired || activity.expiresAt <= Date.now())
           await ctx.runMutation(internal.liveActivities.remove, {
@@ -144,17 +146,10 @@ export const deliver = internalAction({
         activity.environment,
       );
     } catch (error) {
-      console.warn("receipt.activity_delivery_failed", {
-        attempt: args.attempt,
-        error: String(error),
-      });
+      annotateFailure("activity.delivery", error);
     }
 
-    if (status !== 200)
-      console.warn("receipt.activity_delivery_status", {
-        status,
-        attempt: args.attempt,
-      });
+    annotate({ "kvitto.activity.status": status });
 
     const retryable = status === 0 || status === 429 || status >= 500;
 

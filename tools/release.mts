@@ -74,9 +74,9 @@ if (git(["status", "--porcelain"]))
     "Release from a clean, committed worktree so the checked revision is the released revision.",
   );
 
-console.log(
-  `Checking ${operation} at ${git(["rev-parse", "HEAD"])} on ${stagingDeployment}.`,
-);
+const revision = git(["rev-parse", "HEAD"]);
+
+console.log(`Checking ${operation} at ${revision} on ${stagingDeployment}.`);
 
 // The installed CLI gives a deployment-specific key precedence over .env.local.
 // Keep it in the child environment, never in arguments or temporary files.
@@ -98,5 +98,9 @@ if (operation === "client" || values.stage === "enforcement") {
   requireReadModel(ready);
 }
 
-if (operation === "backend") console.log(convex(["deploy", "--yes"]));
-else console.log("Staging read model is ready. No backend was deployed.");
+if (operation === "backend") {
+  console.log(convex(["deploy", "--yes"]));
+  // Every wide event names the commit it ran; set after the deploy, so a
+  // failed deploy leaves the running code's commit in place.
+  console.log(convex(["env", "set", "BACKEND_COMMIT", revision]));
+} else console.log("Staging read model is ready. No backend was deployed.");

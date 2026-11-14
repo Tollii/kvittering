@@ -10,6 +10,7 @@ import {
 import {
   StackContextManager,
   type ReadableSpan,
+  type Span as SdkSpan,
   type SpanProcessor,
 } from "@opentelemetry/sdk-trace";
 import {
@@ -19,22 +20,29 @@ import {
 } from "convex/server";
 import type { Value } from "convex/values";
 import type { ActionCtx } from "./_generated/server";
+import { errorDetails } from "../src/lib/diagnostics";
 import {
+  annotateFailure,
   httpOutcome,
   incomingTraceContext,
+  requestContextOf,
   setRequestAttributes,
   traced,
+  type RequestContext,
   tracedRequest,
   type RequestAttributes,
 } from "../src/lib/tracing";
 import { installTracing, spanRecord } from "../src/lib/tracing/sdk";
 
 /**
- * Backend spans stay in the Convex logs as `trace.span` lines; the free plan
- * has no log streams, and queries and mutations cannot make network requests.
- * Search the logs by trace id to follow one request, including the app's half
- * of it, which carries the same trace id. `OTEL_TRACES_EXPORTER=none` turns
- * the lines off; spans are still recorded so trace context keeps flowing.
+ * Backend telemetry stays in the Convex logs; the free plan has no log
+ * streams, and queries and mutations cannot make network requests. Each
+ * function call writes one wide event, a `request.completed` line with its
+ * outcome, timing, account, household, and the business context its handler
+ * added with `annotate`. Search the logs by trace id to follow one request,
+ * including the app's half of it, which carries the same trace id.
+ * `OTEL_TRACES_EXPORTER=none` turns the lines off; spans are still recorded
+ * so trace context keeps flowing.
  */
 
 /**
@@ -88,56 +96,135 @@ function contextManager(): ContextManager {
   try {
     return new AsyncContextManager();
   } catch (error) {
-    console.warn("trace.async_context_unavailable", { error: String(error) });
+    console.error("trace.async_context_unavailable", {
+      errorType: errorDetails(error).errorType,
+    });
 
     return new StackContextManager();
   }
 }
 
 /**
- * Inner spans one request may log. Convex keeps a bounded number of log
- * lines per execution, and a request that saves hundreds of rows must not
- * crowd out its own diagnostics.
+ * Inner spans one request may keep for its log. Convex keeps a bounded
+ * number of log lines per execution, and a request that saves hundreds of
+ * rows must not crowd out its own diagnostics.
  */
 const loggedInnerSpans = 64;
 
+/** A request at least this slow logs its inner spans. Queries and mutations run on a frozen clock and never are. */
+const slowRequestMs = 2000;
+
 /**
- * Writes each finished span to the function's log: every root and failed
- * span, and inner spans up to the limit. The root counts what was left out.
+ * The share of ordinary requests that log their inner spans too. The choice
+ * follows the trace id, so the app's half of a sampled trace matches.
+ */
+const detailSampleRate = 0.05;
+
+type SpanLine = Omit<ReturnType<typeof spanRecord>, "start" | "end">;
+
+type RequestDetail = { spans: SpanLine[]; omitted: number; failed: boolean };
+
+function sampled(traceId: string) {
+  return Number.parseInt(traceId.slice(-8), 16) / 2 ** 32 < detailSampleRate;
+}
+
+/**
+ * Writes one wide event per request: its root span, enriched with the
+ * request's business context and the deployed commit, as a
+ * `request.completed` line. Inner spans are
+ * tail-sampled once the request ends: a failed span logs right away, and the
+ * rest log only when the request failed, handled a failure, was slow, or is
+ * in the sample. The root counts the spans it left out.
  */
 class LogSpanProcessor implements SpanProcessor {
-  #logged = new Map<string, number>();
+  #requests = new WeakMap<SdkSpan, RequestContext>();
 
-  #omitted = new Map<string, number>();
+  #details = new Map<RequestContext | string, RequestDetail>();
 
-  onStart() {}
+  onStart(span: SdkSpan, parent: Context) {
+    const request = requestContextOf(parent);
+
+    if (request) this.#requests.set(span, request);
+  }
+
+  /** A request's own context tells apart requests that continue the same trace. */
+  #keyOf(span: ReadableSpan) {
+    // SAFETY: the provider passes the same span object to onStart and onEnd.
+    return this.#requests.get(span as SdkSpan) ?? span.spanContext().traceId;
+  }
 
   onEnd(span: ReadableSpan) {
     if (process.env.OTEL_TRACES_EXPORTER === "none") return;
 
-    const { traceId } = span.spanContext();
+    const key = this.#keyOf(span);
     const root = !span.parentSpanContext || span.parentSpanContext.isRemote;
     const { start: _start, end: _end, ...record } = spanRecord(span);
 
-    if (root) {
-      const omitted = this.#omitted.get(traceId);
+    if (root) this.#logRequest(span, record, this.#takeDetail(key));
+    else this.#holdInner(key, record);
+  }
 
-      if (omitted) record.attributes["kvitto.spans.omitted"] = omitted;
-      this.#logged.delete(traceId);
-      this.#omitted.delete(traceId);
-    } else if (!record.failed) {
-      const logged = this.#logged.get(traceId) ?? 0;
+  /** Logs a failed inner span right away and holds the rest until the request ends. */
+  #holdInner(key: RequestContext | string, record: SpanLine) {
+    const detail = this.#details.get(key) ?? {
+      spans: [],
+      omitted: 0,
+      failed: false,
+    };
 
-      if (logged >= loggedInnerSpans) {
-        this.#omitted.set(traceId, (this.#omitted.get(traceId) ?? 0) + 1);
+    this.#details.set(key, detail);
 
-        return;
-      }
+    if (record.failed) {
+      detail.failed = true;
+      console.info("trace.span", record);
+    } else if (detail.spans.length < loggedInnerSpans)
+      detail.spans.push(record);
+    else detail.omitted += 1;
+  }
 
-      this.#logged.set(traceId, logged + 1);
+  #takeDetail(key: RequestContext | string) {
+    const detail = this.#details.get(key);
+
+    this.#details.delete(key);
+
+    return detail;
+  }
+
+  #logRequest(span: ReadableSpan, record: SpanLine, detail?: RequestDetail) {
+    if (detail) {
+      const handled = Number(record.attributes["kvitto.failures.handled"] ?? 0);
+
+      const keep =
+        record.failed ||
+        detail.failed ||
+        handled > 0 ||
+        record.attributes["kvitto.outcome"] !== "success" ||
+        record.durationMs >= slowRequestMs ||
+        sampled(span.spanContext().traceId);
+
+      if (keep) {
+        for (const inner of detail.spans) console.info("trace.span", inner);
+
+        if (detail.omitted)
+          record.attributes["kvitto.spans.omitted"] = detail.omitted;
+      } else
+        record.attributes["kvitto.spans.unlogged"] =
+          detail.spans.length + detail.omitted;
     }
 
-    console.info("trace.span", record);
+    const { attributes: resource } = span.resource;
+
+    const line = {
+      ...record,
+      service: resource["service.name"],
+      commit: resource["service.version"],
+      environment: resource["deployment.environment.name"],
+    };
+
+    // Two levels: error for a defect, info for everything else, including
+    // refusals and handled failures, which the line's fields describe.
+    if (record.failed) console.error("request.completed", line);
+    else console.info("request.completed", line);
   }
 
   forceFlush() {
@@ -152,6 +239,8 @@ class LogSpanProcessor implements SpanProcessor {
 installTracing({
   resource: {
     "service.name": "kvitto-backend",
+    // The release tool sets it after each deploy; development has none.
+    "service.version": process.env.BACKEND_COMMIT ?? "unknown",
     // Read without validation: a bad value must not stop every function from loading.
     "deployment.environment.name": process.env.RELEASE_CHANNEL ?? "development",
   },
@@ -211,7 +300,7 @@ async function describe(span: Span, kind: FunctionKind, ctx: TracedCtx) {
     }
   } catch (error) {
     // Handled: a runtime without metadata still runs the function, unnamed.
-    console.warn("trace.metadata_unavailable", { error: String(error) });
+    annotateFailure("trace.metadata", error);
   }
 
   // Queries learn the account from the access check instead, so a query that

@@ -28,7 +28,7 @@ import {
   requestKey,
   resultLifetime,
 } from "../src/lib/catalog/policy";
-import { traced } from "../src/lib/tracing";
+import { annotate, count, traced } from "../src/lib/tracing";
 
 const pool = new Workpool(components.catalogWorkpool, {
   maxParallelism: 4,
@@ -118,10 +118,11 @@ export const ensureRequest = traced(
       existing &&
       (isRequestLive(existing, now) || existing.expiresAt > now)
     ) {
-      console.info("catalog.request_reused", {
-        requestId: existing._id,
-        kind: request.kind,
-        state: existing.state,
+      count("kvitto.catalog.requests_reused");
+      annotate({
+        "kvitto.catalog.request.id": existing._id,
+        "kvitto.catalog.request.kind": request.kind,
+        "kvitto.catalog.request.state": existing.state,
       });
 
       return existing;
@@ -152,11 +153,14 @@ export const ensureRequest = traced(
 
     if (existing) await ctx.db.replace("catalogRequests", id, values);
     await enqueue(ctx, id);
-    console.info("catalog.request_queued", {
-      requestId: id,
-      kind: request.kind,
-      refresh: !!existing,
-      stale: existing ? isRequestInFlight(existing.state) : false,
+    count("kvitto.catalog.requests_queued");
+    annotate({
+      "kvitto.catalog.request.id": id,
+      "kvitto.catalog.request.kind": request.kind,
+      "kvitto.catalog.request.refresh": !!existing,
+      "kvitto.catalog.request.stale": existing
+        ? isRequestInFlight(existing.state)
+        : false,
     });
 
     const saved = await ctx.db.get("catalogRequests", id);

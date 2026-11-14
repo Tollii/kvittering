@@ -49,6 +49,7 @@ import {
   catalogDecision,
   type CatalogDecision,
 } from "../src/lib/catalog/decisions";
+import { annotate, annotateFailure, count } from "../src/lib/tracing";
 
 export { catalogDecision } from "../src/lib/catalog/decisions";
 
@@ -204,9 +205,9 @@ export const start = internalMutation({
       catalogStatus: "pending",
       catalogWorkflowId: workflowId,
     });
-    console.info("catalog.matching_started", {
-      receiptId: args.id,
-      generation: args.generation,
+    annotate({
+      "kvitto.receipt.id": args.id,
+      "kvitto.receipt.generation": args.generation,
     });
 
     return null;
@@ -332,16 +333,10 @@ async function lineMatchingInput(
   };
 }
 
-/** Counts the decisions for each reason, for the evaluation log. */
-function countDecisionReasons(decisions: CatalogDecision[]) {
-  const reasons: Record<string, number> = {};
-
-  for (const decision of decisions) {
-    const reason = decision.reason ?? "unspecified";
-    reasons[reason] = (reasons[reason] ?? 0) + 1;
-  }
-
-  return reasons;
+/** Counts the decisions for each reason on the request's wide event. */
+function annotateDecisionReasons(decisions: CatalogDecision[]) {
+  for (const decision of decisions)
+    count(`kvitto.catalog.reason.${decision.reason ?? "unspecified"}`);
 }
 
 /**
@@ -391,17 +386,15 @@ export const apply = internalMutation({
       return null;
     const data = receipt.data;
     let changed = false;
-    const reasons = countDecisionReasons(args.decisions);
-
-    console.info("catalog.matching_evaluated", {
-      receiptId: args.id,
-      generation: args.generation,
-      itemCount: args.decisions.length,
-      selectedCount: args.decisions.filter(
+    annotate({
+      "kvitto.receipt.id": args.id,
+      "kvitto.receipt.generation": args.generation,
+      "kvitto.catalog.item_count": args.decisions.length,
+      "kvitto.catalog.selected_count": args.decisions.filter(
         (decision) => decision.productKey !== null,
       ).length,
-      reasons,
     });
+    annotateDecisionReasons(args.decisions);
 
     const diagnostics = new Map(
       (receipt.catalogDecisions ?? []).map((decision) => [
@@ -564,10 +557,11 @@ export const failed = internalMutation({
       receipt?.generation === args.generation &&
       receipt.catalogWorkflowId === args.workflowId
     ) {
-      console.error("catalog.matching_failed", {
-        receiptId: args.id,
-        generation: args.generation,
+      annotate({
+        "kvitto.receipt.id": args.id,
+        "kvitto.receipt.generation": args.generation,
       });
+      annotateFailure("catalog.matching", "workflow_failed");
       await settleFailedMatching(ctx, args.id);
     }
 
@@ -624,11 +618,8 @@ async function endStalledMatching(ctx: MutationCtx, receipt: Doc<"receipts">) {
     reason = "timed_out";
   }
 
-  console.error("catalog.matching_stalled", {
-    receiptId: receipt._id,
-    generation: receipt.generation,
-    reason,
-  });
+  count("kvitto.catalog.matching.stalled");
+  annotateFailure("catalog.matching", reason);
   await settleFailedMatching(ctx, receipt._id);
 }
 
@@ -647,10 +638,7 @@ export const recoverStalled = internalMutation({
         await endStalledMatching(ctx, receipt);
       } catch (cause) {
         // One unreadable run must not hold back the receipts after it.
-        console.error("catalog.matching_recovery_failed", {
-          receiptId: receipt._id,
-          error: cause instanceof Error ? cause.message : String(cause),
-        });
+        annotateFailure("catalog.matching_recovery", cause);
       }
     }
 

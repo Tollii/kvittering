@@ -118,6 +118,6 @@ describe("release command effects", () => {
     const fixture = releaseFixture(true);
     const result = fixture.run(["backend", "--stage", "enforcement"]);
     expect(result.status).toBe(0);
-    expect(fixture.calls()).toBe("run\ndeploy\n");
+    expect(fixture.calls()).toBe("run\ndeploy\nenv\n");
   });
 });

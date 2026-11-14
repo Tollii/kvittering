@@ -1,5 +1,6 @@
 import { v } from "convex/values";
 import { env } from "./_generated/server";
+import { annotateFailure } from "../src/lib/tracing";
 
 /**
  * Receipt model settings. Other modules must not read the receipt reader's
@@ -45,8 +46,7 @@ export function receiptReader(): ReceiptReader {
 }
 
 export type ProductModel =
-  | { kind: "disabled" }
-  | { kind: "model"; model: string };
+  { kind: "disabled" } | { kind: "model"; model: string };
 
 /** `PRODUCT_MODEL` names the product judgment model as `provider:model`, Jev by default. */
 export function productModelName() {
@@ -63,9 +63,7 @@ export function hasProductModel() {
   } catch (error) {
     if (!(error instanceof ProviderConfigurationError)) throw error;
 
-    console.error("receipt.product_model_misconfigured", {
-      message: error.message,
-    });
+    annotateFailure("receipt.product_model", "misconfigured");
 
     return false;
   }
