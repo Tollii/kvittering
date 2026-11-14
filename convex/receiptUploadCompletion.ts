@@ -4,7 +4,7 @@ import type { Doc, Id } from "./_generated/dataModel";
 import type { WithoutSystemFields } from "convex/server";
 import type { ReceiptData } from "../src/lib/domain/receipt";
 import { receiptTransition } from "../src/lib/domain/receipt-state";
-import { traced } from "../src/lib/tracing";
+import { annotate, traced } from "../src/lib/tracing";
 
 type Uploader = Pick<Doc<"members">, "householdId" | "identity" | "name">;
 
@@ -60,10 +60,10 @@ export const beginUploadedReceipt = traced(
     await ctx.db.patch("receipts", id, { status, generation: 1 });
 
     await startReading(ctx, id, 1);
-    console.info("receipt.upload_completed", {
-      receiptId: id,
-      generation: 1,
-      imageCount,
+    annotate({
+      "kvitto.receipt.id": id,
+      "kvitto.receipt.generation": 1,
+      "kvitto.receipt.image_count": imageCount,
     });
   },
 );

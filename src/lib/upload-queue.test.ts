@@ -16,6 +16,7 @@ import {
   type QueueStore,
   type UploadTransport,
 } from "./upload-queue";
+import type { DiagnosticFields } from "./diagnostics";
 
 const household = testId<"households">("household");
 
@@ -750,3 +751,52 @@ it.each(["read", "write", "remove"] as const)(
     expect(present(rows()[0]).failure).toEqual({ kind: "failed" });
   },
 );
+
+describe("upload diagnostics", () => {
+  it("records one event per attempt with what it uploaded and how it ended", async () => {
+    const { store, retries, clock } = fixture();
+    const record = vi.fn<(event: string, fields: DiagnosticFields) => void>();
+
+    const run = createQueueRunner(store, retries, {
+      clock: () => clock.now,
+      record,
+    });
+
+    let failSecond = true;
+
+    const transport: UploadTransport = {
+      reserve: async () => receiptId,
+      upload: async (_id, position) => {
+        if (position === 1 && failSecond)
+          throw new Error("Network request failed");
+      },
+      complete: async () => {},
+    };
+
+    await run("user", household, transport, () => true);
+    failSecond = false;
+    await run("user", household, transport, () => true, { retryFailed: true });
+
+    expect(record.mock.calls).toEqual([
+      [
+        "receipt.upload_attempted",
+        expect.objectContaining({
+          captureId: "capture",
+          receiptId,
+          reserved: true,
+          uploadedImages: 1,
+          outcome: "failed",
+        }),
+      ],
+      [
+        "receipt.upload_attempted",
+        expect.objectContaining({
+          captureId: "capture",
+          receiptId,
+          uploadedImages: 1,
+          outcome: "completed",
+        }),
+      ],
+    ]);
+  });
+});

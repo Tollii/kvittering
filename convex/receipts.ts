@@ -66,6 +66,7 @@ import {
 } from "../src/lib/domain/receipt-summary";
 import { learnCategories } from "./aliases";
 import { renamedName } from "../src/lib/domain/category-memory";
+import { annotate } from "../src/lib/tracing";
 
 export const list = query({
   args: { paginationOpts: paginationOptsValidator },
@@ -204,7 +205,11 @@ export const retry = mutation({
     });
 
     await startReading(ctx, id, generation);
-    console.info("receipt.processing_retried", { receiptId: id, generation });
+    annotate({
+      "kvitto.receipt.id": id,
+      "kvitto.receipt.generation": generation,
+      "kvitto.receipt.retried": true,
+    });
 
     return null;
   },

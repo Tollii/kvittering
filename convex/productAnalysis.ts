@@ -33,6 +33,7 @@ import {
   type ExtractedReceipt,
 } from "../src/lib/domain/receipt-state";
 import { getOrInsert } from "../src/lib/map-cache";
+import { annotate, annotateFailureCode } from "../src/lib/tracing";
 
 const snapshot = {
   id: v.id("receipts"),
@@ -516,15 +517,17 @@ export const finish = internalMutation({
       },
     });
 
-    const fields = {
-      receiptId: args.id,
-      generation: args.generation,
-      revision: args.revision,
-      resultCount: results.length,
-    };
+    annotate({
+      "kvitto.receipt.id": args.id,
+      "kvitto.receipt.generation": args.generation,
+      "kvitto.receipt.revision": args.revision,
+      "kvitto.product.result_count": results.length,
+    });
 
-    if (args.failed) console.error("product.analysis_failed", fields);
-    else console.info("product.analysis_completed", fields);
+    if (args.failed)
+      annotateFailureCode("product.analysis", "analysis_failed", {
+        defect: true,
+      });
 
     return null;
   },

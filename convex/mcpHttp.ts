@@ -17,8 +17,11 @@ import {
   type ParsedToolCall,
   type ToolResult,
 } from "../src/lib/mcp/tools";
-import { errorDetails } from "../src/lib/diagnostics";
-import { setRequestAttributes } from "../src/lib/tracing";
+import {
+  annotate,
+  annotateFailure,
+  setRequestAttributes,
+} from "../src/lib/tracing";
 
 async function runTool(
   ctx: ActionCtx,
@@ -92,12 +95,11 @@ async function callTool(
   call: ParsedToolCall,
 ): Promise<ToolResult> {
   try {
+    annotate({ "kvitto.mcp.tool": call.name });
+
     return await runTool(ctx, householdId, call);
   } catch (error) {
-    console.warn("mcp.tool_failed", {
-      tool: call.name,
-      ...errorDetails(error),
-    });
+    annotateFailure("mcp.tool", error);
 
     const expected =
       error instanceof ConvexError

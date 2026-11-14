@@ -5,7 +5,11 @@ import { diagnosticText } from "./sentry-event";
 import { analytics } from "./analytics";
 import { setRequestAttributes } from "./tracing";
 
-/** Record deliberate milestones; do not pass request arguments or response bodies. */
+/**
+ * Record one event per unit of work, such as an upload attempt or an update
+ * check, carrying what it did and how it ended, instead of a line per step.
+ * Do not pass request arguments or response bodies.
+ */
 export function recordEvent(
   event: string,
   fields: DiagnosticFields = {},
