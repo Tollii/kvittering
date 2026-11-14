@@ -6,7 +6,11 @@ import { env } from "./_generated/server";
 import { internalAction } from "./serverFunctions";
 import { internal } from "./_generated/api";
 import { appleJwt } from "./appleJwt";
-import { annotate, annotateFailure } from "../src/lib/tracing";
+import {
+  annotate,
+  annotateFailure,
+  annotateFailureCode,
+} from "../src/lib/tracing";
 
 function authorization() {
   if (!env.APNS_KEY_ID || !env.APNS_TEAM_ID || !env.APNS_PRIVATE_KEY)
@@ -103,7 +107,9 @@ export const deliver = internalAction({
       if (!jwt || !activity.token || !activity.environment) {
         // Without APNs credentials, the Live Activity only changes while the app is open.
         if (!jwt && activity.token && !args.expired)
-          annotateFailure("activity.push", "apns_unconfigured");
+          annotateFailureCode("activity.push", "apns_unconfigured", {
+            defect: true,
+          });
 
         if (args.expired || activity.expiresAt <= Date.now())
           await ctx.runMutation(internal.liveActivities.remove, {
@@ -150,6 +156,13 @@ export const deliver = internalAction({
     }
 
     annotate({ "kvitto.activity.status": status });
+
+    // Status 0 is a request that threw, recorded above. A refused key or
+    // malformed request is a defect; Apple's throttling and outages are not.
+    if (status !== 0 && status !== 200)
+      annotateFailureCode("activity.delivery", `http_${status}`, {
+        defect: status === 403 || status === 400,
+      });
 
     const retryable = status === 0 || status === 429 || status >= 500;
 

@@ -42,7 +42,7 @@ import {
   applyClassifications,
   canAcceptReceipt,
 } from "../src/lib/domain/receipt-review";
-import { annotate, annotateFailure, traced } from "../src/lib/tracing";
+import { annotate, annotateFailureCode, traced } from "../src/lib/tracing";
 
 const workflow = new WorkflowManager(components.workflow);
 
@@ -630,7 +630,9 @@ async function failReceiptReading(
     "kvitto.receipt.generation": args.generation,
     "kvitto.receipt.failed_stage": args.stage,
   });
-  annotateFailure("receipt.reading", args.errorType ?? "unknown");
+  annotateFailureCode("receipt.reading", args.errorType ?? "unknown", {
+    defect: true,
+  });
   await ctx.db.patch("receipts", args.id, {
     status,
     error: args.error.slice(0, 400),

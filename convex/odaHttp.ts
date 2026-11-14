@@ -132,7 +132,7 @@ export function registerOdaRoutes(http: HttpRouter) {
           ? back(authorization.returnUrl, "failed")
           : back(authorization.returnUrl, "connected", confirmation);
       } catch (error) {
-        annotateFailure("oda.connect", error);
+        annotateFailure("oda.connect", error, { defect: true });
         await ctx.runMutation(internal.oda.forgetAuthorization, {
           id: authorization.id,
         });

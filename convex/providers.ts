@@ -46,6 +46,12 @@ export const extract = internalAction({
   handler: async (ctx, args) => {
     const started = Date.now();
 
+    // Set first, so a reading that fails still names its receipt.
+    annotate({
+      "kvitto.receipt.id": args.receiptId,
+      "kvitto.receipt.generation": args.generation,
+    });
+
     // An evaluation's model replaces the production reader, key check included.
     const reader = args.model
       ? { kind: "model" as const, model: args.model }
@@ -123,8 +129,6 @@ export const extract = internalAction({
     const data = prepareExtraction(response.output, images.length);
     // The model call's token counts are on the same wide event.
     annotate({
-      "kvitto.receipt.id": args.receiptId,
-      "kvitto.receipt.generation": args.generation,
       "kvitto.receipt.reader_model": model,
       "kvitto.receipt.extraction_duration_ms": Date.now() - started,
       "kvitto.receipt.image_count": images.length,

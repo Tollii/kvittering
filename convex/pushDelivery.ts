@@ -1,5 +1,10 @@
 import { receiptReviewCategory } from "../src/lib/receipt-notifications";
-import { annotate, annotateFailure, tracedFetch } from "../src/lib/tracing";
+import {
+  annotate,
+  annotateFailure,
+  annotateFailureCode,
+  tracedFetch,
+} from "../src/lib/tracing";
 import { z } from "zod";
 import { v } from "convex/values";
 import { env } from "./_generated/server";
@@ -116,7 +121,7 @@ async function deliverPush(
 
     if (outcome.kind === "rejected") {
       annotate({ "kvitto.push.rejection.status": outcome.status });
-      annotateFailure("push.delivery", outcome.reason ?? "rejected");
+      annotateFailureCode("push.delivery", outcome.reason ?? "rejected");
     } else annotateFailure("push.delivery", outcome.error);
 
     if (delay !== undefined) await delivery.retry(delay);

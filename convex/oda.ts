@@ -27,7 +27,12 @@ import {
   refreshOdaTokens,
   revokeOdaToken,
 } from "./odaApi";
-import { annotate, annotateFailure, traced } from "../src/lib/tracing";
+import {
+  annotate,
+  annotateFailure,
+  annotateFailureCode,
+  traced,
+} from "../src/lib/tracing";
 
 const authorizationLifetimeMs = 10 * 60 * 1000;
 
@@ -351,7 +356,7 @@ export const holdTokens = internalMutation({
     const client = clientId ?? row?.signIn?.clientId;
 
     if (client) await revokeAtOda(ctx, client, pending);
-    else annotateFailure("oda.revoke", "unknown_client");
+    else annotateFailureCode("oda.revoke", "unknown_client");
 
     return "expired";
   },
@@ -625,7 +630,7 @@ export const syncConnection = internalAction({
         "kvitto.oda.connection.id": args.id,
         "kvitto.oda.sign_in_expired": expired,
       });
-      annotateFailure("oda.sync", error);
+      annotateFailure("oda.sync", error, { defect: !expired });
       await ctx.runMutation(internal.oda.recordFailure, {
         ...held,
         expired,

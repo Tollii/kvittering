@@ -100,7 +100,15 @@ if (operation === "client" || values.stage === "enforcement") {
 
 if (operation === "backend") {
   console.log(convex(["deploy", "--yes"]));
+
   // Every wide event names the commit it ran; set after the deploy, so a
-  // failed deploy leaves the running code's commit in place.
-  console.log(convex(["env", "set", "BACKEND_COMMIT", revision]));
+  // failed deploy leaves the running code's commit in place. It is a label:
+  // lines between the deploy and this call still name the previous commit.
+  try {
+    console.log(convex(["env", "set", "BACKEND_COMMIT", revision]));
+  } catch {
+    console.warn(
+      `Deployed ${revision}, but BACKEND_COMMIT was not updated. Set it with: npx convex env set BACKEND_COMMIT ${revision}`,
+    );
+  }
 } else console.log("Staging read model is ready. No backend was deployed.");

@@ -109,6 +109,9 @@ export function annotate(fields: EventFields) {
   }
 }
 
+/** How many failures the request handled; any keeps its inner spans in the log. */
+export const handledFailuresKey = "kvitto.failures.handled";
+
 /** Adds to a count on the wide event, for work a request repeats, such as each model call. */
 export function count(key: `kvitto.${string}`, amount = 1) {
   const event = requestEvent();
@@ -117,23 +120,53 @@ export function count(key: `kvitto.${string}`, amount = 1) {
   event[key] = Number(event[key] ?? 0) + amount;
 }
 
+/** Set when a handled failure is a defect an operator must fix; the line then logs as an error. */
+export const defectKey = "kvitto.defect";
+
+/**
+ * How bad a handled failure is. A defect, such as missing configuration or a
+ * receipt that could not be read, logs the request's line as an error so the
+ * Convex dashboard's error filter shows it; anything else stays at info.
+ */
+export type FailureSeverity = { defect?: boolean };
+
+function countFailure({ defect }: FailureSeverity) {
+  count(handledFailuresKey);
+
+  if (defect) annotate({ [defectKey]: true });
+}
+
 /**
  * Records a failure the request handled and outlived, such as a provider it
- * fell back from. The request keeps its outcome, but its line is logged as a
- * warning. Pass the caught error, or a code for a failure without one; only
- * the error's type, code, and status are kept.
+ * fell back from. The request keeps its outcome, and the failure is counted
+ * in `kvitto.failures.handled`. Only the error's type or code and its status
+ * are kept, never its message.
  */
-export function annotateFailure(operation: string, cause: unknown) {
-  const details =
-    cause instanceof Object
-      ? errorDetails(cause)
-      : { errorType: String(cause), code: undefined, status: undefined };
+export function annotateFailure(
+  operation: string,
+  cause: unknown,
+  severity: FailureSeverity = {},
+) {
+  const details = errorDetails(cause);
 
   annotate({
     [`kvitto.${operation}.error.type`]: details.code ?? details.errorType,
     [`kvitto.${operation}.error.status`]: details.status,
   });
-  count("kvitto.failures.handled");
+  countFailure(severity);
+}
+
+/**
+ * Records a handled failure that has no error to inspect, such as missing
+ * configuration, by a short code of the caller's own, like `apns_unconfigured`.
+ */
+export function annotateFailureCode(
+  operation: string,
+  code: string,
+  severity: FailureSeverity = {},
+) {
+  annotate({ [`kvitto.${operation}.error.code`]: code });
+  countFailure(severity);
 }
 
 export function outcomeOf(cause: unknown): Outcome {
@@ -252,7 +285,8 @@ export function tracedRequest<T>(
   },
   run: (span: Span) => Promise<T>,
 ): Promise<T> {
-  const request: RequestContext = { attributes: {}, event: {} };
+  const event: Attributes = {};
+  const request: RequestContext = { attributes: {}, event };
 
   return tracer.startActiveSpan(
     name,
@@ -265,7 +299,7 @@ export function tracedRequest<T>(
           try {
             return await run(span);
           } finally {
-            span.setAttributes(request.event ?? {});
+            span.setAttributes(event);
           }
         },
         outcome,

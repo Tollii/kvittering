@@ -33,7 +33,7 @@ import {
   type ExtractedReceipt,
 } from "../src/lib/domain/receipt-state";
 import { getOrInsert } from "../src/lib/map-cache";
-import { annotate, annotateFailure } from "../src/lib/tracing";
+import { annotate, annotateFailureCode } from "../src/lib/tracing";
 
 const snapshot = {
   id: v.id("receipts"),
@@ -524,7 +524,10 @@ export const finish = internalMutation({
       "kvitto.product.result_count": results.length,
     });
 
-    if (args.failed) annotateFailure("product.analysis", "failed");
+    if (args.failed)
+      annotateFailureCode("product.analysis", "analysis_failed", {
+        defect: true,
+      });
 
     return null;
   },

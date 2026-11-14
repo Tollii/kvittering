@@ -22,6 +22,7 @@ export function ReleaseSettings() {
       await refresh();
 
       if (__DEV__ || !Updates.isEnabled) {
+        recordEvent("update.checked", { outcome: "unavailable" });
         setMessage(
           "Direkteoppdateringer er tilgjengelige i installerte utgivelsesbygg.",
         );

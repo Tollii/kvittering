@@ -49,7 +49,12 @@ import {
   catalogDecision,
   type CatalogDecision,
 } from "../src/lib/catalog/decisions";
-import { annotate, annotateFailure, count } from "../src/lib/tracing";
+import {
+  annotate,
+  annotateFailure,
+  annotateFailureCode,
+  count,
+} from "../src/lib/tracing";
 
 export { catalogDecision } from "../src/lib/catalog/decisions";
 
@@ -142,7 +147,7 @@ export const process = workflow
         requestIds: entries.map((entry) => entry.id),
       });
     } catch {
-      // Handled: `failed` records the failed run and logs `catalog.matching_failed`.
+      // Handled: `failed` records the failed run on its wide event.
       await step.runMutation(internal.catalogMatching.failed, {
         ...args,
         workflowId: step.workflowId,
@@ -561,7 +566,9 @@ export const failed = internalMutation({
         "kvitto.receipt.id": args.id,
         "kvitto.receipt.generation": args.generation,
       });
-      annotateFailure("catalog.matching", "workflow_failed");
+      annotateFailureCode("catalog.matching", "workflow_failed", {
+        defect: true,
+      });
       await settleFailedMatching(ctx, args.id);
     }
 
@@ -602,7 +609,7 @@ async function workflowRun(ctx: MutationCtx, workflowId: string) {
 /**
  * Ends a pending receipt's matching when its run can no longer finish it: the
  * run is gone, ended without `finish` or `failed`, or outlived its deadline,
- * in which case it is cancelled first.
+ * in which case it is cancelled first. Returns whether it ended one.
  */
 async function endStalledMatching(ctx: MutationCtx, receipt: Doc<"receipts">) {
   const workflowId = receipt.catalogWorkflowId;
@@ -612,15 +619,17 @@ async function endStalledMatching(ctx: MutationCtx, receipt: Doc<"receipts">) {
   if (!workflowId) reason = "no_run";
   else if (!run) reason = "cleaned_up";
   else if (run.runResult) reason = "ended";
-  else if (Date.now() - run._creationTime < catalogMatchingDeadlineMs) return;
+  else if (Date.now() - run._creationTime < catalogMatchingDeadlineMs)
+    return false;
   else {
     await cancelWorkflow(ctx, components.workflow, workflowId);
     reason = "timed_out";
   }
 
-  count("kvitto.catalog.matching.stalled");
-  annotateFailure("catalog.matching", reason);
+  annotateFailureCode("catalog.matching", reason, { defect: true });
   await settleFailedMatching(ctx, receipt._id);
+
+  return true;
 }
 
 /** Settles pending matching that will never finish, so retry and analysis are not blocked. */
@@ -633,14 +642,27 @@ export const recoverStalled = internalMutation({
       .withIndex("by_catalogStatus", (q) => q.eq("catalogStatus", "pending"))
       .paginate({ cursor, numItems: 20 });
 
+    const stalled: string[] = [];
+    const unrecovered: string[] = [];
+
     for (const receipt of page.page) {
       try {
-        await endStalledMatching(ctx, receipt);
+        if (await endStalledMatching(ctx, receipt)) stalled.push(receipt._id);
       } catch (cause) {
         // One unreadable run must not hold back the receipts after it.
-        annotateFailure("catalog.matching_recovery", cause);
+        unrecovered.push(receipt._id);
+        annotateFailure("catalog.matching_recovery", cause, { defect: true });
       }
     }
+
+    // A page holds at most 20 receipts, so the ids fit on the line.
+    annotate({
+      "kvitto.catalog.matching.stalled_count": stalled.length,
+      "kvitto.catalog.matching.stalled_receipt_ids":
+        stalled.join(",") || undefined,
+      "kvitto.catalog.matching.unrecovered_receipt_ids":
+        unrecovered.join(",") || undefined,
+    });
 
     if (!page.isDone)
       await ctx.scheduler.runAfter(0, internal.catalogMatching.recoverStalled, {

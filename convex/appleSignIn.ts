@@ -3,7 +3,7 @@ import appConfig from "../app.json";
 import { env } from "./_generated/server";
 import { appleJwt, fromBase64url } from "./appleJwt";
 import { userError } from "./userErrors";
-import { annotateFailure, traced, tracedFetch } from "../src/lib/tracing";
+import { annotateFailureCode, traced, tracedFetch } from "../src/lib/tracing";
 
 const apple = "https://appleid.apple.com";
 
@@ -65,7 +65,9 @@ export const revokeAppleAccess = traced(
 
     if (!secret) {
       // Needs APNS_TEAM_ID, APPLE_SIGN_IN_KEY_ID, and APPLE_SIGN_IN_PRIVATE_KEY.
-      annotateFailure("account.apple_revoke", "apple_key_missing");
+      annotateFailureCode("account.apple_revoke", "apple_key_missing", {
+        defect: true,
+      });
 
       throw userError("Kan ikke slette kontoen akkurat nå. Prøv igjen senere.");
     }

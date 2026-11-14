@@ -413,17 +413,17 @@ export function createQueueRunner(
     if (cause instanceof RequestDeferred) {
       applyDeferral(entry, cause);
       deferPendingCaptures(owner, householdId, entry.id, cause);
+    } else {
+      store.update(entry);
 
-      return;
+      try {
+        retries.remove(entry.id);
+      } catch {
+        storageFailure(entry);
+      }
     }
 
-    store.update(entry);
-
-    try {
-      retries.remove(entry.id);
-    } catch {
-      storageFailure(entry);
-    }
+    return { outcome: failure.kind, paused: next === null };
   }
 
   const run = async (
@@ -473,9 +473,10 @@ export function createQueueRunner(
 
           if (!completed) return;
         } catch (cause) {
-          recordFailure(owner, householdId, entry, retry, cause);
-          event.outcome = entry.failure?.kind ?? "failed";
-          event.paused = attempts.get(entry.id)?.nextAttemptAt === null;
+          Object.assign(
+            event,
+            recordFailure(owner, householdId, entry, retry, cause),
+          );
         } finally {
           event.durationMs = clock() - started;
           record("receipt.upload_attempted", event);

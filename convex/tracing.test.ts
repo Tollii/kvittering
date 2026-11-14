@@ -15,6 +15,8 @@ import "./tracing";
 import {
   annotate,
   annotateFailure,
+  annotateFailureCode,
+  count,
   traced,
   tracedFetch,
   tracedRequest,
@@ -56,24 +58,43 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
+/** The caller's span when a test continues a remote trace. */
+const remoteSpanId = "00f067aa0ba902b7";
+
 const rootOf = (name: string) =>
   logged.filter(
     (span) =>
       span.name === name &&
-      (!span.parentSpanId || span.parentSpanId === "00f067aa0ba902b7"),
+      (!span.parentSpanId || span.parentSpanId === remoteSpanId),
   );
 
-/** Runs work in a trace whose id falls in the detail sample, so its inner spans log too. */
-function inSampledTrace<T>(work: () => Promise<T>) {
-  const parent = trace.setSpanContext(ROOT_CONTEXT, {
-    traceId: "4bf92f3577b34da6a3ce929d00000000",
-    spanId: "00f067aa0ba902b7",
+/**
+ * A remote caller's context. The detail sample reads the trace id's last
+ * eight hex digits, so one ending in zeros is always in it and one ending in
+ * f's never is.
+ */
+const remoteParent = (traceId: string) =>
+  trace.setSpanContext(ROOT_CONTEXT, {
+    traceId,
+    spanId: remoteSpanId,
     traceFlags: TraceFlags.SAMPLED,
     isRemote: true,
   });
 
-  return context.with(parent, work);
-}
+const sampledParent = remoteParent("4bf92f3577b34da6a3ce929d00000000");
+
+const unsampledParent = remoteParent("4bf92f3577b34da6a3ce929dffffffff");
+
+/** Runs work in a trace that falls in the detail sample, so its inner spans log too. */
+const inSampledTrace = <T>(work: () => Promise<T>) =>
+  context.with(sampledParent, work);
+
+const request = (work: () => Promise<void>) =>
+  tracedRequest(
+    "tracing.test.request",
+    { kind: SpanKind.SERVER, parent: context.active(), attributes: {} },
+    work,
+  );
 
 it("names each call's span after its function and puts the caller's account and household on every span of it", async () => {
   const t = convexTest(schema, modules);
@@ -165,13 +186,13 @@ it("records an unexpected error as a failed span", async () => {
 it("bounds the lines a request logs and counts the spans it leaves out", async () => {
   const inner = traced("tracing.test.row", async () => {});
 
-  await inSampledTrace(
-    traced("tracing.test.rows", async () => {
+  await inSampledTrace(() =>
+    request(async () => {
       for (let row = 0; row < 300; row += 1) await inner();
     }),
   );
 
-  const [root] = rootOf("tracing.test.rows");
+  const [root] = rootOf("tracing.test.request");
   const rows = logged.filter((span) => span.name === "tracing.test.row");
 
   expect(logged.length).toBeLessThan(100);
@@ -183,7 +204,7 @@ it("bounds the lines a request logs and counts the spans it leaves out", async (
 it("continues the caller's trace in an HTTP action", async () => {
   const t = convexTest(schema, modules);
   const traceId = "4bf92f3577b34da6a3ce929d0e0e4736";
-  const parentId = "00f067aa0ba902b7";
+  const parentId = remoteSpanId;
 
   await t.fetch("/receipt-image", {
     method: "OPTIONS",
@@ -229,20 +250,6 @@ it("forwards the trace to the services it calls, without the request's path", as
     "kvitto.outcome": "failure",
   });
   expect(JSON.stringify(logged)).not.toMatch(/orders|secret/);
-});
-
-const request = (work: () => Promise<void>) =>
-  tracedRequest(
-    "tracing.test.request",
-    { kind: SpanKind.SERVER, parent: context.active(), attributes: {} },
-    work,
-  );
-
-const unsampledParent = trace.setSpanContext(ROOT_CONTEXT, {
-  traceId: "4bf92f3577b34da6a3ce929dffffffff",
-  spanId: "00f067aa0ba902b7",
-  traceFlags: TraceFlags.SAMPLED,
-  isRemote: true,
 });
 
 it("logs an ordinary request as one wide event carrying its business context", async () => {
@@ -302,4 +309,70 @@ it("keeps business context off the request's inner spans", async () => {
 
   expect(inner).toBeDefined();
   expect(inner?.attributes).not.toHaveProperty("kvitto.receipt.id");
+});
+
+it("keeps the fields of requests that run at the same time apart", async () => {
+  const pause = () => new Promise((resolve) => setTimeout(resolve, 1));
+
+  const receipt = (id: string) =>
+    request(async () => {
+      annotate({ "kvitto.receipt.id": id });
+      await pause();
+      count("kvitto.receipt.steps");
+      await pause();
+      count("kvitto.receipt.steps");
+    });
+
+  await Promise.all([receipt("first"), receipt("second")]);
+
+  const lines = rootOf("tracing.test.request").map((span) => span.attributes);
+
+  expect(lines).toHaveLength(2);
+  expect(lines).toEqual(
+    expect.arrayContaining([
+      expect.objectContaining({
+        "kvitto.receipt.id": "first",
+        "kvitto.receipt.steps": 2,
+      }),
+      expect.objectContaining({
+        "kvitto.receipt.id": "second",
+        "kvitto.receipt.steps": 2,
+      }),
+    ]),
+  );
+});
+
+it("logs a failed request and a handled defect as errors, with their inner spans", async () => {
+  const error = vi.mocked(console.error);
+  const step = traced("tracing.test.step", async () => {});
+
+  await expect(
+    context.with(unsampledParent, () =>
+      request(async () => {
+        await step();
+        throw new TypeError("Receipt line 'Melk 2 l' could not be read.");
+      }),
+    ),
+  ).rejects.toThrow(TypeError);
+  await context.with(unsampledParent, () =>
+    request(async () => {
+      await step();
+      annotateFailureCode("tracing.config", "key_missing", { defect: true });
+    }),
+  );
+  await context.with(unsampledParent, () =>
+    request(async () => {
+      await step();
+      annotateFailureCode("tracing.provider", "busy");
+    }),
+  );
+
+  const errors = error.mock.calls.filter(
+    ([event]) => event === "request.completed",
+  );
+
+  expect(errors).toHaveLength(2);
+  expect(
+    logged.filter((span) => span.name === "tracing.test.step"),
+  ).toHaveLength(3);
 });

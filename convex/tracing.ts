@@ -10,7 +10,6 @@ import {
 import {
   StackContextManager,
   type ReadableSpan,
-  type Span as SdkSpan,
   type SpanProcessor,
 } from "@opentelemetry/sdk-trace";
 import {
@@ -23,16 +22,21 @@ import type { ActionCtx } from "./_generated/server";
 import { errorDetails } from "../src/lib/diagnostics";
 import {
   annotateFailure,
+  defectKey,
+  handledFailuresKey,
   httpOutcome,
   incomingTraceContext,
-  requestContextOf,
   setRequestAttributes,
   traced,
   type RequestContext,
   tracedRequest,
   type RequestAttributes,
 } from "../src/lib/tracing";
-import { installTracing, spanRecord } from "../src/lib/tracing/sdk";
+import {
+  installTracing,
+  requestContextOfSpan,
+  spanRecord,
+} from "../src/lib/tracing/sdk";
 
 /**
  * Backend telemetry stays in the Convex logs; the free plan has no log
@@ -137,42 +141,40 @@ function sampled(traceId: string) {
  * in the sample. The root counts the spans it left out.
  */
 class LogSpanProcessor implements SpanProcessor {
-  #requests = new WeakMap<SdkSpan, RequestContext>();
+  #details = new WeakMap<RequestContext, RequestDetail>();
 
-  #details = new Map<RequestContext | string, RequestDetail>();
+  /** Requests whose line is written; a span that ends after it logs on its own. */
+  #finished = new WeakSet<RequestContext>();
 
-  onStart(span: SdkSpan, parent: Context) {
-    const request = requestContextOf(parent);
-
-    if (request) this.#requests.set(span, request);
-  }
-
-  /** A request's own context tells apart requests that continue the same trace. */
-  #keyOf(span: ReadableSpan) {
-    // SAFETY: the provider passes the same span object to onStart and onEnd.
-    return this.#requests.get(span as SdkSpan) ?? span.spanContext().traceId;
-  }
+  onStart() {}
 
   onEnd(span: ReadableSpan) {
     if (process.env.OTEL_TRACES_EXPORTER === "none") return;
 
-    const key = this.#keyOf(span);
-    const root = !span.parentSpanContext || span.parentSpanContext.isRemote;
+    const request = requestContextOfSpan(span);
     const { start: _start, end: _end, ...record } = spanRecord(span);
 
-    if (root) this.#logRequest(span, record, this.#takeDetail(key));
-    else this.#holdInner(key, record);
+    // Only a request's own spans are held; a span outside one logs as it ends.
+    if (!request || this.#finished.has(request))
+      console.info("trace.span", record);
+    else if (!span.parentSpanContext || span.parentSpanContext.isRemote) {
+      const detail = this.#details.get(request);
+
+      this.#details.delete(request);
+      this.#finished.add(request);
+      this.#logRequest(span, record, detail);
+    } else this.#holdInner(request, record);
   }
 
   /** Logs a failed inner span right away and holds the rest until the request ends. */
-  #holdInner(key: RequestContext | string, record: SpanLine) {
-    const detail = this.#details.get(key) ?? {
+  #holdInner(request: RequestContext, record: SpanLine) {
+    const detail = this.#details.get(request) ?? {
       spans: [],
       omitted: 0,
       failed: false,
     };
 
-    this.#details.set(key, detail);
+    this.#details.set(request, detail);
 
     if (record.failed) {
       detail.failed = true;
@@ -182,20 +184,12 @@ class LogSpanProcessor implements SpanProcessor {
     else detail.omitted += 1;
   }
 
-  #takeDetail(key: RequestContext | string) {
-    const detail = this.#details.get(key);
-
-    this.#details.delete(key);
-
-    return detail;
-  }
-
   #logRequest(span: ReadableSpan, record: SpanLine, detail?: RequestDetail) {
     if (detail) {
-      const handled = Number(record.attributes["kvitto.failures.handled"] ?? 0);
+      const handled = Number(record.attributes[handledFailuresKey] ?? 0);
 
+      // A failed request's outcome is a failure too.
       const keep =
-        record.failed ||
         detail.failed ||
         handled > 0 ||
         record.attributes["kvitto.outcome"] !== "success" ||
@@ -223,7 +217,8 @@ class LogSpanProcessor implements SpanProcessor {
 
     // Two levels: error for a defect, info for everything else, including
     // refusals and handled failures, which the line's fields describe.
-    if (record.failed) console.error("request.completed", line);
+    if (record.failed || record.attributes[defectKey] === true)
+      console.error("request.completed", line);
     else console.info("request.completed", line);
   }
 
