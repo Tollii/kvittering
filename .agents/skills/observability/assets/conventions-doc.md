@@ -8,6 +8,8 @@ tracing sections; PR 2 adds the wide-event sections.
 
 Last swept: <YYYY-MM-DD>
 
+<!-- The day this skill last checked the code: the day of the setup PR, then of each maintenance pass. -->
+
 ## Where telemetry goes
 
 <!-- Backend, how it was chosen (found, chosen, defaulted), the env vars that configure it, and what happens with none set. -->

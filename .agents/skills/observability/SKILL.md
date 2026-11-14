@@ -30,6 +30,7 @@ Read only what the current step needs.
 | [vendor/logging-best-practices](vendor/logging-best-practices/SKILL.md) | Writing or judging any logging code. Boris Tane's skill, verbatim; read all of it |
 | [references/maintenance.md](references/maintenance.md) | Both halves already exist |
 | [references/sources.md](references/sources.md) | A rule needs its reasoning, or someone asks where it comes from |
+| [assets/sdk-setup.md](assets/sdk-setup.md) | Writing the module that sets up the SDK |
 | [assets/tracing-helper.md](assets/tracing-helper.md) | Writing the tracing helper and the request-context processor |
 | [assets/wide-event-middleware.md](assets/wide-event-middleware.md) | Adding trace ids and `enrich()` to the middleware his skill describes |
 | [assets/conventions-doc.md](assets/conventions-doc.md) | Creating or extending the project's conventions doc |

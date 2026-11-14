@@ -2,7 +2,7 @@
 
 The lines that tie a wide event to the trace, shown for a Hono-style framework. The event itself (its fields, structure, logger and middleware) follows the embedded `logging-best-practices` skill; its [rules/structure.md](../vendor/logging-best-practices/rules/structure.md) has the full middleware. These lines go inside that middleware and write to the event object it already creates. They do not create a second event.
 
-Nothing compiles or tests this code. Check the calls against the framework and OpenTelemetry versions the project installs.
+Type-checked on 2026-11-14 against `hono` 4.13 and `@opentelemetry/api` 1.10. Nothing checks it since: confirm the calls against the versions the project installs.
 
 ```ts
 import { trace } from "@opentelemetry/api";
