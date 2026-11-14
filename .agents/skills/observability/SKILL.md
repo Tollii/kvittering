@@ -2,6 +2,7 @@
 name: observability
 description: Set up or maintain observability in a codebase with OpenTelemetry tracing plus wide-event logging that follows the logging-best-practices skill, delivered as two pull requests. Use when asked to add tracing, replace scattered logs with one event per request, or check that existing observability still covers new code. Run it again later as a maintenance pass.
 disable-model-invocation: true
+license: MIT
 metadata:
   harness: [claude, codex]
   platform: [darwin, linux]
@@ -104,4 +105,4 @@ The final message to the user gives:
 
 ## Credit
 
-The wide-event half of this skill is the work of Boris Tane: his `logging-best-practices` skill, from [Logging Sucks](https://loggingsucks.com/). The tracing half is general OpenTelemetry practice. The full list, and what each source is used for, is in [references/sources.md](references/sources.md). When a user asks why a rule exists, point them to the source rather than guessing.
+The wide-event half of this skill is the work of Boris Tane: his `logging-best-practices` skill, from [Logging Sucks](https://loggingsucks.com/). The tracing half is general OpenTelemetry practice. The full list, and what each source is used for, is in [references/sources.md](references/sources.md). The skill is under the MIT licence in `LICENSE`, which also says how his files are included. When a user asks why a rule exists, point them to the source rather than guessing.
