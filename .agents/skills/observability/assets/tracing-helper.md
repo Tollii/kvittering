@@ -1,3 +1,10 @@
+# Tracing helper template
+
+A starting point for the project's tracing module, the only file that touches the tracer. Adapt the names, fields and framework calls to the project; in another language, use its idiom for the same idea.
+
+Nothing in this repository compiles this code. Check the signatures against the OpenTelemetry versions the project installs before relying on it.
+
+```ts
 // Template for the project's tracing module, the only file that touches the
 // tracer. Adapt names, the context fields, and the outcome values; in another
 // language, use its idiom for the same idea (a decorator, middleware, `defer`).
@@ -5,6 +12,8 @@
 import { AsyncLocalStorage } from "node:async_hooks";
 import { SpanStatusCode, trace } from "@opentelemetry/api";
 import type { Context } from "@opentelemetry/api";
+// The trace SDK package is named differently across major versions
+// (`sdk-trace-base`, later `sdk-trace`). Import from the one that is installed.
 import type { Span, SpanProcessor } from "@opentelemetry/sdk-trace-base";
 
 const tracer = trace.getTracer("app");
@@ -75,3 +84,4 @@ export class RequestContextProcessor implements SpanProcessor {
     return Promise.resolve();
   }
 }
+```

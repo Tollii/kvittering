@@ -10,7 +10,7 @@ It loads before anything else and sets the service name, version, commit, enviro
 
 ### 2. One tracing helper, applied where functions are defined
 
-A function is traced by wrapping its definition, not by opening a span inside its body or at its call sites. Start from [assets/tracing-helper.ts](../assets/tracing-helper.ts):
+A function is traced by wrapping its definition, not by opening a span inside its body or at its call sites. Start from [assets/tracing-helper.md](../assets/tracing-helper.md):
 
 ```ts
 // at the definition

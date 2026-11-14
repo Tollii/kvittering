@@ -1,6 +1,6 @@
 # PR 2: wide events
 
-Branch: `observability/wide-events`. If PR 1 is still open, branch from it and set PR 1's branch as the base. If PR 1 is merged, branch from the default branch.
+Branch: `observability/wide-events`. If PR 1 is still open, branch from it and set PR 1's branch as the base, so the diff shows only the logging work. If PR 1 is merged, branch from the default branch.
 
 This file applies Boris Tane's writing on wide events; see [sources.md](sources.md). If you can fetch it, read [Logging Sucks](https://loggingsucks.com/) before starting. The summary here is enough to work from if the page is unreachable.
 
@@ -25,7 +25,7 @@ Configured once and imported everywhere, writing single-line JSON. Two levels ar
 
 ### 2. Middleware that owns the event's lifecycle
 
-It creates the event when the request starts, puts it in request context, and emits it once in a `finally` block, so it fires on success and on failure alike. Start from [assets/wide-event-middleware.ts](../assets/wide-event-middleware.ts).
+It creates the event when the request starts, puts it in request context, and emits it once in a `finally` block, so it fires on success and on failure alike. Start from [assets/wide-event-middleware.md](../assets/wide-event-middleware.md).
 
 ### 3. Handlers only add business context
 

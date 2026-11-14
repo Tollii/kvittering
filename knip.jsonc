@@ -16,13 +16,8 @@
     "src/web/*.ts",
     "vitest.mutation.config.mts",
   ],
-  // Vendored rule source, rule-test fixtures, and the templates agent skills
-  // carry are not application code.
-  "ignore": [
-    "tools/oxlint/anti-slop/**",
-    "tools/lint-rules/fixtures/**",
-    ".agents/**",
-  ],
+  // Vendored rule source and rule-test fixtures are not application code.
+  "ignore": ["tools/oxlint/anti-slop/**", "tools/lint-rules/fixtures/**"],
   // expo-router's native tabs require this peer at runtime without an import.
   // Metro resolves the expo-sqlite name in web bundles (metro.config.js).
   // Stryker core bundles its command runner under this name.

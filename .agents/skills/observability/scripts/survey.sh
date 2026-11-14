@@ -4,8 +4,9 @@
 #
 #   bash path/to/observability/scripts/survey.sh [since-date]
 #
-# With a date (YYYY-MM-DD), it also lists source files changed since then,
-# which is where a maintenance pass starts reading.
+# With a date (YYYY-MM-DD), it also lists source files changed on the current
+# branch since then, which is where a maintenance pass starts reading. Run it
+# on the default branch: a merge counts by the date it landed.
 
 set -u
 
@@ -27,10 +28,12 @@ sources=(
   '*.ts' '*.tsx' '*.js' '*.jsx' '*.mjs' '*.cjs' '*.mts' '*.cts'
   '*.py' '*.go' '*.rs' '*.rb' '*.java' '*.kt' '*.cs' '*.swift'
 )
-# Dependencies and generated code say nothing about the project's own habits.
+# Dependencies, generated code and agent tooling say nothing about the
+# project's own habits.
 skip=(
   ':!node_modules' ':!**/node_modules/**' ':!vendor' ':!**/vendor/**'
   ':!dist' ':!build' ':!**/_generated/**' ':!**/generated/**'
+  ':!.agents' ':!.claude' ':!.codex'
 )
 
 section() { printf '\n== %s ==\n' "$1"; }
@@ -77,7 +80,7 @@ echo "default branch: ${default_branch:-unknown}"
 section "Earlier runs of this skill"
 docs="$(git ls-files -- 'docs/observability.md' '**/observability.md' | grep -v '/skills/')"
 if [ -n "$docs" ]; then echo "$docs" | sed 's/^/conventions doc: /'; else echo "conventions doc: (none found at the default path)"; fi
-swept="$(git grep -n -E 'Last swept:' -- '*.md' ':!**/skills/**' 2>/dev/null)"
+swept="$(git grep -n -E 'Last swept: [0-9]{4}-[0-9]{2}-[0-9]{2}' -- '*.md' 2>/dev/null)"
 echo "${swept:-Last swept: (no date recorded)}"
 branches="$(git branch -a --list '*observability/*' 2>/dev/null | sed 's/^[* ]*//')"
 if [ -n "$branches" ]; then echo "$branches" | sed 's/^/branch: /'; else echo "branches named observability/*: (none)"; fi
@@ -97,7 +100,7 @@ found="$(in_manifests "\"?[@A-Za-z0-9_./-]*($loggers)[A-Za-z0-9_./-]*")"
 if [ -n "$found" ]; then echo "$found"; else none; fi
 
 section "OTEL_* configuration mentioned in"
-found="$(git grep -l -E 'OTEL_[A-Z_]+' -- "${skip[@]}" ':!**/skills/**' 2>/dev/null | head -20)"
+found="$(git grep -l -E 'OTEL_[A-Z_]+' -- "${skip[@]}" 2>/dev/null | head -20)"
 if [ -n "$found" ]; then echo "$found"; else none; fi
 
 section "console.* calls"
@@ -108,7 +111,7 @@ summarize '\.(startSpan|startActiveSpan)\('
 
 if [ -n "$since" ]; then
   section "Source files changed since $since"
-  changed="$(git log --since="$since" --name-only --pretty=format: -- "${sources[@]}" "${skip[@]}" | sort -u | sed '/^$/d')"
+  changed="$(git log --since="$since" --first-parent -m --name-only --pretty=format: -- "${sources[@]}" "${skip[@]}" | sort -u | sed '/^$/d')"
   if [ -n "$changed" ]; then
     echo "$changed" | wc -l | awk '{ print $1 " files" }'
     echo "$changed"

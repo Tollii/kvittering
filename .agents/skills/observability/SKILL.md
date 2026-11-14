@@ -4,6 +4,7 @@ description: Set up or maintain observability in a codebase with OpenTelemetry t
 metadata:
   harness: [claude, codex]
   platform: [darwin, linux]
+  scope: project
 ---
 
 # Observability
@@ -25,8 +26,8 @@ Read only what the current step needs.
 | [references/wide-events.md](references/wide-events.md) | Building or fixing wide events (PR 2) |
 | [references/maintenance.md](references/maintenance.md) | Both halves already exist |
 | [references/sources.md](references/sources.md) | A rule needs its reasoning, or someone asks where it comes from |
-| [assets/tracing-helper.ts](assets/tracing-helper.ts) | Writing the tracing helper and the request-context processor |
-| [assets/wide-event-middleware.ts](assets/wide-event-middleware.ts) | Writing the event middleware, `enrich`, and the sampling decision |
+| [assets/tracing-helper.md](assets/tracing-helper.md) | Writing the tracing helper and the request-context processor |
+| [assets/wide-event-middleware.md](assets/wide-event-middleware.md) | Writing the event middleware, `enrich`, and the sampling decision |
 | [assets/conventions-doc.md](assets/conventions-doc.md) | Creating or extending the project's conventions doc |
 | [scripts/survey.sh](scripts/survey.sh) | Step 1, to collect the mechanical facts quickly |
 
@@ -64,7 +65,7 @@ Branch `observability/tracing` from the default branch. Build what [references/t
 
 ## Step 5: PR 2, wide events
 
-Branch `observability/wide-events`. If PR 1 is still open, branch from it and set PR 1's branch as the base, so the diff shows only the logging work. If PR 1 is merged, branch from the default branch.
+Branch `observability/wide-events`; the reference says what to branch from while PR 1 is still open.
 
 Build what [references/wide-events.md](references/wide-events.md) lists: one logger, middleware that emits exactly one event per unit of work in a `finally` block, one `enrich()` function that writes to the event and the root span, a written schema, privacy rules, sampling decided after the request ends, the replacement of existing log calls, and a lint rule against stray logging. Prove it with tests.
 
@@ -99,10 +100,11 @@ The final message to the user gives:
 
 Kvitto already has both halves, so the mode here is the maintenance pass.
 
-- **Conventions doc.** The [Tracing section of the architecture doc](../../../docs/architecture.md#tracing) plays that role. Do not create `docs/observability.md`, and do not add a `Last swept` line to the architecture doc; take the sweep's start date from the fallback in [references/maintenance.md](references/maintenance.md).
+- **Conventions doc.** The [Tracing section of the architecture doc](../../../docs/architecture.md#tracing) plays that role. Do not create `docs/observability.md`. The architecture doc explains decisions and does not track status, so the sweep date lives here and a maintenance PR updates this line: `Last swept: 2026-11-13`.
 - **Backend decision, already made.** Backend telemetry stays in the Convex logs, because the free plan has no log streams and queries and mutations cannot make network requests. The app sends spans to PostHog. Do not reopen this without being asked.
-- **Tracing helper.** [`traced`, `tracedFetch`, `annotate`, `count` and `annotateFailure`](../../../src/lib/tracing/index.ts), plus the builders in [`convex/serverFunctions.ts`](../../../convex/serverFunctions.ts) that give every backend function its root span and its `request.completed` wide event.
-- **Lint rule.** `kvitto/traced-exports` in [`tools/lint-rules/traced-exports.cjs`](../../../tools/lint-rules/traced-exports.cjs), with `fetch` restricted as a global.
+- **Tracing helper.** [`traced`, `tracedFetch`, `annotate`, `count` and `annotateFailure`](../../../src/lib/tracing/index.ts), plus the builders in [`convex/serverFunctions.ts`](../../../convex/serverFunctions.ts) that give every backend function its root span.
+- **Logger module.** [`convex/tracing.ts`](../../../convex/tracing.ts) writes the one `request.completed` wide event per function call, and the `trace.span` lines, through `console`, because the Convex logs are the backend. Handlers add fields with `annotate`, `count` and `annotateFailure` and write no lines of their own.
+- **Lint rules.** `kvitto/traced-exports` in [`tools/lint-rules/traced-exports.cjs`](../../../tools/lint-rules/traced-exports.cjs), with `fetch` restricted as a global. For logging, `kvitto/structured-log` in [`tools/lint-rules/index.cjs`](../../../tools/lint-rules/index.cjs) applies to `convex/` and requires a literal event name; it does not ban `console`, and nothing bans it in `src/`. That is the current design and not a hole in a rule. If a sweep finds scattered logs, fix the code and report it; propose a stricter rule to the owner instead of adding one.
 - **Wide-event rules.** The vendored [logging-best-practices](../logging-best-practices/SKILL.md) skill holds Boris Tane's rules with worked examples. This skill decides what to build and in which order; that one is the reference for what a good event looks like.
 - **Pull requests.** Use [file-pr](../file-pr/SKILL.md), and the project's rule of one reviewable change per PR.
 
