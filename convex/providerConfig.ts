@@ -1,5 +1,6 @@
 import { v } from "convex/values";
 import { env } from "./_generated/server";
+import { annotateFailureCode } from "../src/lib/tracing";
 
 /**
  * Receipt model settings. Other modules must not read the receipt reader's
@@ -63,8 +64,8 @@ export function hasProductModel() {
   } catch (error) {
     if (!(error instanceof ProviderConfigurationError)) throw error;
 
-    console.error("receipt.product_model_misconfigured", {
-      message: error.message,
+    annotateFailureCode("receipt.product_model", "misconfigured", {
+      defect: true,
     });
 
     return false;

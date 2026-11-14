@@ -1,5 +1,10 @@
 import { receiptReviewCategory } from "../src/lib/receipt-notifications";
-import { tracedFetch } from "../src/lib/tracing";
+import {
+  annotate,
+  annotateFailure,
+  annotateFailureCode,
+  tracedFetch,
+} from "../src/lib/tracing";
 import { z } from "zod";
 import { v } from "convex/values";
 import { env } from "./_generated/server";
@@ -93,6 +98,12 @@ async function deliverPush(
 ) {
   const outcome = await request(delivery.token, message);
 
+  annotate({
+    "kvitto.push.subscription.id": delivery.subscriptionId,
+    "kvitto.push.attempt": delivery.attempt,
+    "kvitto.push.outcome": outcome.kind,
+  });
+
   if (outcome.kind === "delivered")
     await ctx.scheduler.runAfter(
       15 * 60 * 1000,
@@ -106,15 +117,12 @@ async function deliverPush(
   else {
     const delay = retryDelays[delivery.attempt];
 
-    console.warn("push.delivery_failed", {
-      subscriptionId: delivery.subscriptionId,
-      attempt: delivery.attempt,
-      kind: outcome.kind,
-      ...(outcome.kind === "rejected"
-        ? { status: outcome.status, reason: outcome.reason }
-        : { error: String(outcome.error) }),
-      retrying: delay !== undefined,
-    });
+    annotate({ "kvitto.push.retrying": delay !== undefined });
+
+    if (outcome.kind === "rejected") {
+      annotate({ "kvitto.push.rejection.status": outcome.status });
+      annotateFailureCode("push.delivery", outcome.reason ?? "rejected");
+    } else annotateFailure("push.delivery", outcome.error);
 
     if (delay !== undefined) await delivery.retry(delay);
   }

@@ -306,34 +306,28 @@ export function createQueueRunner(
     entry: LocalReceipt,
     transport: UploadTransport,
     active: () => boolean,
+    event: DiagnosticFields,
   ) {
     entry.failure = undefined;
 
     if (!entry.receiptId) {
       entry.receiptId = await transport.reserve(entry);
       store.update(entry);
-      record("receipt.reserved", {
-        captureId: entry.id,
-        receiptId: entry.receiptId,
-        imageCount: entry.images.length,
-      });
+      event.reserved = true;
     }
 
     const receiptId = entry.receiptId;
+
+    event.receiptId = receiptId;
 
     const uploadImage = async (image: string, position: number) => {
       if (!active()) return;
 
       if (entry.uploaded[position]) return;
-      const started = Date.now();
       await transport.upload(receiptId, position, image);
       entry.uploaded[position] = true;
       store.update(entry);
-      record("receipt.image_uploaded", {
-        receiptId: entry.receiptId,
-        position,
-        durationMs: Date.now() - started,
-      });
+      event.uploadedImages = (event.uploadedImages ?? 0) + 1;
     };
 
     const results = await Promise.allSettled(
@@ -358,10 +352,6 @@ export function createQueueRunner(
     store.remove(entry);
     attempts.delete(entry.id);
     restrictions.delete(entry.id);
-    record("receipt.upload_completed", {
-      receiptId: entry.receiptId,
-      imageCount: entry.images.length,
-    });
 
     return true;
   }
@@ -418,29 +408,26 @@ export function createQueueRunner(
     );
 
     attempts.set(entry.id, { failures, nextAttemptAt: next });
-
-    if (next === null)
-      record("receipt.upload_paused", {
-        captureId: entry.id,
-        attempts: failures,
-      });
-
     entry.failure = failure;
 
     if (cause instanceof RequestDeferred) {
       applyDeferral(entry, cause);
       deferPendingCaptures(owner, householdId, entry.id, cause);
+    } else {
+      store.update(entry);
 
-      return;
+      try {
+        retries.remove(entry.id);
+      } catch {
+        storageFailure(entry);
+      }
     }
 
-    store.update(entry);
-
-    try {
-      retries.remove(entry.id);
-    } catch {
-      storageFailure(entry);
-    }
+    // A storage failure above also pauses the capture, so read the final state.
+    return {
+      outcome: failure.kind,
+      paused: attempts.get(entry.id)?.nextAttemptAt === null,
+    };
   }
 
   const run = async (
@@ -474,10 +461,29 @@ export function createQueueRunner(
           report(cause, operation, { ...fields, captureId: entry.id }),
         );
 
+        // One event per attempt at a capture, with what the attempt did.
+        const event: DiagnosticFields = {
+          captureId: entry.id,
+          imageCount: entry.images.length,
+          attempts: retry?.failures ?? 0,
+        };
+
+        const started = clock();
+
         try {
-          if (!(await uploadEntry(entry, guarded, active))) return;
+          const completed = await uploadEntry(entry, guarded, active, event);
+
+          event.outcome = completed ? "completed" : "stopped";
+
+          if (!completed) return;
         } catch (cause) {
-          recordFailure(owner, householdId, entry, retry, cause);
+          Object.assign(
+            event,
+            recordFailure(owner, householdId, entry, retry, cause),
+          );
+        } finally {
+          event.durationMs = clock() - started;
+          record("receipt.upload_attempted", event);
         }
       }
     } finally {

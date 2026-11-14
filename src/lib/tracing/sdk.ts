@@ -23,14 +23,19 @@ import {
 import { requestContextOf, type RequestContext } from "./index";
 
 /** Copies the request's attributes onto each of its spans when it starts and again when it ends. */
-class RequestContextProcessor implements SpanProcessor {
-  #requests = new WeakMap<Span, RequestContext>();
+const spanRequests = new WeakMap<ReadableSpan, RequestContext>();
 
+/** The request a span belongs to, for processors that run after this one. */
+export function requestContextOfSpan(span: ReadableSpan) {
+  return spanRequests.get(span);
+}
+
+class RequestContextProcessor implements SpanProcessor {
   onStart(span: Span, parent: Context) {
     const request = requestContextOf(parent);
 
     if (!request) return;
-    this.#requests.set(span, request);
+    spanRequests.set(span, request);
     span.setAttributes(request.attributes);
   }
 
@@ -38,7 +43,7 @@ class RequestContextProcessor implements SpanProcessor {
   // app the context outlives an account, so a span that started under another
   // account keeps what it had.
   onEnding(span: Span) {
-    const request = this.#requests.get(span);
+    const request = spanRequests.get(span);
     const account = span.attributes["user.id"];
 
     if (

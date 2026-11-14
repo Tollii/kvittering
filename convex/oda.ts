@@ -17,7 +17,6 @@ import { receiptDataValidator } from "../src/lib/domain/receipt";
 import { catalogProductValidator } from "../src/lib/catalog/model";
 import { odaCatalogProduct } from "../src/lib/catalog/oda";
 import { saveStoreProduct } from "./catalogLinks";
-import { errorDetails } from "../src/lib/diagnostics";
 import {
   callOdaTool,
   deliveredOrders,
@@ -28,7 +27,12 @@ import {
   refreshOdaTokens,
   revokeOdaToken,
 } from "./odaApi";
-import { traced } from "../src/lib/tracing";
+import {
+  annotate,
+  annotateFailure,
+  annotateFailureCode,
+  traced,
+} from "../src/lib/tracing";
 
 const authorizationLifetimeMs = 10 * 60 * 1000;
 
@@ -179,7 +183,7 @@ export const confirm = mutation({
 
     for (const row of deleted) await ctx.db.delete("receiptImports", row._id);
 
-    console.info("oda.connected", { connectionId: id });
+    annotate({ "kvitto.oda.connection.id": id });
     await ctx.scheduler.runAfter(0, internal.oda.syncConnection, { id });
 
     return null;
@@ -352,7 +356,7 @@ export const holdTokens = internalMutation({
     const client = clientId ?? row?.signIn?.clientId;
 
     if (client) await revokeAtOda(ctx, client, pending);
-    else console.warn("oda.revoke_skipped", { reason: "unknown_client" });
+    else annotateFailureCode("oda.revoke", "unknown_client");
 
     return "expired";
   },
@@ -558,10 +562,10 @@ export const importOrders = internalMutation({
       imported += 1;
     }
 
-    console.info("oda.orders_imported", {
-      connectionId: args.id,
-      orderCount: args.orders.length,
-      imported,
+    annotate({
+      "kvitto.oda.connection.id": args.id,
+      "kvitto.oda.order_count": args.orders.length,
+      "kvitto.oda.imported_count": imported,
     });
     await ctx.db.patch("odaConnections", args.id, {
       householdId: member.householdId,
@@ -622,11 +626,11 @@ export const syncConnection = internalAction({
     } catch (error) {
       const expired = error instanceof OdaSignInExpired;
 
-      console.error("oda.sync_failed", {
-        connectionId: args.id,
-        expired,
-        errorType: errorDetails(error).errorType,
+      annotate({
+        "kvitto.oda.connection.id": args.id,
+        "kvitto.oda.sign_in_expired": expired,
       });
+      annotateFailure("oda.sync", error, { defect: !expired });
       await ctx.runMutation(internal.oda.recordFailure, {
         ...held,
         expired,

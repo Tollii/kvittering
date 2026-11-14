@@ -20,7 +20,7 @@ import {
 import { SearchPhysicalStoresGroup } from "./kassalapp/generated/models";
 import { broaderProductSearch } from "../src/lib/catalog/search";
 import { compatibleCatalogProduct } from "../src/lib/catalog/matching";
-import type { Fetch } from "../src/lib/tracing";
+import { annotate, annotateFailure, type Fetch } from "../src/lib/tracing";
 
 type CatalogFetchOptions = { fetch: Fetch };
 
@@ -124,6 +124,11 @@ export const execute = internalAction({
     if (!request) return null;
     const started = Date.now();
 
+    annotate({
+      "kvitto.catalog.request.id": id,
+      "kvitto.catalog.request.kind": request.kind,
+    });
+
     const options = {
       fetch: providerFetch(ctx, "kassalapp", { kind: "catalog", id }),
     };
@@ -132,24 +137,20 @@ export const execute = internalAction({
       const result = await fetchCatalogResult(request, options);
 
       await ctx.runMutation(internal.catalogQueue.succeed, { id, result });
-      console.info("catalog.request_completed", {
-        requestId: id,
-        kind: request.kind,
-        durationMs: Date.now() - started,
-        productCount: result.products.length,
-        storeCount: result.stores.length,
+      annotate({
+        "kvitto.catalog.provider_duration_ms": Date.now() - started,
+        "kvitto.catalog.product_count": result.products.length,
+        "kvitto.catalog.store_count": result.stores.length,
       });
     } catch (error) {
       const requestError = error instanceof CatalogRequestError ? error : null;
 
-      console.warn("catalog.request_failed", {
-        requestId: id,
-        durationMs: Date.now() - started,
-        retryAfterMs: requestError ? requestError.retryAfterMs : 0,
-        kind: request.kind,
-        status: requestError ? requestError.status : null,
-        errorType: error instanceof Error ? error.name : "unknown",
+      annotate({
+        "kvitto.catalog.provider_duration_ms": Date.now() - started,
+        "kvitto.catalog.retry_after_ms": requestError?.retryAfterMs ?? 0,
+        "kvitto.catalog.provider_status": requestError?.status,
       });
+      annotateFailure("catalog.request", error);
       await ctx.runMutation(internal.catalogQueue.fail, {
         id,
         status: requestError ? requestError.status : 0,

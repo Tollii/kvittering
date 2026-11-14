@@ -270,7 +270,7 @@ module.exports = {
         schema: [],
         messages: {
           event:
-            "Start a backend log with a literal event name such as `receipt.processing_failed`, and put details in a fields object, so log search can find it.",
+            "Start a backend log with a literal event name such as `trace.metadata_unavailable`, and put details in a fields object, so log search can find it.",
         },
       },
       create(context) {

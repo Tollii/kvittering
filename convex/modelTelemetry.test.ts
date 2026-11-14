@@ -1,5 +1,5 @@
 /// <reference types="vite/client" />
-import { metrics } from "@opentelemetry/api";
+import { ROOT_CONTEXT, SpanKind, metrics } from "@opentelemetry/api";
 import {
   DataPointType,
   MeterProvider,
@@ -8,12 +8,21 @@ import {
 import { createTypeSafeAi } from "@ai-sdk/typesafe-ai";
 import { register as registerRateLimiter } from "@convex-dev/rate-limiter/test";
 import { convexTest } from "convex-test";
-import { afterEach, beforeEach, expect, it, vi } from "vitest";
+import {
+  afterEach,
+  beforeEach,
+  expect,
+  it,
+  vi,
+  type MockInstance,
+} from "vitest";
 import { internal } from "./_generated/api";
 import { judgmentClient } from "./decisions";
 import schema from "./schema";
-import type { z } from "zod";
+import { z } from "zod";
 import type { extractionSchema } from "../src/lib/domain/receipt-extraction";
+import { tracedRequest } from "../src/lib/tracing";
+import "./tracing";
 
 const modules = import.meta.glob("./**/*.ts");
 
@@ -90,7 +99,22 @@ const extraction = {
   ],
 } satisfies z.input<typeof extractionSchema>;
 
-it("reports the reader's cached and reasoning tokens in its log and metrics", async () => {
+/** The attributes of the wide event a request logged. */
+function wideEvent(info: MockInstance<typeof console.info>) {
+  const call = info.mock.calls.find(([event]) => event === "request.completed");
+
+  return requestLine.parse(call?.at(1)).attributes;
+}
+
+const requestLine = z.object({
+  attributes: z.record(
+    z.string(),
+    z.union([z.string(), z.number(), z.boolean()]),
+  ),
+});
+
+it("reports the reader's cached and reasoning tokens on the receipt's wide event and in metrics", async () => {
+  vi.stubEnv("OTEL_TRACES_EXPORTER", "");
   vi.stubEnv("RECEIPT_PROVIDER", "openai");
   vi.stubEnv("RECEIPT_MODEL", "openai:gpt-6-luna");
   vi.stubEnv("OPENAI_API_KEY", "test-key");
@@ -139,26 +163,16 @@ it("reports the reader's cached and reasoning tokens in its log and metrics", as
 
   await t.action(internal.providers.extract, { storageIds: [storageId] });
 
-  expect(info).toHaveBeenCalledWith(
-    "model.call_completed",
-    expect.objectContaining({
-      operation: "chat",
-      model: "gpt-6-luna",
-      inputTokens: 1200,
-      cachedInputTokens: 1024,
-      outputTokens: 900,
-      reasoningTokens: 600,
-    }),
-  );
-  expect(info).toHaveBeenCalledWith(
-    "receipt.extraction_completed",
-    expect.objectContaining({
-      inputTokens: 1200,
-      cachedInputTokens: 1024,
-      outputTokens: 900,
-      reasoningTokens: 600,
-    }),
-  );
+  // One line ties the tokens to the receipt reading that spent them.
+  expect(wideEvent(info)).toMatchObject({
+    "kvitto.receipt.line_count": 1,
+    "kvitto.model.chat.model": "gpt-6-luna",
+    "kvitto.model.chat.calls": 1,
+    "kvitto.model.chat.input_tokens": 1200,
+    "kvitto.model.chat.cached_input_tokens": 1024,
+    "kvitto.model.chat.output_tokens": 900,
+    "kvitto.model.chat.reasoning_tokens": 600,
+  });
 
   const call = {
     "gen_ai.operation.name": "chat",
@@ -183,6 +197,7 @@ it("reports the reader's cached and reasoning tokens in its log and metrics", as
 });
 
 it("reports a decision's token use without inventing cached or reasoning tokens", async () => {
+  vi.stubEnv("OTEL_TRACES_EXPORTER", "");
   const info = vi.spyOn(console, "info").mockImplementation(() => {});
   vi.stubGlobal(
     "fetch",
@@ -204,24 +219,28 @@ it("reports a decision's token use without inventing cached or reasoning tokens"
     { timeoutMs: 1000 },
   );
 
-  await client.systemOne({
-    state: { name: "Fiskepinner" },
-    questions: {
-      frozen: { type: "noul", instructions: "Is the product frozen?" },
+  await tracedRequest(
+    "modelTelemetry.test.request",
+    { kind: SpanKind.SERVER, parent: ROOT_CONTEXT, attributes: {} },
+    async () => {
+      await client.systemOne({
+        state: { name: "Fiskepinner" },
+        questions: {
+          frozen: { type: "noul", instructions: "Is the product frozen?" },
+        },
+      });
     },
-  });
-
-  expect(info).toHaveBeenCalledWith(
-    "model.call_completed",
-    expect.objectContaining({
-      operation: "decide",
-      model: "jev-latest",
-      inputTokens: 100,
-      cachedInputTokens: undefined,
-      outputTokens: 20,
-      reasoningTokens: undefined,
-    }),
   );
+
+  const event = wideEvent(info);
+
+  expect(event).toMatchObject({
+    "kvitto.model.decide.model": "jev-latest",
+    "kvitto.model.decide.input_tokens": 100,
+    "kvitto.model.decide.output_tokens": 20,
+  });
+  expect(event).not.toHaveProperty("kvitto.model.decide.cached_input_tokens");
+  expect(event).not.toHaveProperty("kvitto.model.decide.reasoning_tokens");
 
   const call = {
     "gen_ai.operation.name": "decide",

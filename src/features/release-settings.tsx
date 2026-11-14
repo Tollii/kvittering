@@ -14,7 +14,6 @@ export function ReleaseSettings() {
   const [message, setMessage] = useState("");
 
   async function check() {
-    recordEvent("update.check_started");
     setBusy(true);
     setMessage("");
     let phase = "policy_refresh";
@@ -23,6 +22,7 @@ export function ReleaseSettings() {
       await refresh();
 
       if (__DEV__ || !Updates.isEnabled) {
+        recordEvent("update.checked", { outcome: "unavailable" });
         setMessage(
           "Direkteoppdateringer er tilgjengelige i installerte utgivelsesbygg.",
         );
@@ -37,11 +37,12 @@ export function ReleaseSettings() {
         phase = "update_download";
         await Updates.fetchUpdateAsync();
         setReady(true);
-        recordEvent("update.download_completed", {
+        // One event per check; a failed check reports itself below.
+        recordEvent("update.checked", {
           outcome: result.isRollBackToEmbedded ? "rollback" : "update",
         });
       } else {
-        recordEvent("update.check_completed", { outcome: "current" });
+        recordEvent("update.checked", { outcome: "current" });
         setMessage("Appen er oppdatert.");
       }
     } catch (error) {

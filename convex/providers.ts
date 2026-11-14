@@ -26,6 +26,7 @@ import {
   classificationEvidence,
   classificationProductValidator,
 } from "../src/lib/domain/classification";
+import { annotate, annotateFailure } from "../src/lib/tracing";
 
 export const extract = internalAction({
   args: {
@@ -44,6 +45,12 @@ export const extract = internalAction({
   }),
   handler: async (ctx, args) => {
     const started = Date.now();
+
+    // Set first, so a reading that fails still names its receipt.
+    annotate({
+      "kvitto.receipt.id": args.receiptId,
+      "kvitto.receipt.generation": args.generation,
+    });
 
     // An evaluation's model replaces the production reader, key check included.
     const reader = args.model
@@ -120,18 +127,12 @@ export const extract = internalAction({
     });
 
     const data = prepareExtraction(response.output, images.length);
-    // Repeats the model call's token counts so they can be tied to a receipt.
-    console.info("receipt.extraction_completed", {
-      receiptId: args.receiptId,
-      generation: args.generation,
-      model,
-      durationMs: Date.now() - started,
-      imageCount: images.length,
-      lineCount: data.lines.length,
-      inputTokens: response.usage.inputTokens,
-      cachedInputTokens: response.usage.inputTokenDetails.cacheReadTokens,
-      outputTokens: response.usage.outputTokens,
-      reasoningTokens: response.usage.outputTokenDetails.reasoningTokens,
+    // The model call's token counts are on the same wide event.
+    annotate({
+      "kvitto.receipt.reader_model": model,
+      "kvitto.receipt.extraction_duration_ms": Date.now() - started,
+      "kvitto.receipt.image_count": images.length,
+      "kvitto.receipt.line_count": data.lines.length,
     });
 
     return { data, provider: model, durationMs: Date.now() - started };
@@ -202,15 +203,14 @@ export const classify = internalAction({
     const batches = await Promise.all(
       contextBatches(args.products, request).map(async (batch) => ({
         batch,
-        response: await client.systemOne(request(batch)).catch(() => {
-          console.warn("receipt.classification_unavailable", {
-            receiptId: args.receiptId,
-            generation: args.generation,
-            model,
-          });
+        response: await client
+          .systemOne(request(batch))
+          .catch((cause: unknown) => {
+            // The batch falls back to unclear categories for the household to review.
+            annotateFailure("classification", cause);
 
-          return null;
-        }),
+            return null;
+          }),
       })),
     );
 
@@ -240,14 +240,14 @@ export const classify = internalAction({
       });
     });
 
-    console.info("receipt.classification_completed", {
-      receiptId: args.receiptId,
-      generation: args.generation,
-      model,
-      durationMs: Date.now() - started,
-      itemCount: results.length,
-      batchCount: batches.length,
-      provider,
+    annotate({
+      "kvitto.receipt.id": args.receiptId,
+      "kvitto.receipt.generation": args.generation,
+      "kvitto.classification.model": model,
+      "kvitto.classification.provider": provider,
+      "kvitto.classification.duration_ms": Date.now() - started,
+      "kvitto.classification.item_count": results.length,
+      "kvitto.classification.batch_count": batches.length,
     });
 
     return {

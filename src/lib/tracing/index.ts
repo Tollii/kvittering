@@ -31,7 +31,11 @@ export type Outcome = "success" | "expected_failure" | "failure";
  * account and household. The span processor copies them onto every span
  * of the request, including spans that started before they were known.
  */
-export type RequestContext = { attributes: Attributes };
+export type RequestContext = {
+  attributes: Attributes;
+  /** The backend request's wide event: business context for its root span only. */
+  event?: Attributes;
+};
 
 export const requestContextKey = createContextKey("kvitto.request");
 
@@ -73,6 +77,96 @@ export function setRequester(userId: string | undefined, householdId?: string) {
     "user.id": userId,
     "kvitto.household.id": householdId,
   });
+}
+
+/**
+ * A field of a backend request's wide event. Fields stay in Kvitto's own
+ * namespace, which the export allowlist keeps, and hold identifiers, counts,
+ * measurements, and settled states, never receipt text or error messages.
+ */
+export type EventFields = Partial<
+  Record<`kvitto.${string}`, string | number | boolean | undefined>
+>;
+
+function requestEvent() {
+  return requestContextOf(context.active())?.event;
+}
+
+/**
+ * Adds business context to the wide event of the backend request that is
+ * running: one log line per function call, written when it ends, instead of
+ * a line for each step. A later value replaces an earlier one, and
+ * `undefined` removes it. Outside a backend request it does nothing.
+ */
+export function annotate(fields: EventFields) {
+  const event = requestEvent();
+
+  if (!event) return;
+
+  for (const [key, value] of Object.entries(fields)) {
+    if (value === undefined) delete event[key];
+    else event[key] = value;
+  }
+}
+
+/** How many failures the request handled; any keeps its inner spans in the log. */
+export const handledFailuresKey = "kvitto.failures.handled";
+
+/** Adds to a count on the wide event, for work a request repeats, such as each model call. */
+export function count(key: `kvitto.${string}`, amount = 1) {
+  const event = requestEvent();
+
+  if (!event) return;
+  event[key] = Number(event[key] ?? 0) + amount;
+}
+
+/** Set when a handled failure is a defect an operator must fix; the line then logs as an error. */
+export const defectKey = "kvitto.defect";
+
+/**
+ * How bad a handled failure is. A defect, such as missing configuration or a
+ * receipt that could not be read, logs the request's line as an error so the
+ * Convex dashboard's error filter shows it; anything else stays at info.
+ */
+export type FailureSeverity = { defect?: boolean };
+
+function countFailure({ defect }: FailureSeverity) {
+  count(handledFailuresKey);
+
+  if (defect) annotate({ [defectKey]: true });
+}
+
+/**
+ * Records a failure the request handled and outlived, such as a provider it
+ * fell back from. The request keeps its outcome, and the failure is counted
+ * in `kvitto.failures.handled`. Only the error's type or code and its status
+ * are kept, never its message.
+ */
+export function annotateFailure(
+  operation: string,
+  cause: unknown,
+  severity: FailureSeverity = {},
+) {
+  const details = errorDetails(cause);
+
+  annotate({
+    [`kvitto.${operation}.error.type`]: details.code ?? details.errorType,
+    [`kvitto.${operation}.error.status`]: details.status,
+  });
+  countFailure(severity);
+}
+
+/**
+ * Records a handled failure that has no error to inspect, such as missing
+ * configuration, by a short code of the caller's own, like `apns_unconfigured`.
+ */
+export function annotateFailureCode(
+  operation: string,
+  code: string,
+  severity: FailureSeverity = {},
+) {
+  annotate({ [`kvitto.${operation}.error.code`]: code });
+  countFailure(severity);
 }
 
 export function outcomeOf(cause: unknown): Outcome {
@@ -173,7 +267,8 @@ export function traced<F extends AsyncFunction>(
 
 /**
  * Starts the root span of one backend request with its own request context,
- * so attributes set during the request never reach another one.
+ * so attributes set during the request never reach another one. The root
+ * span is the request's wide event: `annotate` adds to it while it runs.
  */
 export function tracedRequest<T>(
   name: string,
@@ -190,13 +285,25 @@ export function tracedRequest<T>(
   },
   run: (span: Span) => Promise<T>,
 ): Promise<T> {
-  const request: RequestContext = { attributes: {} };
+  const event: Attributes = {};
+  const request: RequestContext = { attributes: {}, event };
 
   return tracer.startActiveSpan(
     name,
     { kind, attributes },
     parent.setValue(requestContextKey, request),
-    (span) => settle(span, () => run(span), outcome),
+    (span) =>
+      settle(
+        span,
+        async () => {
+          try {
+            return await run(span);
+          } finally {
+            span.setAttributes(event);
+          }
+        },
+        outcome,
+      ),
   );
 }
 
