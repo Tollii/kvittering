@@ -8,6 +8,8 @@ tracing sections; PR 2 adds the wide-event sections.
 
 Last swept: <YYYY-MM-DD>
 
+<!-- The day this skill last checked the code: the day of the setup PR, then of each maintenance pass. -->
+
 ## Where telemetry goes
 
 <!-- Backend, how it was chosen (found, chosen, defaulted), the env vars that configure it, and what happens with none set. -->
@@ -53,7 +55,7 @@ Last swept: <YYYY-MM-DD>
 
 ### Sampling
 
-<!-- What is always kept, the slow threshold, the sample rate, and the config value that changes it. Trace tail sampling, if ever needed, belongs in a collector. -->
+<!-- "Every event is kept" unless sampling was added. If it was: what is always kept, the thresholds, the rate, and the config value that changes it. -->
 
 ## Deliberately left out
 
@@ -61,6 +63,7 @@ Last swept: <YYYY-MM-DD>
 
 ## Background
 
+- The `logging-best-practices` agent skill by Boris Tane, which sets this project's logging rules
 - [Logging Sucks](https://loggingsucks.com/) by Boris Tane
 - [Observability wide events 101](https://boristane.com/blog/observability-wide-events-101/) by Boris Tane
 - [Canonical log lines](https://stripe.com/blog/canonical-log-lines) on the Stripe blog

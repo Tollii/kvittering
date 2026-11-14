@@ -75,6 +75,14 @@ if [ -z "$default_branch" ]; then
     fi
   done
 fi
+if [ -z "$default_branch" ]; then
+  for candidate in main master; do
+    if git show-ref --verify --quiet "refs/heads/$candidate"; then
+      default_branch="$candidate (guessed: there is no origin)"
+      break
+    fi
+  done
+fi
 echo "default branch: ${default_branch:-unknown}"
 
 section "Earlier runs of this skill"

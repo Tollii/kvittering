@@ -6,7 +6,7 @@ Branch: `observability/tracing`, from the default branch.
 
 ### 1. SDK setup in one module
 
-It loads before anything else and sets the service name, version, commit, environment and region as resource attributes.
+It loads before anything else and sets the service name, version, commit, environment and region as resource attributes. Start from [assets/sdk-setup.md](../assets/sdk-setup.md), which also shows how to keep the app running, and still recording spans, with no endpoint set.
 
 ### 2. One tracing helper, applied where functions are defined
 
@@ -27,6 +27,8 @@ Why definitions and not inline spans: every caller gets the span for free, nobod
 
 Trace every route handler, every middleware, and every helper that does I/O. The rule the linter enforces is: every exported async function is traced. Non-exported async functions that make a network, database, queue or file call are traced too.
 
+Frameworks often take handlers as inline functions, which are not exported and so escape the rule. Hoist each one into a named, exported, traced function and register that. The middleware that opens the root span is the exception: the root span is its span, so it needs no second one.
+
 ### 4. Span names
 
 Stable and low-cardinality, such as `module.function` or the route pattern. Ids go in attributes, never in names. Use OpenTelemetry semantic-convention attribute names where one exists.
@@ -41,21 +43,27 @@ Keep the request's identity in request-scoped context (AsyncLocalStorage, or the
 - route
 - the ids of the domain entities the request is about
 
-Set them as early in the request as they are known, because a span that starts before auth has run cannot carry the user id. The root span gets all of them, plus the final outcome and status code when the request ends.
+Set them as early in the request as they are known. A span processor only sees a span when it starts, so the function that sets a field must also write it to the root span and to the span that is active at that moment; otherwise the root span and the auth span never carry the user id. The root span gets all of them, plus the final outcome and status code when the request ends.
 
-### 6. Propagation
+### 6. Errors the framework swallows
+
+Find out what the framework does with an error a handler throws. Many catch it and turn it into a 500 response, so the middleware's `catch` never runs and the root span looks healthy. Hono does this: it keeps the error on `c.error` and calls its error handler. Mark the root span as an error from the response status as well as from a thrown error, and add a test for it.
+
+### 7. Propagation
 
 - **In.** Read the incoming W3C `traceparent` (and `tracestate`) in the server middleware so the request joins the caller's trace.
 - **Out.** Inject it into every outgoing request by instrumenting the HTTP client or the one fetch wrapper the project uses.
 - **Async work.** Queue messages and job payloads carry it as well.
 - **Baggage.** Send it only to the project's own services, since it can hold user data.
 
-### 7. A lint rule that fails the build
+### 8. A lint rule that fails the build
 
 In whatever linter the project uses (a custom ESLint rule, a Biome plugin, or a small script wired into the lint command and CI), enforce two things:
 
 - An exported async function that is not wrapped by the tracing helper is an error.
 - A direct `startSpan` or `startActiveSpan` call outside the tracing module is an error.
+
+If the project has a lint command but no working linter configuration, set up the smallest one that runs the rule, and say so in the PR.
 
 Allow an opt-out comment that must give a reason, for the rare function that should not be traced. Run the rule over the whole repo and fix everything it finds. The PR is not done while the rule reports anything.
 
@@ -66,13 +74,14 @@ Do not report tracing as working on the strength of a clean typecheck. Add tests
 - A request produces a root span and child spans, and the children carry the request context.
 - A request arriving with a `traceparent` continues that trace id.
 - An outgoing call carries a `traceparent` header.
+- A request that ends in a server error marks the root span as an error.
 
 Then run lint, typecheck and the test suite. If you can start the app, send it one request and look at the spans that come out.
 
 ## Done when
 
 - [ ] The lint rule runs in CI and reports nothing.
-- [ ] The three tests above pass.
+- [ ] The four tests above pass.
 - [ ] The conventions doc exists and covers the backend, local viewing, the helper, the opt-out, and the request-context fields.
 - [ ] The PR description names the env vars to set and anything that could not be traced.
 
