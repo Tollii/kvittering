@@ -423,7 +423,11 @@ export function createQueueRunner(
       }
     }
 
-    return { outcome: failure.kind, paused: next === null };
+    // A storage failure above also pauses the capture, so read the final state.
+    return {
+      outcome: failure.kind,
+      paused: attempts.get(entry.id)?.nextAttemptAt === null,
+    };
   }
 
   const run = async (
