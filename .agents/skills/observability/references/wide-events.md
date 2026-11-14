@@ -2,101 +2,68 @@
 
 Branch: `observability/wide-events`. If PR 1 is still open, branch from it and set PR 1's branch as the base, so the diff shows only the logging work. If PR 1 is merged, branch from the default branch.
 
-This file applies Boris Tane's writing on wide events; see [sources.md](sources.md). If you can fetch it, read [Logging Sucks](https://loggingsucks.com/) before starting. The summary here is enough to work from if the page is unreachable.
+## Who decides what
 
-Where the repository vendors his `logging-best-practices` skill, as this one does, its rule files hold the worked examples and this file does not repeat them:
+The logging rules are not this skill's. They belong to Boris Tane's `logging-best-practices` skill, used as he wrote it. This file does not restate, summarize or adjust them. It covers only what his skill cannot know: how the event ties to the tracing from PR 1, how the work is enforced and proven, and how it ships.
 
-- [wide-events.md](../../logging-best-practices/rules/wide-events.md): the pattern, request correlation, emitting in `finally`.
-- [context.md](../../logging-best-practices/rules/context.md): cardinality, business context, environment fields.
-- [structure.md](../../logging-best-practices/rules/structure.md): single logger, middleware, JSON, levels.
-- [pitfalls.md](../../logging-best-practices/rules/pitfalls.md): the common mistakes.
+If anything in this skill seems to disagree with one of his rules, his rule wins. Say so in the final report, so this skill can be corrected.
 
-Its examples show the pattern, not a schema. Where their field names differ from the project's written schema, the project's schema wins.
+## Step 1: get his skill and read all of it
 
-## The idea
+1. **Find it.** Look for a `logging-best-practices` folder among the repository's agent skills. In this repository it is at [`.agents/skills/logging-best-practices`](../../logging-best-practices/SKILL.md).
+2. **Install it if it is missing.** From the repository root:
 
-Log lines describe what the code was doing. What you need during an incident is what happened to a request, in a form you can query. So each unit of work emits exactly one event with everything known about it: who, what, how long, which deploy, what went wrong. Twenty lines scattered through a handler become twenty fields on one event.
+   ```sh
+   npx add-skill boristane/agent-skills --skill "logging-best-practices"
+   ```
 
-## What to build
+   Commit the installed files in PR 2 as they arrive. Do not edit them; a changed copy can no longer be updated from upstream by running the command again.
+3. **Read it in full before writing any logging code:** its `SKILL.md`, then every file under `rules/` ([wide-events](../../logging-best-practices/rules/wide-events.md), [context](../../logging-best-practices/rules/context.md), [structure](../../logging-best-practices/rules/structure.md), [pitfalls](../../logging-best-practices/rules/pitfalls.md)). Its frontmatter turns off automatic loading, so nothing reads it unless you do.
+4. **If it cannot be installed**, for example with no network, read [Logging Sucks](https://loggingsucks.com/), which is where the rules come from. If neither can be reached, stop before the logging work and report that, instead of writing the rules from memory.
 
-### 1. One logger
+## Step 2: build the logging his skill describes
 
-Configured once and imported everywhere, writing single-line JSON. Two levels are enough: `info` for wide events and `error` for failures that need a person.
+Apply his skill to every unit of work the survey found. What an event contains, how it is structured, the logger, the levels and the middleware are all decided there.
 
-### 2. Middleware that owns the event's lifecycle
+One clarification for this workflow: PR 1 gave every unit of work a root span, not only HTTP requests. Each of them gets its event too: a job run, a consumed message, a webhook, a CLI command.
 
-It creates the event when the request starts, puts it in request context, and emits it once in a `finally` block, so it fires on success and on failure alike. Start from [assets/wide-event-middleware.md](../assets/wide-event-middleware.md).
+## Step 3: tie the event to the trace
 
-### 3. Handlers only add business context
+This is the part his skill leaves open, because it does not assume tracing exists. [assets/wide-event-middleware.md](../assets/wide-event-middleware.md) shows the few lines involved.
 
-Give them one `enrich()` function. It writes each field to the wide event and to the root span, so the trace and the event always agree and nobody maintains two sets of fields.
+- **Trace and span ids on the event.** The event carries the trace id and span id of the unit of work's root span, so an event leads to its trace and back.
+- **One `enrich()` for handlers.** It writes each field to the wide event and to the root span, so the two always agree and nobody maintains two sets of fields. The middleware keeps a reference to the root span, because handlers call `enrich()` from inside traced helpers, where the active span is a child.
+- **The same names as the request context.** The fields PR 1 puts on every span (request id, user id, tenant id, route, entity ids) appear on the event under the same names.
 
-### 4. The same for every other unit of work
+## Step 4: replace what is there, and keep it replaced
 
-One event per job run, per consumed message, per webhook, per CLI command.
+Go through every existing `console.*` and logger call and bring it under his rules. Then add a lint rule in the project's linter, so the work does not erode: outside the logger module, `console.*` and any logger other than the shared one are errors. This mirrors the tracing rule from PR 1.
 
-### 5. Fields
+## One addition that is not from his skill
 
-Aim for wide. Fifty fields is normal.
+His skill does not cover what must stay out of an event, and this skill does not leave that open. Record ids, not personal data. Keep passwords, tokens, auth headers, payment details and request or response bodies out of events. Prefer a user id to an email address. Where a field is useful but sensitive, leave it out and note the decision in the conventions doc.
 
-| Group | Fields |
-| --- | --- |
-| Request | timestamp, request id, trace id, span id, method, route pattern, status code, duration, outcome |
-| Deployment | service, version, commit, deployment id, environment, region, instance |
-| Who | user id, tenant id, plan or tier, and anything that changes how urgent a failure is |
-| What | ids, counts and amounts for the domain entities the request touched; latency and attempt number for each external provider called |
-| Errors | type, code, message, whether it can be retried, and the provider's own error code |
-| Flags | feature flags that were active for the request |
+This rule is the skill owner's, not Boris Tane's. Where his examples log something this rule excludes, this rule wins.
 
-### 6. Naming
+## Sampling
 
-One schema for the whole project, written down in the conventions doc. Use OpenTelemetry semantic-convention names where they exist and one project prefix for business fields. The same thing has the same name in every service; `user_id` in one place and `userId` in another makes cross-service queries fail quietly.
-
-### 7. Privacy
-
-Record ids, not personal data. Keep passwords, tokens, auth headers, payment details and request or response bodies out of events. Prefer a user id to an email address. Where a field is useful but sensitive, leave it out and note the decision in the conventions doc.
-
-### 8. Sampling, decided after the request ends
-
-Write `shouldKeep` so that it:
-
-- always keeps errors;
-- always keeps requests slower than a threshold (start near the p99);
-- always keeps flagged cases: important tenants, internal test accounts, requests under a feature flag being rolled out;
-- keeps a configurable share of the rest, defaulting to 100%.
-
-Sampling is a cost control, and most projects do not have the volume to need it yet. The point of building it now is that when volume grows, the cut is one config value and never drops an error.
-
-Leave trace sampling at its default. If trace volume ever needs tail sampling, that belongs in a collector, and the conventions doc should say so.
-
-### 9. Replace what is there
-
-Go through every existing `console.*` and logger call:
-
-| The call | What happens to it |
-| --- | --- |
-| Inside a unit of work, carrying data | Becomes a field on the event; the line is deleted |
-| A message with no data in it | Deleted |
-| Startup and shutdown lines outside any request | Can stay, as structured logs through the one logger |
-
-### 10. A lint rule
-
-`console.*` and any logger other than the shared one are errors outside the logger module.
+Keep every event. His skill does not sample, and most projects do not have the volume to need it. If volume ever forces the question, follow the tail-sampling rules in [Logging Sucks](https://loggingsucks.com/) and write the decision into the conventions doc.
 
 ## Prove it works
 
 Tests show that:
 
-- A successful request emits exactly one event.
-- A request that throws still emits exactly one event, with the error fields set.
-- The event carries the trace id of the request's root span.
-- An error is kept even with the sample rate at zero.
+- A successful unit of work emits exactly one event.
+- One that throws still emits exactly one event, with its error recorded.
+- The event carries the trace id of the root span.
+- A field added through `enrich()` appears on both the event and the root span.
 
 Then run lint, typecheck and the test suite.
 
 ## Done when
 
+- [ ] `logging-best-practices` is in the repository, unmodified.
 - [ ] The lint rule runs in CI and reports nothing.
 - [ ] The four tests above pass.
-- [ ] The conventions doc holds the schema, the sampling rules and thresholds, and the fields left out for privacy.
+- [ ] The conventions doc holds the event's schema and the fields left out for privacy.
 - [ ] The PR description says whether it is stacked on PR 1.

@@ -4,14 +4,14 @@ This skill arranges other people's ideas into a repeatable workflow. Use these s
 
 ## Wide events
 
-The wide-event approach ([wide-events.md](wide-events.md), and the logging checks in [maintenance.md](maintenance.md)) comes from the work of [Boris Tane](https://x.com/boristane). The ideas are his and those of the sources below.
+The wide-event approach is the work of [Boris Tane](https://x.com/boristane). This skill does not restate his rules: [wide-events.md](wide-events.md) has the agent read and apply his `logging-best-practices` skill as written, and the logging checks in [maintenance.md](maintenance.md) are judged against it.
 
 | Source | Used for |
 | --- | --- |
 | [Logging Sucks](https://loggingsucks.com/) by Boris Tane | The main source: why log lines fail in distributed systems, what a wide event contains, the tail-sampling rules, and how wide events relate to OpenTelemetry |
 | [Observability wide events 101](https://boristane.com/blog/observability-wide-events-101/) by Boris Tane | His longer introduction to wide events |
 | [Canonical log lines](https://stripe.com/blog/canonical-log-lines) on the Stripe blog | The same pattern under its older name: one information-dense line per request |
-| `logging-best-practices` agent skill by Boris Tane (MIT) | The same logging rules as a standalone skill, with worked examples. Vendored in this repository at [`.agents/skills/logging-best-practices`](../../logging-best-practices/SKILL.md) |
+| [`logging-best-practices`](https://github.com/boristane/agent-skills) agent skill by Boris Tane (MIT) | The logging rules themselves, used unmodified. Vendored in this repository at [`.agents/skills/logging-best-practices`](../../logging-best-practices/SKILL.md); installed elsewhere with `npx add-skill boristane/agent-skills --skill "logging-best-practices"` |
 
 ## Tracing
 
@@ -26,7 +26,7 @@ The tracing rules ([tracing.md](tracing.md), [backend.md](backend.md)) are gener
 
 ## What is this skill's own
 
-The two-PR split, the rule that functions are traced where they are defined and enforced by lint, `enrich()` writing to both the event and the root span, the conventions doc, and the maintenance pass.
+The two-PR split, the rule that functions are traced where they are defined and enforced by lint, trace ids on the event and `enrich()` writing to both the event and the root span, the rule about what stays out of an event, the conventions doc, and the maintenance pass.
 
 ## For the conventions doc
 

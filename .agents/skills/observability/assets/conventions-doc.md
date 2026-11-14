@@ -53,7 +53,7 @@ Last swept: <YYYY-MM-DD>
 
 ### Sampling
 
-<!-- What is always kept, the slow threshold, the sample rate, and the config value that changes it. Trace tail sampling, if ever needed, belongs in a collector. -->
+<!-- "Every event is kept" unless sampling was added. If it was: what is always kept, the thresholds, the rate, and the config value that changes it. -->
 
 ## Deliberately left out
 
