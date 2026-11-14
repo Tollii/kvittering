@@ -4,14 +4,13 @@ description: Set up or maintain observability in a codebase with OpenTelemetry t
 metadata:
   harness: [claude, codex]
   platform: [darwin, linux]
-  scope: project
 ---
 
 # Observability
 
 Bring a codebase to the point where any request can be explained after the fact. Two things do that: distributed tracing through OpenTelemetry, and one wide event per unit of work in place of scattered log lines.
 
-Tracing is this skill's own subject. The logging rules are Boris Tane's `logging-best-practices` skill, used as he wrote it; this skill installs it where it is missing, applies it, and ties its events to the traces.
+Tracing is this skill's own subject. The logging rules are Boris Tane's `logging-best-practices` skill, embedded verbatim in [vendor/logging-best-practices](vendor/logging-best-practices/SKILL.md); this skill applies it and ties its events to the traces.
 
 The work lands as two pull requests, tracing first and logging second, so each can be reviewed on its own. On a project that already has both, the skill runs as a maintenance pass: it covers code that arrived since the last run and checks that the logging is still good.
 
@@ -25,17 +24,21 @@ Read only what the current step needs.
 | --- | --- |
 | [references/backend.md](references/backend.md) | Deciding where telemetry goes (full setup, or an adopted setup with no backend) |
 | [references/tracing.md](references/tracing.md) | Building or fixing tracing (PR 1) |
-| [references/wide-events.md](references/wide-events.md) | Building or fixing wide events (PR 2): getting and applying `logging-best-practices`, and tying events to traces |
+| [references/wide-events.md](references/wide-events.md) | Building or fixing wide events (PR 2): applying `logging-best-practices` and tying events to traces |
+| [vendor/logging-best-practices](vendor/logging-best-practices/SKILL.md) | Writing or judging any logging code. Boris Tane's skill, verbatim; read all of it |
 | [references/maintenance.md](references/maintenance.md) | Both halves already exist |
 | [references/sources.md](references/sources.md) | A rule needs its reasoning, or someone asks where it comes from |
 | [assets/tracing-helper.md](assets/tracing-helper.md) | Writing the tracing helper and the request-context processor |
 | [assets/wide-event-middleware.md](assets/wide-event-middleware.md) | Adding trace ids and `enrich()` to the middleware his skill describes |
 | [assets/conventions-doc.md](assets/conventions-doc.md) | Creating or extending the project's conventions doc |
 | [scripts/survey.sh](scripts/survey.sh) | Step 1, to collect the mechanical facts quickly |
+| `PROJECT.md`, when present | Before anything else. Notes for the repository this copy is installed in; not part of the shared skill |
 
 The assets are starting points to adapt to the project's framework and naming, not files to copy unchanged.
 
 ## Step 1: find out where the project stands
+
+If a `PROJECT.md` sits next to this file, read it first. It holds the decisions already made for the repository this copy is installed in, and they stand.
 
 Read before deciding anything. Run `bash <this skill's folder>/scripts/survey.sh` from the repository root for the facts a search can find (telemetry dependencies, `console.*` counts, inline spans, earlier runs), then read the code for the rest:
 
@@ -69,7 +72,7 @@ Branch `observability/tracing` from the default branch. Build what [references/t
 
 Branch `observability/wide-events`; the reference says what to branch from while PR 1 is still open.
 
-Follow [references/wide-events.md](references/wide-events.md). The logging itself is built from the `logging-best-practices` skill, read in full and installed first if the repository lacks it. This skill adds only what that one cannot know: trace ids on the event, one `enrich()` function that writes to the event and the root span, the replacement of existing log calls, a lint rule against stray logging, and what must stay out of an event. Prove it with tests.
+Follow [references/wide-events.md](references/wide-events.md). The logging itself is built from the embedded `logging-best-practices` skill, read in full. This skill adds only what that one cannot know: trace ids on the event, one `enrich()` function that writes to the event and the root span, the replacement of existing log calls, a lint rule against stray logging, and what must stay out of an event. Prove it with tests.
 
 ## Step 6: the conventions doc
 
@@ -79,7 +82,7 @@ PR 1 creates it from [assets/conventions-doc.md](assets/conventions-doc.md) and 
 
 - **Definitions, not call sites.** A function is traced by wrapping its definition. Inline spans drift, and no tool can tell which ones are missing.
 - **Vendor-neutral code.** Changing backend is a config change. With no endpoint set, the app still runs.
-- **Logging rules come from `logging-best-practices`, unmodified.** Do not paraphrase, trim or override them here, and do not edit the installed copy.
+- **Logging rules come from `logging-best-practices`, unmodified.** Do not paraphrase, trim or override them here, and do not edit the embedded copy.
 - **One event per unit of work.** Handlers add fields; they do not write log lines.
 - **Tests are the proof.** A clean typecheck does not show that telemetry works.
 - **No setup that looks complete and emits nothing.** If part of the system cannot be instrumented, say so in the PR and in the conventions doc.
@@ -97,18 +100,6 @@ The final message to the user gives:
 - The backend decision, and whether it was found in the project, chosen by them, or defaulted.
 - The env vars to set before telemetry flows.
 - Anything that needs their judgment: opt-outs you were unsure about, fields you left out for privacy, parts of the system that could not be instrumented.
-
-## In this repository
-
-Kvitto already has both halves, so the mode here is the maintenance pass.
-
-- **Conventions doc.** The [Tracing section of the architecture doc](../../../docs/architecture.md#tracing) plays that role. Do not create `docs/observability.md`. The architecture doc explains decisions and does not track status, so the sweep date lives here and a maintenance PR updates this line: `Last swept: 2026-11-13`.
-- **Backend decision, already made.** Backend telemetry stays in the Convex logs, because the free plan has no log streams and queries and mutations cannot make network requests. The app sends spans to PostHog. Do not reopen this without being asked.
-- **Tracing helper.** [`traced`, `tracedFetch`, `annotate`, `count` and `annotateFailure`](../../../src/lib/tracing/index.ts), plus the builders in [`convex/serverFunctions.ts`](../../../convex/serverFunctions.ts) that give every backend function its root span.
-- **Logger module.** [`convex/tracing.ts`](../../../convex/tracing.ts) writes the one `request.completed` wide event per function call, and the `trace.span` lines, through `console`, because the Convex logs are the backend. Handlers add fields with `annotate`, `count` and `annotateFailure` and write no lines of their own.
-- **Lint rules.** `kvitto/traced-exports` in [`tools/lint-rules/traced-exports.cjs`](../../../tools/lint-rules/traced-exports.cjs), with `fetch` restricted as a global. For logging, `kvitto/structured-log` in [`tools/lint-rules/index.cjs`](../../../tools/lint-rules/index.cjs) applies to `convex/` and requires a literal event name; it does not ban `console`, and nothing bans it in `src/`. That is the current design and not a hole in a rule. If a sweep finds scattered logs, fix the code and report it; propose a stricter rule to the owner instead of adding one.
-- **Wide-event rules.** The vendored [logging-best-practices](../logging-best-practices/SKILL.md) skill is the authority on what a good event looks like, and it is already installed here.
-- **Pull requests.** Use [file-pr](../file-pr/SKILL.md), and the project's rule of one reviewable change per PR.
 
 ## Credit
 

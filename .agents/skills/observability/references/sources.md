@@ -11,7 +11,7 @@ The wide-event approach is the work of [Boris Tane](https://x.com/boristane). Th
 | [Logging Sucks](https://loggingsucks.com/) by Boris Tane | The main source: why log lines fail in distributed systems, what a wide event contains, the tail-sampling rules, and how wide events relate to OpenTelemetry |
 | [Observability wide events 101](https://boristane.com/blog/observability-wide-events-101/) by Boris Tane | His longer introduction to wide events |
 | [Canonical log lines](https://stripe.com/blog/canonical-log-lines) on the Stripe blog | The same pattern under its older name: one information-dense line per request |
-| [`logging-best-practices`](https://github.com/boristane/agent-skills) agent skill by Boris Tane (MIT) | The logging rules themselves, used unmodified. Vendored in this repository at [`.agents/skills/logging-best-practices`](../../logging-best-practices/SKILL.md); installed elsewhere with `npx add-skill boristane/agent-skills --skill "logging-best-practices"` |
+| [`logging-best-practices`](https://github.com/boristane/agent-skills) agent skill by Boris Tane (MIT) | The logging rules themselves. Embedded verbatim in [`vendor/logging-best-practices`](../vendor/logging-best-practices/SKILL.md), with the revision in its [UPSTREAM.md](../vendor/logging-best-practices/UPSTREAM.md). On its own it installs with `npx add-skill boristane/agent-skills --skill "logging-best-practices"` |
 
 ## Tracing
 

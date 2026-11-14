@@ -2,7 +2,7 @@
 
 A starting point for the project's tracing module, the only file that touches the tracer. Adapt the names, fields and framework calls to the project; in another language, use its idiom for the same idea.
 
-Nothing in this repository compiles this code. Check the signatures against the OpenTelemetry versions the project installs before relying on it.
+Nothing compiles or tests this code. Check the signatures against the OpenTelemetry versions the project installs before relying on it.
 
 ```ts
 // Template for the project's tracing module, the only file that touches the

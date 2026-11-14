@@ -2,7 +2,6 @@
 name: logging-best-practices
 description: Logging best practices focused on wide events (canonical log lines) for powerful debugging and analytics
 license: MIT
-disable-model-invocation: true
 metadata:
   author: boristane
   version: "1.0.0"

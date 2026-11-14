@@ -4,22 +4,20 @@ Branch: `observability/wide-events`. If PR 1 is still open, branch from it and s
 
 ## Who decides what
 
-The logging rules are not this skill's. They belong to Boris Tane's `logging-best-practices` skill, used as he wrote it. This file does not restate, summarize or adjust them. It covers only what his skill cannot know: how the event ties to the tracing from PR 1, how the work is enforced and proven, and how it ships.
+The logging rules are not this skill's. They belong to Boris Tane's `logging-best-practices` skill, embedded here exactly as he wrote it. This file does not restate, summarize or adjust them. It covers only what his skill cannot know: how the event ties to the tracing from PR 1, how the work is enforced and proven, and how it ships.
 
 If anything in this skill seems to disagree with one of his rules, his rule wins, with one exception: the rule below about what stays out of an event. Say so in the final report, so this skill can be corrected.
 
-## Step 1: get his skill and read all of it
+## Step 1: read all of his skill
 
-1. **Find it.** Look for a `logging-best-practices` folder among the repository's agent skills. In this repository it is at [`.agents/skills/logging-best-practices`](../../logging-best-practices/SKILL.md).
-2. **Install it if it is missing.** From the repository root:
+A verbatim copy travels with this skill, in [vendor/logging-best-practices](../vendor/logging-best-practices/SKILL.md), so there is nothing to install. Read it in full before writing any logging code: its `SKILL.md`, then every file under `rules/`:
 
-   ```sh
-   npx add-skill boristane/agent-skills --skill "logging-best-practices"
-   ```
+- [wide-events.md](../vendor/logging-best-practices/rules/wide-events.md): the pattern, request correlation, emitting in `finally`.
+- [context.md](../vendor/logging-best-practices/rules/context.md): cardinality, business context, environment fields.
+- [structure.md](../vendor/logging-best-practices/rules/structure.md): single logger, middleware, JSON, levels.
+- [pitfalls.md](../vendor/logging-best-practices/rules/pitfalls.md): the common mistakes.
 
-   Choose a project-local install if the command asks, and check that the folder landed inside the repository, next to its other agent skills, before going on. Commit the installed files in PR 2 as they arrive. Do not edit them; a changed copy can no longer be updated from upstream by running the command again.
-3. **Read it in full before writing any logging code:** its `SKILL.md`, then every file under `rules/` ([wide-events](../../logging-best-practices/rules/wide-events.md), [context](../../logging-best-practices/rules/context.md), [structure](../../logging-best-practices/rules/structure.md), [pitfalls](../../logging-best-practices/rules/pitfalls.md)). Its frontmatter turns off automatic loading, so nothing reads it unless you do.
-4. **If it cannot be installed**, for example with no network, read [Logging Sucks](https://loggingsucks.com/), which is where the rules come from. If neither can be reached, stop before the logging work and report that, instead of writing the rules from memory.
+Do not edit that folder. [UPSTREAM.md](../vendor/logging-best-practices/UPSTREAM.md) records where it comes from and how to update it.
 
 ## Step 2: build the logging his skill describes
 
@@ -62,7 +60,6 @@ Then run lint, typecheck and the test suite.
 
 ## Done when
 
-- [ ] `logging-best-practices` is in the repository, unmodified, or the PR says why it is not and that Logging Sucks was used instead.
 - [ ] The lint rule runs in CI and reports nothing.
 - [ ] The four tests above pass.
 - [ ] The conventions doc holds the event's schema and the fields left out for privacy.
