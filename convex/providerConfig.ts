@@ -46,7 +46,8 @@ export function receiptReader(): ReceiptReader {
 }
 
 export type ProductModel =
-  { kind: "disabled" } | { kind: "model"; model: string };
+  | { kind: "disabled" }
+  | { kind: "model"; model: string };
 
 /** `PRODUCT_MODEL` names the product judgment model as `provider:model`, Jev by default. */
 export function productModelName() {
