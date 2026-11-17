@@ -9,7 +9,7 @@
     "@ai-sdk/typesafe-ai": "^3.0.26",
     "@better-auth/core": "1.6.33",
     "@better-auth/expo": "1.6.33",
-    "@convex-dev/better-auth": "^0.12.5",
+    "@convex-dev/better-auth": "^0.13.0",
     "@convex-dev/rate-limiter": "^0.4.2",
     "@convex-dev/workflow": "^0.4.10",
     "@convex-dev/workpool": "^0.4.14",
